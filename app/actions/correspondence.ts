@@ -208,6 +208,10 @@ export async function deleteCorrespondence(id: string) {
 /**
  * Check if correspondence with same content already exists for this business
  * Returns existing entry if duplicate found
+ *
+ * Checks both:
+ * - Raw text hash (catches pasting same email twice)
+ * - Formatted text match (catches copying from page display)
  */
 export async function checkForDuplicates(
   rawText: string,
@@ -222,7 +226,7 @@ export async function checkForDuplicates(
     return { isDuplicate: false }
   }
 
-  // Compute hash
+  // Compute hash of pasted text
   const { data: contentHash, error: hashError } = await supabase.rpc('compute_content_hash', {
     raw_text: rawText,
   })
@@ -232,7 +236,7 @@ export async function checkForDuplicates(
     return { isDuplicate: false }
   }
 
-  // Check for existing entry with same hash and business
+  // First check: Does content_hash match any existing entry?
   const { data: existing, error } = await supabase
     .from('correspondence')
     .select('*, contact:contacts(name, role)')
@@ -249,6 +253,41 @@ export async function checkForDuplicates(
     return {
       isDuplicate: true,
       existingEntry: existing as Correspondence,
+    }
+  }
+
+  // Second check: Get all entries for this business and check if pasted text
+  // matches their formatted text (catches when user copies from page display)
+  const { data: allEntries } = await supabase
+    .from('correspondence')
+    .select('*, contact:contacts(name, role)')
+    .eq('business_id', businessId)
+
+  if (allEntries && allEntries.length > 0) {
+    const normalizedPasted = rawText.trim().toLowerCase()
+
+    for (const entry of allEntries) {
+      // Check formatted_text_current
+      if (entry.formatted_text_current) {
+        const normalizedFormatted = entry.formatted_text_current.trim().toLowerCase()
+        if (normalizedPasted === normalizedFormatted) {
+          return {
+            isDuplicate: true,
+            existingEntry: entry as Correspondence,
+          }
+        }
+      }
+
+      // Check formatted_text_original as fallback
+      if (entry.formatted_text_original) {
+        const normalizedOriginal = entry.formatted_text_original.trim().toLowerCase()
+        if (normalizedPasted === normalizedOriginal) {
+          return {
+            isDuplicate: true,
+            existingEntry: entry as Correspondence,
+          }
+        }
+      }
     }
   }
 
