@@ -73,14 +73,6 @@ export default function BusinessDetailPage({
     loadData()
   }, [id, router])
 
-  if (loading || !business || !id) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <p className="text-gray-600">Loading...</p>
-      </div>
-    )
-  }
-
   // Split correspondence into recent (last 12 months) and archive (older)
   // Memoize to prevent recalculation on every render
   const { recentEntries, archiveEntries } = useMemo(() => {
@@ -130,6 +122,14 @@ export default function BusinessDetailPage({
       archive: archiveEntries.filter(matchesQuery),
     }
   }, [recentEntries, archiveEntries, searchQuery])
+
+  if (loading || !business || !id) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    )
+  }
 
   const handleFormatLater = async (entryId: string) => {
     setFormattingInProgress(entryId)
