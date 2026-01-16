@@ -93,6 +93,183 @@ export default function BusinessDetailPage({
       return dateB - dateA
     })
 
+  const handleFormatLater = async (entryId: string) => {
+    setFormattingInProgress(entryId)
+
+    const result = await retryFormatting(entryId)
+
+    if ('error' in result) {
+      alert(`Formatting failed: ${result.error}`)
+    } else {
+      // Reload correspondence to show updated entry
+      if (id) {
+        const correspondenceResult = await getCorrespondenceByBusiness(id)
+        setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
+      }
+    }
+
+    setFormattingInProgress(null)
+  }
+
+  const handleStartEdit = (entry: Correspondence) => {
+    setEditingEntryId(entry.id)
+    setEditedText(
+      entry.formatted_text_current ||
+      entry.formatted_text_original ||
+      entry.raw_text_original
+    )
+  }
+
+  const handleCancelEdit = () => {
+    setEditingEntryId(null)
+    setEditedText('')
+  }
+
+  const handleSaveEdit = async (entryId: string) => {
+    if (!editedText.trim()) {
+      alert('Entry text cannot be empty')
+      return
+    }
+
+    setSavingEdit(true)
+
+    const result = await updateFormattedText(entryId, editedText)
+
+    if ('error' in result) {
+      alert(`Error saving: ${result.error}`)
+    } else {
+      // Reload correspondence to show updated entry
+      if (id) {
+        const correspondenceResult = await getCorrespondenceByBusiness(id)
+        setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
+      }
+      setEditingEntryId(null)
+      setEditedText('')
+    }
+
+    setSavingEdit(false)
+  }
+
+  const renderEntry = (entry: Correspondence) => {
+    const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
+    const directionIcon = entry.direction === 'sent' ? '→' : entry.direction === 'received' ? '←' : null
+    const isUnformatted = entry.formatting_status !== 'formatted'
+    const isEdited = entry.edited_at !== null
+    const isEditing = editingEntryId === entry.id
+
+    return (
+      <div key={entry.id} className="border-t border-gray-300 pt-6 first:border-t-0 first:pt-0">
+        {/* Unformatted indicator */}
+        {isUnformatted && (
+          <div className="bg-orange-50 border-2 border-orange-600 p-3 mb-3">
+            <p className="text-sm text-orange-900 font-semibold mb-2">
+              ⚠ Unformatted Entry
+            </p>
+            <p className="text-xs text-orange-800 mb-2">
+              This entry was saved without AI formatting. The raw text is displayed below.
+            </p>
+            <Button
+              onClick={() => handleFormatLater(entry.id)}
+              disabled={formattingInProgress === entry.id}
+              className="bg-orange-600 text-white hover:bg-orange-700 px-3 py-1 text-xs font-semibold"
+            >
+              {formattingInProgress === entry.id ? 'Formatting...' : 'Format Now'}
+            </Button>
+          </div>
+        )}
+
+        {/* Subject line with edit indicator */}
+        <div className="flex items-center gap-2 mb-2">
+          {entry.subject && (
+            <h3 className="font-semibold text-gray-900">
+              {entry.subject}
+            </h3>
+          )}
+          {isEdited && (
+            <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800">
+              Corrected
+            </span>
+          )}
+        </div>
+
+        {/* Meta line with direction */}
+        <div className="text-sm text-gray-600 mb-3 italic">
+          {directionIcon && (
+            <span className="font-bold mr-1">
+              {directionIcon} {entry.direction === 'sent' ? 'Sent' : 'Received'}
+            </span>
+          )}
+          {entry.entry_date && (
+            <span>
+              | {new Date(entry.entry_date).toLocaleDateString('en-GB')} {' '}
+            </span>
+          )}
+          {entry.type && <span>| {entry.type} </span>}
+          <span>
+            | {entry.contact.name}
+            {entry.contact.role && `, ${entry.contact.role}`}
+          </span>
+        </div>
+
+        {/* Body text or edit textarea */}
+        {isEditing ? (
+          <div className="mb-3">
+            <textarea
+              value={editedText}
+              onChange={(e) => setEditedText(e.target.value)}
+              className="w-full min-h-[200px] px-3 py-2 border-2 border-blue-600 focus:outline-none focus:border-blue-700 font-mono text-sm"
+            />
+            <div className="flex gap-2 mt-2">
+              <Button
+                onClick={() => handleSaveEdit(entry.id)}
+                disabled={savingEdit}
+                className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm font-semibold"
+              >
+                {savingEdit ? 'Saving...' : 'Save Changes'}
+              </Button>
+              <Button
+                onClick={handleCancelEdit}
+                disabled={savingEdit}
+                className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-4 py-2 text-sm"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="text-sm text-gray-800 whitespace-pre-wrap mb-3">
+              {entry.formatted_text_current ||
+                entry.formatted_text_original ||
+                entry.raw_text_original}
+            </div>
+            <Button
+              onClick={() => handleStartEdit(entry)}
+              className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
+            >
+              Edit
+            </Button>
+          </>
+        )}
+
+        {/* Action needed badge and due date */}
+        {entry.action_needed !== 'none' && (
+          <div className="mt-3 space-y-2">
+            <span className="text-xs bg-yellow-100 px-2 py-1 text-yellow-800">
+              Action: {entry.action_needed.replace(/_/g, ' ')}
+            </span>
+            {entry.due_at && (
+              <div className={`text-xs ${isOverdue ? 'text-red-600 font-semibold' : 'text-yellow-700'}`}>
+                Due: {new Date(entry.due_at).toLocaleDateString('en-GB')}
+                {isOverdue && ' (Overdue)'}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Success Banner */}
@@ -234,181 +411,4 @@ export default function BusinessDetailPage({
       </div>
     </div>
   )
-
-  const handleFormatLater = async (entryId: string) => {
-    setFormattingInProgress(entryId)
-
-    const result = await retryFormatting(entryId)
-
-    if ('error' in result) {
-      alert(`Formatting failed: ${result.error}`)
-    } else {
-      // Reload correspondence to show updated entry
-      if (id) {
-        const correspondenceResult = await getCorrespondenceByBusiness(id)
-        setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
-      }
-    }
-
-    setFormattingInProgress(null)
-  }
-
-  const handleStartEdit = (entry: Correspondence) => {
-    setEditingEntryId(entry.id)
-    setEditedText(
-      entry.formatted_text_current ||
-      entry.formatted_text_original ||
-      entry.raw_text_original
-    )
-  }
-
-  const handleCancelEdit = () => {
-    setEditingEntryId(null)
-    setEditedText('')
-  }
-
-  const handleSaveEdit = async (entryId: string) => {
-    if (!editedText.trim()) {
-      alert('Entry text cannot be empty')
-      return
-    }
-
-    setSavingEdit(true)
-
-    const result = await updateFormattedText(entryId, editedText)
-
-    if ('error' in result) {
-      alert(`Error saving: ${result.error}`)
-    } else {
-      // Reload correspondence to show updated entry
-      if (id) {
-        const correspondenceResult = await getCorrespondenceByBusiness(id)
-        setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
-      }
-      setEditingEntryId(null)
-      setEditedText('')
-    }
-
-    setSavingEdit(false)
-  }
-
-  function renderEntry(entry: Correspondence) {
-    const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
-    const directionIcon = entry.direction === 'sent' ? '→' : entry.direction === 'received' ? '←' : null
-    const isUnformatted = entry.formatting_status !== 'formatted'
-    const isEdited = entry.edited_at !== null
-    const isEditing = editingEntryId === entry.id
-
-    return (
-      <div key={entry.id} className="border-t border-gray-300 pt-6 first:border-t-0 first:pt-0">
-        {/* Unformatted indicator */}
-        {isUnformatted && (
-          <div className="bg-orange-50 border-2 border-orange-600 p-3 mb-3">
-            <p className="text-sm text-orange-900 font-semibold mb-2">
-              ⚠ Unformatted Entry
-            </p>
-            <p className="text-xs text-orange-800 mb-2">
-              This entry was saved without AI formatting. The raw text is displayed below.
-            </p>
-            <Button
-              onClick={() => handleFormatLater(entry.id)}
-              disabled={formattingInProgress === entry.id}
-              className="bg-orange-600 text-white hover:bg-orange-700 px-3 py-1 text-xs font-semibold"
-            >
-              {formattingInProgress === entry.id ? 'Formatting...' : 'Format Now'}
-            </Button>
-          </div>
-        )}
-
-        {/* Subject line with edit indicator */}
-        <div className="flex items-center gap-2 mb-2">
-          {entry.subject && (
-            <h3 className="font-semibold text-gray-900">
-              {entry.subject}
-            </h3>
-          )}
-          {isEdited && (
-            <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800">
-              Corrected
-            </span>
-          )}
-        </div>
-
-        {/* Meta line with direction */}
-        <div className="text-sm text-gray-600 mb-3 italic">
-          {directionIcon && (
-            <span className="font-bold mr-1">
-              {directionIcon} {entry.direction === 'sent' ? 'Sent' : 'Received'}
-            </span>
-          )}
-          {entry.entry_date && (
-            <span>
-              | {new Date(entry.entry_date).toLocaleDateString('en-GB')} {' '}
-            </span>
-          )}
-          {entry.type && <span>| {entry.type} </span>}
-          <span>
-            | {entry.contact.name}
-            {entry.contact.role && `, ${entry.contact.role}`}
-          </span>
-        </div>
-
-        {/* Body text or edit textarea */}
-        {isEditing ? (
-          <div className="mb-3">
-            <textarea
-              value={editedText}
-              onChange={(e) => setEditedText(e.target.value)}
-              className="w-full min-h-[200px] px-3 py-2 border-2 border-blue-600 focus:outline-none focus:border-blue-700 font-mono text-sm"
-            />
-            <div className="flex gap-2 mt-2">
-              <Button
-                onClick={() => handleSaveEdit(entry.id)}
-                disabled={savingEdit}
-                className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm font-semibold"
-              >
-                {savingEdit ? 'Saving...' : 'Save Changes'}
-              </Button>
-              <Button
-                onClick={handleCancelEdit}
-                disabled={savingEdit}
-                className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-4 py-2 text-sm"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="text-sm text-gray-800 whitespace-pre-wrap mb-3">
-              {entry.formatted_text_current ||
-                entry.formatted_text_original ||
-                entry.raw_text_original}
-            </div>
-            <Button
-              onClick={() => handleStartEdit(entry)}
-              className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
-            >
-              Edit
-            </Button>
-          </>
-        )}
-
-        {/* Action needed badge and due date */}
-        {entry.action_needed !== 'none' && (
-          <div className="mt-3 space-y-2">
-            <span className="text-xs bg-yellow-100 px-2 py-1 text-yellow-800">
-              Action: {entry.action_needed.replace(/_/g, ' ')}
-            </span>
-            {entry.due_at && (
-              <div className={`text-xs ${isOverdue ? 'text-red-600 font-semibold' : 'text-yellow-700'}`}>
-                Due: {new Date(entry.due_at).toLocaleDateString('en-GB')}
-                {isOverdue && ' (Overdue)'}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
 }
