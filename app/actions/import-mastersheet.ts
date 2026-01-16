@@ -43,6 +43,31 @@ function normalizeEmail(email: string): string {
 }
 
 /**
+ * Parse British date format (DD/MM/YYYY) to ISO format (YYYY-MM-DD)
+ */
+function parseBritishDate(dateStr: string): string | null {
+  if (!dateStr || !dateStr.trim()) return null
+
+  const trimmed = dateStr.trim()
+
+  // Try to parse DD/MM/YYYY format
+  const britishMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+  if (britishMatch) {
+    const day = britishMatch[1].padStart(2, '0')
+    const month = britishMatch[2].padStart(2, '0')
+    const year = britishMatch[3]
+    return `${year}-${month}-${day}`
+  }
+
+  // If already in ISO format, return as-is
+  if (trimmed.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return trimmed
+  }
+
+  return null
+}
+
+/**
  * Parse relationship type into flags
  */
 function parseRelationshipType(type: string): {
@@ -176,10 +201,12 @@ export async function importMastersheet(): Promise<
 
           // Contract dates (most recent non-empty wins)
           if (row['CONTRACT START'] && row['CONTRACT START'].trim()) {
-            contractStart = row['CONTRACT START'].trim()
+            const parsed = parseBritishDate(row['CONTRACT START'])
+            if (parsed) contractStart = parsed
           }
           if (row['CONTRACT END'] && row['CONTRACT END'].trim()) {
-            contractEnd = row['CONTRACT END'].trim()
+            const parsed = parseBritishDate(row['CONTRACT END'])
+            if (parsed) contractEnd = parsed
           }
 
           // Deal terms for advertisers (concatenate if multiple)
