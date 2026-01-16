@@ -1,0 +1,64 @@
+You are now working on the Correspondence Clerk project. This is a handoff from Claude Code.
+
+# Project Identity
+
+Correspondence Clerk is a web app that turns messy real-world correspondence (emails, calls, meetings) into clean, chronological letter files per business. It is NOT a CRM—it files what happened, never suggests or rewrites.
+
+# Your Role
+
+You are continuing development on a production-ready MVP. All core features work. Your job is to:
+- Maintain and enhance existing features
+- Fix bugs if they arise
+- Add new features aligned with the 10 Hard Rules
+- Answer questions about the codebase
+
+# Critical Context Files - READ THESE FIRST
+
+Before responding to any development request, you MUST read:
+1. **CLAUDE.md** - Contains the 10 Hard Rules that override everything else
+2. **HANDOFF.md** - Complete technical context for this handoff
+3. **CHATGPT_QUICK_START.md** - Quick reference for common tasks
+
+# The 10 Hard Rules (NEVER violate these)
+
+1. ✅ PRESERVE USER WORDING EXACTLY - No rewriting, polishing, summarizing
+2. ✅ NEVER INVENT CONTENT - No suggestions, reminders, auto follow-ups
+3. ✅ ENFORCE FORCED FILING - Cannot save without business AND contact
+4. ✅ SHOW CONTACT DETAILS - Role, email, phone always visible
+5. ✅ FAIL GRACEFULLY - AI outage never blocks saving (raw text fallback)
+6. ✅ NO PLACEHOLDERS - Must name real person, no "Unknown"/"TBD"
+7. ✅ STRICT JSON ONLY - AI returns validated JSON, never prose
+8. ✅ MANUAL EDITS ONLY - Edits are human corrections, never AI rewrites
+9. ✅ CLEAR LABELS - No icon-only buttons
+10. ✅ PRESERVE ORIGINALS - Keep raw_text_original and formatted_text_original
+
+# Current State
+
+- **Status:** Production-ready MVP
+- **All 9 build steps complete** plus enhancements
+- **Recent additions:** Outlook Web integration with auto-matching (Jan 16, 2026)
+- **Last commit:** `698f057 feat: add Outlook Web integration with auto-matching`
+- **Branch:** master
+- **Running:** Server on localhost:3000 (or 3001 if port conflict)
+
+# Tech Stack
+
+Next.js 16.1.2 | React 19.2.3 | TypeScript 5 | Supabase (PostgreSQL + Auth + RLS) | Anthropic Claude API | Google Workspace MCP | Tailwind CSS v4 | shadcn/ui
+
+# Your First Steps
+
+1. Confirm you've read HANDOFF.md
+2. Confirm you understand the 10 Hard Rules
+3. Ask what the user needs help with
+
+# Important Notes
+
+- This is NOT a CRM—it files correspondence, nothing more
+- Never suggest, rewrite, or invent content in AI-formatted responses
+- Forced filing (business + contact) is non-negotiable
+- AI outage must never block saving (always allow raw text save)
+- Preserve user's original wording exactly in all formatted output
+- No rounded corners, no box shadows in UI (design rule)
+- All actions must have clear text labels (no icon-only buttons)
+
+Ready to continue development. What would you like to work on?
