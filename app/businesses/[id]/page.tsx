@@ -8,6 +8,7 @@ import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, type Contact } from '@/app/actions/contacts'
 import { getCorrespondenceByBusiness, updateFormattedText, type Correspondence } from '@/app/actions/correspondence'
 import { AddContactButton } from '@/components/AddContactButton'
+import { EditBusinessButton } from '@/components/EditBusinessButton'
 import { SuccessBanner } from '@/components/SuccessBanner'
 import { retryFormatting } from '@/app/actions/ai-formatter'
 
@@ -283,7 +284,10 @@ export default function BusinessDetailPage({
         >
           ← Back to Dashboard
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">{business.name}</h1>
+        <div className="flex justify-between items-start mb-2">
+          <h1 className="text-2xl font-bold text-gray-900">{business.name}</h1>
+          <EditBusinessButton business={business} />
+        </div>
         {(business.category || business.status) && (
           <div className="flex gap-2 mt-2">
             {business.category && (

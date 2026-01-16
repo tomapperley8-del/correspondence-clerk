@@ -1,7 +1,7 @@
 # Correspondence Clerk - Current State Summary
 **Last Updated:** 2026-01-16
 
-## ✅ Completed Steps (1-7)
+## ✅ Completed Steps (1-8)
 
 ### Step 1: Foundation and Auth ✅
 - Next.js 15 with App Router
@@ -81,6 +81,32 @@ All migrations in `supabase/migrations/`:
 - **British Date Format:** DD/MM/YYYY in search results
 - **Uses Existing Indexes:** Leverages existing database structure (no new indexes needed)
 
+### Step 8: Mastersheet Import & Dashboard Enhancements ✅
+- **Mastersheet CSV Import:**
+  - Server action `importMastersheet()` in app/actions/import-mastersheet.ts
+  - Reads Mastersheet.csv from project root
+  - Detects duplicate businesses by normalized name
+  - Merges Club Card + Advertiser duplicates into single records with both flags
+  - Creates contacts from Primary Contact and Other Contacts columns
+  - Idempotent (safe to run multiple times)
+  - Generates detailed import report with counts and errors
+  - Admin UI at /admin/import with import button and report display
+- **Dashboard Search & Filters:**
+  - Live search bar (filters as you type)
+  - Filter by type: All, Club Card Only, Advertiser Only, Both, Prospects Only
+  - Category dropdown filter (dynamically populated)
+  - Sort options: Most/Least Recently Contacted, Name A-Z/Z-A
+  - Results counter shows "X of Y businesses"
+  - All filters work together (compound filtering)
+- **Edit Business Functionality:**
+  - EditBusinessButton component on business detail page
+  - Modal form to edit: name, category, status, is_club_card, is_advertiser
+  - Uses existing `updateBusiness()` server action
+  - Refreshes page after save to show updated data
+  - Cancel button resets form to original values
+- **Data Protection:**
+  - Mastersheet.csv added to .gitignore (contains sensitive business data)
+
 ## 🗄️ Database Schema Summary
 
 ### businesses
@@ -151,6 +177,7 @@ From `app/globals.css`:
 - `getBusinesses()` - Returns all businesses
 - `getBusinessById(id)` - Single business lookup
 - `createBusiness(data)` - Add new business
+- `updateBusiness(id, data)` - ✨ NEW: Update business details (name, category, status, flags)
 
 ### `app/actions/contacts.ts`
 - `getContactsByBusiness(businessId)` - Scoped to business
@@ -168,18 +195,18 @@ From `app/globals.css`:
 - `createUnformattedCorrespondence(formData)` - Saves without formatting (fallback)
 - `retryFormatting(correspondenceId)` - Attempts to format unformatted entries
 
-### `app/actions/search.ts` ✨ NEW
+### `app/actions/search.ts`
 - `searchAll(query)` - Full-text search across businesses and correspondence
 - Returns unified SearchResult[] array with type, title, snippet
 - Prioritizes business name matches (rank 1) over correspondence keyword matches (rank 2)
 
-## 🚀 What's Next (PRD Steps 8-9)
+### `app/actions/import-mastersheet.ts` ✨ NEW
+- `importMastersheet()` - Imports businesses and contacts from Mastersheet.csv
+- Merges duplicate businesses (Club Card + Advertiser)
+- Creates contacts from Primary Contact and Other Contacts columns
+- Returns detailed import report with counts, warnings, and errors
 
-### Step 8: Mastersheet Import
-- Import from Mastersheet.csv
-- Merge duplicates (Club Card + Advertiser flags)
-- Create contacts from Primary/Other Contacts
-- Idempotent with import report
+## 🚀 What's Next (PRD Step 9)
 
 ### Step 9: Export to Google Docs via MCP
 - One-click per business
@@ -226,9 +253,15 @@ From `app/globals.css`:
 - [x] Full-text search across businesses and correspondence
 - [x] Business name prioritization in search results
 - [x] Search page with result badges and snippets
+- [x] Mastersheet CSV import with duplicate merging
+- [x] Import report with counts and errors
+- [x] Dashboard search bar (live filtering)
+- [x] Dashboard filter by type (Club Card, Advertiser, Both, Prospect)
+- [x] Dashboard category filter dropdown
+- [x] Dashboard sort options (recent, oldest, name A-Z/Z-A)
+- [x] Edit business modal with name, category, status, and flags
 
 ### 🔲 Not Yet Tested
-- [ ] Mastersheet import
 - [ ] Google Docs export
 
 ## 📂 Critical Files
@@ -236,19 +269,23 @@ From `app/globals.css`:
 ```
 app/
   actions/
-    businesses.ts          # Business CRUD
+    businesses.ts          # Business CRUD + updateBusiness
     contacts.ts            # Contact CRUD
     correspondence.ts      # Correspondence CRUD + manual edits
     ai-formatter.ts        # AI formatting + retry logic
-    search.ts              # ✨ NEW: Full-text search
+    search.ts              # Full-text search
+    import-mastersheet.ts  # ✨ NEW: CSV import with duplicate merging
   dashboard/
-    page.tsx              # Business cards with last contacted
+    page.tsx              # ✨ ENHANCED: Search, filters, sort options
   businesses/[id]/
-    page.tsx              # TWO-SECTION VIEW + unformatted indicators + Format Now
+    page.tsx              # TWO-SECTION VIEW + Edit Business button
   new-entry/
     page.tsx              # AI FORMATTING + thread detection + fallback
   search/
-    page.tsx              # ✨ NEW: Search results page
+    page.tsx              # Search results page
+  admin/
+    import/
+      page.tsx            # ✨ NEW: Mastersheet import UI
   api/
     businesses/route.ts   # GET all businesses
     contacts/route.ts     # GET contacts by business
@@ -258,6 +295,7 @@ components/
   ContactSelector.tsx     # Scoped to business, shows details
   AddBusinessModal.tsx    # Inline add, auto-select
   AddContactModal.tsx     # Inline add, auto-select
+  EditBusinessButton.tsx  # ✨ NEW: Edit business modal
   SuccessBanner.tsx       # Auto-dismiss success message
 
 lib/
@@ -280,9 +318,9 @@ MIGRATION_INSTRUCTIONS.md # ✨ NEW: Migration guide
 
 ## 🎯 Current Position
 
-**We are between Step 7 and Step 8.**
+**We are between Step 8 and Step 9.**
 
-Everything through full-text search is complete and working. The next piece is Mastersheet import (CSV import with duplicate merging).
+Everything through Mastersheet import and dashboard enhancements is complete and working. The final piece is Google Docs export via MCP.
 
 ## 💡 Key Decisions Made
 
@@ -296,6 +334,8 @@ Everything through full-text search is complete and working. The next piece is M
 8. **AI never blocks saving** - Fallback to unformatted always available
 9. **Thread splitting optional** - User controls split toggle, AI only suggests
 10. **Claude Sonnet 4** - Using latest model for best formatting quality
+11. **Client-side filtering** - Dashboard filters and search happen in browser (fine for thousands of businesses)
+12. **Idempotent import** - Mastersheet import can be run multiple times safely
 
 ## 🐛 Known Issues
 
@@ -309,8 +349,12 @@ None currently! Everything implemented is working as expected.
 - Graceful fallback ensures AI outage never blocks workflow ✅
 - Manual editing (correction layer) complete ✅
 - Full-text search complete with business name prioritization ✅
+- Mastersheet import complete with duplicate merging ✅
+- Dashboard search and filters working ✅
+- Edit business functionality added ✅
 - ANTHROPIC_API_KEY is configured in .env.local ✅
-- Ready to proceed with Step 8 (Mastersheet Import) when ready
+- Mastersheet.csv added to .gitignore ✅
+- Ready to proceed with Step 9 (Google Docs Export) when ready
 
 ---
 
