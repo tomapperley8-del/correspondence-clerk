@@ -10,6 +10,7 @@ import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence,
 import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
 import { EditContactButton } from '@/components/EditContactButton'
+import { ExportToGoogleDocsButton } from '@/components/ExportToGoogleDocsButton'
 import { SuccessBanner } from '@/components/SuccessBanner'
 import { retryFormatting } from '@/app/actions/ai-formatter'
 
@@ -421,11 +422,14 @@ export default function BusinessDetailPage({
       <div className="bg-white border-2 border-gray-300 p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Correspondence</h2>
-          <Link href={`/new-entry?businessId=${business.id}`}>
-            <Button className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold">
-              New Entry
-            </Button>
-          </Link>
+          <div className="flex gap-3">
+            <ExportToGoogleDocsButton businessId={business.id} />
+            <Link href={`/new-entry?businessId=${business.id}`}>
+              <Button className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold">
+                New Entry
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {correspondence && correspondence.length === 0 ? (
