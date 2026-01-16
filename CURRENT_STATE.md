@@ -1,7 +1,7 @@
 # Correspondence Clerk - Current State Summary
 **Last Updated:** 2026-01-16
 
-## ✅ Completed Steps (1-6)
+## ✅ Completed Steps (1-7)
 
 ### Step 1: Foundation and Auth ✅
 - Next.js 15 with App Router
@@ -66,6 +66,20 @@ All migrations in `supabase/migrations/`:
 - **Tracking:** Stores edited_at timestamp and edited_by user_id
 - **Corrected Indicator:** Blue "Corrected" badge shows on edited entries
 - **Manual Only:** Edits are human corrections, never AI rewrites
+
+### Step 7: Full-Text Search ✅
+- **Search Server Action:** `searchAll()` function in app/actions/search.ts
+- **Business Name Prioritization:** Business name matches ranked higher (rank 1) than keyword matches (rank 2)
+- **Correspondence Search:** Full-text search across subject, formatted_text_current, formatted_text_original, and raw_text_original
+- **Search Page:** Dedicated /search page with search form and results display
+- **Result Display:**
+  - Business results show green "Business" badge with category and status
+  - Correspondence results show blue "Correspondence" badge with business name, contact name, and entry date
+  - All results link to appropriate pages (businesses or business detail)
+  - Snippets shown for correspondence (first 150 characters)
+- **Navigation:** Search link already present in main navigation
+- **British Date Format:** DD/MM/YYYY in search results
+- **Uses Existing Indexes:** Leverages existing database structure (no new indexes needed)
 
 ## 🗄️ Database Schema Summary
 
@@ -148,18 +162,18 @@ From `app/globals.css`:
 - `updateFormattedText(correspondenceId, formattedTextCurrent)` - ✨ NEW: Manual edits
 - Updates `businesses.last_contacted_at` on save
 
-### `app/actions/ai-formatter.ts` ✨ NEW
+### `app/actions/ai-formatter.ts`
 - `formatCorrespondenceText(rawText, shouldSplit)` - Calls Anthropic API for formatting
 - `createFormattedCorrespondence(formData, aiResponse)` - Saves with AI formatting
 - `createUnformattedCorrespondence(formData)` - Saves without formatting (fallback)
 - `retryFormatting(correspondenceId)` - Attempts to format unformatted entries
 
-## 🚀 What's Next (PRD Steps 7-9)
+### `app/actions/search.ts` ✨ NEW
+- `searchAll(query)` - Full-text search across businesses and correspondence
+- Returns unified SearchResult[] array with type, title, snippet
+- Prioritizes business name matches (rank 1) over correspondence keyword matches (rank 2)
 
-### Step 7: Full-Text Search
-- Use existing tsvector + GIN index
-- Global search bar
-- Prioritize business name, then keyword hits
+## 🚀 What's Next (PRD Steps 8-9)
 
 ### Step 8: Mastersheet Import
 - Import from Mastersheet.csv
@@ -209,9 +223,11 @@ From `app/globals.css`:
 - [x] Manual editing with Edit button
 - [x] "Corrected" indicator on edited entries
 - [x] Preserves originals when editing
+- [x] Full-text search across businesses and correspondence
+- [x] Business name prioritization in search results
+- [x] Search page with result badges and snippets
 
 ### 🔲 Not Yet Tested
-- [ ] Full-text search
 - [ ] Mastersheet import
 - [ ] Google Docs export
 
@@ -222,14 +238,17 @@ app/
   actions/
     businesses.ts          # Business CRUD
     contacts.ts            # Contact CRUD
-    correspondence.ts      # Correspondence CRUD + direction field
-    ai-formatter.ts        # ✨ NEW: AI formatting + retry logic
+    correspondence.ts      # Correspondence CRUD + manual edits
+    ai-formatter.ts        # AI formatting + retry logic
+    search.ts              # ✨ NEW: Full-text search
   dashboard/
     page.tsx              # Business cards with last contacted
   businesses/[id]/
     page.tsx              # TWO-SECTION VIEW + unformatted indicators + Format Now
   new-entry/
     page.tsx              # AI FORMATTING + thread detection + fallback
+  search/
+    page.tsx              # ✨ NEW: Search results page
   api/
     businesses/route.ts   # GET all businesses
     contacts/route.ts     # GET contacts by business
@@ -261,9 +280,9 @@ MIGRATION_INSTRUCTIONS.md # ✨ NEW: Migration guide
 
 ## 🎯 Current Position
 
-**We are between Step 6 and Step 7.**
+**We are between Step 7 and Step 8.**
 
-Everything through manual editing is complete and working. The next piece is full-text search using the existing tsvector + GIN index.
+Everything through full-text search is complete and working. The next piece is Mastersheet import (CSV import with duplicate merging).
 
 ## 💡 Key Decisions Made
 
@@ -289,8 +308,9 @@ None currently! Everything implemented is working as expected.
 - Thread detection using client-side heuristics ✅
 - Graceful fallback ensures AI outage never blocks workflow ✅
 - Manual editing (correction layer) complete ✅
+- Full-text search complete with business name prioritization ✅
 - ANTHROPIC_API_KEY is configured in .env.local ✅
-- Ready to proceed with Step 7 (Full-Text Search) when ready
+- Ready to proceed with Step 8 (Mastersheet Import) when ready
 
 ---
 
