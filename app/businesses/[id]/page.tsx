@@ -73,6 +73,25 @@ export default function BusinessDetailPage({
     loadData()
   }, [id, router])
 
+  // Scroll to entry if hash is present in URL (for "View Existing Entry" from duplicate warning)
+  useEffect(() => {
+    if (!loading && typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash.substring(1) // Remove the #
+      const element = document.getElementById(hash)
+      if (element) {
+        // Wait a bit for the page to fully render
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Add a subtle highlight effect
+          element.classList.add('ring-2', 'ring-blue-500', 'ring-offset-4')
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-4')
+          }, 2000)
+        }, 100)
+      }
+    }
+  }, [loading])
+
   // Split correspondence into recent (last 12 months) and archive (older)
   // Memoize to prevent recalculation on every render
   const { recentEntries, archiveEntries } = useMemo(() => {

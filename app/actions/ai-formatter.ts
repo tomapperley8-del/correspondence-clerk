@@ -72,50 +72,52 @@ export async function createFormattedCorrespondence(
     return { error: 'Unauthorized' }
   }
 
-  // Compute content hash for duplicate detection
-  const { data: contentHash } = await supabase.rpc('compute_content_hash', {
-    raw_text: formData.raw_text_original,
-  })
-
   // Handle thread split vs single entry
   if (isThreadSplitResponse(aiResponse)) {
-    // Multiple entries - insert in chronological order
-    const entries = aiResponse.entries.map((entry, index) => {
-      // Use matched contact if available, otherwise use default contact
-      const contactId = contactMatches && contactMatches[index]?.contactId
-        ? contactMatches[index].contactId
-        : formData.contact_id
+    // Multiple entries - compute unique hash for each split email based on its formatted content
+    const entries = await Promise.all(
+      aiResponse.entries.map(async (entry, index) => {
+        // Use matched contact if available, otherwise use default contact
+        const contactId = contactMatches && contactMatches[index]?.contactId
+          ? contactMatches[index].contactId
+          : formData.contact_id
 
-      return {
-        business_id: formData.business_id,
-        contact_id: contactId,
-        user_id: user.id,
-        raw_text_original: formData.raw_text_original,
-        formatted_text_original: entry.formatted_text,
-        formatted_text_current: entry.formatted_text,
-        entry_date: entry.entry_date_guess || formData.entry_date || new Date().toISOString(),
-        subject: entry.subject_guess,
-        type: entry.entry_type_guess,
-        direction: entry.direction_guess || formData.direction || null,
-        action_needed: formData.action_needed || 'none',
-        due_at: formData.due_at || null,
-        formatting_status: 'formatted',
-        content_hash: contentHash || null,
-        ai_metadata: {
-          warnings: entry.warnings,
-          split_from_thread: true,
-          thread_position: index + 1,
-          thread_total: aiResponse.entries.length,
-          matched_contact: contactMatches && contactMatches[index]
-            ? {
-                matched: true,
-                matched_from: contactMatches[index].matchedFrom,
-                confidence: contactMatches[index].confidence,
-              }
-            : { matched: false },
-        },
-      }
-    })
+        // Hash the formatted text of THIS specific email, not the full raw thread
+        const { data: entryHash } = await supabase.rpc('compute_content_hash', {
+          raw_text: entry.formatted_text,
+        })
+
+        return {
+          business_id: formData.business_id,
+          contact_id: contactId,
+          user_id: user.id,
+          raw_text_original: formData.raw_text_original,
+          formatted_text_original: entry.formatted_text,
+          formatted_text_current: entry.formatted_text,
+          entry_date: entry.entry_date_guess || formData.entry_date || new Date().toISOString(),
+          subject: entry.subject_guess,
+          type: entry.entry_type_guess,
+          direction: entry.direction_guess || formData.direction || null,
+          action_needed: formData.action_needed || 'none',
+          due_at: formData.due_at || null,
+          formatting_status: 'formatted',
+          content_hash: entryHash || null,
+          ai_metadata: {
+            warnings: entry.warnings,
+            split_from_thread: true,
+            thread_position: index + 1,
+            thread_total: aiResponse.entries.length,
+            matched_contact: contactMatches && contactMatches[index]
+              ? {
+                  matched: true,
+                  matched_from: contactMatches[index].matchedFrom,
+                  confidence: contactMatches[index].confidence,
+                }
+              : { matched: false },
+          },
+        }
+      })
+    )
 
     const { data, error } = await supabase
       .from('correspondence')
@@ -140,7 +142,11 @@ export async function createFormattedCorrespondence(
 
     return { data, count: data.length }
   } else {
-    // Single entry
+    // Single entry - compute hash from raw text
+    const { data: contentHash } = await supabase.rpc('compute_content_hash', {
+      raw_text: formData.raw_text_original,
+    })
+
     const { data, error } = await supabase
       .from('correspondence')
       .insert({

@@ -22,7 +22,8 @@
       "Bash(vercel --version:*)",
       "Bash(npm run build)",
       "Bash(git diff:*)",
-      "Bash(taskkill //F //PID 6324)"
+      "Bash(taskkill //F //PID 6324)",
+      "Bash(echo:*)"
     ]
   }
 }
