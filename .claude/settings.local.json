@@ -7,7 +7,13 @@
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
       "Bash(timeout 3 tail:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(supabase --version:*)",
+      "Bash(npx supabase:*)",
+      "Bash(test:*)",
+      "Bash(node scripts/run-migration.mjs:*)"
     ]
   }
 }

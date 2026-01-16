@@ -1,7 +1,7 @@
 # Correspondence Clerk - Current State Summary
 **Last Updated:** 2026-01-16
 
-## ✅ Completed Steps (1-4)
+## ✅ Completed Steps (1-5)
 
 ### Step 1: Foundation and Auth ✅
 - Next.js 15 with App Router
@@ -17,7 +17,8 @@ All migrations in `supabase/migrations/`:
 - `20250115_003_create_correspondence_table.sql` - Correspondence with indexes
 - `20250115_004_create_contacts_table.sql` - Contacts linked to businesses
 - `20250115_005_rls_policies.sql` - Row-level security (all authenticated users can read/write)
-- `20250115_006_add_direction_column.sql` - **NEW: Direction field (received/sent)**
+- `20250115_006_add_direction_column.sql` - Direction field (received/sent)
+- `20250116_001_add_formatting_status.sql` - **NEW: Formatting status tracking**
 
 ### Step 3: Dashboard and Business Pages ✅
 - Dashboard shows all businesses with last contacted date (DD/MM/YYYY format)
@@ -42,6 +43,19 @@ All migrations in `supabase/migrations/`:
 - Unsaved changes warning
 - Success redirect with banner
 
+### Step 5: AI Formatter and Thread Splitting ✅
+- **Anthropic API Integration** (Claude Sonnet 4) for formatting correspondence
+- **Thread Detection:** Lightweight heuristics detect email chains
+- **Split Toggle:** Auto-defaults ON for high-confidence threads
+- **Strict JSON Contract:** AI returns only validated JSON (subject, type, date, formatted text)
+- **Graceful Fallback:** AI outage never blocks saving
+  - Save as "unformatted" if AI fails
+  - Show clear error message with "Save Without Formatting" button
+- **Format Later:** Unformatted entries show orange indicator with "Format Now" button
+- **Retry Formatting:** Can attempt formatting again for unformatted entries
+- **Preserves Originals:** Always stores raw_text_original and formatted_text_original
+- **Hard Rules Enforced:** No rewriting, no invented content, preserves user wording exactly
+
 ## 🗄️ Database Schema Summary
 
 ### businesses
@@ -59,6 +73,7 @@ All migrations in `supabase/migrations/`:
 - **Text preservation:** raw_text_original, formatted_text_original, formatted_text_current
 - **Metadata:** entry_date, subject, type (Email/Call/Meeting)
 - **NEW: direction** (received/sent) - only for emails
+- **NEW: formatting_status** (formatted/unformatted/failed) - tracks AI formatting
 - **Actions:** action_needed, due_at
 - **Editing:** edited_at, edited_by
 - Full-text search on formatted and raw text
@@ -118,17 +133,16 @@ From `app/globals.css`:
 
 ### `app/actions/correspondence.ts`
 - `getCorrespondenceByBusiness(businessId, limit, offset)` - Paginated
-- `createCorrespondence(data)` - **Includes direction field**
+- `createCorrespondence(data)` - Includes direction field
 - Updates `businesses.last_contacted_at` on save
 
-## 🚀 What's Next (PRD Steps 5-9)
+### `app/actions/ai-formatter.ts` ✨ NEW
+- `formatCorrespondenceText(rawText, shouldSplit)` - Calls Anthropic API for formatting
+- `createFormattedCorrespondence(formData, aiResponse)` - Saves with AI formatting
+- `createUnformattedCorrespondence(formData)` - Saves without formatting (fallback)
+- `retryFormatting(correspondenceId)` - Attempts to format unformatted entries
 
-### Step 5: AI Formatter and Thread Splitting
-- Integrate Anthropic API (Claude Sonnet)
-- Strict JSON output contract
-- Thread detection and split toggle
-- Fallback: save as unformatted if AI fails
-- "Format later" option
+## 🚀 What's Next (PRD Steps 6-9)
 
 ### Step 6: Manual Editing (Correction Layer)
 - Edit `formatted_text_current` only
@@ -181,10 +195,13 @@ From `app/globals.css`:
 - [x] British date format (DD/MM/YYYY)
 - [x] "New Entry" button on business page with pre-fill
 - [x] Add business/contact inline without losing form state
+- [x] AI formatting integration with Anthropic API
+- [x] Thread detection and split toggle
+- [x] Graceful fallback (save without formatting)
+- [x] "Format Later" button for unformatted entries
+- [x] Unformatted entry indicators
 
 ### 🔲 Not Yet Tested
-- [ ] AI formatting integration
-- [ ] Thread splitting
 - [ ] Manual editing of formatted text
 - [ ] Full-text search
 - [ ] Mastersheet import
@@ -198,12 +215,13 @@ app/
     businesses.ts          # Business CRUD
     contacts.ts            # Contact CRUD
     correspondence.ts      # Correspondence CRUD + direction field
+    ai-formatter.ts        # ✨ NEW: AI formatting + retry logic
   dashboard/
     page.tsx              # Business cards with last contacted
   businesses/[id]/
-    page.tsx              # TWO-SECTION VIEW + direction + due dates
+    page.tsx              # TWO-SECTION VIEW + unformatted indicators + Format Now
   new-entry/
-    page.tsx              # CONDITIONAL DIRECTION + date/time split
+    page.tsx              # AI FORMATTING + thread detection + fallback
   api/
     businesses/route.ts   # GET all businesses
     contacts/route.ts     # GET contacts by business
@@ -215,20 +233,29 @@ components/
   AddContactModal.tsx     # Inline add, auto-select
   SuccessBanner.tsx       # Auto-dismiss success message
 
+lib/
+  ai/
+    formatter.ts          # ✨ NEW: Anthropic API integration
+    types.ts              # ✨ NEW: AI response type contracts
+    thread-detection.ts   # ✨ NEW: Email thread heuristics
+
 supabase/migrations/
-  20250115_001 - 006      # All 6 migrations (direction added in 006)
+  20250115_001 - 006      # Migrations 1-6 (through direction field)
+  20250116_001            # ✨ NEW: formatting_status column
 
 CLAUDE.md                 # Full PRD + Hard Rules
 ARCHITECTURE.md           # Schema, RLS, search, modules
 USER_FLOW.md              # Forced filing flow
 GLOSSARY.md               # Mastersheet, Club Card, etc.
+MIGRATION_INSTRUCTIONS.md # ✨ NEW: Migration guide
+.env.local.example        # ✨ NEW: Environment template with ANTHROPIC_API_KEY
 ```
 
 ## 🎯 Current Position
 
-**We are between Step 4 and Step 5.**
+**We are between Step 5 and Step 6.**
 
-Everything through forced filing and correspondence display is complete and working. The next major piece is AI integration for formatting and thread splitting.
+Everything through AI formatting and thread splitting is complete and working. The next piece is manual editing (correction layer) for formatted text.
 
 ## 💡 Key Decisions Made
 
@@ -239,6 +266,9 @@ Everything through forced filing and correspondence display is complete and work
 5. **Noon default** - When time omitted, use 12:00 PM not midnight
 6. **Forced filing** - No placeholders, must name real people
 7. **Client-side sorting** - Two-section split happens in browser (fine for <200 entries)
+8. **AI never blocks saving** - Fallback to unformatted always available
+9. **Thread splitting optional** - User controls split toggle, AI only suggests
+10. **Claude Sonnet 4** - Using latest model for best formatting quality
 
 ## 🐛 Known Issues
 
@@ -246,11 +276,12 @@ None currently! Everything implemented is working as expected.
 
 ## 📝 Notes for Next Session
 
-- Migration 006 (direction column) has been run in Supabase ✅
-- All date displays use 'en-GB' format ✅
-- Direction validation only applies to email entries ✅
-- Ready to proceed with Step 5 (AI Integration) when user is ready
-- Consider whether to implement Steps 5-9 or if there are other priorities
+- Migration 007 (formatting_status column) has been run in Supabase ✅
+- AI formatting integration complete with Anthropic API ✅
+- Thread detection using client-side heuristics ✅
+- Graceful fallback ensures AI outage never blocks workflow ✅
+- **IMPORTANT:** Add ANTHROPIC_API_KEY to .env.local for AI formatting to work
+- Ready to proceed with Step 6 (Manual Editing) when ready
 
 ---
 

@@ -11,7 +11,13 @@ import { AddBusinessModal } from '@/components/AddBusinessModal'
 import { AddContactModal } from '@/components/AddContactModal'
 import type { Business } from '@/app/actions/businesses'
 import type { Contact } from '@/app/actions/contacts'
-import { createCorrespondence } from '@/app/actions/correspondence'
+import { detectEmailThread, shouldDefaultToSplit } from '@/lib/ai/thread-detection'
+import {
+  formatCorrespondenceText,
+  createFormattedCorrespondence,
+  createUnformattedCorrespondence,
+} from '@/app/actions/ai-formatter'
+import type { AIFormatterResponse } from '@/lib/ai/types'
 
 export default function NewEntryPage() {
   const router = useRouter()
@@ -41,6 +47,17 @@ export default function NewEntryPage() {
   const [isDirty, setIsDirty] = useState(false)
   const [showAddBusiness, setShowAddBusiness] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
+
+  // AI formatting state
+  const [threadDetection, setThreadDetection] = useState<{
+    looksLikeThread: boolean
+    confidence: 'low' | 'medium' | 'high'
+    indicators: string[]
+  } | null>(null)
+  const [shouldSplit, setShouldSplit] = useState(false)
+  const [isFormatting, setIsFormatting] = useState(false)
+  const [formattingError, setFormattingError] = useState<string | null>(null)
+  const [aiResponse, setAiResponse] = useState<AIFormatterResponse | null>(null)
 
   // Load businesses on mount
   useEffect(() => {
@@ -101,6 +118,22 @@ export default function NewEntryPage() {
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [isDirty])
+
+  // Detect email threads when raw text changes
+  useEffect(() => {
+    if (rawText.trim().length < 50) {
+      setThreadDetection(null)
+      setShouldSplit(false)
+      return
+    }
+
+    const detection = detectEmailThread(rawText)
+    setThreadDetection(detection)
+
+    // Auto-default split toggle based on confidence
+    const autoSplit = shouldDefaultToSplit(rawText)
+    setShouldSplit(autoSplit)
+  }, [rawText])
 
   const handleBusinessSelect = (businessId: string) => {
     setSelectedBusinessId(businessId || null)
@@ -170,13 +203,59 @@ export default function NewEntryPage() {
     }
 
     setIsLoading(true)
+    setFormattingError(null)
 
     // Combine date and time
     const entry_date = entryTime
       ? `${entryDateOnly}T${entryTime}:00`
       : `${entryDateOnly}T12:00:00`
 
-    const result = await createCorrespondence({
+    // Try AI formatting first
+    setIsFormatting(true)
+    const formatResult = await formatCorrespondenceText(rawText, shouldSplit)
+    setIsFormatting(false)
+
+    if ('error' in formatResult) {
+      // AI formatting failed - offer to save as unformatted
+      setFormattingError(formatResult.error)
+      setIsLoading(false)
+      return
+    }
+
+    // AI formatting succeeded - save formatted correspondence
+    const result = await createFormattedCorrespondence(
+      {
+        business_id: selectedBusinessId!,
+        contact_id: selectedContactId!,
+        raw_text_original: rawText,
+        entry_date,
+        type: entryType || undefined,
+        direction: direction || undefined,
+        action_needed: actionNeeded,
+        due_at: dueAt || undefined,
+      },
+      formatResult.data
+    )
+
+    if ('error' in result) {
+      alert(`Error saving: ${result.error}`)
+      setIsLoading(false)
+    } else {
+      setIsDirty(false)
+      router.push(`/businesses/${selectedBusinessId}?saved=true`)
+    }
+  }
+
+  const handleSaveUnformatted = async () => {
+    setIsLoading(true)
+    setFormattingError(null)
+
+    // Combine date and time
+    const entry_date = entryTime
+      ? `${entryDateOnly}T${entryTime}:00`
+      : `${entryDateOnly}T12:00:00`
+
+    const result = await createUnformattedCorrespondence({
       business_id: selectedBusinessId!,
       contact_id: selectedContactId!,
       raw_text_original: rawText,
@@ -189,7 +268,7 @@ export default function NewEntryPage() {
     })
 
     if ('error' in result) {
-      alert(`Error: ${result.error}`)
+      alert(`Error saving: ${result.error}`)
       setIsLoading(false)
     } else {
       setIsDirty(false)
@@ -341,6 +420,53 @@ export default function NewEntryPage() {
           {errors.rawText && (
             <p className="text-red-600 text-xs mt-1">{errors.rawText}</p>
           )}
+
+          {/* Thread Detection Display */}
+          {threadDetection && threadDetection.looksLikeThread && (
+            <div className="mt-3 p-4 bg-blue-50 border-2 border-blue-600">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="font-semibold text-blue-900 mb-1">
+                    Email thread detected ({threadDetection.confidence} confidence)
+                  </p>
+                  <p className="text-sm text-blue-800 mb-2">
+                    This looks like it might contain multiple emails. Split into separate entries?
+                  </p>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={shouldSplit}
+                      onChange={(e) => setShouldSplit(e.target.checked)}
+                      className="mr-2 w-4 h-4"
+                    />
+                    <span className="text-sm font-semibold">
+                      Split into individual emails
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Formatting Error Display */}
+          {formattingError && (
+            <div className="mt-3 p-4 bg-red-50 border-2 border-red-600">
+              <p className="font-semibold text-red-900 mb-2">AI Formatting Failed</p>
+              <p className="text-sm text-red-800 mb-3">{formattingError}</p>
+              <p className="text-sm text-red-800 mb-3">
+                You can still save this entry without AI formatting. The original text will be
+                preserved and you can format it later.
+              </p>
+              <Button
+                type="button"
+                onClick={handleSaveUnformatted}
+                disabled={isLoading}
+                className="bg-red-600 text-white hover:bg-red-700 px-4 py-2 font-semibold"
+              >
+                {isLoading ? 'Saving...' : 'Save Without Formatting'}
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Optional Fields */}
@@ -405,14 +531,15 @@ export default function NewEntryPage() {
         <div className="flex gap-4">
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || isFormatting}
             className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
           >
-            {isLoading ? 'Saving...' : 'Save Entry'}
+            {isFormatting ? 'Formatting...' : isLoading ? 'Saving...' : 'Save Entry'}
           </Button>
           <Button
             type="button"
             onClick={() => router.back()}
+            disabled={isLoading || isFormatting}
             className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-6 py-3"
           >
             Cancel

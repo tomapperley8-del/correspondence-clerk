@@ -9,6 +9,7 @@ import { getContactsByBusiness, type Contact } from '@/app/actions/contacts'
 import { getCorrespondenceByBusiness, type Correspondence } from '@/app/actions/correspondence'
 import { AddContactButton } from '@/components/AddContactButton'
 import { SuccessBanner } from '@/components/SuccessBanner'
+import { retryFormatting } from '@/app/actions/ai-formatter'
 
 export default function BusinessDetailPage({
   params,
@@ -25,6 +26,7 @@ export default function BusinessDetailPage({
   const [correspondence, setCorrespondence] = useState<Correspondence[]>([])
   const [isArchiveExpanded, setIsArchiveExpanded] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [formattingInProgress, setFormattingInProgress] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadParams() {
@@ -230,12 +232,50 @@ export default function BusinessDetailPage({
     </div>
   )
 
+  const handleFormatLater = async (entryId: string) => {
+    setFormattingInProgress(entryId)
+
+    const result = await retryFormatting(entryId)
+
+    if ('error' in result) {
+      alert(`Formatting failed: ${result.error}`)
+    } else {
+      // Reload correspondence to show updated entry
+      if (id) {
+        const correspondenceResult = await getCorrespondenceByBusiness(id)
+        setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
+      }
+    }
+
+    setFormattingInProgress(null)
+  }
+
   function renderEntry(entry: Correspondence) {
     const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
     const directionIcon = entry.direction === 'sent' ? '→' : entry.direction === 'received' ? '←' : null
+    const isUnformatted = entry.formatting_status !== 'formatted'
 
     return (
       <div key={entry.id} className="border-t border-gray-300 pt-6 first:border-t-0 first:pt-0">
+        {/* Unformatted indicator */}
+        {isUnformatted && (
+          <div className="bg-orange-50 border-2 border-orange-600 p-3 mb-3">
+            <p className="text-sm text-orange-900 font-semibold mb-2">
+              ⚠ Unformatted Entry
+            </p>
+            <p className="text-xs text-orange-800 mb-2">
+              This entry was saved without AI formatting. The raw text is displayed below.
+            </p>
+            <Button
+              onClick={() => handleFormatLater(entry.id)}
+              disabled={formattingInProgress === entry.id}
+              className="bg-orange-600 text-white hover:bg-orange-700 px-3 py-1 text-xs font-semibold"
+            >
+              {formattingInProgress === entry.id ? 'Formatting...' : 'Format Now'}
+            </Button>
+          </div>
+        )}
+
         {/* Subject line */}
         {entry.subject && (
           <h3 className="font-semibold text-gray-900 mb-2">
