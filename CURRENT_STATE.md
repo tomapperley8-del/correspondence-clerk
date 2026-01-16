@@ -1,7 +1,7 @@
 # Correspondence Clerk - Current State Summary
 **Last Updated:** 2026-01-16
 
-## ✅ Completed Steps (1-5)
+## ✅ Completed Steps (1-6)
 
 ### Step 1: Foundation and Auth ✅
 - Next.js 15 with App Router
@@ -55,6 +55,17 @@ All migrations in `supabase/migrations/`:
 - **Retry Formatting:** Can attempt formatting again for unformatted entries
 - **Preserves Originals:** Always stores raw_text_original and formatted_text_original
 - **Hard Rules Enforced:** No rewriting, no invented content, preserves user wording exactly
+
+### Step 6: Manual Editing (Correction Layer) ✅
+- **Edit Button:** Each entry has an "Edit" button in normal view
+- **Edit Mode:** Clicking Edit shows textarea with formatted_text_current
+- **Save/Cancel:** Clear Save Changes and Cancel buttons
+- **Preserves Originals:** Only edits formatted_text_current
+  - raw_text_original stays intact
+  - formatted_text_original stays intact
+- **Tracking:** Stores edited_at timestamp and edited_by user_id
+- **Corrected Indicator:** Blue "Corrected" badge shows on edited entries
+- **Manual Only:** Edits are human corrections, never AI rewrites
 
 ## 🗄️ Database Schema Summary
 
@@ -134,6 +145,7 @@ From `app/globals.css`:
 ### `app/actions/correspondence.ts`
 - `getCorrespondenceByBusiness(businessId, limit, offset)` - Paginated
 - `createCorrespondence(data)` - Includes direction field
+- `updateFormattedText(correspondenceId, formattedTextCurrent)` - ✨ NEW: Manual edits
 - Updates `businesses.last_contacted_at` on save
 
 ### `app/actions/ai-formatter.ts` ✨ NEW
@@ -142,13 +154,7 @@ From `app/globals.css`:
 - `createUnformattedCorrespondence(formData)` - Saves without formatting (fallback)
 - `retryFormatting(correspondenceId)` - Attempts to format unformatted entries
 
-## 🚀 What's Next (PRD Steps 6-9)
-
-### Step 6: Manual Editing (Correction Layer)
-- Edit `formatted_text_current` only
-- Preserve originals
-- Track `edited_at` and `edited_by`
-- Show "corrected" indicator
+## 🚀 What's Next (PRD Steps 7-9)
 
 ### Step 7: Full-Text Search
 - Use existing tsvector + GIN index
@@ -200,9 +206,11 @@ From `app/globals.css`:
 - [x] Graceful fallback (save without formatting)
 - [x] "Format Later" button for unformatted entries
 - [x] Unformatted entry indicators
+- [x] Manual editing with Edit button
+- [x] "Corrected" indicator on edited entries
+- [x] Preserves originals when editing
 
 ### 🔲 Not Yet Tested
-- [ ] Manual editing of formatted text
 - [ ] Full-text search
 - [ ] Mastersheet import
 - [ ] Google Docs export
@@ -253,9 +261,9 @@ MIGRATION_INSTRUCTIONS.md # ✨ NEW: Migration guide
 
 ## 🎯 Current Position
 
-**We are between Step 5 and Step 6.**
+**We are between Step 6 and Step 7.**
 
-Everything through AI formatting and thread splitting is complete and working. The next piece is manual editing (correction layer) for formatted text.
+Everything through manual editing is complete and working. The next piece is full-text search using the existing tsvector + GIN index.
 
 ## 💡 Key Decisions Made
 
@@ -280,8 +288,9 @@ None currently! Everything implemented is working as expected.
 - AI formatting integration complete with Anthropic API ✅
 - Thread detection using client-side heuristics ✅
 - Graceful fallback ensures AI outage never blocks workflow ✅
-- **IMPORTANT:** Add ANTHROPIC_API_KEY to .env.local for AI formatting to work
-- Ready to proceed with Step 6 (Manual Editing) when ready
+- Manual editing (correction layer) complete ✅
+- ANTHROPIC_API_KEY is configured in .env.local ✅
+- Ready to proceed with Step 7 (Full-Text Search) when ready
 
 ---
 

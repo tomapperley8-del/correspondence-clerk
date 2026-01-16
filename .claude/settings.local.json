@@ -13,7 +13,9 @@
       "Bash(supabase --version:*)",
       "Bash(npx supabase:*)",
       "Bash(test:*)",
-      "Bash(node scripts/run-migration.mjs:*)"
+      "Bash(node scripts/run-migration.mjs:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

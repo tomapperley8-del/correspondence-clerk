@@ -120,3 +120,39 @@ export async function createCorrespondence(formData: {
 
   return { data }
 }
+
+/**
+ * Update formatted_text_current for manual corrections
+ * Per CLAUDE.md: Edits are human corrections, never AI rewrites
+ * Preserves raw_text_original and formatted_text_original
+ */
+export async function updateFormattedText(
+  correspondenceId: string,
+  formattedTextCurrent: string
+) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const { data, error } = await supabase
+    .from('correspondence')
+    .update({
+      formatted_text_current: formattedTextCurrent,
+      edited_at: new Date().toISOString(),
+      edited_by: user.id,
+    })
+    .eq('id', correspondenceId)
+    .select()
+    .single()
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { data }
+}
