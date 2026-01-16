@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { updateBusiness, type Business } from '@/app/actions/businesses'
+import { updateBusiness, deleteBusiness, type Business } from '@/app/actions/businesses'
+import { useRouter } from 'next/navigation'
 
 export function EditBusinessButton({ business }: { business: Business }) {
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,6 +53,34 @@ export function EditBusinessButton({ business }: { business: Business }) {
     })
     setError(null)
     setIsOpen(false)
+  }
+
+  const handleDelete = async () => {
+    const confirmMessage = `Are you sure you want to delete "${business.name}"?\n\nThis will delete:\n- The business\n- All contacts\n- All correspondence entries\n\nThis action CANNOT be undone.`
+
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    // Second confirmation
+    const finalConfirm = prompt(`Type DELETE to confirm deletion of "${business.name}":`)
+    if (finalConfirm !== 'DELETE') {
+      alert('Deletion cancelled')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    const result = await deleteBusiness(business.id)
+
+    if ('error' in result) {
+      setError(result.error)
+      setSaving(false)
+    } else {
+      // Redirect to dashboard after deletion
+      router.push('/dashboard')
+    }
   }
 
   if (!isOpen) {
@@ -175,6 +205,23 @@ export function EditBusinessButton({ business }: { business: Business }) {
             </Button>
           </div>
         </form>
+
+        {/* Danger Zone - Delete Business */}
+        <div className="mt-6 pt-6 border-t-2 border-gray-300">
+          <h3 className="text-sm font-bold text-red-900 mb-2">Danger Zone</h3>
+          <p className="text-xs text-gray-600 mb-3">
+            Deleting this business will permanently remove all contacts and correspondence entries.
+            This action cannot be undone.
+          </p>
+          <Button
+            type="button"
+            onClick={handleDelete}
+            disabled={saving}
+            className="bg-red-600 text-white hover:bg-red-700 px-6 py-3 font-semibold"
+          >
+            Delete Business
+          </Button>
+        </div>
       </div>
     </div>
   )

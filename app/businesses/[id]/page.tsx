@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
-import { getContactsByBusiness, type Contact } from '@/app/actions/contacts'
-import { getCorrespondenceByBusiness, updateFormattedText, type Correspondence } from '@/app/actions/correspondence'
+import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
+import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, type Correspondence } from '@/app/actions/correspondence'
 import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
 import { SuccessBanner } from '@/components/SuccessBanner'
@@ -151,6 +151,42 @@ export default function BusinessDetailPage({
     setSavingEdit(false)
   }
 
+  const handleDeleteContact = async (contactId: string, contactName: string) => {
+    if (!confirm(`Are you sure you want to delete contact "${contactName}"?`)) {
+      return
+    }
+
+    const result = await deleteContact(contactId)
+
+    if ('error' in result) {
+      alert(`Error deleting contact: ${result.error}`)
+    } else {
+      // Reload contacts
+      if (id) {
+        const contactsResult = await getContactsByBusiness(id)
+        setContacts('error' in contactsResult ? [] : contactsResult.data || [])
+      }
+    }
+  }
+
+  const handleDeleteEntry = async (entryId: string, subject: string) => {
+    if (!confirm(`Are you sure you want to delete this entry${subject ? ` "${subject}"` : ''}? This cannot be undone.`)) {
+      return
+    }
+
+    const result = await deleteCorrespondence(entryId)
+
+    if ('error' in result) {
+      alert(`Error deleting entry: ${result.error}`)
+    } else {
+      // Reload correspondence
+      if (id) {
+        const correspondenceResult = await getCorrespondenceByBusiness(id)
+        setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
+      }
+    }
+  }
+
   const renderEntry = (entry: Correspondence) => {
     const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
     const directionIcon = entry.direction === 'sent' ? '→' : entry.direction === 'received' ? '←' : null
@@ -244,12 +280,20 @@ export default function BusinessDetailPage({
                 entry.formatted_text_original ||
                 entry.raw_text_original}
             </div>
-            <Button
-              onClick={() => handleStartEdit(entry)}
-              className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
-            >
-              Edit
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => handleStartEdit(entry)}
+                className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
+              >
+                Edit
+              </Button>
+              <Button
+                onClick={() => handleDeleteEntry(entry.id, entry.subject || '')}
+                className="bg-red-100 text-red-900 hover:bg-red-200 px-3 py-1 text-xs"
+              >
+                Delete
+              </Button>
+            </div>
           </>
         )}
 
@@ -356,6 +400,12 @@ export default function BusinessDetailPage({
                       </p>
                     )}
                   </div>
+                  <Button
+                    onClick={() => handleDeleteContact(contact.id, contact.name)}
+                    className="bg-red-100 text-red-900 hover:bg-red-200 px-3 py-1 text-xs"
+                  >
+                    Delete
+                  </Button>
                 </div>
               </div>
             ))}

@@ -156,3 +156,37 @@ export async function updateFormattedText(
 
   return { data }
 }
+
+/**
+ * Delete a correspondence entry
+ */
+export async function deleteCorrespondence(id: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  // Get business_id before deleting
+  const { data: entry } = await supabase
+    .from('correspondence')
+    .select('business_id')
+    .eq('id', id)
+    .single()
+
+  const { error } = await supabase.from('correspondence').delete().eq('id', id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  if (entry) {
+    // Note: We don't update last_contacted_at when deleting
+    // That would require recalculating from remaining entries
+  }
+
+  return { success: true }
+}
