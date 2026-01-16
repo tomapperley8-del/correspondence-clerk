@@ -1,7 +1,9 @@
-# Session Notes - Word Document Import Feature
+# Session Notes - Word Document Import & Contact Matching
 
 **Date:** 2026-01-16
-**Commit:** 1a09bbb - "feat: Word document import with contact extraction and enhanced thread splitting"
+**Commits:**
+- 1a09bbb - "feat: Word document import with contact extraction and enhanced thread splitting"
+- 81c5d86 - "feat: automatic contact matching for email threads"
 
 ## What Was Built
 
@@ -27,16 +29,32 @@ Database schema updated to support multiple emails/phones per contact:
 - Backward compatible with old `email` and `phone` columns
 - Migration applied successfully
 
+### 4. Automatic Contact Matching (NEW!)
+When pasting email threads with multiple people, the system now:
+- Automatically matches each email to the correct contact
+- Uses fuzzy name matching with nickname support
+- Matches sender for received emails, recipient for sent emails
+- Shows preview modal before saving
+- Allows manual adjustment of matches
+- Each email saves with its correct contact
+
+**Example:** Thread with emails from Freddie Mitchell, Jon Fuller, and you → automatically assigns:
+- Freddie's emails to Freddie contact
+- Jon's emails to Jon contact
+- Your sent emails to the recipient contact
+
 ## Files Created
 
 1. **lib/contact-extraction.ts** - Contact parsing logic
-2. **components/ContactExtractionModal.tsx** - Contact review UI
-3. **components/ui/checkbox.tsx** - Checkbox component
-4. **components/ui/dialog.tsx** - Dialog component
-5. **supabase/migrations/20250117_001_add_multiple_contacts.sql** - Database migration
-6. **app/admin/run-migration/page.tsx** - Migration runner UI (optional)
-7. **app/api/run-migration/route.ts** - Migration API endpoint (optional)
-8. **scripts/apply-migration.mjs** - Migration script (optional)
+2. **lib/contact-matching.ts** - **NEW:** Fuzzy name matching for auto-contact assignment
+3. **components/ContactExtractionModal.tsx** - Contact review UI
+4. **components/ContactMatchPreviewModal.tsx** - **NEW:** Preview auto-matched contacts
+5. **components/ui/checkbox.tsx** - Checkbox component
+6. **components/ui/dialog.tsx** - Dialog component
+7. **supabase/migrations/20250117_001_add_multiple_contacts.sql** - Database migration
+8. **app/admin/run-migration/page.tsx** - Migration runner UI (optional)
+9. **app/api/run-migration/route.ts** - Migration API endpoint (optional)
+10. **scripts/apply-migration.mjs** - Migration script (optional)
 
 ## Files Modified
 
@@ -44,7 +62,8 @@ Database schema updated to support multiple emails/phones per contact:
 2. **lib/ai/formatter.ts** - Updated AI prompts for Word format
 3. **lib/ai/types.ts** - Added extracted_names field
 4. **app/actions/contacts.ts** - Fixed JSONB parsing
-5. **app/new-entry/page.tsx** - Integrated contact extraction
+5. **app/actions/ai-formatter.ts** - **UPDATED:** Accepts contact matches, assigns per entry
+6. **app/new-entry/page.tsx** - Integrated contact extraction + matching
 
 ## Current Status
 
@@ -57,9 +76,14 @@ Database schema updated to support multiple emails/phones per contact:
 - Contact modal with select/deselect
 - Database migration applied
 - JSONB parsing fixed
+- **Automatic contact matching for email threads**
+- **Fuzzy name matching (handles nicknames)**
+- **Preview modal showing all matched contacts**
+- **Each email saved with correct contact**
 
 ## How to Use
 
+### Contact Extraction (optional):
 1. Navigate to **New Entry** page
 2. Paste Word document text (with contacts section and correspondence)
 3. Yellow banner appears: "Detected N contacts"
@@ -67,10 +91,18 @@ Database schema updated to support multiple emails/phones per contact:
 5. Select/deselect contacts to add
 6. Click **Add N Contacts**
 7. Green confirmation: "✓ Added N contacts to [Business Name]"
+
+### Saving Correspondence with Auto-Contact Matching:
 8. Blue banner for thread detection appears
 9. Toggle "Split into individual emails" (defaults ON for Word format)
-10. Select business, contact, and save
-11. AI creates separate entries with correct dates
+10. Select business and a default contact
+11. Click **Save Entry**
+12. **NEW:** If multiple emails detected, preview modal shows:
+    - Each email with its auto-matched contact
+    - Ability to adjust matches manually
+    - Preview of email content
+13. Review matches and click **Save N Emails**
+14. Each email saved with its correct contact!
 
 ## Testing Completed
 
@@ -127,6 +159,9 @@ Development server running on:
 ## Git Status
 
 Committed to master branch:
-- Commit: 1a09bbb
-- 13 files changed, 1253 insertions, 33 deletions
+- Commit: 1a09bbb - Word document import with contact extraction
+  - 13 files changed, 1253 insertions, 33 deletions
+- Commit: 81c5d86 - Automatic contact matching for email threads
+  - 4 files changed, 479 insertions, 27 deletions
+- **Total: 17 files changed, 1732 insertions, 60 deletions**
 - Ready for next session
