@@ -27,14 +27,14 @@ export function EditBusinessButton({ business }: { business: Business }) {
 
     const result = await updateBusiness(business.id, {
       name: formData.name,
-      category: formData.category || null,
-      status: formData.status || null,
+      category: formData.category || undefined,
+      status: formData.status || undefined,
       is_club_card: formData.is_club_card,
       is_advertiser: formData.is_advertiser,
     })
 
     if ('error' in result) {
-      setError(result.error)
+      setError(result.error || 'An error occurred')
       setSaving(false)
     } else {
       setSaving(false)
@@ -75,7 +75,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
     const result = await deleteBusiness(business.id)
 
     if ('error' in result) {
-      setError(result.error)
+      setError(result.error || 'An error occurred')
       setSaving(false)
     } else {
       // Redirect to dashboard after deletion

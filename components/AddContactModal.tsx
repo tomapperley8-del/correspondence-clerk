@@ -21,33 +21,65 @@ export function AddContactModal({
   onContactAdded,
 }: AddContactModalProps) {
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
   const [role, setRole] = useState('')
-  const [phone, setPhone] = useState('')
+  const [emails, setEmails] = useState<string[]>([''])
+  const [phones, setPhones] = useState<string[]>([''])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  const handleAddEmail = () => {
+    setEmails([...emails, ''])
+  }
+
+  const handleRemoveEmail = (index: number) => {
+    setEmails(emails.filter((_, i) => i !== index))
+  }
+
+  const handleEmailChange = (index: number, value: string) => {
+    const newEmails = [...emails]
+    newEmails[index] = value
+    setEmails(newEmails)
+  }
+
+  const handleAddPhone = () => {
+    setPhones([...phones, ''])
+  }
+
+  const handleRemovePhone = (index: number) => {
+    setPhones(phones.filter((_, i) => i !== index))
+  }
+
+  const handlePhoneChange = (index: number, value: string) => {
+    const newPhones = [...phones]
+    newPhones[index] = value
+    setPhones(newPhones)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
 
+    // Filter out empty emails and phones
+    const filteredEmails = emails.filter(e => e.trim())
+    const filteredPhones = phones.filter(p => p.trim())
+
     const result = await createContact({
       business_id: businessId,
       name,
-      email: email || undefined,
       role: role || undefined,
-      phone: phone || undefined,
+      emails: filteredEmails,
+      phones: filteredPhones,
     })
 
     if ('error' in result) {
-      setError(result.error)
+      setError(result.error || 'An error occurred')
       setIsLoading(false)
     } else if (result.data) {
       setName('')
-      setEmail('')
       setRole('')
-      setPhone('')
+      setEmails([''])
+      setPhones([''])
       setIsLoading(false)
       onContactAdded(result.data)
       onClose()
@@ -60,7 +92,7 @@ export function AddContactModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white border-2 border-gray-800 w-full max-w-2xl p-6">
+      <div className="bg-white border-2 border-gray-800 w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-6">Add New Contact</h2>
 
         {error && (
@@ -102,33 +134,79 @@ export function AddContactModal({
           </div>
 
           <div>
-            <Label htmlFor="email" className="block mb-2 font-semibold">
-              Email
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
-              className="w-full"
-              placeholder="john@example.com"
-            />
+            <div className="flex justify-between items-center mb-2">
+              <Label className="font-semibold">Email Addresses</Label>
+              <Button
+                type="button"
+                onClick={handleAddEmail}
+                disabled={isLoading}
+                className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-3 py-1 text-xs"
+              >
+                Add Another Email
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {emails.map((email, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => handleEmailChange(index, e.target.value)}
+                    disabled={isLoading}
+                    className="flex-1"
+                    placeholder="john@example.com"
+                  />
+                  {emails.length > 1 && (
+                    <Button
+                      type="button"
+                      onClick={() => handleRemoveEmail(index)}
+                      disabled={isLoading}
+                      className="bg-red-100 text-red-800 hover:bg-red-200 px-3 py-2 text-sm"
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>
-            <Label htmlFor="phone" className="block mb-2 font-semibold">
-              Phone
-            </Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              disabled={isLoading}
-              className="w-full"
-              placeholder="555-123-4567"
-            />
+            <div className="flex justify-between items-center mb-2">
+              <Label className="font-semibold">Phone Numbers</Label>
+              <Button
+                type="button"
+                onClick={handleAddPhone}
+                disabled={isLoading}
+                className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-3 py-1 text-xs"
+              >
+                Add Another Phone
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {phones.map((phone, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => handlePhoneChange(index, e.target.value)}
+                    disabled={isLoading}
+                    className="flex-1"
+                    placeholder="555-123-4567"
+                  />
+                  {phones.length > 1 && (
+                    <Button
+                      type="button"
+                      onClick={() => handleRemovePhone(index)}
+                      disabled={isLoading}
+                      className="bg-red-100 text-red-800 hover:bg-red-200 px-3 py-2 text-sm"
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex gap-4 pt-4">

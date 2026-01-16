@@ -28,7 +28,7 @@ export default function DashboardPage() {
     async function loadBusinesses() {
       const result = await getBusinesses()
       if ('error' in result) {
-        setError(result.error)
+        setError(result.error || 'An error occurred')
       } else {
         setBusinesses(result.data || [])
       }
@@ -57,7 +57,7 @@ export default function DashboardPage() {
 
   // Get unique categories
   const categories = Array.from(
-    new Set(businesses.map((b) => b.category).filter(Boolean))
+    new Set(businesses.map((b) => b.category).filter((c): c is string => Boolean(c)))
   ).sort()
 
   // Filter businesses

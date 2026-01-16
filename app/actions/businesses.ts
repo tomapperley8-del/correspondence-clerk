@@ -16,6 +16,9 @@ export type Business = {
   deal_terms: string | null
   payment_structure: string | null
   contract_amount: number | null
+  address: string | null
+  email: string | null
+  phone: string | null
   last_contacted_at: string | null
   mastersheet_source_ids: any
   created_at: string
@@ -119,6 +122,9 @@ export async function updateBusiness(
     status?: string
     is_club_card?: boolean
     is_advertiser?: boolean
+    address?: string
+    email?: string
+    phone?: string
     last_contacted_at?: string
   }
 ) {
@@ -143,6 +149,9 @@ export async function updateBusiness(
     updateData.is_club_card = formData.is_club_card
   if (formData.is_advertiser !== undefined)
     updateData.is_advertiser = formData.is_advertiser
+  if (formData.address !== undefined) updateData.address = formData.address
+  if (formData.email !== undefined) updateData.email = formData.email
+  if (formData.phone !== undefined) updateData.phone = formData.phone
   if (formData.last_contacted_at !== undefined)
     updateData.last_contacted_at = formData.last_contacted_at
 

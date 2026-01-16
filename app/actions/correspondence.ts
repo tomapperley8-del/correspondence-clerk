@@ -23,6 +23,7 @@ export type Correspondence = {
     | 'renewal'
   due_at: string | null
   formatting_status: 'formatted' | 'unformatted' | 'failed'
+  content_hash: string | null
   ai_metadata: any
   created_at: string
   updated_at: string
@@ -128,7 +129,8 @@ export async function createCorrespondence(formData: {
  */
 export async function updateFormattedText(
   correspondenceId: string,
-  formattedTextCurrent: string
+  formattedTextCurrent: string,
+  entryDate?: string | null
 ) {
   const supabase = await createClient()
   const {
@@ -139,13 +141,25 @@ export async function updateFormattedText(
     return { error: 'Unauthorized' }
   }
 
+  const updateData: {
+    formatted_text_current: string
+    edited_at: string
+    edited_by: string
+    entry_date?: string | null
+  } = {
+    formatted_text_current: formattedTextCurrent,
+    edited_at: new Date().toISOString(),
+    edited_by: user.id,
+  }
+
+  // Only update entry_date if explicitly provided
+  if (entryDate !== undefined) {
+    updateData.entry_date = entryDate
+  }
+
   const { data, error } = await supabase
     .from('correspondence')
-    .update({
-      formatted_text_current: formattedTextCurrent,
-      edited_at: new Date().toISOString(),
-      edited_by: user.id,
-    })
+    .update(updateData)
     .eq('id', correspondenceId)
     .select()
     .single()
@@ -189,4 +203,54 @@ export async function deleteCorrespondence(id: string) {
   }
 
   return { success: true }
+}
+
+/**
+ * Check if correspondence with same content already exists for this business
+ * Returns existing entry if duplicate found
+ */
+export async function checkForDuplicates(
+  rawText: string,
+  businessId: string
+): Promise<{ isDuplicate: boolean; existingEntry?: Correspondence }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { isDuplicate: false }
+  }
+
+  // Compute hash
+  const { data: contentHash, error: hashError } = await supabase.rpc('compute_content_hash', {
+    raw_text: rawText,
+  })
+
+  if (hashError || !contentHash) {
+    // If hash computation fails, allow save (fail gracefully)
+    return { isDuplicate: false }
+  }
+
+  // Check for existing entry with same hash and business
+  const { data: existing, error } = await supabase
+    .from('correspondence')
+    .select('*, contact:contacts(name, role)')
+    .eq('content_hash', contentHash)
+    .eq('business_id', businessId)
+    .maybeSingle()
+
+  if (error) {
+    // If query fails, allow save (fail gracefully)
+    return { isDuplicate: false }
+  }
+
+  if (existing) {
+    return {
+      isDuplicate: true,
+      existingEntry: existing as Correspondence,
+    }
+  }
+
+  return { isDuplicate: false }
 }

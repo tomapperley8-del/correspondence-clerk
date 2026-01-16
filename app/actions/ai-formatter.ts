@@ -72,6 +72,11 @@ export async function createFormattedCorrespondence(
     return { error: 'Unauthorized' }
   }
 
+  // Compute content hash for duplicate detection
+  const { data: contentHash } = await supabase.rpc('compute_content_hash', {
+    raw_text: formData.raw_text_original,
+  })
+
   // Handle thread split vs single entry
   if (isThreadSplitResponse(aiResponse)) {
     // Multiple entries - insert in chronological order
@@ -95,6 +100,7 @@ export async function createFormattedCorrespondence(
         action_needed: formData.action_needed || 'none',
         due_at: formData.due_at || null,
         formatting_status: 'formatted',
+        content_hash: contentHash || null,
         ai_metadata: {
           warnings: entry.warnings,
           split_from_thread: true,
@@ -152,6 +158,7 @@ export async function createFormattedCorrespondence(
         action_needed: formData.action_needed || 'none',
         due_at: formData.due_at || null,
         formatting_status: 'formatted',
+        content_hash: contentHash || null,
         ai_metadata: {
           warnings: aiResponse.warnings,
           split_from_thread: false,
@@ -207,6 +214,11 @@ export async function createUnformattedCorrespondence(formData: {
     return { error: 'Unauthorized' }
   }
 
+  // Compute content hash for duplicate detection
+  const { data: contentHash } = await supabase.rpc('compute_content_hash', {
+    raw_text: formData.raw_text_original,
+  })
+
   const { data, error } = await supabase
     .from('correspondence')
     .insert({
@@ -223,6 +235,7 @@ export async function createUnformattedCorrespondence(formData: {
       action_needed: formData.action_needed || 'none',
       due_at: formData.due_at || null,
       formatting_status: 'unformatted',
+      content_hash: contentHash || null,
       ai_metadata: { saved_without_formatting: true },
     })
     .select()

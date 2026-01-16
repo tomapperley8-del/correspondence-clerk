@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -9,9 +9,11 @@ import { getContactsByBusiness, deleteContact, type Contact } from '@/app/action
 import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, type Correspondence } from '@/app/actions/correspondence'
 import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
+import { EditBusinessDetailsButton } from '@/components/EditBusinessDetailsButton'
 import { EditContactButton } from '@/components/EditContactButton'
 import { ExportToGoogleDocsButton } from '@/components/ExportToGoogleDocsButton'
 import { CorrespondenceSummary } from '@/components/CorrespondenceSummary'
+import { ActionSuggestions } from '@/components/ActionSuggestions'
 import { SuccessBanner } from '@/components/SuccessBanner'
 import { retryFormatting } from '@/app/actions/ai-formatter'
 
@@ -33,7 +35,9 @@ export default function BusinessDetailPage({
   const [formattingInProgress, setFormattingInProgress] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [editedText, setEditedText] = useState<string>('')
+  const [editedDate, setEditedDate] = useState<string>('')
   const [savingEdit, setSavingEdit] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     async function loadParams() {
@@ -49,6 +53,8 @@ export default function BusinessDetailPage({
     if (!id) return
 
     async function loadData() {
+      if (!id) return // Type guard for nested function
+
       const businessResult = await getBusinessById(id)
       if ('error' in businessResult || !businessResult.data) {
         router.push('/dashboard')
@@ -67,7 +73,7 @@ export default function BusinessDetailPage({
     loadData()
   }, [id, router])
 
-  if (loading || !business) {
+  if (loading || !business || !id) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <p className="text-gray-600">Loading...</p>
@@ -76,26 +82,54 @@ export default function BusinessDetailPage({
   }
 
   // Split correspondence into recent (last 12 months) and archive (older)
-  const twelveMonthsAgo = new Date()
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+  // Memoize to prevent recalculation on every render
+  const { recentEntries, archiveEntries } = useMemo(() => {
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
 
-  const recentEntries = correspondence
-    .filter((e) => new Date(e.entry_date || e.created_at) >= twelveMonthsAgo)
-    .sort((a, b) => {
-      // Sort oldest first (chronological)
-      const dateA = new Date(a.entry_date || a.created_at).getTime()
-      const dateB = new Date(b.entry_date || b.created_at).getTime()
-      return dateA - dateB
-    })
+    const recent = correspondence
+      .filter((e) => new Date(e.entry_date || e.created_at) >= twelveMonthsAgo)
+      .sort((a, b) => {
+        // Sort oldest first (chronological)
+        const dateA = new Date(a.entry_date || a.created_at).getTime()
+        const dateB = new Date(b.entry_date || b.created_at).getTime()
+        return dateA - dateB
+      })
 
-  const archiveEntries = correspondence
-    .filter((e) => new Date(e.entry_date || e.created_at) < twelveMonthsAgo)
-    .sort((a, b) => {
-      // Sort newest first within archive
-      const dateA = new Date(a.entry_date || a.created_at).getTime()
-      const dateB = new Date(b.entry_date || b.created_at).getTime()
-      return dateB - dateA
-    })
+    const archive = correspondence
+      .filter((e) => new Date(e.entry_date || e.created_at) < twelveMonthsAgo)
+      .sort((a, b) => {
+        // Sort newest first within archive
+        const dateA = new Date(a.entry_date || a.created_at).getTime()
+        const dateB = new Date(b.entry_date || b.created_at).getTime()
+        return dateB - dateA
+      })
+
+    return { recentEntries: recent, archiveEntries: archive }
+  }, [correspondence])
+
+  // Filter correspondence based on search query
+  const filteredCorrespondence = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return { recent: recentEntries, archive: archiveEntries }
+    }
+
+    const query = searchQuery.toLowerCase()
+    const matchesQuery = (entry: Correspondence) => {
+      return (
+        entry.subject?.toLowerCase().includes(query) ||
+        entry.contact.name.toLowerCase().includes(query) ||
+        entry.formatted_text_current?.toLowerCase().includes(query) ||
+        entry.formatted_text_original?.toLowerCase().includes(query) ||
+        entry.raw_text_original.toLowerCase().includes(query)
+      )
+    }
+
+    return {
+      recent: recentEntries.filter(matchesQuery),
+      archive: archiveEntries.filter(matchesQuery),
+    }
+  }, [recentEntries, archiveEntries, searchQuery])
 
   const handleFormatLater = async (entryId: string) => {
     setFormattingInProgress(entryId)
@@ -122,11 +156,20 @@ export default function BusinessDetailPage({
       entry.formatted_text_original ||
       entry.raw_text_original
     )
+    // Set date in YYYY-MM-DD format for the input field
+    if (entry.entry_date) {
+      const date = new Date(entry.entry_date)
+      const formattedDate = date.toISOString().split('T')[0]
+      setEditedDate(formattedDate)
+    } else {
+      setEditedDate('')
+    }
   }
 
   const handleCancelEdit = () => {
     setEditingEntryId(null)
     setEditedText('')
+    setEditedDate('')
   }
 
   const handleSaveEdit = async (entryId: string) => {
@@ -137,7 +180,10 @@ export default function BusinessDetailPage({
 
     setSavingEdit(true)
 
-    const result = await updateFormattedText(entryId, editedText)
+    // Convert edited date to ISO format if provided
+    const dateToSave = editedDate ? new Date(editedDate).toISOString() : null
+
+    const result = await updateFormattedText(entryId, editedText, dateToSave)
 
     if ('error' in result) {
       alert(`Error saving: ${result.error}`)
@@ -149,6 +195,7 @@ export default function BusinessDetailPage({
       }
       setEditingEntryId(null)
       setEditedText('')
+      setEditedDate('')
     }
 
     setSavingEdit(false)
@@ -190,15 +237,35 @@ export default function BusinessDetailPage({
     }
   }
 
+  // Helper to extract sender/recipient name from AI metadata
+  const getExtractedName = (entry: Correspondence): string | null => {
+    if (!entry.ai_metadata) return null
+    try {
+      const metadata = entry.ai_metadata as any
+      // Try to get matched contact name
+      if (metadata.matched_contact?.matched_from) {
+        return metadata.matched_contact.matched_from
+      }
+      // Try to get extracted names
+      if (metadata.extracted_names?.length > 0) {
+        return metadata.extracted_names[0]
+      }
+    } catch (e) {
+      // Silently fail and fall back to contact name
+    }
+    return null
+  }
+
   const renderEntry = (entry: Correspondence) => {
     const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
     const directionIcon = entry.direction === 'sent' ? '→' : entry.direction === 'received' ? '←' : null
     const isUnformatted = entry.formatting_status !== 'formatted'
     const isEdited = entry.edited_at !== null
     const isEditing = editingEntryId === entry.id
+    const extractedName = getExtractedName(entry)
 
     return (
-      <div key={entry.id} className="border-t border-gray-300 pt-6 first:border-t-0 first:pt-0">
+      <div id={`entry-${entry.id}`} key={entry.id} className="border-t border-gray-300 pt-6 first:border-t-0 first:pt-0">
         {/* Unformatted indicator */}
         {isUnformatted && (
           <div className="bg-orange-50 border-2 border-orange-600 p-3 mb-3">
@@ -232,28 +299,46 @@ export default function BusinessDetailPage({
           )}
         </div>
 
-        {/* Meta line with direction */}
-        <div className="text-sm text-gray-600 mb-3 italic">
-          {directionIcon && (
-            <span className="font-bold mr-1">
-              {directionIcon} {entry.direction === 'sent' ? 'Sent' : 'Received'}
+        {/* Prominent direction and contact display */}
+        <div className="flex items-center gap-2 mb-2">
+          {entry.direction === 'received' && (
+            <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800 font-semibold border-2 border-blue-300">
+              RECEIVED FROM
             </span>
           )}
-          {entry.entry_date && (
-            <span>
-              | {new Date(entry.entry_date).toLocaleDateString('en-GB')} {' '}
+          {entry.direction === 'sent' && (
+            <span className="text-xs bg-green-100 px-2 py-1 text-green-800 font-semibold border-2 border-green-300">
+              SENT TO
             </span>
           )}
-          {entry.type && <span>| {entry.type} </span>}
-          <span>
-            | {entry.contact.name}
-            {entry.contact.role && `, ${entry.contact.role}`}
+          <span className="text-lg font-bold text-gray-900">
+            {extractedName || entry.contact.name}
           </span>
+          {entry.contact.role && (
+            <span className="text-sm text-gray-600">({entry.contact.role})</span>
+          )}
+        </div>
+
+        {/* Secondary meta line */}
+        <div className="text-sm text-gray-600 mb-3">
+          {entry.entry_date && <span>{new Date(entry.entry_date).toLocaleDateString('en-GB')}</span>}
+          {entry.type && <span> • {entry.type}</span>}
         </div>
 
         {/* Body text or edit textarea */}
         {isEditing ? (
           <div className="mb-3">
+            <div className="mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-1">
+                Entry Date
+              </label>
+              <input
+                type="date"
+                value={editedDate}
+                onChange={(e) => setEditedDate(e.target.value)}
+                className="px-3 py-2 border-2 border-gray-300 focus:outline-none focus:border-blue-600 text-sm"
+              />
+            </div>
             <textarea
               value={editedText}
               onChange={(e) => setEditedText(e.target.value)}
@@ -383,8 +468,58 @@ export default function BusinessDetailPage({
         )}
       </div>
 
+      {/* Business Context Box */}
+      <div className="bg-gray-50 border-2 border-gray-300 p-4 mb-6">
+        <div className="flex justify-between items-start mb-3">
+          <h3 className="text-sm font-bold text-gray-900 uppercase">Business Details</h3>
+          <EditBusinessDetailsButton
+            business={business}
+            onUpdate={() => window.location.reload()}
+          />
+        </div>
+        <div className="space-y-2 text-sm">
+          <div>
+            <span className="font-semibold text-gray-700">Address:</span>
+            <span className="ml-2 text-gray-900">{business.address || 'Not set'}</span>
+          </div>
+          <div>
+            <span className="font-semibold text-gray-700">Email:</span>
+            <span className="ml-2 text-gray-900">{business.email || 'Not set'}</span>
+          </div>
+          <div>
+            <span className="font-semibold text-gray-700">Phone:</span>
+            <span className="ml-2 text-gray-900">{business.phone || 'Not set'}</span>
+          </div>
+        </div>
+      </div>
+
       {/* AI Summary of Last 12 Months */}
       <CorrespondenceSummary businessId={business.id} />
+
+      {/* AI Action Detection */}
+      <ActionSuggestions businessId={business.id} />
+
+      {/* Correspondence Search */}
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Search correspondence..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-4 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none"
+        />
+        {searchQuery && (
+          <p className="text-sm text-gray-600 mt-2">
+            Showing {filteredCorrespondence.recent.length + filteredCorrespondence.archive.length} matching entries
+            <button
+              onClick={() => setSearchQuery('')}
+              className="ml-2 text-blue-600 hover:underline"
+            >
+              Clear search
+            </button>
+          </p>
+        )}
+      </div>
 
       {/* Contacts Section */}
       <div className="bg-white border-2 border-gray-300 p-6 mb-6">
@@ -407,25 +542,33 @@ export default function BusinessDetailPage({
                     {contact.role && (
                       <p className="text-sm text-gray-600">{contact.role}</p>
                     )}
-                    {contact.email && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        <a
-                          href={`mailto:${contact.email}`}
-                          className="text-blue-600 hover:text-blue-800 hover:underline"
-                        >
-                          {contact.email}
-                        </a>
-                      </p>
+                    {contact.emails && contact.emails.length > 0 && (
+                      <div className="mt-1">
+                        {contact.emails.map((email, index) => (
+                          <p key={index} className="text-sm text-gray-600">
+                            <a
+                              href={`mailto:${email}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {email}
+                            </a>
+                          </p>
+                        ))}
+                      </div>
                     )}
-                    {contact.phone && (
-                      <p className="text-sm text-gray-600">
-                        <a
-                          href={`tel:${contact.phone}`}
-                          className="text-blue-600 hover:text-blue-800 hover:underline"
-                        >
-                          {contact.phone}
-                        </a>
-                      </p>
+                    {contact.phones && contact.phones.length > 0 && (
+                      <div>
+                        {contact.phones.map((phone, index) => (
+                          <p key={index} className="text-sm text-gray-600">
+                            <a
+                              href={`tel:${phone}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {phone}
+                            </a>
+                          </p>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <div className="flex gap-2">
@@ -466,30 +609,30 @@ export default function BusinessDetailPage({
         ) : (
           <>
             {/* Recent Section (Last 12 Months) */}
-            {recentEntries.length > 0 && (
+            {filteredCorrespondence.recent.length > 0 && (
               <div className="mb-8">
                 <h3 className="font-bold text-gray-900 mb-4 text-lg">
                   Recent (Last 12 Months)
                 </h3>
                 <div className="space-y-6">
-                  {recentEntries.map((entry) => renderEntry(entry))}
+                  {filteredCorrespondence.recent.map((entry) => renderEntry(entry))}
                 </div>
               </div>
             )}
 
             {/* Archive Section (Older than 12 Months) */}
-            {archiveEntries.length > 0 && (
+            {filteredCorrespondence.archive.length > 0 && (
               <div>
                 <button
                   onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
                   className="w-full flex justify-between items-center font-bold text-gray-900 mb-4 text-lg hover:text-blue-600"
                 >
-                  <span>Archive ({archiveEntries.length} older entries)</span>
+                  <span>Archive ({filteredCorrespondence.archive.length} older entries)</span>
                   <span>{isArchiveExpanded ? '▼' : '▶'}</span>
                 </button>
                 {isArchiveExpanded && (
                   <div className="space-y-6 pl-4 border-l-2 border-gray-300">
-                    {archiveEntries.map((entry) => renderEntry(entry))}
+                    {filteredCorrespondence.archive.map((entry) => renderEntry(entry))}
                   </div>
                 )}
               </div>

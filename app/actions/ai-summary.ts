@@ -53,6 +53,14 @@ export async function generateCorrespondenceSummary(businessId: string) {
       return dateA - dateB
     })
 
+    // Get current date for temporal awareness
+    const today = new Date()
+    const todayFormatted = today.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    })
+
     // Build a concise text summary for the AI
     const correspondenceText = sortedEntries
       .map((entry) => {
@@ -73,7 +81,15 @@ export async function generateCorrespondenceSummary(businessId: string) {
       messages: [
         {
           role: 'user',
-          content: `You are summarizing correspondence between a business and a client. Based on the following correspondence entries from the last 12 months, provide a VERY BRIEF summary in 1-2 sentences. Focus on: the main topics discussed, current relationship status, and any pending actions or important developments.
+          content: `You are summarizing correspondence between a business and a client. Today's date is ${todayFormatted}.
+
+Based on the following correspondence entries from the last 12 months, provide a VERY BRIEF summary in 1-2 sentences. Focus on: the main topics discussed, current relationship status, and any pending actions or important developments.
+
+IMPORTANT: Be aware of dates and use temporal language to indicate recency. For example:
+- "Last contacted 2 weeks ago..."
+- "Most recent discussion in October was about..."
+- "No contact since September..."
+- "Recent exchange last week regarding..."
 
 Do not invent information. Only summarize what is actually in the correspondence. Be concise and factual.
 

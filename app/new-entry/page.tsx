@@ -21,8 +21,10 @@ import type { AIFormatterResponse } from '@/lib/ai/types'
 import { extractContactsFromText, type ExtractedContact } from '@/lib/contact-extraction'
 import { ContactExtractionModal } from '@/components/ContactExtractionModal'
 import { ContactMatchPreviewModal } from '@/components/ContactMatchPreviewModal'
+import { DuplicateWarningModal } from '@/components/DuplicateWarningModal'
 import { matchEntriesToContacts, type ContactMatchResult } from '@/lib/contact-matching'
 import { isThreadSplitResponse } from '@/lib/ai/types'
+import { checkForDuplicates, type Correspondence } from '@/app/actions/correspondence'
 
 function NewEntryPageContent() {
   const router = useRouter()
@@ -73,6 +75,11 @@ function NewEntryPageContent() {
   const [contactMatches, setContactMatches] = useState<ContactMatchResult[]>([])
   const [showMatchPreview, setShowMatchPreview] = useState(false)
   const [pendingAiResponse, setPendingAiResponse] = useState<AIFormatterResponse | null>(null)
+
+  // Duplicate detection state
+  const [duplicateEntry, setDuplicateEntry] = useState<Correspondence | null>(null)
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false)
+  const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false)
 
   // Load businesses on mount
   useEffect(() => {
@@ -243,6 +250,17 @@ function NewEntryPageContent() {
     setIsLoading(true)
     setFormattingError(null)
 
+    // Check for duplicates first (unless bypassing)
+    if (!bypassDuplicateCheck && selectedBusinessId) {
+      const duplicateCheck = await checkForDuplicates(rawText, selectedBusinessId)
+      if (duplicateCheck.isDuplicate && duplicateCheck.existingEntry) {
+        setDuplicateEntry(duplicateCheck.existingEntry)
+        setShowDuplicateWarning(true)
+        setIsLoading(false)
+        return
+      }
+    }
+
     // Combine date and time
     const entry_date = entryTime
       ? `${entryDateOnly}T${entryTime}:00`
@@ -337,6 +355,17 @@ function NewEntryPageContent() {
     setIsLoading(true)
     setFormattingError(null)
 
+    // Check for duplicates first (unless bypassing)
+    if (!bypassDuplicateCheck && selectedBusinessId) {
+      const duplicateCheck = await checkForDuplicates(rawText, selectedBusinessId)
+      if (duplicateCheck.isDuplicate && duplicateCheck.existingEntry) {
+        setDuplicateEntry(duplicateCheck.existingEntry)
+        setShowDuplicateWarning(true)
+        setIsLoading(false)
+        return
+      }
+    }
+
     // Combine date and time
     const entry_date = entryTime
       ? `${entryDateOnly}T${entryTime}:00`
@@ -360,6 +389,22 @@ function NewEntryPageContent() {
     } else {
       setIsDirty(false)
       router.push(`/businesses/${selectedBusinessId}?saved=true`)
+    }
+  }
+
+  const handleCloseDuplicateWarning = () => {
+    setShowDuplicateWarning(false)
+    setDuplicateEntry(null)
+    setIsLoading(false)
+  }
+
+  const handleSaveAnyway = () => {
+    setShowDuplicateWarning(false)
+    setBypassDuplicateCheck(true)
+    // Trigger form submission which will now bypass the duplicate check
+    const form = document.querySelector('form')
+    if (form) {
+      form.requestSubmit()
     }
   }
 
@@ -700,6 +745,16 @@ function NewEntryPageContent() {
           initialMatches={contactMatches}
           defaultContactId={selectedContactId}
           onConfirm={handleConfirmMatches}
+        />
+      )}
+
+      {/* Duplicate Warning Modal */}
+      {duplicateEntry && (
+        <DuplicateWarningModal
+          isOpen={showDuplicateWarning}
+          onClose={handleCloseDuplicateWarning}
+          existingEntry={duplicateEntry}
+          onSaveAnyway={handleSaveAnyway}
         />
       )}
     </div>

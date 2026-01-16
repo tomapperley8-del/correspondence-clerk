@@ -32,7 +32,7 @@ export function AddBusinessButton() {
     })
 
     if ('error' in result) {
-      setError(result.error)
+      setError(result.error || 'An error occurred')
       setIsLoading(false)
     } else {
       setIsOpen(false)

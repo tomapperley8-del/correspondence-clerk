@@ -31,7 +31,7 @@ export function AddContactButton({ businessId }: { businessId: string }) {
     })
 
     if ('error' in result) {
-      setError(result.error)
+      setError(result.error || 'An error occurred')
       setIsLoading(false)
     } else {
       setIsOpen(false)

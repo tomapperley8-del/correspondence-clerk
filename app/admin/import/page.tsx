@@ -28,7 +28,7 @@ export default function ImportPage() {
     const result = await importMastersheet()
 
     if ('error' in result) {
-      setError(result.error)
+      setError(result.error || 'Import failed')
     } else {
       setReport(result.data)
     }

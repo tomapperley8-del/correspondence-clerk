@@ -16,7 +16,7 @@ export function CorrespondenceSummary({ businessId }: { businessId: string }) {
       const result = await generateCorrespondenceSummary(businessId)
 
       if ('error' in result) {
-        setError(result.error)
+        setError(result.error || 'Failed to generate summary')
       } else {
         setSummary(result.data)
       }

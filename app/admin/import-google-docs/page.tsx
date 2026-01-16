@@ -2,7 +2,11 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { importGoogleDocsData } from '@/app/actions/import-google-docs'
+import {
+  importGoogleDocsData,
+  listGoogleDocsFolder,
+  readGoogleDocsBatch,
+} from '@/app/actions/import-google-docs'
 import Link from 'next/link'
 
 const FOLDER_ID = '1Lmd4lRiynEUkxkspyrQmUqsNsXCcUJMD'
@@ -20,45 +24,40 @@ export default function ImportGoogleDocsPage() {
     setReport(null)
 
     try {
-      // @ts-ignore - MCP tools are injected at runtime
-      const folderContents = await mcp__google_workspace__listFolderContents({
-        folderId: FOLDER_ID,
-        maxResults: 100,
-      })
+      // List documents in the folder
+      const folderResult = await listGoogleDocsFolder(FOLDER_ID)
 
-      if (!folderContents || !folderContents.files) {
-        setError('Failed to list folder contents')
+      if ('error' in folderResult) {
+        setError(folderResult.error)
         setImporting(false)
         return
       }
 
-      const documents = folderContents.files.filter((file: any) =>
-        file.name.includes('Merged Contacts & Correspondence')
-      )
+      const documents = folderResult.data
 
       setProgress(`Found ${documents.length} documents. Reading content...`)
 
-      // Read all documents
+      // Read all documents in parallel batches
       const documentsData = []
-      for (let i = 0; i < documents.length; i++) {
-        const doc = documents[i]
-        setProgress(`Reading document ${i + 1}/${documents.length}: ${doc.name}`)
+      const BATCH_SIZE = 5
 
-        try {
-          // @ts-ignore - MCP tools are injected at runtime
-          const content = await mcp__google_workspace__readGoogleDoc({
-            documentId: doc.id,
-            format: 'text',
-          })
+      for (let i = 0; i < documents.length; i += BATCH_SIZE) {
+        const batch = documents.slice(i, i + BATCH_SIZE)
+        const batchStart = i + 1
+        const batchEnd = Math.min(i + BATCH_SIZE, documents.length)
 
-          documentsData.push({
-            documentId: doc.id,
-            title: doc.name,
-            content: content,
-          })
-        } catch (err) {
-          console.error(`Failed to read document ${doc.name}:`, err)
+        setProgress(
+          `Reading documents ${batchStart}-${batchEnd}/${documents.length}...`
+        )
+
+        const batchResult = await readGoogleDocsBatch(batch)
+
+        if ('error' in batchResult) {
+          console.error(`Failed to read batch ${batchStart}-${batchEnd}:`, batchResult.error)
+          continue
         }
+
+        documentsData.push(...batchResult.data)
       }
 
       setProgress(`Read ${documentsData.length} documents. Processing and importing...`)
@@ -67,7 +66,7 @@ export default function ImportGoogleDocsPage() {
       const result = await importGoogleDocsData(documentsData)
 
       if ('error' in result) {
-        setError(result.error)
+        setError(result.error || 'Import failed')
       } else {
         setReport(result.data)
       }

@@ -15,7 +15,14 @@
       "Bash(test:*)",
       "Bash(node scripts/run-migration.mjs:*)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "mcp__google-workspace__listFolderContents",
+      "mcp__google-workspace__readGoogleDoc",
+      "Bash(timeout:*)",
+      "Bash(vercel --version:*)",
+      "Bash(npm run build)",
+      "Bash(git diff:*)",
+      "Bash(taskkill //F //PID 6324)"
     ]
   }
 }

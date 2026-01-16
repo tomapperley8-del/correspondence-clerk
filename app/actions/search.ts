@@ -100,7 +100,9 @@ export async function searchAll(query: string) {
 
   // Combine and sort: businesses first, then correspondence
   const allResults = [...businessResults, ...correspondenceResults].sort((a, b) => {
-    if (a.rank !== b.rank) return a.rank - b.rank
+    const rankA = a.rank ?? 0
+    const rankB = b.rank ?? 0
+    if (rankA !== rankB) return rankA - rankB
     return 0
   })
 

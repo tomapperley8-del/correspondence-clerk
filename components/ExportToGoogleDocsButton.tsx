@@ -19,7 +19,7 @@ export function ExportToGoogleDocsButton({ businessId }: { businessId: string })
       const result = await exportToGoogleDocs(businessId)
 
       if ('error' in result) {
-        setError(result.error)
+        setError(result.error || 'Export failed')
         setExporting(false)
         return
       }

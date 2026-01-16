@@ -2,6 +2,19 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+// MCP type definitions
+declare global {
+  function mcp__google_workspace__listFolderContents(params: {
+    folderId: string
+    maxResults: number
+  }): Promise<{ files: Array<{ id: string; name: string }> }>
+
+  function mcp__google_workspace__readGoogleDoc(params: {
+    documentId: string
+    format: string
+  }): Promise<string>
+}
+
 interface GoogleDocsImportReport {
   documentsProcessed: number
   businessesMatched: number
@@ -52,31 +65,6 @@ function extractBusinessName(title: string): string {
 }
 
 /**
- * Import correspondence from a single Google Doc
- */
-export async function importFromGoogleDoc(
-  documentId: string,
-  documentTitle: string
-): Promise<{ error: string } | { data: { contactsCreated: number; correspondenceCreated: number } }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  try {
-    // This function will be called from the client with MCP-fetched content
-    return { error: 'This function should be called from importFromGoogleDocsFolder' }
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err)
-    return { error: errorMessage }
-  }
-}
-
-/**
  * Parse correspondence entries from document text
  */
 function parseCorrespondenceEntries(text: string): Array<{
@@ -99,7 +87,7 @@ function parseCorrespondenceEntries(text: string): Array<{
     if (!trimmed) continue
 
     // Look for date at the start of the entry (DD/MM/YY or DD/MM/YYYY)
-    const dateMatch = trimmed.match(/^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*-?\s*(.*)$/s)
+    const dateMatch = trimmed.match(/^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*-?\s*(.*)$/)
 
     if (dateMatch) {
       const dateStr = dateMatch[1]
@@ -161,16 +149,19 @@ function parseContactInfo(text: string): {
   return contact
 }
 
-export async function importGoogleDocsData(
+/**
+ * Process documents data and import to database
+ */
+async function processDocumentsData(
   documentsData: Array<{ documentId: string; title: string; content: string }>
-): Promise<{ error: string } | { data: GoogleDocsImportReport }> {
+): Promise<GoogleDocsImportReport> {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return { error: 'Unauthorized' }
+    throw new Error('Unauthorized')
   }
 
   const report: GoogleDocsImportReport = {
@@ -327,5 +318,117 @@ export async function importGoogleDocsData(
     }
   }
 
-  return { data: report }
+  return report
+}
+
+/**
+ * List documents in the Google Drive folder
+ */
+export async function listGoogleDocsFolder(
+  folderId: string
+): Promise<{ error: string } | { data: Array<{ id: string; name: string }> }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const folderContents = await mcp__google_workspace__listFolderContents({
+      folderId,
+      maxResults: 100,
+    })
+
+    if (!folderContents || !folderContents.files) {
+      return { error: 'Failed to list folder contents' }
+    }
+
+    const documents = folderContents.files.filter((file) =>
+      file.name.includes('Merged Contacts & Correspondence')
+    )
+
+    return { data: documents }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    return { error: errorMessage }
+  }
+}
+
+/**
+ * Read a batch of Google Docs
+ */
+export async function readGoogleDocsBatch(
+  documentIds: Array<{ id: string; name: string }>
+): Promise<{
+  error: string
+} | { data: Array<{ documentId: string; title: string; content: string }> }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const results = await Promise.all(
+      documentIds.map(async (doc) => {
+        try {
+          const content = await mcp__google_workspace__readGoogleDoc({
+            documentId: doc.id,
+            format: 'text',
+          })
+
+          return {
+            documentId: doc.id,
+            title: doc.name,
+            content: content,
+          }
+        } catch (err) {
+          console.error(`Failed to read document ${doc.name}:`, err)
+          return null
+        }
+      })
+    )
+
+    const successfulReads = results.filter((r) => r !== null) as Array<{
+      documentId: string
+      title: string
+      content: string
+    }>
+
+    return { data: successfulReads }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    return { error: errorMessage }
+  }
+}
+
+/**
+ * Import Google Docs data that has already been fetched
+ * This is called from the UI after documents are read
+ */
+export async function importGoogleDocsData(
+  documentsData: Array<{ documentId: string; title: string; content: string }>
+): Promise<{ error: string } | { data: GoogleDocsImportReport }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    const report = await processDocumentsData(documentsData)
+    return { data: report }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    return { error: errorMessage }
+  }
 }

@@ -178,7 +178,7 @@ export function matchEntriesToContacts(
       return {
         contactId,
         contactName: contact?.name || null,
-        matchedFrom: nameToMatch,
+        matchedFrom: nameToMatch || null,
         confidence: 'high', // We can make this more sophisticated later
       };
     }
