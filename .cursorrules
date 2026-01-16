@@ -1,0 +1,579 @@
+# Correspondence Clerk - Design & Code Rules
+
+## Typography Rules
+
+### Font Sizes
+- **Body text:** 14px (0.875rem) for all regular content
+- **Headings:**
+  - H1 (page titles): 24px (1.5rem), font-weight: 700
+  - H2 (section headers): 20px (1.25rem), font-weight: 700
+  - H3 (subsection headers): 18px (1.125rem), font-weight: 600
+  - H4 (card titles): 16px (1rem), font-weight: 600
+- **Small text:** 12px (0.75rem) for meta information, timestamps, helper text
+- **Labels:** 14px (0.875rem), font-weight: 600
+- **Buttons:** 14px (0.875rem), font-weight: 500
+
+### Line Height
+- **Body text:** 1.6 (comfortable reading)
+- **Headings:** 1.2
+- **Buttons and compact UI:** 1.4
+
+### Font Family
+- **Primary:** System font stack for performance:
+  ```css
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  ```
+- **Monospace (for code/IDs):** `font-family: 'Courier New', monospace;`
+
+### Text Colors
+- **Primary text:** `text-gray-900` (dark mode: `text-gray-100`)
+- **Secondary text:** `text-gray-600` (dark mode: `text-gray-400`)
+- **Muted text:** `text-gray-500` (dark mode: `text-gray-500`)
+- **Links:** `text-blue-600 hover:text-blue-800` (dark mode: `text-blue-400`)
+- **Error text:** `text-red-600` (dark mode: `text-red-400`)
+- **Success text:** `text-green-600` (dark mode: `text-green-400`)
+
+---
+
+## Component Style Rules
+
+### NO Rounded Corners
+**Rule:** All components must use sharp corners (border-radius: 0).
+
+```tsx
+// ✅ CORRECT
+<div className="border border-gray-300">Content</div>
+<button className="bg-blue-600 px-4 py-2">Save</button>
+
+// ❌ WRONG
+<div className="rounded-lg border">Content</div>
+<button className="rounded px-4 py-2">Save</button>
+```
+
+**Override shadcn/ui defaults:**
+```css
+/* globals.css */
+* {
+  border-radius: 0 !important;
+}
+```
+
+### NO Shadows
+**Rule:** No drop shadows, box shadows, or elevation effects.
+
+```tsx
+// ✅ CORRECT
+<div className="border border-gray-300 bg-white">Card</div>
+
+// ❌ WRONG
+<div className="shadow-lg rounded-lg">Card</div>
+<div className="drop-shadow-md">Card</div>
+```
+
+**Override shadcn/ui defaults:**
+```css
+/* globals.css */
+* {
+  box-shadow: none !important;
+  filter: none !important;
+}
+```
+
+### Borders
+**Rule:** Use solid borders for visual separation, not shadows.
+
+- **Standard border:** `border border-gray-300`
+- **Emphasized border:** `border-2 border-gray-800`
+- **Subtle border:** `border border-gray-200`
+- **Colored borders:** Use for status (`border-blue-600`, `border-red-600`, etc.)
+
+---
+
+## Button Rules
+
+### NO Icon-Only Buttons
+**Rule:** Every button must have visible text label. Icons can accompany text but never replace it.
+
+```tsx
+// ✅ CORRECT
+<button>
+  <PlusIcon className="h-4 w-4 mr-2" />
+  Add New Business
+</button>
+
+<button>Save Entry</button>
+
+<button>
+  Export to Google Docs
+  <ExternalLinkIcon className="h-4 w-4 ml-2" />
+</button>
+
+// ❌ WRONG
+<button aria-label="Add new">
+  <PlusIcon />
+</button>
+
+<button title="Save">
+  <SaveIcon />
+</button>
+```
+
+**Exception:** Close buttons on modals/dialogs can use "×" symbol with aria-label.
+
+### Button Hierarchy
+1. **Primary action:** `bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold`
+2. **Secondary action:** `bg-gray-200 text-gray-900 hover:bg-gray-300 px-6 py-3`
+3. **Destructive action:** `bg-red-600 text-white hover:bg-red-700 px-6 py-3`
+4. **Ghost/link button:** `text-blue-600 hover:text-blue-800 hover:underline px-2 py-1`
+
+### Button States
+- **Disabled:** `opacity-50 cursor-not-allowed` (no interaction)
+- **Loading:** Show spinner + "Saving..." text, disable interaction
+- **Active/pressed:** `bg-blue-700` (darker than hover)
+
+### Button Sizing
+- **Large (primary actions):** `px-6 py-3 text-base`
+- **Medium (standard):** `px-4 py-2 text-sm`
+- **Small (compact contexts):** `px-3 py-1 text-xs`
+
+---
+
+## Form Rules
+
+### Input Fields
+```tsx
+// Standard text input
+<input
+  type="text"
+  className="w-full border border-gray-300 px-3 py-2 text-sm
+             focus:border-blue-600 focus:outline-none"
+/>
+
+// Required field indicator
+<label className="block font-semibold mb-1">
+  Business Name <span className="text-red-600">*</span>
+</label>
+
+// Error state
+<input
+  className="border border-red-600 focus:border-red-600"
+  aria-invalid="true"
+  aria-describedby="error-message"
+/>
+<p id="error-message" className="text-red-600 text-xs mt-1">
+  This field is required
+</p>
+```
+
+### Dropdowns / Select
+```tsx
+// Use combobox pattern for searchable dropdowns
+<Combobox value={selected} onChange={setSelected}>
+  <ComboboxInput
+    className="w-full border border-gray-300 px-3 py-2"
+    placeholder="Search businesses..."
+  />
+  <ComboboxOptions className="border border-gray-300 bg-white max-h-60 overflow-auto">
+    {options.map(option => (
+      <ComboboxOption
+        key={option.id}
+        value={option}
+        className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+      >
+        {option.label}
+      </ComboboxOption>
+    ))}
+  </ComboboxOptions>
+</Combobox>
+```
+
+### Checkboxes and Radio Buttons
+- Always show label text next to control
+- Use standard HTML elements, style minimally
+- Group related options with fieldset + legend
+
+---
+
+## Layout Rules
+
+### Spacing
+- **Section spacing:** `mb-8` or `mb-12` between major sections
+- **Element spacing:** `mb-4` between related elements
+- **Tight spacing:** `mb-2` within groups (label + input)
+- **Padding:** `p-4` for cards, `p-6` for modals, `px-8 py-6` for page content
+
+### Containers
+```tsx
+// Page container
+<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  {/* content */}
+</div>
+
+// Card container
+<div className="border border-gray-300 bg-white p-6">
+  {/* content */}
+</div>
+
+// Modal container
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+  <div className="bg-white border-2 border-gray-800 w-full max-w-2xl p-6">
+    {/* modal content */}
+  </div>
+</div>
+```
+
+### Grid Layouts
+- Use CSS Grid for dashboard cards: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6`
+- Use Flexbox for inline elements: `flex items-center gap-4`
+
+---
+
+## Interaction Rules
+
+### Loading States
+**Rule:** Always show loading feedback for async operations.
+
+```tsx
+// Button loading state
+<button disabled={isLoading}>
+  {isLoading ? (
+    <>
+      <Spinner className="h-4 w-4 mr-2" />
+      Saving...
+    </>
+  ) : (
+    'Save Entry'
+  )}
+</button>
+
+// Page loading state
+{isLoading && (
+  <div className="flex items-center justify-center py-12">
+    <Spinner className="h-8 w-8" />
+    <span className="ml-3 text-gray-600">Loading correspondence...</span>
+  </div>
+)}
+```
+
+### Error States
+**Rule:** Show errors inline, near the relevant context.
+
+```tsx
+// Form field error
+<input className={error ? "border-red-600" : "border-gray-300"} />
+{error && (
+  <p className="text-red-600 text-xs mt-1">{error}</p>
+)}
+
+// Page-level error
+{error && (
+  <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6">
+    <p className="text-red-800 font-semibold">Error</p>
+    <p className="text-red-700 text-sm">{error}</p>
+    <button className="text-red-600 hover:text-red-800 underline text-sm mt-2">
+      Try again
+    </button>
+  </div>
+)}
+```
+
+### Success Feedback
+```tsx
+// Toast notification (auto-dismiss after 3 seconds)
+<div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 border-2 border-green-700">
+  <CheckIcon className="h-5 w-5 inline mr-2" />
+  Entry saved successfully
+</div>
+
+// Inline success message
+<p className="text-green-600 text-sm">
+  ✓ Changes saved
+</p>
+```
+
+### Hover States
+**Rule:** All interactive elements must have visible hover states.
+
+```tsx
+// Button hover
+className="hover:bg-blue-700 transition-colors duration-150"
+
+// Link hover
+className="hover:underline"
+
+// Card hover (if clickable)
+className="hover:border-blue-600 hover:bg-blue-50 cursor-pointer transition-colors duration-150"
+```
+
+### Focus States
+**Rule:** All focusable elements must have visible focus outline.
+
+```css
+/* globals.css */
+*:focus {
+  outline: 2px solid #2563eb; /* blue-600 */
+  outline-offset: 2px;
+}
+
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 0;
+}
+```
+
+---
+
+## Accessibility Rules
+
+### Semantic HTML
+- Use `<button>` for actions, `<a>` for navigation
+- Use `<label>` with `htmlFor` for all inputs
+- Use `<fieldset>` and `<legend>` for grouped inputs
+- Use heading hierarchy (h1 → h2 → h3, never skip levels)
+
+### ARIA Labels
+```tsx
+// Icon buttons (exception case)
+<button aria-label="Close modal">
+  <XIcon />
+</button>
+
+// Loading states
+<button aria-busy="true" disabled>
+  <Spinner /> Saving...
+</button>
+
+// Error states
+<input aria-invalid="true" aria-describedby="error-msg" />
+<p id="error-msg" role="alert">Invalid email</p>
+```
+
+### Keyboard Navigation
+- All interactive elements must be keyboard accessible
+- Modals must trap focus and restore on close
+- Dropdown menus must support arrow key navigation
+- Provide "Skip to main content" link
+
+---
+
+## Color Palette
+
+### Primary Colors
+- **Blue (primary action):** `blue-600` (#2563eb)
+- **Gray (neutral):** `gray-900`, `gray-600`, `gray-300`, `gray-100`
+- **White:** `white` (#ffffff)
+- **Black:** `black` (#000000)
+
+### Semantic Colors
+- **Error/Destructive:** `red-600` (#dc2626)
+- **Success:** `green-600` (#16a34a)
+- **Warning:** `yellow-500` (#eab308)
+- **Info:** `blue-500` (#3b82f6)
+
+### Background Colors
+- **Page background:** `bg-gray-50`
+- **Card background:** `bg-white`
+- **Hover background:** `bg-gray-100`
+- **Selected background:** `bg-blue-50`
+- **Disabled background:** `bg-gray-200`
+
+---
+
+## Code Style Rules
+
+### React Components
+```tsx
+// Use function components with TypeScript
+interface BusinessCardProps {
+  business: Business;
+  onSelect: (id: string) => void;
+}
+
+export function BusinessCard({ business, onSelect }: BusinessCardProps) {
+  return (
+    <div className="border border-gray-300 bg-white p-4">
+      <h3 className="font-semibold text-lg">{business.name}</h3>
+      <p className="text-gray-600 text-sm">{business.category}</p>
+      <button
+        onClick={() => onSelect(business.id)}
+        className="mt-4 bg-blue-600 text-white px-4 py-2 hover:bg-blue-700"
+      >
+        View Details
+      </button>
+    </div>
+  );
+}
+```
+
+### Tailwind Usage
+- Prefer Tailwind utility classes over custom CSS
+- Use `@apply` sparingly (only for repeated complex patterns)
+- Keep className strings organized: layout → spacing → colors → typography → interactions
+
+```tsx
+// Organized className
+<div className="
+  flex items-center justify-between
+  px-4 py-3 mb-6
+  border border-gray-300 bg-white
+  text-sm
+  hover:bg-gray-50 cursor-pointer
+">
+```
+
+### File Naming
+- Components: PascalCase (`BusinessCard.tsx`)
+- Utils/helpers: camelCase (`formatDate.ts`)
+- Server actions: kebab-case (`create-correspondence.ts`)
+- Pages (Next.js): kebab-case (`new-entry/page.tsx`)
+
+---
+
+## Performance Rules
+
+### Lazy Loading
+- Use `React.lazy()` for large components not in initial view
+- Use Next.js dynamic imports with `ssr: false` when appropriate
+- Lazy load entries in letter file (IntersectionObserver, 20 at a time)
+
+### Image Optimization
+- Use Next.js `<Image>` component for all images
+- Provide width and height to prevent layout shift
+- Use appropriate formats (WebP with fallback)
+
+### Database Queries
+- Always use indexes for WHERE clauses
+- Limit result sets (pagination, cursor-based)
+- Avoid N+1 queries (use joins or batch fetching)
+
+---
+
+## Testing Rules
+
+### What to Test
+1. **Critical user flows:**
+   - New entry creation with forced filing
+   - Business and contact selection
+   - Thread splitting
+   - Export to Google Docs
+
+2. **Edge cases:**
+   - AI outage during save
+   - Duplicate business/contact names
+   - Invalid input handling
+   - Permission denied errors
+
+3. **Accessibility:**
+   - Keyboard navigation works
+   - Screen reader compatibility
+   - Focus management in modals
+
+### Testing Tools
+- **Unit tests:** Vitest
+- **Integration tests:** Playwright or Cypress
+- **Accessibility:** axe-devtools, WAVE
+
+---
+
+## Security Rules
+
+### Input Sanitization
+- Never trust user input
+- Use DOMPurify for rendering formatted_text_current
+- Validate all inputs server-side (zod schemas)
+- Escape SQL inputs (Supabase client handles this)
+
+### Authentication
+- Check auth on every server action
+- Use Supabase RLS as second layer of defense
+- Never expose API keys in client code
+- Use httpOnly cookies for sessions
+
+### API Keys
+```typescript
+// ❌ WRONG
+const apiKey = "sk-ant-..."; // exposed in client bundle
+
+// ✅ CORRECT
+// Server action or API route only
+const apiKey = process.env.ANTHROPIC_API_KEY;
+if (!apiKey) throw new Error("Missing ANTHROPIC_API_KEY");
+```
+
+---
+
+## Git Commit Rules
+
+### Commit Message Format
+```
+<type>: <description>
+
+[optional body]
+[optional footer]
+```
+
+**Types:**
+- `feat:` New feature
+- `fix:` Bug fix
+- `docs:` Documentation only
+- `style:` Formatting (no code change)
+- `refactor:` Code restructuring
+- `test:` Adding tests
+- `chore:` Maintenance
+
+**Examples:**
+```
+feat: add thread split toggle to new entry form
+
+- Detect email chains using heuristics
+- Show preview of split entries
+- Allow user to enable/disable split
+
+fix: prevent saving entry without contact selected
+
+- Add disabled state to save button
+- Show error message if contact is missing
+- Update validation logic
+```
+
+---
+
+## Documentation Rules
+
+### Code Comments
+- Explain **why**, not **what** (code should be self-documenting)
+- Add comments for complex algorithms or non-obvious logic
+- Add JSDoc for exported functions
+
+```typescript
+/**
+ * Formats correspondence text using Claude API.
+ *
+ * @param rawText - Original unformatted text from user
+ * @returns Formatted text with subject, date, and warnings
+ * @throws Never throws - returns unformatted on error
+ */
+export async function formatEntry(rawText: string): Promise<AIFormattedEntry> {
+  // Implementation
+}
+```
+
+### README Updates
+- Keep README.md up to date with setup instructions
+- Document environment variables
+- Include troubleshooting section
+
+---
+
+## Questions?
+
+If any rule conflicts with user requirements or creates UX problems:
+1. Document the conflict
+2. Propose alternative that preserves intent
+3. Get user approval before deviating
+
+**Remember:** These rules exist to create a consistent, accessible, professional application. When in doubt, prioritize user experience and accessibility over aesthetics.
