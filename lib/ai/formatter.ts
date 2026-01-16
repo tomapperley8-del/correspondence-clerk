@@ -79,7 +79,7 @@ function validateAIResponse(data: unknown): AIFormatterResponse {
 
   // Otherwise validate as single entry
   validateSingleEntry(obj, 'Single entry');
-  return obj as SingleEntryResponse;
+  return obj as unknown as SingleEntryResponse;
 }
 
 /**
@@ -93,7 +93,9 @@ function validateSingleEntry(entry: unknown, context: string): void {
   const obj = entry as Record<string, unknown>;
 
   if (typeof obj.subject_guess !== 'string') {
-    throw new Error(`${context}: subject_guess must be a string`);
+    throw new Error(
+      `${context}: subject_guess must be a string (got ${typeof obj.subject_guess}: ${JSON.stringify(obj.subject_guess)})`
+    );
   }
 
   if (
@@ -101,19 +103,68 @@ function validateSingleEntry(entry: unknown, context: string): void {
     obj.entry_type_guess !== 'Call' &&
     obj.entry_type_guess !== 'Meeting'
   ) {
-    throw new Error(`${context}: entry_type_guess must be Email, Call, or Meeting`);
+    throw new Error(
+      `${context}: entry_type_guess must be Email, Call, or Meeting (got ${obj.entry_type_guess})`
+    );
   }
 
   if (obj.entry_date_guess !== null && typeof obj.entry_date_guess !== 'string') {
-    throw new Error(`${context}: entry_date_guess must be string or null`);
+    throw new Error(
+      `${context}: entry_date_guess must be string or null (got ${typeof obj.entry_date_guess})`
+    );
+  }
+
+  // direction_guess is optional, but if present must be valid
+  if (
+    obj.direction_guess !== undefined &&
+    obj.direction_guess !== null &&
+    obj.direction_guess !== 'sent' &&
+    obj.direction_guess !== 'received'
+  ) {
+    throw new Error(
+      `${context}: direction_guess must be "sent", "received", null, or undefined (got ${obj.direction_guess})`
+    );
   }
 
   if (typeof obj.formatted_text !== 'string') {
-    throw new Error(`${context}: formatted_text must be a string`);
+    throw new Error(
+      `${context}: formatted_text must be a string (got ${typeof obj.formatted_text})`
+    );
   }
 
   if (!Array.isArray(obj.warnings)) {
-    throw new Error(`${context}: warnings must be an array`);
+    throw new Error(`${context}: warnings must be an array (got ${typeof obj.warnings})`);
+  }
+
+  // extracted_names is optional, but if present must be valid
+  if (obj.extracted_names !== undefined) {
+    if (typeof obj.extracted_names !== 'object' || obj.extracted_names === null) {
+      throw new Error(
+        `${context}: extracted_names must be an object (got ${typeof obj.extracted_names})`
+      );
+    }
+
+    const extractedNames = obj.extracted_names as Record<string, unknown>;
+
+    if (
+      extractedNames.sender !== null &&
+      extractedNames.sender !== undefined &&
+      typeof extractedNames.sender !== 'string'
+    ) {
+      throw new Error(
+        `${context}: extracted_names.sender must be string, null, or undefined (got ${typeof extractedNames.sender})`
+      );
+    }
+
+    if (
+      extractedNames.recipient !== null &&
+      extractedNames.recipient !== undefined &&
+      typeof extractedNames.recipient !== 'string'
+    ) {
+      throw new Error(
+        `${context}: extracted_names.recipient must be string, null, or undefined (got ${typeof extractedNames.recipient})`
+      );
+    }
   }
 }
 
@@ -132,11 +183,103 @@ export async function formatCorrespondence(
     const client = getAnthropicClient();
 
     const userPrompt = shouldSplit
-      ? `Format and split this email thread into individual entries. Return JSON with an "entries" array and a "warnings" array.
+      ? `YOU MUST SPLIT THIS CORRESPONDENCE INTO SEPARATE INDIVIDUAL EMAILS.
 
+CRITICAL: Recognize BOTH standard email formats AND Word document formats:
+
+FORMAT 1 - Standard Email Headers:
+Look for "From:", "Sent:", "To:", "Subject:", "Date:", or "On...wrote:" patterns.
+
+FORMAT 2 - Word Document Format:
+Look for "Email from [Name] to [Name], [Date]" pattern.
+Examples:
+- "Email from me to Freddie Mitchell, 14/12/2025"
+- "Email from Freddie to me, 5/01/2026"
+
+SEPARATORS:
+- Dotted lines: ……………… (20+ dots)
+- Dashed lines: ----------- (5+ dashes)
+- Underscores: ___________ (5+ underscores)
+
+Each time you see headers OR separators, that's a SEPARATE email needing its own entry.
+
+Return JSON with this EXACT structure:
+{
+  "entries": [
+    {
+      "subject_guess": "string (max 90 chars, required)",
+      "entry_type_guess": "Email",
+      "entry_date_guess": "ISO 8601 string or null",
+      "direction_guess": "sent" | "received" | null,
+      "formatted_text": "string (ONLY this email's content)",
+      "warnings": [],
+      "extracted_names": {
+        "sender": "string or null",
+        "recipient": "string or null"
+      }
+    }
+  ],
+  "warnings": []
+}
+
+RULES:
+1. Create SEPARATE entry for EACH email
+2. Extract dates:
+   - From "Sent:" or "Date:" headers → ISO 8601
+   - From "Email from... to..., DD/MM/YYYY" → ISO 8601
+   - Examples: "14/12/2025" → "2025-12-14T00:00:00Z", "5/01/2026" → "2026-01-05T00:00:00Z"
+   - British format is DD/MM/YYYY
+3. Extract names from headers:
+   - Standard: From "From:" header
+   - Word format: From "Email from [Sender] to [Recipient]"
+   - Store in extracted_names field
+   - Use null if cannot extract
+4. Determine direction:
+   - "sent" if sender is "me", "I", "Bridget", or @chiswickcalendar.co.uk
+   - "received" for all other senders
+   - null if cannot determine
+5. CRITICAL: Strip headers from formatted_text
+   - Remove "From:", "Sent:", "Subject:" lines
+   - Remove "Email from... to..., date" line
+   - Start formatted_text with actual message content
+6. Preserve exact wording - no summarization
+7. Order chronologically (oldest first)
+
+Text to process:
 ${rawText}`
-      : `Format this correspondence entry. Return JSON with subject_guess, entry_type_guess, entry_date_guess, formatted_text, and warnings array.
+      : `Format this correspondence entry.
 
+Return JSON with this EXACT structure:
+{
+  "subject_guess": "string (max 90 chars, required)",
+  "entry_type_guess": "Email" | "Call" | "Meeting" (required),
+  "entry_date_guess": "ISO 8601 string or null" (required),
+  "direction_guess": "sent" | "received" | null (optional - only for emails),
+  "formatted_text": "string (required)",
+  "warnings": [] (required array, can be empty),
+  "extracted_names": {
+    "sender": "string or null",
+    "recipient": "string or null"
+  } (optional - only for emails)
+}
+
+If entry_type_guess is "Email":
+- Support BOTH standard format AND Word document format:
+  * Standard: "From:", "Sent:", "To:", "Subject:" headers
+  * Word format: "Email from [Name] to [Name], DD/MM/YYYY"
+- Extract names from headers and store in extracted_names field
+- Determine direction_guess:
+  * If sender is "me", "I", "Bridget", or @chiswickcalendar.co.uk → "sent"
+  * Otherwise → "received"
+  * If you cannot determine → null
+- Parse dates:
+  * Standard: from "Sent:" or "Date:" headers
+  * Word format: from "Email from... to..., DD/MM/YYYY" (British format)
+  * Convert to ISO 8601
+- CRITICAL: Remove email headers from formatted_text. DO NOT include "From:", "Sent:", "To:", "Subject:", "Date:", or "Email from..." lines in the body
+- Start formatted_text from the first line AFTER the headers
+
+Text to process:
 ${rawText}`;
 
     const response = await client.messages.create({
@@ -169,11 +312,18 @@ ${rawText}`;
     try {
       parsed = JSON.parse(jsonText);
     } catch (parseError) {
+      console.error('Failed to parse AI response. Raw text:', jsonText);
       throw new Error(`Failed to parse AI response as JSON: ${parseError}`);
     }
 
     // Validate against contract
-    const validated = validateAIResponse(parsed);
+    let validated: AIFormatterResponse;
+    try {
+      validated = validateAIResponse(parsed);
+    } catch (validationError) {
+      console.error('AI response validation failed. Response:', JSON.stringify(parsed, null, 2));
+      throw validationError;
+    }
 
     return {
       success: true,

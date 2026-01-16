@@ -23,6 +23,8 @@ const EMAIL_HEADER_PATTERNS = [
   /^[-]{3,}\s*Original Message\s*[-]{3,}/im,
   /^[-]{3,}\s*Forwarded Message\s*[-]{3,}/im,
   /^_{5,}/m, // Outlook-style separators
+  /\.{20,}/m, // Dotted line separators (Word format)
+  /^Email from .+ to .+,\s*\d{1,2}\/\d{1,2}\/\d{2,4}/im, // "Email from X to Y, date" (Word format)
 ];
 
 /**
@@ -32,6 +34,9 @@ const THREAD_INDICATORS = [
   /From:[\s\S]{20,}?From:/i, // Multiple "From:" headers
   /On\s+.+wrote:[\s\S]{50,}?On\s+.+wrote:/i, // Multiple "On...wrote:" patterns
   /Subject:[\s\S]{20,}?Subject:/i, // Multiple subjects
+  /Sent:[\s\S]{20,}?Sent:/i, // Multiple "Sent:" headers (common in Outlook threads)
+  /Email from .+ to .+,[\s\S]{20,}?Email from .+ to .+,/i, // Multiple "Email from..." patterns (Word format)
+  /\.{20,}[\s\S]{20,}?\.{20,}/m, // Multiple dotted separators (Word format)
 ];
 
 /**
@@ -57,14 +62,27 @@ export function detectEmailThread(rawText: string): ThreadDetectionResult {
     const matches = rawText.match(pattern);
     if (matches) {
       threadPatternMatches++;
-      indicators.push(`Found multiple ${pattern.source.split(':')[0]} patterns`);
     }
   });
 
+  // Count actual email headers to give better feedback
+  const fromCount = (rawText.match(/^From:\s*/gm) || []).length;
+  const sentCount = (rawText.match(/^Sent:\s*/gm) || []).length;
+  const subjectCount = (rawText.match(/^Subject:\s*/gm) || []).length;
+  const wordFormatCount = (rawText.match(/^Email from .+ to .+,\s*\d{1,2}\/\d{1,2}\/\d{2,4}/gim) || []).length;
+
+  if (fromCount > 1 || sentCount > 1 || subjectCount > 1 || wordFormatCount > 1) {
+    const maxCount = Math.max(fromCount, sentCount, subjectCount, wordFormatCount);
+    indicators.push(`Detected ${maxCount} possible emails in thread`);
+  }
+
   // Count how many times common separator patterns appear
   const separatorCount = (rawText.match(/^[-_]{5,}/gm) || []).length;
-  if (separatorCount >= 2) {
-    indicators.push(`${separatorCount} separator lines detected`);
+  const dottedSeparatorCount = (rawText.match(/\.{20,}/gm) || []).length;
+  const totalSeparators = separatorCount + dottedSeparatorCount;
+
+  if (totalSeparators >= 2) {
+    indicators.push(`${totalSeparators} separator lines detected`);
     threadPatternMatches++;
   }
 
@@ -80,14 +98,23 @@ export function detectEmailThread(rawText: string): ThreadDetectionResult {
   let confidence: 'low' | 'medium' | 'high' = 'low';
   let looksLikeThread = false;
 
-  if (threadPatternMatches >= 2) {
+  // High confidence for Word format with dotted separators
+  if (dottedSeparatorCount >= 2 && wordFormatCount >= 2) {
+    confidence = 'high';
+    looksLikeThread = true;
+    indicators.push('High confidence: Word document format detected');
+  } else if (threadPatternMatches >= 2) {
     confidence = 'high';
     looksLikeThread = true;
     indicators.push('High confidence: multiple thread patterns detected');
-  } else if (threadPatternMatches === 1 || (headerCount >= 4 && separatorCount >= 1)) {
+  } else if (threadPatternMatches === 1 || (headerCount >= 4 && totalSeparators >= 1)) {
     confidence = 'medium';
     looksLikeThread = true;
     indicators.push('Medium confidence: some thread indicators present');
+  } else if (dottedSeparatorCount >= 2 || wordFormatCount >= 1) {
+    confidence = 'medium';
+    looksLikeThread = true;
+    indicators.push('Medium confidence: Word format indicators present');
   } else if (headerCount >= 3) {
     confidence = 'low';
     looksLikeThread = false;

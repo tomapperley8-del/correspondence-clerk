@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -18,8 +18,10 @@ import {
   createUnformattedCorrespondence,
 } from '@/app/actions/ai-formatter'
 import type { AIFormatterResponse } from '@/lib/ai/types'
+import { extractContactsFromText, type ExtractedContact } from '@/lib/contact-extraction'
+import { ContactExtractionModal } from '@/components/ContactExtractionModal'
 
-export default function NewEntryPage() {
+function NewEntryPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const businessIdFromQuery = searchParams.get('businessId')
@@ -58,6 +60,11 @@ export default function NewEntryPage() {
   const [isFormatting, setIsFormatting] = useState(false)
   const [formattingError, setFormattingError] = useState<string | null>(null)
   const [aiResponse, setAiResponse] = useState<AIFormatterResponse | null>(null)
+
+  // Contact extraction state
+  const [extractedContacts, setExtractedContacts] = useState<ExtractedContact[]>([])
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [contactsAdded, setContactsAdded] = useState(0)
 
   // Load businesses on mount
   useEffect(() => {
@@ -119,6 +126,17 @@ export default function NewEntryPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [isDirty])
 
+  // Extract contacts when raw text changes
+  useEffect(() => {
+    if (rawText.trim().length < 100) {
+      setExtractedContacts([])
+      return
+    }
+
+    const result = extractContactsFromText(rawText)
+    setExtractedContacts(result.contacts)
+  }, [rawText])
+
   // Detect email threads when raw text changes
   useEffect(() => {
     if (rawText.trim().length < 50) {
@@ -165,6 +183,18 @@ export default function NewEntryPage() {
   const handleContactAdded = (contact: Contact) => {
     setContacts((prev) => [...prev, contact])
     setSelectedContactId(contact.id)
+  }
+
+  const handleContactsAdded = async (count: number) => {
+    setContactsAdded(count)
+    // Reload contacts for the selected business
+    if (selectedBusinessId) {
+      const response = await fetch(`/api/contacts?businessId=${selectedBusinessId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setContacts(data)
+      }
+    }
   }
 
   const validate = () => {
@@ -217,7 +247,7 @@ export default function NewEntryPage() {
 
     if ('error' in formatResult) {
       // AI formatting failed - offer to save as unformatted
-      setFormattingError(formatResult.error)
+      setFormattingError(formatResult.error || 'Formatting failed')
       setIsLoading(false)
       return
     }
@@ -421,6 +451,31 @@ export default function NewEntryPage() {
             <p className="text-red-600 text-xs mt-1">{errors.rawText}</p>
           )}
 
+          {/* Contact Extraction Display */}
+          {extractedContacts.length > 0 && selectedBusinessId && contactsAdded === 0 && (
+            <div className="mt-3 p-4 bg-yellow-50 border-2 border-yellow-300">
+              <p className="text-sm text-yellow-900 mb-2">
+                <strong>Detected {extractedContacts.length} contact{extractedContacts.length !== 1 ? 's' : ''} in pasted text</strong>
+              </p>
+              <Button
+                type="button"
+                onClick={() => setShowContactModal(true)}
+                className="bg-yellow-600 text-white hover:bg-yellow-700 px-4 py-2 text-sm font-semibold"
+              >
+                Review & Add Contacts
+              </Button>
+            </div>
+          )}
+
+          {/* Contact Added Confirmation */}
+          {contactsAdded > 0 && selectedBusinessId && (
+            <div className="mt-3 p-4 bg-green-50 border-2 border-green-300">
+              <p className="text-sm text-green-900">
+                ✓ Added {contactsAdded} contact{contactsAdded !== 1 ? 's' : ''} to {businesses.find(b => b.id === selectedBusinessId)?.name}
+              </p>
+            </div>
+          )}
+
           {/* Thread Detection Display */}
           {threadDetection && threadDetection.looksLikeThread && (
             <div className="mt-3 p-4 bg-blue-50 border-2 border-blue-600">
@@ -563,6 +618,29 @@ export default function NewEntryPage() {
           onContactAdded={handleContactAdded}
         />
       )}
+
+      {/* Contact Extraction Modal */}
+      {selectedBusinessId && (
+        <ContactExtractionModal
+          isOpen={showContactModal}
+          onClose={() => setShowContactModal(false)}
+          extractedContacts={extractedContacts}
+          businessId={selectedBusinessId}
+          onContactsAdded={handleContactsAdded}
+        />
+      )}
     </div>
+  )
+}
+
+export default function NewEntryPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    }>
+      <NewEntryPageContent />
+    </Suspense>
   )
 }
