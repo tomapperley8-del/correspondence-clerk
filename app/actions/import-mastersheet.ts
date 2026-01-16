@@ -8,6 +8,11 @@ import path from 'path'
 interface MastersheetRow {
   BUSINESS: string
   'RELATIONSHIP TYPE': string
+  'CONTRACT START': string
+  'CONTRACT END': string
+  'NOTES/AD DETAILS/FLAG INFO': string
+  'PAYMENT STRUCTURE': string
+  'AMOUNT (£)': string
   'PRIMARY CONTACT': string
   'OTHER CONTACTS': string
   EMAIL: string
@@ -15,6 +20,8 @@ interface MastersheetRow {
   'BUSINESS CATEGORY': string
   'ON WEBSITE?': string
   'REMINDER FLAG': string
+  'Primary Contact': string
+  'Other Contacts': string
 }
 
 interface ImportReport {
@@ -141,6 +148,11 @@ export async function importMastersheet(): Promise<
         let isAdvertiser = false
         let category = ''
         let status = 'Prospect'
+        let contractStart: string | null = null
+        let contractEnd: string | null = null
+        let dealTerms: string | null = null
+        let paymentStructure: string | null = null
+        let contractAmount: number | null = null
         const contacts: Array<{
           name: string
           email: string
@@ -162,18 +174,52 @@ export async function importMastersheet(): Promise<
             category = row['BUSINESS CATEGORY']
           }
 
-          // Collect contacts
-          if (row['PRIMARY CONTACT'] && row['PRIMARY CONTACT'].trim()) {
+          // Contract dates (most recent non-empty wins)
+          if (row['CONTRACT START'] && row['CONTRACT START'].trim()) {
+            contractStart = row['CONTRACT START'].trim()
+          }
+          if (row['CONTRACT END'] && row['CONTRACT END'].trim()) {
+            contractEnd = row['CONTRACT END'].trim()
+          }
+
+          // Deal terms for advertisers (concatenate if multiple)
+          if (row['NOTES/AD DETAILS/FLAG INFO'] && row['NOTES/AD DETAILS/FLAG INFO'].trim()) {
+            if (dealTerms) {
+              dealTerms += '; ' + row['NOTES/AD DETAILS/FLAG INFO'].trim()
+            } else {
+              dealTerms = row['NOTES/AD DETAILS/FLAG INFO'].trim()
+            }
+          }
+
+          // Payment structure (most recent non-empty wins)
+          if (row['PAYMENT STRUCTURE'] && row['PAYMENT STRUCTURE'].trim()) {
+            paymentStructure = row['PAYMENT STRUCTURE'].trim()
+          }
+
+          // Contract amount (most recent non-empty wins)
+          if (row['AMOUNT (£)'] && row['AMOUNT (£)'].trim()) {
+            const amountStr = row['AMOUNT (£)'].trim().replace(/[£,]/g, '')
+            const amount = parseFloat(amountStr)
+            if (!isNaN(amount)) {
+              contractAmount = amount
+            }
+          }
+
+          // Collect contacts (handle both uppercase and proper case column names)
+          const primaryContact = row['PRIMARY CONTACT'] || row['Primary Contact']
+          const otherContacts = row['OTHER CONTACTS'] || row['Other Contacts']
+
+          if (primaryContact && primaryContact.trim()) {
             contacts.push({
-              name: row['PRIMARY CONTACT'].trim(),
+              name: primaryContact.trim(),
               email: row.EMAIL || '',
               phone: row.PHONE || '',
             })
           }
 
-          if (row['OTHER CONTACTS'] && row['OTHER CONTACTS'].trim()) {
+          if (otherContacts && otherContacts.trim()) {
             // Split by comma or semicolon
-            const otherNames = row['OTHER CONTACTS']
+            const otherNames = otherContacts
               .split(/[,;]/)
               .map((n) => n.trim())
               .filter((n) => n)
@@ -189,8 +235,8 @@ export async function importMastersheet(): Promise<
 
           // If no named contact but we have email/phone, create anonymous contact
           if (
-            !row['PRIMARY CONTACT'] &&
-            !row['OTHER CONTACTS'] &&
+            !primaryContact &&
+            !otherContacts &&
             (row.EMAIL || row.PHONE)
           ) {
             contacts.push({
@@ -227,6 +273,11 @@ export async function importMastersheet(): Promise<
               is_advertiser: isAdvertiser,
               category,
               status,
+              contract_start: contractStart,
+              contract_end: contractEnd,
+              deal_terms: dealTerms,
+              payment_structure: paymentStructure,
+              contract_amount: contractAmount,
               mastersheet_source_ids: rowNumbers,
             })
             .eq('id', existingBusiness.id)
@@ -257,6 +308,11 @@ export async function importMastersheet(): Promise<
               is_advertiser: isAdvertiser,
               category,
               status,
+              contract_start: contractStart,
+              contract_end: contractEnd,
+              deal_terms: dealTerms,
+              payment_structure: paymentStructure,
+              contract_amount: contractAmount,
               mastersheet_source_ids: rowNumbers,
             })
             .select('id')

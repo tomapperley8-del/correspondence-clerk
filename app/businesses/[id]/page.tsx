@@ -11,6 +11,7 @@ import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
 import { EditContactButton } from '@/components/EditContactButton'
 import { ExportToGoogleDocsButton } from '@/components/ExportToGoogleDocsButton'
+import { CorrespondenceSummary } from '@/components/CorrespondenceSummary'
 import { SuccessBanner } from '@/components/SuccessBanner'
 import { retryFormatting } from '@/app/actions/ai-formatter'
 
@@ -331,7 +332,29 @@ export default function BusinessDetailPage({
           ← Back to Dashboard
         </Link>
         <div className="flex justify-between items-start mb-2">
-          <h1 className="text-2xl font-bold text-gray-900">{business.name}</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{business.name}</h1>
+
+            {/* Contract Details */}
+            {business.is_club_card && (business.contract_start || business.contract_end) && (
+              <div className="text-sm text-gray-700 mt-1">
+                <span className="font-semibold">Contract:</span>{' '}
+                {business.contract_start && (
+                  <span>{new Date(business.contract_start).toLocaleDateString('en-GB')}</span>
+                )}
+                {business.contract_start && business.contract_end && <span> - </span>}
+                {business.contract_end && (
+                  <span>{new Date(business.contract_end).toLocaleDateString('en-GB')}</span>
+                )}
+              </div>
+            )}
+
+            {business.is_advertiser && business.deal_terms && (
+              <div className="text-sm text-gray-700 mt-1">
+                <span className="font-semibold">Deal:</span> {business.deal_terms}
+              </div>
+            )}
+          </div>
           <EditBusinessButton business={business} />
         </div>
         {(business.category || business.status) && (
@@ -359,6 +382,9 @@ export default function BusinessDetailPage({
           </div>
         )}
       </div>
+
+      {/* AI Summary of Last 12 Months */}
+      <CorrespondenceSummary businessId={business.id} />
 
       {/* Contacts Section */}
       <div className="bg-white border-2 border-gray-300 p-6 mb-6">

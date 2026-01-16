@@ -11,6 +11,11 @@ export type Business = {
   status: string | null
   is_club_card: boolean
   is_advertiser: boolean
+  contract_start: string | null
+  contract_end: string | null
+  deal_terms: string | null
+  payment_structure: string | null
+  contract_amount: number | null
   last_contacted_at: string | null
   mastersheet_source_ids: any
   created_at: string
