@@ -20,6 +20,9 @@ import {
 import type { AIFormatterResponse } from '@/lib/ai/types'
 import { extractContactsFromText, type ExtractedContact } from '@/lib/contact-extraction'
 import { ContactExtractionModal } from '@/components/ContactExtractionModal'
+import { ContactMatchPreviewModal } from '@/components/ContactMatchPreviewModal'
+import { matchEntriesToContacts, type ContactMatchResult } from '@/lib/contact-matching'
+import { isThreadSplitResponse } from '@/lib/ai/types'
 
 function NewEntryPageContent() {
   const router = useRouter()
@@ -65,6 +68,11 @@ function NewEntryPageContent() {
   const [extractedContacts, setExtractedContacts] = useState<ExtractedContact[]>([])
   const [showContactModal, setShowContactModal] = useState(false)
   const [contactsAdded, setContactsAdded] = useState(0)
+
+  // Contact matching state (for thread splits)
+  const [contactMatches, setContactMatches] = useState<ContactMatchResult[]>([])
+  const [showMatchPreview, setShowMatchPreview] = useState(false)
+  const [pendingAiResponse, setPendingAiResponse] = useState<AIFormatterResponse | null>(null)
 
   // Load businesses on mount
   useEffect(() => {
@@ -252,11 +260,59 @@ function NewEntryPageContent() {
       return
     }
 
-    // AI formatting succeeded - save formatted correspondence
+    // AI formatting succeeded
+    // Check if it's a thread split with multiple entries
+    if (isThreadSplitResponse(formatResult.data) && formatResult.data.entries.length > 1) {
+      // Match each entry to a contact
+      const matches = matchEntriesToContacts(formatResult.data.entries, contacts)
+
+      // Store the matches and AI response for preview
+      setContactMatches(matches)
+      setPendingAiResponse(formatResult.data)
+      setShowMatchPreview(true)
+      setIsLoading(false)
+    } else {
+      // Single entry - save directly without contact matching
+      const result = await createFormattedCorrespondence(
+        {
+          business_id: selectedBusinessId!,
+          contact_id: selectedContactId!,
+          raw_text_original: rawText,
+          entry_date,
+          type: entryType || undefined,
+          direction: direction || undefined,
+          action_needed: actionNeeded,
+          due_at: dueAt || undefined,
+        },
+        formatResult.data
+      )
+
+      if ('error' in result) {
+        alert(`Error saving: ${result.error}`)
+        setIsLoading(false)
+      } else {
+        setIsDirty(false)
+        router.push(`/businesses/${selectedBusinessId}?saved=true`)
+      }
+    }
+  }
+
+  const handleConfirmMatches = async (confirmedMatches: ContactMatchResult[]) => {
+    if (!pendingAiResponse || !selectedBusinessId) return
+
+    setIsLoading(true)
+    setShowMatchPreview(false)
+
+    // Combine date and time
+    const entry_date = entryTime
+      ? `${entryDateOnly}T${entryTime}:00`
+      : `${entryDateOnly}T12:00:00`
+
+    // Save correspondence with matched contacts
     const result = await createFormattedCorrespondence(
       {
-        business_id: selectedBusinessId!,
-        contact_id: selectedContactId!,
+        business_id: selectedBusinessId,
+        contact_id: selectedContactId!, // Fallback contact (not used if matches provided)
         raw_text_original: rawText,
         entry_date,
         type: entryType || undefined,
@@ -264,7 +320,8 @@ function NewEntryPageContent() {
         action_needed: actionNeeded,
         due_at: dueAt || undefined,
       },
-      formatResult.data
+      pendingAiResponse,
+      confirmedMatches // Pass the confirmed contact matches
     )
 
     if ('error' in result) {
@@ -627,6 +684,22 @@ function NewEntryPageContent() {
           extractedContacts={extractedContacts}
           businessId={selectedBusinessId}
           onContactsAdded={handleContactsAdded}
+        />
+      )}
+
+      {/* Contact Match Preview Modal */}
+      {pendingAiResponse && isThreadSplitResponse(pendingAiResponse) && selectedContactId && (
+        <ContactMatchPreviewModal
+          isOpen={showMatchPreview}
+          onClose={() => {
+            setShowMatchPreview(false);
+            setIsLoading(false);
+          }}
+          entries={pendingAiResponse.entries}
+          contacts={contacts}
+          initialMatches={contactMatches}
+          defaultContactId={selectedContactId}
+          onConfirm={handleConfirmMatches}
         />
       )}
     </div>

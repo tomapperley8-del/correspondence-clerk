@@ -3,6 +3,7 @@
 import { formatCorrespondence } from '@/lib/ai/formatter'
 import { AIFormatterResponse, isThreadSplitResponse } from '@/lib/ai/types'
 import { createClient } from '@/lib/supabase/server'
+import type { ContactMatchResult } from '@/lib/contact-matching'
 
 /**
  * Format correspondence text using AI
@@ -40,6 +41,7 @@ export async function formatCorrespondenceText(
 /**
  * Create correspondence with AI formatting
  * Handles both single entries and thread splits
+ * Optionally accepts contact matches to assign different contacts to different emails
  */
 export async function createFormattedCorrespondence(
   formData: {
@@ -58,7 +60,8 @@ export async function createFormattedCorrespondence(
       | 'renewal'
     due_at?: string
   },
-  aiResponse: AIFormatterResponse
+  aiResponse: AIFormatterResponse,
+  contactMatches?: ContactMatchResult[]
 ) {
   const supabase = await createClient()
   const {
@@ -72,27 +75,41 @@ export async function createFormattedCorrespondence(
   // Handle thread split vs single entry
   if (isThreadSplitResponse(aiResponse)) {
     // Multiple entries - insert in chronological order
-    const entries = aiResponse.entries.map((entry, index) => ({
-      business_id: formData.business_id,
-      contact_id: formData.contact_id,
-      user_id: user.id,
-      raw_text_original: formData.raw_text_original,
-      formatted_text_original: entry.formatted_text,
-      formatted_text_current: entry.formatted_text,
-      entry_date: entry.entry_date_guess || formData.entry_date || new Date().toISOString(),
-      subject: entry.subject_guess,
-      type: entry.entry_type_guess,
-      direction: formData.direction || null,
-      action_needed: formData.action_needed || 'none',
-      due_at: formData.due_at || null,
-      formatting_status: 'formatted',
-      ai_metadata: {
-        warnings: entry.warnings,
-        split_from_thread: true,
-        thread_position: index + 1,
-        thread_total: aiResponse.entries.length,
-      },
-    }))
+    const entries = aiResponse.entries.map((entry, index) => {
+      // Use matched contact if available, otherwise use default contact
+      const contactId = contactMatches && contactMatches[index]?.contactId
+        ? contactMatches[index].contactId
+        : formData.contact_id
+
+      return {
+        business_id: formData.business_id,
+        contact_id: contactId,
+        user_id: user.id,
+        raw_text_original: formData.raw_text_original,
+        formatted_text_original: entry.formatted_text,
+        formatted_text_current: entry.formatted_text,
+        entry_date: entry.entry_date_guess || formData.entry_date || new Date().toISOString(),
+        subject: entry.subject_guess,
+        type: entry.entry_type_guess,
+        direction: entry.direction_guess || formData.direction || null,
+        action_needed: formData.action_needed || 'none',
+        due_at: formData.due_at || null,
+        formatting_status: 'formatted',
+        ai_metadata: {
+          warnings: entry.warnings,
+          split_from_thread: true,
+          thread_position: index + 1,
+          thread_total: aiResponse.entries.length,
+          matched_contact: contactMatches && contactMatches[index]
+            ? {
+                matched: true,
+                matched_from: contactMatches[index].matchedFrom,
+                confidence: contactMatches[index].confidence,
+              }
+            : { matched: false },
+        },
+      }
+    })
 
     const { data, error } = await supabase
       .from('correspondence')
@@ -131,7 +148,7 @@ export async function createFormattedCorrespondence(
           aiResponse.entry_date_guess || formData.entry_date || new Date().toISOString(),
         subject: aiResponse.subject_guess,
         type: aiResponse.entry_type_guess,
-        direction: formData.direction || null,
+        direction: aiResponse.direction_guess || formData.direction || null,
         action_needed: formData.action_needed || 'none',
         due_at: formData.due_at || null,
         formatting_status: 'formatted',
