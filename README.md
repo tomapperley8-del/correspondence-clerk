@@ -148,6 +148,25 @@ npm run lint
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Technical architecture and database schema
 - **[USER_FLOW.md](./USER_FLOW.md)** - User flows and interaction patterns
 - **[GLOSSARY.md](./GLOSSARY.md)** - Project terminology
+- **[OUTLOOK_INTEGRATION.md](./OUTLOOK_INTEGRATION.md)** - Outlook Web integration guide
+
+## Outlook Integration
+
+Send emails directly from Outlook Web to Correspondence Clerk with a browser bookmarklet.
+
+**Quick Start:**
+1. Install the bookmarklet (see [OUTLOOK_INTEGRATION.md](./OUTLOOK_INTEGRATION.md))
+2. Open an email in Outlook Web
+3. Click the bookmarklet
+4. Correspondence Clerk opens with the form pre-filled
+
+**Features:**
+- Extracts email subject, body, sender, date automatically
+- Pre-fills form fields in Correspondence Clerk
+- Auto-matches business/contact from email addresses
+- Supports email threads and conversation views
+
+For detailed setup instructions and troubleshooting, see [OUTLOOK_INTEGRATION.md](./OUTLOOK_INTEGRATION.md).
 
 ## Next Steps
 

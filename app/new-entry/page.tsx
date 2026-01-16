@@ -80,6 +80,91 @@ function NewEntryPageContent() {
   const [duplicateEntry, setDuplicateEntry] = useState<Correspondence | null>(null)
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false)
   const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false)
+  const [autoMatchedContactId, setAutoMatchedContactId] = useState<string | null>(null)
+
+  // Check for email import query parameters and pre-fill form
+  useEffect(() => {
+    const emailSubject = searchParams.get('emailSubject')
+    const emailBody = searchParams.get('emailBody')
+    const emailFrom = searchParams.get('emailFrom')
+    const emailFromEmail = searchParams.get('emailFromEmail')
+    const emailDate = searchParams.get('emailDate')
+    const emailRawContent = searchParams.get('emailRawContent')
+    const contactIdFromQuery = searchParams.get('contactId')
+
+    if (emailSubject || emailBody || emailRawContent) {
+      // Pre-fill raw text with formatted email content
+      if (emailRawContent) {
+        setRawText(decodeURIComponent(emailRawContent))
+      } else if (emailFrom || emailSubject || emailBody) {
+        const formattedEmail = `From: ${emailFrom || ''}
+${searchParams.get('emailTo') ? `To: ${searchParams.get('emailTo')}\n` : ''}${emailDate ? `Date: ${emailDate}\n` : ''}${emailSubject ? `Subject: ${emailSubject}\n` : ''}
+
+${emailBody || ''}`
+        setRawText(formattedEmail)
+      }
+
+      // Pre-fill subject
+      if (emailSubject) {
+        setSubject(emailSubject)
+      }
+
+      // Pre-fill entry date
+      if (emailDate) {
+        try {
+          const date = new Date(emailDate)
+          setEntryDateOnly(date.toISOString().slice(0, 10))
+          const hours = date.getHours()
+          const minutes = date.getMinutes()
+          setEntryTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`)
+        } catch (e) {
+          // Invalid date, use today's date
+        }
+      }
+
+      // Set entry type to Email
+      setEntryType('Email')
+
+      // Detect direction from email (if "from" contains user's domain, it's sent)
+      if (emailFrom) {
+        const fromLower = emailFrom.toLowerCase()
+        if (
+          fromLower.includes('chiswickcalendar.co.uk') ||
+          fromLower.includes('bridget') ||
+          fromLower.includes('<') && fromLower.includes('chiswickcalendar')
+        ) {
+          setDirection('sent')
+        } else {
+          setDirection('received')
+        }
+      }
+
+      // Pre-select contact if provided
+      if (contactIdFromQuery) {
+        setSelectedContactId(contactIdFromQuery)
+      }
+
+      // Auto-match business and contact from sender email
+      if (emailFromEmail && !businessIdFromQuery && !contactIdFromQuery) {
+        async function matchFromEmail() {
+          try {
+            const response = await fetch(`/api/contacts?email=${encodeURIComponent(emailFromEmail)}`)
+            if (response.ok) {
+              const matchedContacts = await response.json()
+              if (matchedContacts.length > 0) {
+                const contact = matchedContacts[0]
+                setAutoMatchedContactId(contact.id) // Store for later
+                setSelectedBusinessId(contact.business_id)
+              }
+            }
+          } catch (error) {
+            console.error('Error matching contact:', error)
+          }
+        }
+        matchFromEmail()
+      }
+    }
+  }, [searchParams, businessIdFromQuery])
 
   // Load businesses on mount
   useEffect(() => {
@@ -112,8 +197,13 @@ function NewEntryPageContent() {
         const data = await response.json()
         setContacts(data)
 
+        // If we have an auto-matched contact, select it
+        if (autoMatchedContactId && data.some((c: Contact) => c.id === autoMatchedContactId)) {
+          setSelectedContactId(autoMatchedContactId)
+          setAutoMatchedContactId(null) // Clear it so it doesn't interfere later
+        }
         // Smart default: if only one contact, preselect it
-        if (data.length === 1) {
+        else if (data.length === 1) {
           setSelectedContactId(data[0].id)
         } else {
           setSelectedContactId(null)
@@ -121,7 +211,7 @@ function NewEntryPageContent() {
       }
     }
     loadContacts()
-  }, [selectedBusinessId])
+  }, [selectedBusinessId, autoMatchedContactId])
 
   // Track unsaved changes
   useEffect(() => {
@@ -408,9 +498,27 @@ function NewEntryPageContent() {
     }
   }
 
+  // Check if email was imported from Outlook
+  const emailImported = !!(
+    searchParams.get('emailSubject') ||
+    searchParams.get('emailBody') ||
+    searchParams.get('emailRawContent')
+  )
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">New Entry</h1>
+
+      {emailImported && (
+        <div className="mb-6 border-2 border-blue-600 bg-blue-50 px-4 py-3">
+          <p className="text-blue-900 font-semibold text-sm">
+            Email imported from Outlook
+          </p>
+          <p className="text-blue-700 text-sm mt-1">
+            Please verify business and contact selection, then save the entry.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Business Selector */}

@@ -13,10 +13,28 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const businessId = searchParams.get('businessId')
+  const email = searchParams.get('email')
 
+  // Search by email (for auto-matching from Outlook)
+  if (email) {
+    const normalizedEmail = email.toLowerCase().trim()
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('*')
+      .or(`email.ilike.${normalizedEmail},normalized_email.ilike.${normalizedEmail}`)
+      .limit(1)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data || [])
+  }
+
+  // Search by business ID
   if (!businessId) {
     return NextResponse.json(
-      { error: 'businessId is required' },
+      { error: 'businessId or email is required' },
       { status: 400 }
     )
   }
