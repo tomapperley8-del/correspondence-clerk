@@ -9,6 +9,7 @@ import { getContactsByBusiness, deleteContact, type Contact } from '@/app/action
 import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, type Correspondence } from '@/app/actions/correspondence'
 import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
+import { EditContactButton } from '@/components/EditContactButton'
 import { SuccessBanner } from '@/components/SuccessBanner'
 import { retryFormatting } from '@/app/actions/ai-formatter'
 
@@ -400,12 +401,15 @@ export default function BusinessDetailPage({
                       </p>
                     )}
                   </div>
-                  <Button
-                    onClick={() => handleDeleteContact(contact.id, contact.name)}
-                    className="bg-red-100 text-red-900 hover:bg-red-200 px-3 py-1 text-xs"
-                  >
-                    Delete
-                  </Button>
+                  <div className="flex gap-2">
+                    <EditContactButton contact={contact} />
+                    <Button
+                      onClick={() => handleDeleteContact(contact.id, contact.name)}
+                      className="bg-red-100 text-red-900 hover:bg-red-200 px-3 py-1 text-xs"
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
