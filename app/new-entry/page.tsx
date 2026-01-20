@@ -147,6 +147,7 @@ ${emailBody || ''}`
       // Auto-match business and contact from sender email
       if (emailFromEmail && !businessIdFromQuery && !contactIdFromQuery) {
         async function matchFromEmail() {
+          if (!emailFromEmail) return
           try {
             const response = await fetch(`/api/contacts?email=${encodeURIComponent(emailFromEmail)}`)
             if (response.ok) {
