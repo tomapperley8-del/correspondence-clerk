@@ -179,4 +179,4 @@ After completing Step 1, the next step is:
 
 ## Contact
 
-Project maintained by Bridget Osborne
+Project maintained by Tom Apperley
