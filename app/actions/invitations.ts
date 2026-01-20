@@ -249,7 +249,7 @@ export async function acceptInvitation(token: string, userId: string) {
     .insert({
       id: userId,
       organization_id: invitation.organization_id,
-      display_name: userData.user.email,
+      display_name: invitation.email,
     })
     .select()
     .single()
