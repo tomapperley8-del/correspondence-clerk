@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { validateInvitationToken } from '@/app/actions/invitations'
 
-export default function SignupPage() {
+function SignupPageContent() {
   const searchParams = useSearchParams()
   const invitationToken = searchParams.get('invitation_token')
 
@@ -218,5 +218,23 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+          <div className="w-full max-w-md">
+            <div className="bg-white border-2 border-gray-800 p-8">
+              <p className="text-gray-600">Loading...</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <SignupPageContent />
+    </Suspense>
   )
 }

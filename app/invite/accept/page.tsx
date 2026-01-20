@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -17,7 +17,7 @@ type InvitationData = {
   }
 }
 
-export default function AcceptInvitePage() {
+function AcceptInvitePageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams.get('token')
@@ -156,5 +156,23 @@ export default function AcceptInvitePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AcceptInvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+          <div className="w-full max-w-md">
+            <div className="bg-white border-2 border-gray-800 p-8">
+              <p className="text-gray-600">Validating invitation...</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <AcceptInvitePageContent />
+    </Suspense>
   )
 }
