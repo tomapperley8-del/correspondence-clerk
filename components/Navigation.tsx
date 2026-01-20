@@ -6,9 +6,16 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import type { User } from '@supabase/supabase-js'
+import { getCurrentOrganization } from '@/app/actions/organizations'
+
+type Organization = {
+  id: string
+  name: string
+}
 
 export function Navigation() {
   const [user, setUser] = useState<User | null>(null)
+  const [organization, setOrganization] = useState<Organization | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const pathname = usePathname()
   const router = useRouter()
@@ -20,6 +27,15 @@ export function Navigation() {
         data: { user },
       } = await supabase.auth.getUser()
       setUser(user)
+
+      // Fetch organization if user is authenticated
+      if (user) {
+        const orgResult = await getCurrentOrganization()
+        if (orgResult.data) {
+          setOrganization(orgResult.data)
+        }
+      }
+
       setIsLoading(false)
     }
 
@@ -27,8 +43,19 @@ export function Navigation() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null
+      setUser(currentUser)
+
+      // Fetch organization when user logs in
+      if (currentUser) {
+        const orgResult = await getCurrentOrganization()
+        if (orgResult.data) {
+          setOrganization(orgResult.data)
+        }
+      } else {
+        setOrganization(null)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -40,11 +67,13 @@ export function Navigation() {
     router.refresh()
   }
 
-  // Don't show navigation on auth pages
+  // Don't show navigation on auth pages, onboarding, or invite pages
   if (
     pathname === '/login' ||
     pathname === '/signup' ||
-    pathname?.startsWith('/auth/')
+    pathname?.startsWith('/auth/') ||
+    pathname?.startsWith('/onboarding/') ||
+    pathname?.startsWith('/invite/')
   ) {
     return null
   }
@@ -116,7 +145,22 @@ export function Navigation() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">{user.email}</span>
+            <div className="text-right">
+              <div className="text-sm text-gray-600">{user.email}</div>
+              {organization && (
+                <div className="text-xs text-gray-500">{organization.name}</div>
+              )}
+            </div>
+            <Link
+              href="/settings/organization"
+              className={`px-3 py-2 text-sm font-medium ${
+                pathname === '/settings/organization'
+                  ? 'text-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Settings
+            </Link>
             <Button
               onClick={handleLogout}
               variant="ghost"

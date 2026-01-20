@@ -4,6 +4,7 @@ import { formatCorrespondence } from '@/lib/ai/formatter'
 import { AIFormatterResponse, isThreadSplitResponse } from '@/lib/ai/types'
 import { createClient } from '@/lib/supabase/server'
 import type { ContactMatchResult } from '@/lib/contact-matching'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 /**
  * Format correspondence text using AI
@@ -72,6 +73,12 @@ export async function createFormattedCorrespondence(
     return { error: 'Unauthorized' }
   }
 
+  // Get user's organization
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   // Handle thread split vs single entry
   if (isThreadSplitResponse(aiResponse)) {
     // Multiple entries - compute unique hash for each split email based on its formatted content
@@ -102,6 +109,7 @@ export async function createFormattedCorrespondence(
           due_at: formData.due_at || null,
           formatting_status: 'formatted',
           content_hash: entryHash || null,
+          organization_id: organizationId,
           ai_metadata: {
             warnings: entry.warnings,
             split_from_thread: true,
@@ -165,6 +173,7 @@ export async function createFormattedCorrespondence(
         due_at: formData.due_at || null,
         formatting_status: 'formatted',
         content_hash: contentHash || null,
+        organization_id: organizationId,
         ai_metadata: {
           warnings: aiResponse.warnings,
           split_from_thread: false,
@@ -220,6 +229,12 @@ export async function createUnformattedCorrespondence(formData: {
     return { error: 'Unauthorized' }
   }
 
+  // Get user's organization
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   // Compute content hash for duplicate detection
   const { data: contentHash } = await supabase.rpc('compute_content_hash', {
     raw_text: formData.raw_text_original,
@@ -242,6 +257,7 @@ export async function createUnformattedCorrespondence(formData: {
       due_at: formData.due_at || null,
       formatting_status: 'unformatted',
       content_hash: contentHash || null,
+      organization_id: organizationId,
       ai_metadata: { saved_without_formatting: true },
     })
     .select()

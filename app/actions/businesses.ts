@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 export type Business = {
   id: string
@@ -21,6 +22,7 @@ export type Business = {
   phone: string | null
   last_contacted_at: string | null
   mastersheet_source_ids: any
+  organization_id: string
   created_at: string
   updated_at: string
 }
@@ -86,6 +88,12 @@ export async function createBusiness(formData: {
     return { error: 'Unauthorized' }
   }
 
+  // Get user's organization
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   // Normalize name for uniqueness check
   const normalized_name = formData.name.toLowerCase().trim()
 
@@ -98,6 +106,7 @@ export async function createBusiness(formData: {
       status: formData.status || null,
       is_club_card: formData.is_club_card || false,
       is_advertiser: formData.is_advertiser || false,
+      organization_id: organizationId,
     })
     .select()
     .single()

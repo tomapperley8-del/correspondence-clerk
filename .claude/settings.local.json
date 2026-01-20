@@ -23,7 +23,18 @@
       "Bash(npm run build)",
       "Bash(git diff:*)",
       "Bash(taskkill //F //PID 6324)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "WebSearch",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c \"taskkill /F /PID 25856\")",
+      "Bash(if exist \".next\\\\dev\\\\lock\" del /F \".next\\\\dev\\\\lock\")",
+      "Bash(ls:*)",
+      "Bash(git -C \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\" log --oneline -20)",
+      "Bash(git -C \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\" show 698f057 --stat)",
+      "Bash(git -C \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\" log --oneline -5 --format=\"%H %s\")",
+      "Bash(git -C \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\" diff HEAD~5 HEAD --stat)",
+      "Bash(git -C \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\" status --short)",
+      "Bash(git -C \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\" log --all --oneline)"
     ]
   }
 }

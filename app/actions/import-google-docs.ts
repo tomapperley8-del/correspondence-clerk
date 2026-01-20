@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 // MCP type definitions
 declare global {
@@ -164,6 +165,12 @@ async function processDocumentsData(
     throw new Error('Unauthorized')
   }
 
+  // Get user's organization
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    throw new Error('No organization found')
+  }
+
   const report: GoogleDocsImportReport = {
     documentsProcessed: 0,
     businessesMatched: 0,
@@ -224,6 +231,7 @@ async function processDocumentsData(
               normalized_email: contactInfo.email?.toLowerCase() || null,
               phone: contactInfo.phone,
               role: contactInfo.role,
+              organization_id: organizationId,
             })
             .select('id')
             .single()
@@ -249,6 +257,7 @@ async function processDocumentsData(
             email: contactInfo.email,
             normalized_email: contactInfo.email?.toLowerCase() || null,
             phone: contactInfo.phone,
+            organization_id: organizationId,
           })
           .select('id')
           .single()
@@ -283,6 +292,7 @@ async function processDocumentsData(
             direction: null,
             action_needed: 'none',
             formatting_status: 'formatted', // Mark as already formatted since it's from historical docs
+            organization_id: organizationId,
           })
 
           if (corrError) {

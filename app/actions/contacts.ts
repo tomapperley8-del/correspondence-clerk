@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 export type Contact = {
   id: string
@@ -13,6 +14,7 @@ export type Contact = {
   phone: string | null // Deprecated: use phones array
   emails: string[]
   phones: string[]
+  organization_id: string
   created_at: string
   updated_at: string
 }
@@ -95,6 +97,12 @@ export async function createContact(formData: {
     return { error: 'Unauthorized' }
   }
 
+  // Get user's organization
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   // Use new emails/phones arrays if provided, otherwise fall back to single values
   const emailsArray = formData.emails && formData.emails.length > 0
     ? formData.emails.map(e => e.trim()).filter(e => e)
@@ -120,6 +128,7 @@ export async function createContact(formData: {
       phone: phonesArray[0] || null, // Keep for backward compatibility
       emails: JSON.stringify(emailsArray),
       phones: JSON.stringify(phonesArray),
+      organization_id: organizationId,
     })
     .select()
     .single()

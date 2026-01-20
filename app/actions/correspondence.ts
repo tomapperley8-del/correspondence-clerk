@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 export type Correspondence = {
   id: string
@@ -25,6 +26,7 @@ export type Correspondence = {
   formatting_status: 'formatted' | 'unformatted' | 'failed'
   content_hash: string | null
   ai_metadata: any
+  organization_id: string
   created_at: string
   updated_at: string
   edited_at: string | null
@@ -90,6 +92,12 @@ export async function createCorrespondence(formData: {
     return { error: 'Unauthorized' }
   }
 
+  // Get user's organization
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   const { data, error } = await supabase
     .from('correspondence')
     .insert({
@@ -103,6 +111,7 @@ export async function createCorrespondence(formData: {
       direction: formData.direction || null,
       action_needed: formData.action_needed || 'none',
       due_at: formData.due_at || null,
+      organization_id: organizationId,
     })
     .select()
     .single()

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { parse } from 'csv-parse/sync'
 import fs from 'fs/promises'
 import path from 'path'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 interface MastersheetRow {
   BUSINESS: string
@@ -107,6 +108,12 @@ export async function importMastersheet(): Promise<
 
   if (!user) {
     return { error: 'Unauthorized' }
+  }
+
+  // Get user's organization
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
   }
 
   const report: ImportReport = {
@@ -341,6 +348,7 @@ export async function importMastersheet(): Promise<
               payment_structure: paymentStructure,
               contract_amount: contractAmount,
               mastersheet_source_ids: rowNumbers,
+              organization_id: organizationId,
             })
             .select('id')
             .single()
@@ -398,6 +406,7 @@ export async function importMastersheet(): Promise<
                 email: contact.email || null,
                 normalized_email: normalizedEmail,
                 phone: contact.phone || null,
+                organization_id: organizationId,
               })
 
             if (contactError) {

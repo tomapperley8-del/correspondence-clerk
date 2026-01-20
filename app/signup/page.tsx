@@ -1,26 +1,57 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
+import { validateInvitationToken } from '@/app/actions/invitations'
 
 export default function SignupPage() {
+  const searchParams = useSearchParams()
+  const invitationToken = searchParams.get('invitation_token')
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [invitedEmail, setInvitedEmail] = useState<string | null>(null)
+  const [organizationName, setOrganizationName] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  // Validate invitation token on mount
+  useEffect(() => {
+    async function checkInvitation() {
+      if (invitationToken) {
+        const result = await validateInvitationToken(invitationToken)
+        if (result.error) {
+          setError(result.error)
+        } else if (result.data) {
+          setInvitedEmail(result.data.email)
+          setEmail(result.data.email)
+          setOrganizationName(result.data.organizations?.name || null)
+        }
+      }
+    }
+    checkInvitation()
+  }, [invitationToken])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    // If invitation token exists, validate email matches
+    if (invitedEmail && email.toLowerCase() !== invitedEmail.toLowerCase()) {
+      setError(
+        `You must sign up with the invited email address: ${invitedEmail}`
+      )
+      return
+    }
 
     // Client-side validation
     if (password !== confirmPassword) {
@@ -35,11 +66,16 @@ export default function SignupPage() {
 
     setIsLoading(true)
 
+    // Add invitation token to redirect URL if present
+    const redirectUrl = invitationToken
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?invitation_token=${invitationToken}`
+      : `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        emailRedirectTo: redirectUrl,
       },
     })
 
@@ -63,6 +99,13 @@ export default function SignupPage() {
             <p className="text-gray-700 mb-6">
               We&apos;ve sent a confirmation link to <strong>{email}</strong>.
               Please check your email and click the link to verify your account.
+              {organizationName && (
+                <>
+                  {' '}
+                  After verification, you&apos;ll be added to{' '}
+                  <strong>{organizationName}</strong>.
+                </>
+              )}
             </p>
             <Link
               href="/login"
@@ -80,9 +123,14 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md">
         <div className="bg-white border-2 border-gray-800 p-8">
-          <h1 className="text-2xl font-bold mb-6 text-gray-900">
+          <h1 className="text-2xl font-bold mb-2 text-gray-900">
             Create Account
           </h1>
+          {organizationName && (
+            <p className="text-gray-600 mb-6">
+              Join <strong>{organizationName}</strong> on Correspondence Clerk
+            </p>
+          )}
 
           {error && (
             <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6">
@@ -101,10 +149,15 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || !!invitedEmail}
                 className="w-full"
                 placeholder="you@example.com"
               />
+              {invitedEmail && (
+                <p className="text-gray-500 text-xs mt-1">
+                  Using invited email address
+                </p>
+              )}
             </div>
 
             <div>
