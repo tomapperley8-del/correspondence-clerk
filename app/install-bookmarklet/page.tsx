@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function InstallBookmarkletPage() {
   const [activeVersion, setActiveVersion] = useState<'production' | 'local'>('production')
+  const bookmarkletRef = useRef<HTMLAnchorElement>(null)
 
   // Production bookmarklet code
   const productionCode = `javascript:(function(){var url='https://correspondence-clerk.vercel.app';if(!window.location.hostname.includes('outlook')&&!window.location.hostname.includes('office.com')&&!window.location.hostname.includes('live.com')){alert('Please open while viewing an email in Outlook Web.');return;}function parseEmailAddress(text){if(!text)return{email:'',name:''};var emailRegex=/[\\w\\.-]+@[\\w\\.-]+\\.\\w+/;var match=text.match(emailRegex);var email=match?match[0]:'';var name='';if(text.includes('<')&&text.includes('>')){name=text.substring(0,text.indexOf('<')).trim();}else if(text!==email&&!text.includes('@')){name=text.trim();}return{email:email,name:name};}function extractBodyText(element){if(!element)return'';var clone=element.cloneNode(true);var sigs=clone.querySelectorAll('[class*="signature"],[id*="signature"]');sigs.forEach(function(s){s.remove();});var quoted=clone.querySelectorAll('[class*="quote"],[class*="reply"]');quoted.forEach(function(q){q.remove();});var text=clone.textContent||clone.innerText||'';text=text.replace(/\\n\\s*\\n\\s*\\n/g,'\\n\\n');return text.trim();}try{var subject='',body='',from={email:'',name:''},to=[],date=new Date().toISOString();var headings=document.querySelectorAll('[role="heading"]');var fromText='',toText='',dateText='';headings.forEach(function(h){var txt=h.textContent.trim();if(txt.includes('<')&&txt.includes('@')&&txt.includes('>')){fromText=txt;}else if(txt.startsWith('To:')||txt.startsWith('To:\\u200b')){toText=txt.replace(/^To:\\u200b?/,'').trim();}else if(txt.match(/\\d{2}\\/\\d{2}\\/\\d{4}\\s+\\d{2}:\\d{2}/)){dateText=txt;}});if(fromText){from=parseEmailAddress(fromText);}if(toText){to=[parseEmailAddress(toText)];}if(dateText){var parts=dateText.match(/(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{2}):(\\d{2})/);if(parts){var d=new Date(parts[3],parts[2]-1,parts[1],parts[4],parts[5]);if(!isNaN(d.getTime()))date=d.toISOString();}}var subjectCandidates=document.querySelectorAll('h1,h2,h3,h4,[role="heading"]');for(var i=0;i<subjectCandidates.length;i++){var txt=subjectCandidates[i].textContent.trim();if(txt.length>5&&txt.length<200&&!txt.includes('@')&&!txt.startsWith('To:')&&!txt.startsWith('Cc:')&&!txt.match(/\\d{2}\\/\\d{2}\\/\\d{4}/)&&txt!=='Navigation pane'&&txt!=='Inbox'){subject=txt;break;}}var bodyEl=document.querySelector('[role="document"]')||document.querySelector('.customScrollBar')||document.querySelector('[role="main"]');body=extractBodyText(bodyEl);if(!body){alert('Could not extract email body.');return;}var fromStr=from.name?from.name+' <'+from.email+'>':from.email;var toStr=to.map(function(t){return t.name?t.name+' <'+t.email+'>':t.email;}).join(', ');var params=new URLSearchParams({emailSubject:subject,emailBody:body,emailFrom:fromStr,emailFromEmail:from.email,emailFromName:from.name,emailDate:date,emailTo:toStr,emailRawContent:'From: '+fromStr+'\\nTo: '+toStr+'\\nDate: '+new Date(date).toLocaleString('en-GB')+'\\nSubject: '+subject+'\\n\\n'+body});window.open(url+'/new-entry?'+params.toString(),'_blank');}catch(error){alert('Error: '+error.message);}})();`
@@ -13,6 +14,13 @@ export default function InstallBookmarkletPage() {
 
   const currentCode = activeVersion === 'production' ? productionCode : localCode
   const currentUrl = activeVersion === 'production' ? 'https://correspondence-clerk.vercel.app' : 'http://localhost:3000'
+
+  // Set href after mount to bypass React's javascript: URL blocking
+  useEffect(() => {
+    if (bookmarkletRef.current) {
+      bookmarkletRef.current.href = currentCode
+    }
+  }, [currentCode])
 
   return (
     <div className="min-h-screen bg-white">
@@ -55,7 +63,7 @@ export default function InstallBookmarkletPage() {
           <p className="text-xl mb-8 text-[#777]">👇 Drag this button to your bookmarks bar</p>
 
           <a
-            href={currentCode}
+            ref={bookmarkletRef}
             className="inline-block px-12 py-6 bg-[#98bf64] text-white text-xl font-bold no-underline border-3 border-dashed border-[#333] cursor-move transition-all hover:bg-[#7a9d4f] hover:scale-105"
             draggable="true"
           >
