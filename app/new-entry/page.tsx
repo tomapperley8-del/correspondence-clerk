@@ -82,8 +82,97 @@ function NewEntryPageContent() {
   const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false)
   const [autoMatchedContactId, setAutoMatchedContactId] = useState<string | null>(null)
 
+  // Function to fetch email data by token
+  async function fetchEmailDataByToken(token: string) {
+    try {
+      setIsLoading(true)
+
+      const response = await fetch(`/api/import-email/retrieve/${token}`)
+
+      if (!response.ok) {
+        throw new Error('Failed to retrieve email data')
+      }
+
+      const { success, emailData } = await response.json()
+
+      if (success && emailData) {
+        // Pre-fill form with retrieved data
+        if (emailData.emailRawContent) {
+          setRawText(emailData.emailRawContent)
+        } else if (emailData.emailFrom || emailData.emailSubject || emailData.emailBody) {
+          const formattedEmail = `From: ${emailData.emailFrom || ''}
+${emailData.emailTo ? `To: ${emailData.emailTo}\n` : ''}${emailData.emailDate ? `Date: ${emailData.emailDate}\n` : ''}${emailData.emailSubject ? `Subject: ${emailData.emailSubject}\n` : ''}
+
+${emailData.emailBody || ''}`
+          setRawText(formattedEmail)
+        }
+
+        if (emailData.emailSubject) {
+          setSubject(emailData.emailSubject)
+        }
+
+        if (emailData.emailDate) {
+          try {
+            const date = new Date(emailData.emailDate)
+            setEntryDateOnly(date.toISOString().slice(0, 10))
+            const hours = date.getHours()
+            const minutes = date.getMinutes()
+            setEntryTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`)
+          } catch (e) {
+            // Invalid date, use today
+          }
+        }
+
+        setEntryType('Email')
+
+        // Auto-detect direction
+        if (emailData.emailFrom) {
+          const fromLower = emailData.emailFrom.toLowerCase()
+          if (
+            fromLower.includes('chiswickcalendar.co.uk') ||
+            fromLower.includes('bridget')
+          ) {
+            setDirection('sent')
+          } else {
+            setDirection('received')
+          }
+        }
+
+        // Auto-match contact if email provided
+        if (emailData.emailFromEmail) {
+          try {
+            const response = await fetch(`/api/contacts?email=${encodeURIComponent(emailData.emailFromEmail)}`)
+            if (response.ok) {
+              const matchedContacts = await response.json()
+              if (matchedContacts.length > 0) {
+                const contact = matchedContacts[0]
+                setAutoMatchedContactId(contact.id)
+                setSelectedBusinessId(contact.business_id)
+              }
+            }
+          } catch (error) {
+            console.error('Error matching contact:', error)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching email data:', error)
+      alert('Failed to load email data. The link may have expired (tokens are valid for 1 hour). Please try the bookmarklet again or copy the email manually.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Check for email import query parameters and pre-fill form
   useEffect(() => {
+    // NEW: Check for emailToken first (API-based storage)
+    const emailToken = searchParams.get('emailToken')
+    if (emailToken) {
+      fetchEmailDataByToken(emailToken)
+      return // Exit early, don't process URL params
+    }
+
+    // EXISTING: Handle direct URL parameters (fallback)
     const emailSubject = searchParams.get('emailSubject')
     const emailBody = searchParams.get('emailBody')
     const emailFrom = searchParams.get('emailFrom')
@@ -514,6 +603,15 @@ ${emailBody || ''}`
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Loading state for token-based email retrieval */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white px-8 py-6 border-2 border-gray-900">
+            <p className="text-lg font-semibold text-gray-900">Loading email data...</p>
+          </div>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold text-gray-900 mb-6">New Entry</h1>
 
       {emailImported && (
