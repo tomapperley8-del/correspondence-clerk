@@ -6,9 +6,9 @@
 
 ## 🌐 Live URLs
 
-- **Production Site:** https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app
-- **Dashboard:** https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app/dashboard
-- **Help Page:** https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app/help
+- **Production Site:** https://correspondence-clerk.vercel.app
+- **Dashboard:** https://correspondence-clerk.vercel.app/dashboard
+- **Help Page:** https://correspondence-clerk.vercel.app/help
 - **Vercel Dashboard:** https://vercel.com/dashboard
 - **GitHub Repo:** https://github.com/tomapperley8-del/correspondence-clerk
 
@@ -16,7 +16,7 @@
 
 ## 📧 Outlook Integration
 
-**Bookmarklet Installer:** https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app/install-bookmarklet.html
+**Bookmarklet Installer:** https://correspondence-clerk.vercel.app/install-bookmarklet.html
 
 One-click email filing from Outlook Web:
 - Drag-and-drop installer page
