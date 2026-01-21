@@ -46,7 +46,15 @@
       "Bash(del /F C:UsersBridgProjectscorrespondence-clerk.nextdevlock)",
       "Bash(curl:*)",
       "Bash(vercel --prod:*)",
-      "Bash(vercel link:*)"
+      "Bash(vercel link:*)",
+      "WebFetch(domain:correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app)",
+      "Bash(git rm:*)",
+      "Bash(npm run supabase:migrate:*)",
+      "Bash(npm run:*)",
+      "Bash(npx vercel:*)",
+      "Bash(git checkout:*)",
+      "WebFetch(domain:correspondence-clerk.vercel.app)",
+      "Bash(git merge:*)"
     ]
   }
 }
