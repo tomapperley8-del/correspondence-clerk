@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cleanup-temp-emails",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
