@@ -26,11 +26,12 @@ const SINGLE_ENTRY_SCHEMA = {
       enum: ['Email', 'Call', 'Meeting']
     },
     entry_date_guess: {
-      type: ['string', 'null'],
-      format: 'date-time'
+      anyOf: [
+        { type: 'string', format: 'date-time' },
+        { type: 'null' }
+      ]
     },
     direction_guess: {
-      type: ['string', 'null'],
       enum: ['sent', 'received', null]
     },
     formatted_text: { type: 'string' },
@@ -41,8 +42,18 @@ const SINGLE_ENTRY_SCHEMA = {
     extracted_names: {
       type: 'object',
       properties: {
-        sender: { type: ['string', 'null'] },
-        recipient: { type: ['string', 'null'] }
+        sender: {
+          anyOf: [
+            { type: 'string' },
+            { type: 'null' }
+          ]
+        },
+        recipient: {
+          anyOf: [
+            { type: 'string' },
+            { type: 'null' }
+          ]
+        }
       },
       additionalProperties: false
     }
@@ -68,11 +79,12 @@ const THREAD_SPLIT_SCHEMA = {
             enum: ['Email', 'Call', 'Meeting']
           },
           entry_date_guess: {
-            type: ['string', 'null'],
-            format: 'date-time'
+            anyOf: [
+              { type: 'string', format: 'date-time' },
+              { type: 'null' }
+            ]
           },
           direction_guess: {
-            type: ['string', 'null'],
             enum: ['sent', 'received', null]
           },
           formatted_text: { type: 'string' },
@@ -83,8 +95,18 @@ const THREAD_SPLIT_SCHEMA = {
           extracted_names: {
             type: 'object',
             properties: {
-              sender: { type: ['string', 'null'] },
-              recipient: { type: ['string', 'null'] }
+              sender: {
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'null' }
+                ]
+              },
+              recipient: {
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'null' }
+                ]
+              }
             },
             additionalProperties: false
           }
