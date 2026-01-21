@@ -2,7 +2,19 @@
 
 Send emails directly from Outlook Web to Correspondence Clerk with one click.
 
-**🚀 Easiest Installation:** Visit the [Bookmarklet Installer](https://correspondence-clerk.vercel.app/install-bookmarklet.html) for a drag-and-drop installation page.
+**🚀 Easiest Installation:** Visit the [Bookmarklet Installer](https://correspondence-clerk.vercel.app/install-bookmarklet) for a drag-and-drop installation page.
+
+**✅ Status:** Fully working and tested (January 21, 2026)
+
+## Important Technical Notes
+
+**Implementation:** The installer is a Next.js page at `/app/install-bookmarklet/page.tsx`, not a static HTML file. This is critical because:
+- React blocks `javascript:` URLs for security
+- We bypass this using `useEffect` to set the href after mount
+- Static HTML files caused URL encoding corruption (`%27` instead of quotes)
+- The Next.js approach generates clean, working bookmarklet code
+
+**Production URL:** `https://correspondence-clerk.vercel.app` (not the long deployment preview URLs)
 
 ## How It Works
 
@@ -37,17 +49,23 @@ The Outlook integration uses a browser bookmarklet that:
 
 4. **Save the bookmark**
 
-### Method 2: HTML Installer (Easier)
+### Method 2: Next.js Installer Page (Recommended)
+
+**This is the recommended and tested method.**
 
 A full-featured installer page is available at:
-[https://correspondence-clerk.vercel.app/install-bookmarklet.html](https://correspondence-clerk.vercel.app/install-bookmarklet.html)
+[https://correspondence-clerk.vercel.app/install-bookmarklet](https://correspondence-clerk.vercel.app/install-bookmarklet)
+
+**Source:** `/app/install-bookmarklet/page.tsx`
 
 This page includes:
-- Drag-and-drop bookmarklet installation
+- Drag-and-drop bookmarklet installation (bypasses React security blocking)
 - Toggle between Production and Local Dev versions
 - Step-by-step instructions
 - Troubleshooting guide
 - Chiswick Calendar theme styling
+
+**Why this works:** The Next.js page uses `useEffect` and `ref` to set the bookmarklet href after mount, bypassing React's security blocking of `javascript:` URLs.
 
 Or create a simple HTML page locally with this content (save as `bookmarklet-installer.html`):
 
@@ -213,6 +231,14 @@ The integration uses the `/api/import-email` endpoint:
 - Ensure you're using HTTPS in production
 - Email data is only sent to your Correspondence Clerk instance
 - Authentication is required (must be logged in to Correspondence Clerk)
+
+## Known Limitations (As of January 21, 2026)
+
+1. **Thread Detection:** Currently extracts only the most recent email in a thread, not the full conversation history. Thread splitting needs to be improved.
+
+2. **Contact Matching:** If an email address already exists but with a different contact name, the system tries to create a duplicate rather than offering to edit the existing contact. This needs enhancement.
+
+3. **Email Threads:** The bookmarklet doesn't detect when viewing an email thread with multiple messages. It only extracts the visible/latest message.
 
 ## Future Enhancements
 

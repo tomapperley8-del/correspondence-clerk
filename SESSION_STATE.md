@@ -1,12 +1,47 @@
 # Correspondence Clerk - Current Session State
 
-**Date:** January 20, 2026
+**Date:** January 21, 2026
 **Status:** ✅ Deployed to Production
-**Live URL:** https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app
+**Live URL:** https://correspondence-clerk.vercel.app
 
 ---
 
-## 🎉 What Was Accomplished This Session
+## 🎉 Latest Session: Outlook Bookmarklet Production Deployment (January 21, 2026)
+
+### Outlook Bookmarklet Integration - WORKING
+- **Status:** ✅ Fully functional and tested
+- **Installer Page:** https://correspondence-clerk.vercel.app/install-bookmarklet
+- **Implementation:** Next.js page at `/app/install-bookmarklet/page.tsx`
+
+**Key Technical Solutions:**
+1. **React Security Blocking:** Bypassed using `useEffect` + `ref` to set href after mount
+2. **URL Encoding Issues:** Next.js page generates clean code (no `%27` corruption)
+3. **Static HTML Failed:** Attempted `public/install-bookmarklet.html` but React blocked `javascript:` URLs
+4. **Production URL:** Corrected from long deployment URL to `correspondence-clerk.vercel.app`
+5. **Middleware Fix:** Added `.html` exclusion to allow public access
+
+**Files Modified:**
+- `/app/install-bookmarklet/page.tsx` - Next.js installer page (working solution)
+- `/middleware.ts` - Excluded `.html` files from auth
+- `/public/outlook-bookmarklet-simple.js` - Updated to correct production URL
+- `/public/outlook-bookmarklet.js` - Updated to correct production URL
+- `OUTLOOK_INTEGRATION.md` - Documented working approach
+- `QUICK_REFERENCE.md` - Updated installer URL
+
+**Known Limitations to Address:**
+1. Thread detection only captures latest email, not full conversation
+2. Contact matching needs improvement - should offer to edit existing contact if email exists
+
+**Commits:**
+- `41282c7` - feat: update Outlook bookmarklet for production deployment
+- `33c05dd` - fix: allow public access to .html files in middleware
+- `f0b8180` - fix: update all URLs to correct production domain
+- `9b3a9ec` - feat: create Next.js installer page to fix bookmarklet encoding issues
+- `5d437fa` - fix: bypass React javascript: URL blocking using useEffect and ref
+
+---
+
+## 🎉 Previous Session: Documentation & Dashboard Updates (January 20, 2026)
 
 ### 1. Comprehensive User Documentation System
 - **Created USER_GUIDE.md** (863 lines) - Complete user guide with 7 major sections
@@ -87,7 +122,7 @@ npm run export-user-guide   # Prepare Google Docs export
 
 ### Vercel Deployment
 - **Status:** Deployed (auto-deployment via GitHub integration)
-- **Production URL:** https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app
+- **Production URL:** https://correspondence-clerk.vercel.app
 - **Deployment Method:** Automatic (GitHub integration)
 - **Build Status:** ✅ Successful
 
@@ -265,7 +300,7 @@ vercel --prod
 ## 📞 Quick Reference
 
 ### Important URLs
-- **Production:** https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app
+- **Production:** https://correspondence-clerk.vercel.app
 - **Dashboard:** /dashboard
 - **Help Page:** /help
 - **GitHub:** https://github.com/tomapperley8-del/correspondence-clerk

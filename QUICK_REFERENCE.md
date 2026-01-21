@@ -16,7 +16,7 @@
 
 ## 📧 Outlook Integration
 
-**Bookmarklet Installer:** https://correspondence-clerk.vercel.app/install-bookmarklet.html
+**Bookmarklet Installer:** https://correspondence-clerk.vercel.app/install-bookmarklet
 
 One-click email filing from Outlook Web:
 - Drag-and-drop installer page
