@@ -84,35 +84,14 @@ function NewEntryPageContent() {
 
   // Check for email import query parameters and pre-fill form
   useEffect(() => {
-    // Check if email data is in localStorage (from bookmarklet to avoid URI length limits)
-    const fromOutlook = searchParams.get('fromOutlook')
-    let emailSubject = searchParams.get('emailSubject')
-    let emailBody = searchParams.get('emailBody')
-    let emailFrom = searchParams.get('emailFrom')
-    let emailFromEmail = searchParams.get('emailFromEmail')
-    let emailDate = searchParams.get('emailDate')
-    let emailRawContent = searchParams.get('emailRawContent')
-    let contactIdFromQuery = searchParams.get('contactId')
-
-    if (fromOutlook === '1') {
-      // Read from localStorage instead of URL params
-      try {
-        const storedData = localStorage.getItem('outlook_email_data')
-        if (storedData) {
-          const data = JSON.parse(storedData)
-          emailSubject = data.emailSubject || emailSubject
-          emailBody = data.emailBody || emailBody
-          emailFrom = data.emailFrom || emailFrom
-          emailFromEmail = data.emailFromEmail || emailFromEmail
-          emailDate = data.emailDate || emailDate
-          emailRawContent = data.emailRawContent || emailRawContent
-          // Clear localStorage after reading
-          localStorage.removeItem('outlook_email_data')
-        }
-      } catch (e) {
-        console.error('Error reading email data from localStorage:', e)
-      }
-    }
+    const emailSubject = searchParams.get('emailSubject')
+    const emailBody = searchParams.get('emailBody')
+    const emailFrom = searchParams.get('emailFrom')
+    const emailFromEmail = searchParams.get('emailFromEmail')
+    const emailDate = searchParams.get('emailDate')
+    const emailRawContent = searchParams.get('emailRawContent')
+    const contactIdFromQuery = searchParams.get('contactId')
+    const truncated = searchParams.get('truncated')
 
     if (emailSubject || emailBody || emailRawContent) {
       // Pre-fill raw text with formatted email content
@@ -146,6 +125,11 @@ ${emailBody || ''}`
 
       // Set entry type to Email
       setEntryType('Email')
+
+      // Show warning if email was truncated
+      if (truncated === '1') {
+        alert('Note: This email was truncated due to length. The first 3000 characters have been imported. You may need to copy additional content manually from Outlook.')
+      }
 
       // Detect direction from email (if "from" contains user's domain, it's sent)
       if (emailFrom) {
@@ -525,8 +509,7 @@ ${emailBody || ''}`
   const emailImported = !!(
     searchParams.get('emailSubject') ||
     searchParams.get('emailBody') ||
-    searchParams.get('emailRawContent') ||
-    searchParams.get('fromOutlook')
+    searchParams.get('emailRawContent')
   )
 
   return (
