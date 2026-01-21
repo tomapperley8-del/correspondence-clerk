@@ -14,11 +14,13 @@ Send emails directly from Outlook Web to Correspondence Clerk with one click.
 - Static HTML files caused URL encoding corruption (`%27` instead of quotes)
 - The Next.js approach generates clean, working bookmarklet code
 
-**Data Transfer:** Uses `localStorage` instead of URL parameters to avoid URI length limits:
-- Bookmarklet stores email data in `localStorage.setItem('outlook_email_data', JSON.stringify(data))`
-- Opens `/new-entry?fromOutlook=1` (minimal URL, no email content in query string)
-- New entry page reads from `localStorage` and clears it immediately
-- This fixes `URI_TOO_LONG` errors that occurred with large email bodies
+**Data Transfer:** Uses URL parameters with truncation to avoid URI length limits:
+- **Why not localStorage?** localStorage is domain-specific - data stored on outlook.office.com cannot be read by correspondence-clerk.vercel.app due to browser security
+- **Current Approach:** Truncates long email content to fit in URL parameters
+  - Email body: max 2000 characters (truncates with "...")
+  - Raw content: max 3000 characters (truncates with warning message)
+  - Shows alert if email was truncated
+- **User Experience:** Most emails fit completely; very long emails get first 2000-3000 chars with option to manually copy full content
 
 **Production URL:** `https://correspondence-clerk.vercel.app` (not the long deployment preview URLs)
 
@@ -240,11 +242,13 @@ The integration uses the `/api/import-email` endpoint:
 
 ## Known Limitations (As of January 21, 2026)
 
-1. **Thread Detection:** Currently extracts only the most recent email in a thread, not the full conversation history. Thread splitting needs to be improved.
+1. **Long Email Truncation:** Very long emails (>2000 chars body or >3000 chars total) are truncated to avoid URL length limits. Users will see an alert and need to manually copy additional content if needed.
 
-2. **Contact Matching:** If an email address already exists but with a different contact name, the system tries to create a duplicate rather than offering to edit the existing contact. This needs enhancement.
+2. **Thread Detection:** Currently extracts only the most recent email in a thread, not the full conversation history. Thread splitting needs to be improved.
 
-3. **Email Threads:** The bookmarklet doesn't detect when viewing an email thread with multiple messages. It only extracts the visible/latest message.
+3. **Contact Matching:** If an email address already exists but with a different contact name, the system tries to create a duplicate rather than offering to edit the existing contact. This needs enhancement.
+
+4. **Email Threads:** The bookmarklet doesn't detect when viewing an email thread with multiple messages. It only extracts the visible/latest message.
 
 ## Future Enhancements
 
