@@ -14,6 +14,12 @@ Send emails directly from Outlook Web to Correspondence Clerk with one click.
 - Static HTML files caused URL encoding corruption (`%27` instead of quotes)
 - The Next.js approach generates clean, working bookmarklet code
 
+**Data Transfer:** Uses `localStorage` instead of URL parameters to avoid URI length limits:
+- Bookmarklet stores email data in `localStorage.setItem('outlook_email_data', JSON.stringify(data))`
+- Opens `/new-entry?fromOutlook=1` (minimal URL, no email content in query string)
+- New entry page reads from `localStorage` and clears it immediately
+- This fixes `URI_TOO_LONG` errors that occurred with large email bodies
+
 **Production URL:** `https://correspondence-clerk.vercel.app` (not the long deployment preview URLs)
 
 ## How It Works
