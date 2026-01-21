@@ -3,9 +3,32 @@ import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 
+// Allowed origins for CORS (Outlook domains)
+const ALLOWED_ORIGINS = [
+  'https://outlook.office.com',
+  'https://outlook.office365.com',
+  'https://outlook.live.com',
+  'https://outlook-sdf.office.com',
+]
+
+// Helper to get CORS headers
+function getCorsHeaders(origin: string | null) {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
+
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+}
+
 // POST /api/import-email/store
 // Stores email data temporarily and returns a token
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+
   try {
     const supabase = await createClient()
 
@@ -14,7 +37,7 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       )
     }
 
@@ -25,7 +48,7 @@ export async function POST(request: NextRequest) {
     if (!emailData.emailSubject && !emailData.emailBody) {
       return NextResponse.json(
         { error: 'Email data must include subject or body' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       )
     }
 
@@ -47,7 +70,7 @@ export async function POST(request: NextRequest) {
       console.error('Error storing temp email data:', insertError)
       return NextResponse.json(
         { error: 'Failed to store email data', details: insertError.message },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       )
     }
 
@@ -56,25 +79,24 @@ export async function POST(request: NextRequest) {
       success: true,
       token: token,
       expiresIn: 3600 // 1 hour in seconds
-    })
+    }, { headers: corsHeaders })
 
   } catch (error) {
     console.error('Error in store endpoint:', error)
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     )
   }
 }
 
-// Enable CORS for bookmarklet
+// Enable CORS for bookmarklet preflight requests
 export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
+    headers: corsHeaders,
   })
 }
