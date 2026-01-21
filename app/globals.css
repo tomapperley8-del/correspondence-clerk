@@ -62,7 +62,7 @@
 
 /* Focus states - must be visible for accessibility */
 *:focus {
-  outline: 2px solid #2563eb !important; /* blue-600 */
+  outline: 2px solid #98bf64 !important; /* olive green */
   outline-offset: 2px !important;
 }
 
@@ -70,7 +70,7 @@ button:focus,
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid #2563eb !important;
+  outline: 2px solid #98bf64 !important;
   outline-offset: 0 !important;
 }
 
@@ -107,37 +107,56 @@ h4 {
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+
+  /* Chiswick Calendar Color Scheme */
+  --header-bg: #000000; /* Deep black for main top bar */
+  --nav-text: #ffffff;
+  --link-hover: #98bf64; /* Signature light olive green */
+
+  /* Sectional Accents */
+  --section-news-features: #98bf64; /* Light Olive Green */
+  --section-chiswick-news: #e67e51; /* Muted Coral/Orange */
+  --section-sidebar-btn: #eaff00;  /* Bright Neon Yellow for 'Support Us' */
+
+  /* Text & Backgrounds */
+  --main-bg: #ffffff;
+  --sidebar-bg: #f5f5f5; /* Very light grey for sidebar background */
+  --body-text: #333333;
+  --italic-subtext: #777777;
+  --link-blue: #4a6fa5;
+
+  /* Existing Tailwind color system (mapped to Chiswick colors) */
+  --background: oklch(1 0 0); /* white */
+  --foreground: oklch(0.2 0 0); /* near black #333333 */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.2 0 0);
+  --primary: #000000; /* black header */
+  --primary-foreground: #ffffff; /* white text */
+  --secondary: #98bf64; /* olive green */
+  --secondary-foreground: #ffffff; /* white text */
+  --muted: #f5f5f5; /* light grey */
+  --muted-foreground: #777777; /* grey text */
+  --accent: #98bf64; /* olive green accent */
+  --accent-foreground: #ffffff; /* white text */
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --ring: #98bf64; /* olive green focus ring */
+  --chart-1: #98bf64; /* olive green */
+  --chart-2: #e67e51; /* coral */
+  --chart-3: #eaff00; /* yellow */
+  --chart-4: #4a6fa5; /* blue */
+  --chart-5: #777777; /* grey */
+  --sidebar: #f5f5f5;
+  --sidebar-foreground: #333333;
+  --sidebar-primary: #98bf64;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e67e51;
+  --sidebar-accent-foreground: #ffffff;
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: #98bf64;
 }
 
 .dark {

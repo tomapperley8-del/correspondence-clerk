@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "update-docs": "tsx scripts/update-docs.ts",
+    "export-user-guide": "tsx scripts/export-user-guide-to-gdoc.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -36,6 +38,7 @@
     "eslint-config-next": "16.1.2",
     "supabase": "^2.72.7",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "tw-animate-css": "^1.4.0",
     "typescript": "^5"
   }
