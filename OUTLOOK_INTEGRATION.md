@@ -2,6 +2,8 @@
 
 Send emails directly from Outlook Web to Correspondence Clerk with one click.
 
+**🚀 Easiest Installation:** Visit the [Bookmarklet Installer](https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app/install-bookmarklet.html) for a drag-and-drop installation page.
+
 ## How It Works
 
 The Outlook integration uses a browser bookmarklet that:
@@ -24,19 +26,30 @@ The Outlook integration uses a browser bookmarklet that:
    - For the URL, paste this code (update the URL to match your Correspondence Clerk instance):
 
    ```javascript
-   javascript:(function(){var url='http://localhost:3001';if(!window.location.hostname.includes('outlook')&&!window.location.hostname.includes('office.com')&&!window.location.hostname.includes('live.com')){alert('Please open this bookmarklet while viewing an email in Outlook Web.');return;}var script=document.createElement('script');script.src=url+'/outlook-extractor.js';script.onload=function(){try{var emailData=window.extractOutlookEmail();if(!emailData||emailData.error){alert('Could not extract email data: '+(emailData?.error||'Unknown'));return;}var params=new URLSearchParams({emailSubject:emailData.subject||'',emailBody:emailData.body||'',emailFrom:emailData.from.name?emailData.from.name+' <'+emailData.from.email+'>':emailData.from.email,emailDate:emailData.date,emailTo:emailData.to.map(function(t){return t.name?t.name+' <'+t.email+'>':t.email;}).join(', '),emailRawContent:encodeURIComponent(emailData.raw_content||'')});window.open(url+'/new-entry?'+params.toString(),'_blank');}catch(e){alert('Error: '+e.message);}};script.onerror=function(){alert('Could not load email extractor. Is Correspondence Clerk running?');};document.head.appendChild(script);})();
+   javascript:(function(){var url='https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app';if(!window.location.hostname.includes('outlook')&&!window.location.hostname.includes('office.com')&&!window.location.hostname.includes('live.com')){alert('Please open this bookmarklet while viewing an email in Outlook Web.');return;}var script=document.createElement('script');script.src=url+'/outlook-extractor.js';script.onload=function(){try{var emailData=window.extractOutlookEmail();if(!emailData||emailData.error){alert('Could not extract email data: '+(emailData?.error||'Unknown'));return;}var params=new URLSearchParams({emailSubject:emailData.subject||'',emailBody:emailData.body||'',emailFrom:emailData.from.name?emailData.from.name+' <'+emailData.from.email+'>':emailData.from.email,emailDate:emailData.date,emailTo:emailData.to.map(function(t){return t.name?t.name+' <'+t.email+'>':t.email;}).join(', '),emailRawContent:encodeURIComponent(emailData.raw_content||'')});window.open(url+'/new-entry?'+params.toString(),'_blank');}catch(e){alert('Error: '+e.message);}};script.onerror=function(){alert('Could not load email extractor. Is Correspondence Clerk running?');};document.head.appendChild(script);})();
    ```
 
-3. **Update the URL:**
-   - Replace `http://localhost:3001` with your Correspondence Clerk URL
-   - For production: `https://your-domain.com`
-   - For local development: `http://localhost:3001` (or 3000 if that's your port)
+   **Production URL:** This code points to the production server. For local development, replace the URL with `http://localhost:3000`
+
+3. **Update the URL (if needed):**
+   - The code above uses the production URL
+   - For local development: Replace with `http://localhost:3000` (or 3001 if that's your port)
 
 4. **Save the bookmark**
 
 ### Method 2: HTML Installer (Easier)
 
-Create a simple HTML page with this content (save as `bookmarklet-installer.html`):
+A full-featured installer page is available at:
+[https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app/install-bookmarklet.html](https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app/install-bookmarklet.html)
+
+This page includes:
+- Drag-and-drop bookmarklet installation
+- Toggle between Production and Local Dev versions
+- Step-by-step instructions
+- Troubleshooting guide
+- Chiswick Calendar theme styling
+
+Or create a simple HTML page locally with this content (save as `bookmarklet-installer.html`):
 
 ```html
 <!DOCTYPE html>
@@ -45,7 +58,7 @@ Create a simple HTML page with this content (save as `bookmarklet-installer.html
   <title>Install Correspondence Clerk Bookmarklet</title>
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-    .bookmarklet { display: inline-block; padding: 10px 20px; background: #2563eb; color: white; 
+    .bookmarklet { display: inline-block; padding: 10px 20px; background: #2563eb; color: white;
                    text-decoration: none; border: none; cursor: pointer; }
     .bookmarklet:hover { background: #1d4ed8; }
     code { background: #f3f4f6; padding: 2px 6px; border-radius: 3px; }
@@ -54,15 +67,15 @@ Create a simple HTML page with this content (save as `bookmarklet-installer.html
 <body>
   <h1>Install Outlook Integration</h1>
   <p>Drag this button to your bookmarks bar:</p>
-  <a href="javascript:(function(){var url='http://localhost:3001';if(!window.location.hostname.includes('outlook')&&!window.location.hostname.includes('office.com')&&!window.location.hostname.includes('live.com')){alert('Please open this bookmarklet while viewing an email in Outlook Web.');return;}var script=document.createElement('script');script.src=url+'/outlook-extractor.js';script.onload=function(){try{var emailData=window.extractOutlookEmail();if(!emailData||emailData.error){alert('Could not extract email data: '+(emailData?.error||'Unknown'));return;}var params=new URLSearchParams({emailSubject:emailData.subject||'',emailBody:emailData.body||'',emailFrom:emailData.from.name?emailData.from.name+' <'+emailData.from.email+'>':emailData.from.email,emailDate:emailData.date,emailTo:emailData.to.map(function(t){return t.name?t.name+' <'+t.email+'>':t.email;}).join(', '),emailRawContent:encodeURIComponent(emailData.raw_content||'')});window.open(url+'/new-entry?'+params.toString(),'_blank');}catch(e){alert('Error: '+e.message);}};script.onerror=function(){alert('Could not load email extractor. Is Correspondence Clerk running?');};document.head.appendChild(script);})();" class="bookmarklet">📧 Send to Correspondence Clerk</a>
-  
-  <h2>Update URL</h2>
-  <p>Before using, update the <code>url</code> variable in the bookmarklet:</p>
+  <a href="javascript:(function(){var url='https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app';if(!window.location.hostname.includes('outlook')&&!window.location.hostname.includes('office.com')&&!window.location.hostname.includes('live.com')){alert('Please open this bookmarklet while viewing an email in Outlook Web.');return;}var script=document.createElement('script');script.src=url+'/outlook-extractor.js';script.onload=function(){try{var emailData=window.extractOutlookEmail();if(!emailData||emailData.error){alert('Could not extract email data: '+(emailData?.error||'Unknown'));return;}var params=new URLSearchParams({emailSubject:emailData.subject||'',emailBody:emailData.body||'',emailFrom:emailData.from.name?emailData.from.name+' <'+emailData.from.email+'>':emailData.from.email,emailDate:emailData.date,emailTo:emailData.to.map(function(t){return t.name?t.name+' <'+t.email+'>':t.email;}).join(', '),emailRawContent:encodeURIComponent(emailData.raw_content||'')});window.open(url+'/new-entry?'+params.toString(),'_blank');}catch(e){alert('Error: '+e.message);}};script.onerror=function(){alert('Could not load email extractor. Is Correspondence Clerk running?');};document.head.appendChild(script);})();" class="bookmarklet">📧 Send to Correspondence Clerk</a>
+
+  <h2>Update URL for Local Development</h2>
+  <p>The button above uses the production URL. For local development, update the <code>url</code> variable in the bookmarklet code:</p>
   <ul>
-    <li><strong>Local development:</strong> <code>http://localhost:3001</code> (or 3000 if that's your port)</li>
-    <li><strong>Production:</strong> <code>https://your-domain.com</code></li>
+    <li><strong>Local development:</strong> <code>http://localhost:3000</code> (or 3001 if that's your port)</li>
+    <li><strong>Production:</strong> <code>https://correspondence-clerk-bk3xsch9o-tom-apperleys-projects.vercel.app</code> (already set)</li>
   </ul>
-  
+
   <h2>How to Use</h2>
   <ol>
     <li>Open an email in Outlook Web</li>
