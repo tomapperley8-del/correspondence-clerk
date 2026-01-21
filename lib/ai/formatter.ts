@@ -14,6 +14,95 @@ import {
 import { parseWithRecovery } from './json-recovery';
 
 /**
+ * JSON Schema for single entry formatting
+ * Used with Anthropic structured outputs to guarantee valid JSON
+ */
+const SINGLE_ENTRY_SCHEMA = {
+  type: 'object',
+  properties: {
+    subject_guess: { type: 'string' },
+    entry_type_guess: {
+      type: 'string',
+      enum: ['Email', 'Call', 'Meeting']
+    },
+    entry_date_guess: {
+      type: ['string', 'null'],
+      format: 'date-time'
+    },
+    direction_guess: {
+      type: ['string', 'null'],
+      enum: ['sent', 'received', null]
+    },
+    formatted_text: { type: 'string' },
+    warnings: {
+      type: 'array',
+      items: { type: 'string' }
+    },
+    extracted_names: {
+      type: 'object',
+      properties: {
+        sender: { type: ['string', 'null'] },
+        recipient: { type: ['string', 'null'] }
+      },
+      additionalProperties: false
+    }
+  },
+  required: ['subject_guess', 'entry_type_guess', 'entry_date_guess', 'formatted_text', 'warnings'],
+  additionalProperties: false
+} as const;
+
+/**
+ * JSON Schema for thread split formatting
+ */
+const THREAD_SPLIT_SCHEMA = {
+  type: 'object',
+  properties: {
+    entries: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          subject_guess: { type: 'string' },
+          entry_type_guess: {
+            type: 'string',
+            enum: ['Email', 'Call', 'Meeting']
+          },
+          entry_date_guess: {
+            type: ['string', 'null'],
+            format: 'date-time'
+          },
+          direction_guess: {
+            type: ['string', 'null'],
+            enum: ['sent', 'received', null]
+          },
+          formatted_text: { type: 'string' },
+          warnings: {
+            type: 'array',
+            items: { type: 'string' }
+          },
+          extracted_names: {
+            type: 'object',
+            properties: {
+              sender: { type: ['string', 'null'] },
+              recipient: { type: ['string', 'null'] }
+            },
+            additionalProperties: false
+          }
+        },
+        required: ['subject_guess', 'entry_type_guess', 'entry_date_guess', 'formatted_text', 'warnings'],
+        additionalProperties: false
+      }
+    },
+    warnings: {
+      type: 'array',
+      items: { type: 'string' }
+    }
+  },
+  required: ['entries', 'warnings'],
+  additionalProperties: false
+} as const;
+
+/**
  * Initialize Anthropic client
  * API key must be in ANTHROPIC_API_KEY environment variable
  */
@@ -283,9 +372,11 @@ If entry_type_guess is "Email":
 Text to process:
 ${rawText}`;
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+    const response = await client.beta.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 16384,
+      temperature: 0,
+      betas: ['structured-outputs-2025-11-13'],
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -293,7 +384,21 @@ ${rawText}`;
           content: userPrompt,
         },
       ],
+      output_format: {
+        type: 'json_schema',
+        schema: shouldSplit ? THREAD_SPLIT_SCHEMA : SINGLE_ENTRY_SCHEMA,
+      },
     });
+
+    // Check if response was truncated
+    if (response.stop_reason === 'max_tokens') {
+      console.error('Response truncated due to max_tokens limit');
+      return {
+        success: false,
+        error: 'This correspondence is too long to format in one request. Please split it into smaller sections.',
+        shouldSaveUnformatted: true,
+      };
+    }
 
     // Extract text from response
     const content = response.content[0];
@@ -301,20 +406,17 @@ ${rawText}`;
       throw new Error('AI response was not text');
     }
 
-    let jsonText = content.text.trim();
+    // With structured outputs, response is guaranteed to be valid JSON
+    const jsonText = content.text.trim();
 
-    // Use robust JSON recovery
-    const parseResult = parseWithRecovery(jsonText);
-
-    if (!parseResult.success) {
-      throw new Error(parseResult.error || 'Failed to parse JSON response');
-    }
-
-    const parsed = parseResult.data;
-
-    // Log if fixes were applied (for monitoring)
-    if (parseResult.attemptedFixes && parseResult.attemptedFixes.length > 0) {
-      console.log(`AI response required fixes: ${parseResult.attemptedFixes.join(', ')}`);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch (parseError) {
+      // This should never happen with structured outputs
+      console.error('Unexpected JSON parse error with structured outputs:', parseError);
+      console.error('Raw response:', jsonText.substring(0, 1000));
+      throw new Error('Failed to parse AI response despite structured outputs');
     }
 
     // Validate against contract
