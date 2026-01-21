@@ -11,6 +11,7 @@ import {
   SingleEntryResponse,
   ThreadSplitResponse,
 } from './types';
+import { parseWithRecovery } from './json-recovery';
 
 /**
  * Initialize Anthropic client
@@ -302,18 +303,18 @@ ${rawText}`;
 
     let jsonText = content.text.trim();
 
-    // Remove markdown code blocks if present
-    if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```(?:json)?\n/, '').replace(/\n```$/, '');
+    // Use robust JSON recovery
+    const parseResult = parseWithRecovery(jsonText);
+
+    if (!parseResult.success) {
+      throw new Error(parseResult.error || 'Failed to parse JSON response');
     }
 
-    // Parse JSON
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch (parseError) {
-      console.error('Failed to parse AI response. Raw text:', jsonText);
-      throw new Error(`Failed to parse AI response as JSON: ${parseError}`);
+    const parsed = parseResult.data;
+
+    // Log if fixes were applied (for monitoring)
+    if (parseResult.attemptedFixes && parseResult.attemptedFixes.length > 0) {
+      console.log(`AI response required fixes: ${parseResult.attemptedFixes.join(', ')}`);
     }
 
     // Validate against contract

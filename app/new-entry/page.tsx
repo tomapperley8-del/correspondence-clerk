@@ -901,12 +901,23 @@ ${emailBody || ''}`
           {/* Formatting Error Display */}
           {formattingError && (
             <div className="mt-3 p-4 bg-red-50 border-2 border-red-600">
-              <p className="font-semibold text-red-900 mb-2">AI Formatting Failed</p>
-              <p className="text-sm text-red-800 mb-3">{formattingError}</p>
+              <h3 className="font-semibold text-red-900 mb-2">AI Formatting Failed</h3>
               <p className="text-sm text-red-800 mb-3">
-                You can still save this entry without AI formatting. The original text will be
-                preserved and you can format it later.
+                {formattingError}
               </p>
+              <p className="text-sm text-red-700 mb-3">
+                <strong>What this means:</strong> Claude returned a response that couldn&apos;t be processed.
+                This sometimes happens with very long or complex text.
+                Your original text is preserved and you can still save it.
+              </p>
+              <p className="text-sm text-red-700 mb-3">
+                <strong>Options:</strong>
+              </p>
+              <ul className="list-disc list-inside text-sm text-red-700 mb-4 space-y-1">
+                <li>Click &quot;Save Without Formatting&quot; to save the original text as-is</li>
+                <li>Try splitting the text into smaller entries</li>
+                <li>Try again later - AI formatting issues are often temporary</li>
+              </ul>
               <Button
                 type="button"
                 onClick={handleSaveUnformatted}
