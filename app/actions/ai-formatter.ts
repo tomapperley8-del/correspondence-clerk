@@ -60,6 +60,7 @@ export async function createFormattedCorrespondence(
       | 'invoice'
       | 'renewal'
     due_at?: string
+    email_source?: any
   },
   aiResponse: AIFormatterResponse,
   contactMatches?: ContactMatchResult[]
@@ -122,6 +123,7 @@ export async function createFormattedCorrespondence(
                   confidence: contactMatches[index].confidence,
                 }
               : { matched: false },
+            ...(formData.email_source && { email_source: formData.email_source }),
           },
         }
       })
@@ -177,6 +179,7 @@ export async function createFormattedCorrespondence(
         ai_metadata: {
           warnings: aiResponse.warnings,
           split_from_thread: false,
+          ...(formData.email_source && { email_source: formData.email_source }),
         },
       })
       .select()

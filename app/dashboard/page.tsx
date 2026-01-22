@@ -162,12 +162,52 @@ export default function DashboardPage() {
     </button>
   )
 
+  // Check if bookmarklet is installed
+  const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
+  useEffect(() => {
+    const installed = localStorage.getItem('bookmarklet-installed')
+    setBookmarkletInstalled(!!installed)
+  }, [])
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <AddBusinessButton />
       </div>
+
+      {/* Bookmarklet Installation Card */}
+      {!bookmarkletInstalled && (
+        <div className="bg-blue-50 border-2 border-blue-600 p-6 mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                📧 Import Emails from Outlook
+              </h2>
+              <p className="text-gray-700 mb-4">
+                Install the Email Import Tool to import emails directly from
+                Outlook Web with one click. No more copying and pasting.
+              </p>
+              <Link
+                href="/bookmarklet"
+                className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold hover:bg-blue-700 border-2 border-blue-600"
+              >
+                Install Email Import Tool
+              </Link>
+            </div>
+            <button
+              onClick={() => {
+                setBookmarkletInstalled(true)
+                localStorage.setItem('bookmarklet-installed', 'true')
+              }}
+              className="text-gray-500 hover:text-gray-700"
+              title="Dismiss this message"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {businesses.length === 0 ? (
         <div className="bg-white border border-gray-300 p-12 text-center">

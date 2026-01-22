@@ -87,15 +87,20 @@
       const params = new URLSearchParams({
         emailSubject: emailData.subject || '',
         emailBody: emailData.body || '',
-        emailFrom: emailData.from.name 
+        emailFrom: emailData.from.name
           ? `${emailData.from.name} <${emailData.from.email}>`
           : emailData.from.email,
         emailDate: emailData.date,
-        emailTo: emailData.to.map(t => 
+        emailTo: emailData.to.map(t =>
           t.name ? `${t.name} <${t.email}>` : t.email
         ).join(', '),
         emailRawContent: encodeURIComponent(emailData.raw_content || ''),
       });
+
+      // Add email source metadata if available
+      if (emailData.email_source) {
+        params.append('emailSourceMetadata', JSON.stringify(emailData.email_source));
+      }
 
       const correspondenceClerkUrl = getCorrespondenceClerkUrl();
       const prefillUrl = `${correspondenceClerkUrl}/new-entry?${params.toString()}`;

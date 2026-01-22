@@ -72,12 +72,27 @@ export async function exportToGoogleDocs(businessId: string) {
           documentContent += ` - ${contact.role}`
         }
         documentContent += `\n`
-        if (contact.email) {
+
+        // Handle multiple emails
+        if (contact.emails && contact.emails.length > 0) {
+          contact.emails.forEach((email: string) => {
+            documentContent += `Email: ${email}\n`
+          })
+        } else if (contact.email) {
+          // Fallback for old single email field
           documentContent += `Email: ${contact.email}\n`
         }
-        if (contact.phone) {
+
+        // Handle multiple phones
+        if (contact.phones && contact.phones.length > 0) {
+          contact.phones.forEach((phone: string) => {
+            documentContent += `Phone: ${phone}\n`
+          })
+        } else if (contact.phone) {
+          // Fallback for old single phone field
           documentContent += `Phone: ${contact.phone}\n`
         }
+
         documentContent += `\n`
       })
     }

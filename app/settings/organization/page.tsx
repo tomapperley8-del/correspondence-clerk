@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -175,9 +176,28 @@ export default function OrganizationSettingsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8 text-gray-900">
+      <h1 className="text-3xl font-bold mb-2 text-gray-900">
         Organization Settings
       </h1>
+      <p className="text-gray-600 mb-8">
+        Manage your organization and team members.
+      </p>
+
+      {/* Navigation to other settings pages */}
+      <div className="flex gap-2 mb-6 pb-6 border-b-2 border-gray-300">
+        <Link
+          href="/settings"
+          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-blue-600"
+        >
+          User Profile
+        </Link>
+        <Link
+          href="/settings/organization"
+          className="px-4 py-2 bg-blue-600 text-white font-semibold border-2 border-blue-600"
+        >
+          Organization
+        </Link>
+      </div>
 
       {error && (
         <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6">

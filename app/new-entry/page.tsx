@@ -52,6 +52,7 @@ function NewEntryPageContent() {
   }>({})
   const [isLoading, setIsLoading] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
+  const [emailSourceMetadata, setEmailSourceMetadata] = useState<any>(null)
   const [showAddBusiness, setShowAddBusiness] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
 
@@ -82,11 +83,18 @@ function NewEntryPageContent() {
   const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false)
   const [autoMatchedContactId, setAutoMatchedContactId] = useState<string | null>(null)
 
+  // Business email suggestion state (Feature #1)
+  const [suggestedBusinessEmail, setSuggestedBusinessEmail] = useState<string | null>(null)
+  const [showBusinessEmailPrompt, setShowBusinessEmailPrompt] = useState(false)
+  const [senderEmailData, setSenderEmailData] = useState<{ email: string; name: string } | null>(null)
+
   // Function to fetch email data by token
   async function fetchEmailDataByToken(token: string) {
     try {
+      performance.mark('email-import-start')
       setIsLoading(true)
 
+      performance.mark('fetch-email-data-start')
       const response = await fetch(`/api/import-email/retrieve/${token}`)
 
       if (!response.ok) {
@@ -94,6 +102,8 @@ function NewEntryPageContent() {
       }
 
       const { success, emailData } = await response.json()
+      performance.mark('fetch-email-data-end')
+      performance.measure('fetch-email-data', 'fetch-email-data-start', 'fetch-email-data-end')
 
       if (success && emailData) {
         // Pre-fill form with retrieved data
@@ -112,6 +122,7 @@ ${emailData.emailBody || ''}`
         }
 
         if (emailData.emailDate) {
+          performance.mark('date-parse-start')
           try {
             const date = new Date(emailData.emailDate)
             setEntryDateOnly(date.toISOString().slice(0, 10))
@@ -120,6 +131,20 @@ ${emailData.emailBody || ''}`
             setEntryTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`)
           } catch (e) {
             // Invalid date, use today
+          }
+          performance.mark('date-parse-end')
+          performance.measure('date-parse', 'date-parse-start', 'date-parse-end')
+        }
+
+        // Feature #9: Capture email source metadata (message ID, web link)
+        if (emailData.emailSourceMetadata) {
+          try {
+            const metadata = typeof emailData.emailSourceMetadata === 'string'
+              ? JSON.parse(emailData.emailSourceMetadata)
+              : emailData.emailSourceMetadata
+            setEmailSourceMetadata(metadata)
+          } catch (e) {
+            console.warn('Failed to parse email source metadata:', e)
           }
         }
 
@@ -138,12 +163,23 @@ ${emailData.emailBody || ''}`
           }
         }
 
+        // Store sender email data for business email suggestion (Feature #1)
+        if (emailData.emailFromEmail) {
+          setSenderEmailData({
+            email: emailData.emailFromEmail,
+            name: emailData.emailFrom || emailData.emailFromEmail,
+          })
+        }
+
         // Auto-match contact if email provided
         if (emailData.emailFromEmail) {
+          performance.mark('contact-match-start')
           try {
             const response = await fetch(`/api/contacts?email=${encodeURIComponent(emailData.emailFromEmail)}`)
             if (response.ok) {
               const matchedContacts = await response.json()
+              performance.mark('contact-match-end')
+              performance.measure('contact-match', 'contact-match-start', 'contact-match-end')
               if (matchedContacts.length > 0) {
                 const contact = matchedContacts[0]
                 setAutoMatchedContactId(contact.id)
@@ -155,6 +191,17 @@ ${emailData.emailBody || ''}`
           }
         }
       }
+
+      // Log performance summary
+      performance.mark('email-import-end')
+      performance.measure('email-import-total', 'email-import-start', 'email-import-end')
+
+      const measurements = performance.getEntriesByType('measure')
+      console.group('📊 Email Import Performance')
+      measurements.forEach((measure) => {
+        console.log(`${measure.name}: ${measure.duration.toFixed(2)}ms`)
+      })
+      console.groupEnd()
     } catch (error) {
       console.error('Error fetching email data:', error)
       alert('Failed to load email data. The link may have expired (tokens are valid for 1 hour). Please try the bookmarklet again or copy the email manually.')
@@ -434,9 +481,31 @@ ${emailBody || ''}`
     setShouldSplit(autoSplit)
   }, [rawText])
 
-  const handleBusinessSelect = (businessId: string) => {
+  const handleBusinessSelect = async (businessId: string) => {
     setSelectedBusinessId(businessId || null)
     setErrors((prev) => ({ ...prev, business: undefined }))
+
+    // Feature #1: Check if we should suggest adding business email
+    if (businessId && senderEmailData) {
+      const selectedBusiness = businesses.find((b) => b.id === businessId)
+      if (selectedBusiness && !selectedBusiness.email) {
+        // Extract domain email from sender
+        const senderEmail = senderEmailData.email
+        const domain = senderEmail.split('@')[1]
+
+        // Don't suggest if sender is a known contact
+        const isKnownContact = contacts.some((c) =>
+          c.emails?.some((e) => e.toLowerCase() === senderEmail.toLowerCase())
+        )
+
+        if (!isKnownContact && domain) {
+          // Suggest generic business email like info@domain.com
+          const suggestedEmail = `info@${domain}`
+          setSuggestedBusinessEmail(suggestedEmail)
+          setShowBusinessEmailPrompt(true)
+        }
+      }
+    }
   }
 
   const handleContactSelect = (contactId: string) => {
@@ -464,6 +533,51 @@ ${emailBody || ''}`
   const handleContactAdded = (contact: Contact) => {
     setContacts((prev) => [...prev, contact])
     setSelectedContactId(contact.id)
+  }
+
+  // Feature #1: Handle business email suggestion
+  const handleAcceptBusinessEmail = async () => {
+    if (!selectedBusinessId || !suggestedBusinessEmail) return
+
+    try {
+      const response = await fetch('/api/businesses/update-email', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessId: selectedBusinessId,
+          email: suggestedBusinessEmail,
+        }),
+      })
+
+      if (response.ok) {
+        // Update local businesses state
+        setBusinesses((prev) =>
+          prev.map((b) =>
+            b.id === selectedBusinessId ? { ...b, email: suggestedBusinessEmail } : b
+          )
+        )
+        setShowBusinessEmailPrompt(false)
+        setSuggestedBusinessEmail(null)
+      } else {
+        console.error('Failed to update business email')
+        alert('Failed to add email to business')
+      }
+    } catch (error) {
+      console.error('Error updating business email:', error)
+      alert('Error adding email to business')
+    }
+  }
+
+  const handleDeclineBusinessEmail = () => {
+    setShowBusinessEmailPrompt(false)
+    setSuggestedBusinessEmail(null)
+  }
+
+  // Feature #1: Handle contact being updated via inline editing
+  const handleContactUpdated = (updatedContact: Contact) => {
+    setContacts((prev) =>
+      prev.map((c) => (c.id === updatedContact.id ? updatedContact : c))
+    )
   }
 
   const handleContactsAdded = async (count: number) => {
@@ -567,6 +681,7 @@ ${emailBody || ''}`
           direction: direction || undefined,
           action_needed: actionNeeded,
           due_at: dueAt || undefined,
+          email_source: emailSourceMetadata || undefined,
         },
         formatResult.data
       )
@@ -603,6 +718,7 @@ ${emailBody || ''}`
         direction: direction || undefined,
         action_needed: actionNeeded,
         due_at: dueAt || undefined,
+        email_source: emailSourceMetadata || undefined,
       },
       pendingAiResponse,
       confirmedMatches // Pass the confirmed contact matches
@@ -715,6 +831,40 @@ ${emailBody || ''}`
           error={errors.business}
         />
 
+        {/* Business Email Suggestion Prompt (Feature #1) */}
+        {showBusinessEmailPrompt && suggestedBusinessEmail && (
+          <div className="bg-blue-50 border-2 border-blue-600 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 mb-2">
+                  Add Email to {businesses.find((b) => b.id === selectedBusinessId)?.name}?
+                </h3>
+                <p className="text-sm text-gray-700 mb-3">
+                  This email came from <strong>{senderEmailData?.email}</strong>.
+                  Would you like to add <strong>{suggestedBusinessEmail}</strong> as the
+                  primary email for this business?
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleAcceptBusinessEmail}
+                    className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm font-semibold"
+                  >
+                    Yes, Add Email
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleDeclineBusinessEmail}
+                    className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-4 py-2 text-sm"
+                  >
+                    No, Skip
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Contact Selector */}
         <ContactSelector
           contacts={contacts}
@@ -723,6 +873,7 @@ ${emailBody || ''}`
           onAddNew={handleAddNewContact}
           error={errors.contact}
           disabled={!selectedBusinessId}
+          onContactUpdated={handleContactUpdated}
         />
 
         {/* Entry Details Section */}

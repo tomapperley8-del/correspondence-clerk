@@ -2,15 +2,22 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getCorrespondenceByBusiness } from './correspondence'
+import { getBusinessById, type Business } from './businesses'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
+export type AISummaryResult = {
+  correspondence_summary: string
+  contract_status: string | null
+}
+
 /**
  * Generate a very brief AI summary of the last 12 months of correspondence
- * Returns 1-2 sentences summarizing the main topics and current status
+ * and analyze contract status if contract data exists
+ * Returns summary + contract analysis
  */
 export async function generateCorrespondenceSummary(businessId: string) {
   const supabase = await createClient()
@@ -23,6 +30,13 @@ export async function generateCorrespondenceSummary(businessId: string) {
   }
 
   try {
+    // Get business data for contract analysis
+    const businessResult = await getBusinessById(businessId)
+    if ('error' in businessResult || !businessResult.data) {
+      return { error: 'Business not found' }
+    }
+    const business = businessResult.data
+
     // Get last 12 months of correspondence
     const twelveMonthsAgo = new Date()
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
@@ -35,15 +49,63 @@ export async function generateCorrespondenceSummary(businessId: string) {
 
     const correspondence = correspondenceResult.data || []
 
+    // Get current date for temporal awareness (needed for contract analysis)
+    const today = new Date()
+    const todayFormatted = today.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+
     // Filter to last 12 months
     const recentEntries = correspondence.filter((entry) => {
       const entryDate = new Date(entry.entry_date || entry.created_at)
       return entryDate >= twelveMonthsAgo
     })
 
-    // If no recent correspondence, return a message
+    // If no recent correspondence, return a message (but still analyze contract if exists)
     if (recentEntries.length === 0) {
-      return { data: 'No correspondence in the last 12 months.' }
+      // Still analyze contract even if no correspondence
+      const hasContractData = business.contract_start || business.contract_end || business.deal_terms
+
+      if (!hasContractData) {
+        return {
+          data: {
+            correspondence_summary: 'No correspondence in the last 12 months.',
+            contract_status: null,
+          },
+        }
+      }
+
+      // Generate contract analysis only
+      const contractOnlyMessage = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 150,
+        messages: [
+          {
+            role: 'user',
+            content: `Today's date is ${todayFormatted}.
+
+Analyze this contract:
+- Start Date: ${business.contract_start ? new Date(business.contract_start).toLocaleDateString('en-GB') : 'Not set'}
+- End Date: ${business.contract_end ? new Date(business.contract_end).toLocaleDateString('en-GB') : 'Not set'}
+- Deal Terms: ${business.deal_terms || 'Not set'}
+- Contract Amount: ${business.contract_amount ? `£${business.contract_amount.toLocaleString('en-GB')}` : 'Not set'}
+
+Provide a brief 1-sentence contract status: Is it expired? Expiring soon (within 3 months)? Key points from deal terms?`,
+          },
+        ],
+      })
+
+      const contractStatusText =
+        contractOnlyMessage.content[0].type === 'text' ? contractOnlyMessage.content[0].text : null
+
+      return {
+        data: {
+          correspondence_summary: 'No correspondence in the last 12 months.',
+          contract_status: contractStatusText,
+        },
+      }
     }
 
     // Sort chronologically (oldest first)
@@ -51,14 +113,6 @@ export async function generateCorrespondenceSummary(businessId: string) {
       const dateA = new Date(a.entry_date || a.created_at).getTime()
       const dateB = new Date(b.entry_date || b.created_at).getTime()
       return dateA - dateB
-    })
-
-    // Get current date for temporal awareness
-    const today = new Date()
-    const todayFormatted = today.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
     })
 
     // Build a concise text summary for the AI
@@ -74,10 +128,29 @@ export async function generateCorrespondenceSummary(businessId: string) {
       })
       .join('\n\n')
 
-    // Call Anthropic API for summary
+    // Build contract context for AI if contract data exists
+    const hasContractData = business.contract_start || business.contract_end || business.deal_terms
+    const contractContext = hasContractData
+      ? `
+
+CONTRACT INFORMATION:
+- Start Date: ${business.contract_start ? new Date(business.contract_start).toLocaleDateString('en-GB') : 'Not set'}
+- End Date: ${business.contract_end ? new Date(business.contract_end).toLocaleDateString('en-GB') : 'Not set'}
+- Deal Terms: ${business.deal_terms || 'Not set'}
+- Contract Amount: ${business.contract_amount ? `£${business.contract_amount.toLocaleString('en-GB')}` : 'Not set'}
+
+If contract dates are provided, analyze:
+1. Is the contract expired (end date < today)?
+2. Is it expiring soon (within 3 months)?
+3. What are the key points from the deal terms?
+
+Provide a brief contract status statement (1 sentence) if contract data exists. If no contract data, return null for contract_status.`
+      : ''
+
+    // Call Anthropic API for summary with structured output
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 150,
+      max_tokens: 300,
       messages: [
         {
           role: 'user',
@@ -92,6 +165,13 @@ IMPORTANT: Be aware of dates and use temporal language to indicate recency. For 
 - "Recent exchange last week regarding..."
 
 Do not invent information. Only summarize what is actually in the correspondence. Be concise and factual.
+${contractContext}
+
+Return your response in JSON format:
+{
+  "correspondence_summary": "Your 1-2 sentence summary here",
+  "contract_status": "Your 1 sentence contract analysis here, or null if no contract data"
+}
 
 Correspondence:
 ${correspondenceText}`,
@@ -99,10 +179,26 @@ ${correspondenceText}`,
       ],
     })
 
-    // Extract text from response
-    const summary = message.content[0].type === 'text' ? message.content[0].text : 'Unable to generate summary.'
+    // Extract and parse JSON response
+    const responseText = message.content[0].type === 'text' ? message.content[0].text : '{}'
 
-    return { data: summary.trim() }
+    try {
+      // Try to parse as JSON
+      const parsed = JSON.parse(responseText)
+      const result: AISummaryResult = {
+        correspondence_summary: parsed.correspondence_summary || 'Unable to generate summary.',
+        contract_status: parsed.contract_status || null,
+      }
+      return { data: result }
+    } catch (parseError) {
+      // Fallback: treat entire response as correspondence summary
+      return {
+        data: {
+          correspondence_summary: responseText.trim(),
+          contract_status: null,
+        },
+      }
+    }
   } catch (err) {
     console.error('AI Summary Error:', err)
     const errorMessage = err instanceof Error ? err.message : String(err)

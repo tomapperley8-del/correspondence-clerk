@@ -82,6 +82,7 @@ export async function createCorrespondence(formData: {
   direction?: 'received' | 'sent'
   action_needed?: 'none' | 'prospect' | 'follow_up' | 'waiting_on_them' | 'invoice' | 'renewal'
   due_at?: string
+  ai_metadata?: any
 }) {
   const supabase = await createClient()
   const {
@@ -98,7 +99,7 @@ export async function createCorrespondence(formData: {
     return { error: 'No organization found' }
   }
 
-  const { data, error } = await supabase
+  const { data, error} = await supabase
     .from('correspondence')
     .insert({
       business_id: formData.business_id,
@@ -111,6 +112,7 @@ export async function createCorrespondence(formData: {
       direction: formData.direction || null,
       action_needed: formData.action_needed || 'none',
       due_at: formData.due_at || null,
+      ai_metadata: formData.ai_metadata || null,
       organization_id: organizationId,
     })
     .select()

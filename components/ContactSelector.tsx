@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -13,18 +13,27 @@ interface ContactSelectorProps {
   onAddNew: () => void
   error?: string
   disabled?: boolean
+  onContactUpdated?: (contact: Contact) => void  // Feature #1: Callback when contact is edited
 }
 
-export function ContactSelector({
+function ContactSelectorComponent({
   contacts,
   selectedContactId,
   onSelect,
   onAddNew,
   error,
   disabled = false,
+  onContactUpdated,
 }: ContactSelectorProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [isOpen, setIsOpen] = useState(false)
+
+  // Feature #1: Inline editing state
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedRole, setEditedRole] = useState('')
+  const [editedEmails, setEditedEmails] = useState<string[]>([])
+  const [editedPhones, setEditedPhones] = useState<string[]>([])
+  const [isSaving, setIsSaving] = useState(false)
 
   const selectedContact = contacts.find((c) => c.id === selectedContactId)
 
@@ -36,6 +45,72 @@ export function ContactSelector({
     onSelect(contactId)
     setIsOpen(false)
     setSearchTerm('')
+  }
+
+  // Feature #1: Handle inline editing
+  const handleStartEdit = () => {
+    if (!selectedContact) return
+    setEditedRole(selectedContact.role || '')
+    setEditedEmails(selectedContact.emails || [selectedContact.email || ''].filter(Boolean))
+    setEditedPhones(selectedContact.phones || [selectedContact.phone || ''].filter(Boolean))
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditedRole('')
+    setEditedEmails([])
+    setEditedPhones([])
+  }
+
+  const handleSaveEdit = async () => {
+    if (!selectedContact) return
+
+    setIsSaving(true)
+
+    try {
+      const response = await fetch('/api/contacts/update-details', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedContact.id,
+          role: editedRole.trim() || null,
+          emails: editedEmails.filter((e) => e.trim()),
+          phones: editedPhones.filter((p) => p.trim()),
+        }),
+      })
+
+      if (response.ok) {
+        const { data } = await response.json()
+        if (data && onContactUpdated) {
+          onContactUpdated(data)
+        }
+        setIsEditing(false)
+      } else {
+        alert('Failed to update contact details')
+      }
+    } catch (error) {
+      console.error('Error updating contact:', error)
+      alert('Error updating contact details')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleAddEmail = () => {
+    setEditedEmails([...editedEmails, ''])
+  }
+
+  const handleRemoveEmail = (index: number) => {
+    setEditedEmails(editedEmails.filter((_, i) => i !== index))
+  }
+
+  const handleAddPhone = () => {
+    setEditedPhones([...editedPhones, ''])
+  }
+
+  const handleRemovePhone = (index: number) => {
+    setEditedPhones(editedPhones.filter((_, i) => i !== index))
   }
 
   return (
@@ -123,7 +198,118 @@ export function ContactSelector({
             />
           )}
         </div>
+      ) : isEditing ? (
+        /* Feature #1: Inline Edit Mode */
+        <div className="border-2 border-blue-600 bg-blue-50 px-4 py-3">
+          <h3 className="font-semibold text-gray-900 mb-3">
+            Edit Details for {selectedContact.name}
+          </h3>
+
+          {/* Role */}
+          <div className="mb-3">
+            <Label htmlFor="editRole" className="block text-sm font-semibold mb-1">
+              Role
+            </Label>
+            <Input
+              id="editRole"
+              type="text"
+              value={editedRole}
+              onChange={(e) => setEditedRole(e.target.value)}
+              placeholder="e.g., Manager, Director"
+              className="w-full"
+            />
+          </div>
+
+          {/* Emails */}
+          <div className="mb-3">
+            <Label className="block text-sm font-semibold mb-1">Emails</Label>
+            {editedEmails.map((email, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    const newEmails = [...editedEmails]
+                    newEmails[index] = e.target.value
+                    setEditedEmails(newEmails)
+                  }}
+                  placeholder="email@example.com"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  onClick={() => handleRemoveEmail(index)}
+                  className="bg-red-100 text-red-900 hover:bg-red-200 px-3 py-1 text-xs"
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              onClick={handleAddEmail}
+              className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-3 py-1 text-xs"
+            >
+              + Add Email
+            </Button>
+          </div>
+
+          {/* Phones */}
+          <div className="mb-4">
+            <Label className="block text-sm font-semibold mb-1">Phones</Label>
+            {editedPhones.map((phone, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <Input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    const newPhones = [...editedPhones]
+                    newPhones[index] = e.target.value
+                    setEditedPhones(newPhones)
+                  }}
+                  placeholder="+44 20 1234 5678"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  onClick={() => handleRemovePhone(index)}
+                  className="bg-red-100 text-red-900 hover:bg-red-200 px-3 py-1 text-xs"
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              onClick={handleAddPhone}
+              className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-3 py-1 text-xs"
+            >
+              + Add Phone
+            </Button>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              onClick={handleSaveEdit}
+              disabled={isSaving}
+              className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm font-semibold"
+            >
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCancelEdit}
+              disabled={isSaving}
+              className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-4 py-2 text-sm"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
       ) : (
+        /* Feature #1: Display Mode with Edit Button */
         <div className="border-2 border-green-600 bg-green-50 px-4 py-3">
           <div className="flex justify-between items-start">
             <div className="flex-1">
@@ -135,38 +321,53 @@ export function ContactSelector({
                   {selectedContact.role}
                 </div>
               )}
-              {(selectedContact.email || selectedContact.phone) && (
+              {(selectedContact.emails || selectedContact.phones) && (
                 <div className="text-xs text-gray-600 mt-1">
-                  {selectedContact.email && (
+                  {selectedContact.emails && selectedContact.emails.length > 0 && (
                     <div>
-                      <a
-                        href={`mailto:${selectedContact.email}`}
-                        className="text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        {selectedContact.email}
-                      </a>
+                      {selectedContact.emails.map((email, idx) => (
+                        <a
+                          key={idx}
+                          href={`mailto:${email}`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline block"
+                        >
+                          {email}
+                        </a>
+                      ))}
                     </div>
                   )}
-                  {selectedContact.phone && (
-                    <div>
-                      <a
-                        href={`tel:${selectedContact.phone}`}
-                        className="text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        {selectedContact.phone}
-                      </a>
+                  {selectedContact.phones && selectedContact.phones.length > 0 && (
+                    <div className="mt-1">
+                      {selectedContact.phones.map((phone, idx) => (
+                        <a
+                          key={idx}
+                          href={`tel:${phone}`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline block"
+                        >
+                          {phone}
+                        </a>
+                      ))}
                     </div>
                   )}
                 </div>
               )}
             </div>
-            <Button
-              type="button"
-              onClick={() => onSelect('')}
-              className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-4 py-2 ml-4"
-            >
-              Change
-            </Button>
+            <div className="flex gap-2 ml-4">
+              <Button
+                type="button"
+                onClick={handleStartEdit}
+                className="bg-blue-100 text-blue-900 hover:bg-blue-200 px-3 py-2 text-sm"
+              >
+                Edit Details
+              </Button>
+              <Button
+                type="button"
+                onClick={() => onSelect('')}
+                className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-3 py-2 text-sm"
+              >
+                Change
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -175,3 +376,6 @@ export function ContactSelector({
     </div>
   )
 }
+
+// Memoize to prevent unnecessary re-renders during email import
+export const ContactSelector = memo(ContactSelectorComponent)

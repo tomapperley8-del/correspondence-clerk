@@ -11,27 +11,95 @@
   'use strict';
 
   /**
+   * Extract email metadata (message ID, web link)
+   * @returns {Object} Email source metadata
+   */
+  function extractEmailMetadata() {
+    const metadata = {
+      message_id: null,
+      conversation_id: null,
+      web_link: null,
+      import_source: 'outlook_web'
+    };
+
+    // Try to get message ID and conversation ID from URL
+    try {
+      const url = new URL(window.location.href);
+
+      // Modern Outlook and Office 365 use 'ItemID' or 'msgid' parameter
+      const itemId = url.searchParams.get('ItemID') ||
+                     url.searchParams.get('msgid') ||
+                     url.searchParams.get('id');
+
+      // Conversation ID
+      const convId = url.searchParams.get('ConversationId') ||
+                     url.searchParams.get('conversationid');
+
+      if (itemId) {
+        metadata.message_id = itemId;
+        metadata.web_link = window.location.href;
+      }
+
+      if (convId) {
+        metadata.conversation_id = convId;
+      }
+
+      // If no URL parameters, try to find message ID in data attributes
+      if (!metadata.message_id) {
+        const messageEl = document.querySelector('[data-convid]') ||
+                         document.querySelector('[data-itemid]') ||
+                         document.querySelector('[data-id]');
+
+        if (messageEl) {
+          metadata.message_id = messageEl.getAttribute('data-itemid') ||
+                               messageEl.getAttribute('data-id');
+          metadata.conversation_id = messageEl.getAttribute('data-convid');
+        }
+      }
+
+      // Always capture web link even if we can't get message ID
+      metadata.web_link = window.location.href;
+
+    } catch (error) {
+      console.warn('Could not extract email metadata:', error);
+      // Still set web_link as fallback
+      metadata.web_link = window.location.href;
+    }
+
+    return metadata;
+  }
+
+  /**
    * Extract email data from Outlook Web
    * @returns {Object|null} Email data or null if extraction fails
    */
   window.extractOutlookEmail = function() {
     try {
+      // Extract email metadata first (message ID, web link)
+      const emailMetadata = extractEmailMetadata();
+
+      let emailData;
+
       // Try new Outlook interface (modern)
       if (document.querySelector('[data-testid="message-header"]')) {
-        return extractModernOutlook();
+        emailData = extractModernOutlook();
       }
-      
       // Try classic Outlook interface
-      if (document.querySelector('#ReadingPaneContainerId')) {
-        return extractClassicOutlook();
+      else if (document.querySelector('#ReadingPaneContainerId')) {
+        emailData = extractClassicOutlook();
       }
-      
       // Try Outlook.com (consumer)
-      if (document.querySelector('[role="main"]')) {
-        return extractOutlookCom();
+      else if (document.querySelector('[role="main"]')) {
+        emailData = extractOutlookCom();
       }
-      
-      throw new Error('Could not detect Outlook Web interface');
+      else {
+        throw new Error('Could not detect Outlook Web interface');
+      }
+
+      // Add metadata to email data
+      emailData.email_source = emailMetadata;
+
+      return emailData;
     } catch (error) {
       console.error('Outlook extraction error:', error);
       return {
@@ -41,7 +109,13 @@
         from: { email: '', name: '' },
         to: [],
         date: new Date().toISOString(),
-        raw_content: ''
+        raw_content: '',
+        email_source: {
+          message_id: null,
+          conversation_id: null,
+          web_link: window.location.href,
+          import_source: 'outlook_web'
+        }
       };
     }
   };

@@ -14,6 +14,7 @@ export type Business = {
   is_advertiser: boolean
   contract_start: string | null
   contract_end: string | null
+  contract_currency: string | null
   deal_terms: string | null
   payment_structure: string | null
   contract_amount: number | null

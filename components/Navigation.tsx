@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import type { User } from '@supabase/supabase-js'
 import { getCurrentOrganization } from '@/app/actions/organizations'
+import { getUserProfile } from '@/app/actions/user-profile'
 
 type Organization = {
   id: string
@@ -16,6 +17,7 @@ type Organization = {
 export function Navigation() {
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<Organization | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const pathname = usePathname()
   const router = useRouter()
@@ -28,11 +30,16 @@ export function Navigation() {
       } = await supabase.auth.getUser()
       setUser(user)
 
-      // Fetch organization if user is authenticated
+      // Fetch organization and display name if user is authenticated
       if (user) {
         const orgResult = await getCurrentOrganization()
         if (orgResult.data) {
           setOrganization(orgResult.data)
+        }
+
+        const profileResult = await getUserProfile()
+        if (profileResult.data) {
+          setDisplayName(profileResult.data.display_name)
         }
       }
 
@@ -47,14 +54,20 @@ export function Navigation() {
       const currentUser = session?.user ?? null
       setUser(currentUser)
 
-      // Fetch organization when user logs in
+      // Fetch organization and display name when user logs in
       if (currentUser) {
         const orgResult = await getCurrentOrganization()
         if (orgResult.data) {
           setOrganization(orgResult.data)
         }
+
+        const profileResult = await getUserProfile()
+        if (profileResult.data) {
+          setDisplayName(profileResult.data.display_name)
+        }
       } else {
         setOrganization(null)
+        setDisplayName(null)
       }
     })
 
@@ -160,15 +173,17 @@ export function Navigation() {
 
           <div className="flex items-center space-x-4">
             <div className="text-right">
-              <div className="text-sm text-white">{user.email}</div>
+              <div className="text-sm text-white">
+                {displayName || user.email?.split('@')[0] || user.email}
+              </div>
               {organization && (
                 <div className="text-xs text-gray-400">{organization.name}</div>
               )}
             </div>
             <Link
-              href="/settings/organization"
+              href="/settings"
               className={`px-3 py-2 text-sm font-medium transition-colors ${
-                pathname === '/settings/organization'
+                pathname?.startsWith('/settings')
                   ? 'text-white bg-[#98bf64]'
                   : 'text-white hover:text-[#98bf64]'
               }`}

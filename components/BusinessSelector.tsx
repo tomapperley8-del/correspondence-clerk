@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,7 @@ interface BusinessSelectorProps {
   error?: string
 }
 
-export function BusinessSelector({
+function BusinessSelectorComponent({
   businesses,
   selectedBusinessId,
   onSelect,
@@ -139,3 +139,6 @@ export function BusinessSelector({
     </div>
   )
 }
+
+// Memoize to prevent unnecessary re-renders during email import
+export const BusinessSelector = memo(BusinessSelectorComponent)

@@ -7,13 +7,15 @@ import { Button } from '@/components/ui/button'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
 import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, type Correspondence } from '@/app/actions/correspondence'
+import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
 import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
 import { EditBusinessDetailsButton } from '@/components/EditBusinessDetailsButton'
 import { EditContactButton } from '@/components/EditContactButton'
-import { ExportToGoogleDocsButton } from '@/components/ExportToGoogleDocsButton'
+import { ExportDropdown } from '@/components/ExportDropdown'
 import { CorrespondenceSummary } from '@/components/CorrespondenceSummary'
 import { ActionSuggestions } from '@/components/ActionSuggestions'
+import { ContractDetailsCard } from '@/components/ContractDetailsCard'
 import { SuccessBanner } from '@/components/SuccessBanner'
 import { retryFormatting } from '@/app/actions/ai-formatter'
 
@@ -30,6 +32,7 @@ export default function BusinessDetailPage({
   const [business, setBusiness] = useState<Business | null>(null)
   const [contacts, setContacts] = useState<Contact[]>([])
   const [correspondence, setCorrespondence] = useState<Correspondence[]>([])
+  const [displayNames, setDisplayNames] = useState<Record<string, string>>({})
   const [isArchiveExpanded, setIsArchiveExpanded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [formattingInProgress, setFormattingInProgress] = useState<string | null>(null)
@@ -38,6 +41,14 @@ export default function BusinessDetailPage({
   const [editedDate, setEditedDate] = useState<string>('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Feature #3: AI summary refresh trigger
+  const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0)
+
+  // Feature #4: Correspondence view controls state
+  const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest')
+  const [contactFilter, setContactFilter] = useState<string>('all')
+  const [directionFilter, setDirectionFilter] = useState<'all' | 'received' | 'sent' | 'conversation'>('all')
 
   useEffect(() => {
     async function loadParams() {
@@ -48,6 +59,37 @@ export default function BusinessDetailPage({
     }
     loadParams()
   }, [params, searchParams])
+
+  // Feature #4: Load filter preferences from localStorage
+  useEffect(() => {
+    if (!id) return
+
+    const storageKey = `business_${id}_view`
+    const savedPrefs = localStorage.getItem(storageKey)
+    if (savedPrefs) {
+      try {
+        const prefs = JSON.parse(savedPrefs)
+        if (prefs.sortOrder) setSortOrder(prefs.sortOrder)
+        if (prefs.contactFilter) setContactFilter(prefs.contactFilter)
+        if (prefs.directionFilter) setDirectionFilter(prefs.directionFilter)
+      } catch (e) {
+        console.error('Error loading view preferences:', e)
+      }
+    }
+  }, [id])
+
+  // Feature #4: Save filter preferences to localStorage
+  useEffect(() => {
+    if (!id) return
+
+    const storageKey = `business_${id}_view`
+    const prefs = {
+      sortOrder,
+      contactFilter,
+      directionFilter,
+    }
+    localStorage.setItem(storageKey, JSON.stringify(prefs))
+  }, [id, sortOrder, contactFilter, directionFilter])
 
   useEffect(() => {
     if (!id) return
@@ -66,7 +108,22 @@ export default function BusinessDetailPage({
 
       setBusiness(businessResult.data)
       setContacts('error' in contactsResult ? [] : contactsResult.data || [])
-      setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
+      const correspondenceData = 'error' in correspondenceResult ? [] : correspondenceResult.data || []
+      setCorrespondence(correspondenceData)
+
+      // Fetch display names for all users who created correspondence
+      const userIds = [...new Set(correspondenceData.map((c) => c.user_id))]
+      if (userIds.length > 0) {
+        const displayNamesResult = await getDisplayNamesForUsers(userIds)
+        if (displayNamesResult.data) {
+          const namesMap: Record<string, string> = {}
+          displayNamesResult.data.forEach((item) => {
+            namesMap[item.id] = item.display_name || ''
+          })
+          setDisplayNames(namesMap)
+        }
+      }
+
       setLoading(false)
     }
 
@@ -92,32 +149,50 @@ export default function BusinessDetailPage({
     }
   }, [loading])
 
-  // Split correspondence into recent (last 12 months) and archive (older)
+  // Feature #4: Split correspondence into recent and archive with filters applied
   // Memoize to prevent recalculation on every render
   const { recentEntries, archiveEntries } = useMemo(() => {
     const twelveMonthsAgo = new Date()
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
 
-    const recent = correspondence
-      .filter((e) => new Date(e.entry_date || e.created_at) >= twelveMonthsAgo)
-      .sort((a, b) => {
-        // Sort oldest first (chronological)
-        const dateA = new Date(a.entry_date || a.created_at).getTime()
-        const dateB = new Date(b.entry_date || b.created_at).getTime()
-        return dateA - dateB
-      })
+    // Apply contact and direction filters
+    let filtered = correspondence.filter((e) => {
+      // Contact filter
+      if (contactFilter !== 'all' && e.contact_id !== contactFilter) {
+        return false
+      }
 
-    const archive = correspondence
+      // Direction filter
+      if (directionFilter === 'received' && e.direction !== 'received') {
+        return false
+      }
+      if (directionFilter === 'sent' && e.direction !== 'sent') {
+        return false
+      }
+      if (directionFilter === 'conversation' && e.direction !== 'received' && e.direction !== 'sent') {
+        return false
+      }
+
+      return true
+    })
+
+    // Sort based on user preference
+    const sortFn = (a: typeof correspondence[0], b: typeof correspondence[0]) => {
+      const dateA = new Date(a.entry_date || a.created_at).getTime()
+      const dateB = new Date(b.entry_date || b.created_at).getTime()
+      return sortOrder === 'oldest' ? dateA - dateB : dateB - dateA
+    }
+
+    const recent = filtered
+      .filter((e) => new Date(e.entry_date || e.created_at) >= twelveMonthsAgo)
+      .sort(sortFn)
+
+    const archive = filtered
       .filter((e) => new Date(e.entry_date || e.created_at) < twelveMonthsAgo)
-      .sort((a, b) => {
-        // Sort newest first within archive
-        const dateA = new Date(a.entry_date || a.created_at).getTime()
-        const dateB = new Date(b.entry_date || b.created_at).getTime()
-        return dateB - dateA
-      })
+      .sort(sortFn)
 
     return { recentEntries: recent, archiveEntries: archive }
-  }, [correspondence])
+  }, [correspondence, contactFilter, directionFilter, sortOrder])
 
   // Filter correspondence based on search query
   const filteredCorrespondence = useMemo(() => {
@@ -256,6 +331,23 @@ export default function BusinessDetailPage({
     }
   }
 
+  // Feature #3: Handle contract details update with AI summary refresh
+  const handleContractUpdate = async () => {
+    if (!id) return
+
+    // Reload business data to get updated contract fields
+    const businessResult = await getBusinessById(id)
+    if ('error' in businessResult || !businessResult.data) {
+      window.location.reload()
+      return
+    }
+
+    setBusiness(businessResult.data)
+
+    // Trigger AI summary refresh
+    setSummaryRefreshTrigger((prev) => prev + 1)
+  }
+
   // Helper to extract sender/recipient name from AI metadata
   const getExtractedName = (entry: Correspondence): string | null => {
     if (!entry.ai_metadata) return null
@@ -387,7 +479,16 @@ export default function BusinessDetailPage({
                 entry.formatted_text_original ||
                 entry.raw_text_original}
             </div>
-            <div className="flex gap-2">
+
+            {/* Display who created this entry */}
+            <div className="text-xs text-gray-500 mb-2">
+              Created by {displayNames[entry.user_id] || 'Unknown'}
+              {entry.edited_at && entry.edited_by && (
+                <span> • Edited by {displayNames[entry.edited_by] || 'Unknown'}</span>
+              )}
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
               <Button
                 onClick={() => handleStartEdit(entry)}
                 className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
@@ -400,6 +501,22 @@ export default function BusinessDetailPage({
               >
                 Delete
               </Button>
+              {/* Feature #9: View Original Email in Outlook */}
+              {entry.ai_metadata && (entry.ai_metadata as any).email_source && (entry.ai_metadata as any).email_source.web_link && (
+                <Button
+                  onClick={() => {
+                    const webLink = (entry.ai_metadata as any).email_source.web_link
+                    try {
+                      window.open(webLink, '_blank', 'noopener,noreferrer')
+                    } catch (error) {
+                      alert('Could not open email link. The email may have been moved or deleted in Outlook.')
+                    }
+                  }}
+                  className="bg-blue-100 text-blue-900 hover:bg-blue-200 px-3 py-1 text-xs"
+                >
+                  📧 View Original Email
+                </Button>
+              )}
             </div>
           </>
         )}
@@ -513,10 +630,15 @@ export default function BusinessDetailPage({
       </div>
 
       {/* AI Summary of Last 12 Months */}
-      <CorrespondenceSummary businessId={business.id} />
+      <CorrespondenceSummary businessId={business.id} business={business} refreshTrigger={summaryRefreshTrigger} />
 
       {/* AI Action Detection */}
       <ActionSuggestions businessId={business.id} />
+
+      {/* Contract Details */}
+      <div className="mb-6">
+        <ContractDetailsCard business={business} onUpdate={handleContractUpdate} />
+      </div>
 
       {/* Correspondence Search */}
       <div className="mb-6">
@@ -611,7 +733,7 @@ export default function BusinessDetailPage({
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Correspondence</h2>
           <div className="flex gap-3">
-            <ExportToGoogleDocsButton businessId={business.id} />
+            <ExportDropdown businessId={business.id} />
             <Link href={`/new-entry?businessId=${business.id}`}>
               <Button className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold">
                 New Entry
@@ -619,6 +741,136 @@ export default function BusinessDetailPage({
             </Link>
           </div>
         </div>
+
+        {/* Feature #4: Correspondence View Controls */}
+        {correspondence && correspondence.length > 0 && (
+          <div className="border-t-2 border-gray-300 pt-4 mb-6">
+            <div className="flex flex-wrap gap-4 items-center mb-3">
+              {/* Sort Order */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1">
+                  Sort:
+                </label>
+                <div className="flex border-2 border-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => setSortOrder('oldest')}
+                    className={`px-3 py-1 text-sm font-medium ${
+                      sortOrder === 'oldest'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Oldest First
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSortOrder('newest')}
+                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
+                      sortOrder === 'newest'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Newest First
+                  </button>
+                </div>
+              </div>
+
+              {/* Contact Filter */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1">
+                  Contact:
+                </label>
+                <select
+                  value={contactFilter}
+                  onChange={(e) => setContactFilter(e.target.value)}
+                  className="px-3 py-1 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+                >
+                  <option value="all">All Contacts</option>
+                  {contacts.map((contact) => (
+                    <option key={contact.id} value={contact.id}>
+                      {contact.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Direction Filter */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1">
+                  Direction:
+                </label>
+                <div className="flex border-2 border-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => setDirectionFilter('all')}
+                    className={`px-3 py-1 text-sm font-medium ${
+                      directionFilter === 'all'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDirectionFilter('received')}
+                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
+                      directionFilter === 'received'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Received
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDirectionFilter('sent')}
+                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
+                      directionFilter === 'sent'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Sent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDirectionFilter('conversation')}
+                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
+                      directionFilter === 'conversation'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Conversation
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Entry Count and Reset */}
+            <div className="flex justify-between items-center text-sm">
+              <p className="text-gray-600">
+                Showing {filteredCorrespondence.recent.length + filteredCorrespondence.archive.length} of {correspondence.length} entries
+              </p>
+              {(sortOrder !== 'oldest' || contactFilter !== 'all' || directionFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortOrder('oldest')
+                    setContactFilter('all')
+                    setDirectionFilter('all')
+                  }}
+                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  Reset to default view
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {correspondence && correspondence.length === 0 ? (
           <p className="text-gray-600 text-sm">
