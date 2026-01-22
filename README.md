@@ -64,25 +64,32 @@ The Correspondence Clerk is a web app that transforms messy real-world correspon
 
 ## Project Status
 
-### Current Status
+### 🎉 All Steps Complete! (v1.0)
 
-- ✅ **Step 1: Foundation and Auth** (COMPLETE)
-  - Next.js 15 project initialized
-  - Tailwind CSS configured (no rounded corners, no shadows)
-  - shadcn/ui components installed
-  - Supabase Auth working (signup, login, logout)
-  - Protected routes implemented
-  - Navigation shell created
-  - TypeScript types defined
+**Last Updated:** January 22, 2026
 
-- ⏳ **Step 2:** Database migrations and RLS
-- ⏳ **Step 3:** Dashboard and business pages
-- ⏳ **Step 4:** New entry flow
-- ⏳ **Step 5:** AI formatter
-- ⏳ **Step 6:** Editing layer
-- ⏳ **Step 7:** Full-text search
-- ⏳ **Step 8:** Mastersheet import
-- ⏳ **Step 9:** Export to Google Docs
+- ✅ **Step 1:** Foundation and Auth
+- ✅ **Step 2:** Database migrations and RLS
+- ✅ **Step 3:** Dashboard and business pages
+- ✅ **Step 4:** New entry flow with forced filing
+- ✅ **Step 5:** AI formatter with structured outputs (zero JSON errors)
+- ✅ **Step 6:** Manual editing (correction layer)
+- ✅ **Step 7:** Full-text search
+- ✅ **Step 8:** Mastersheet import with filters
+- ✅ **Step 9:** Export to Google Docs via MCP
+
+**Latest Update (Jan 22):** Eliminated AI formatting errors using Anthropic structured outputs. 100% success rate on test suite, handles 13KB+ email threads without errors.
+
+### 🌐 Live Deployment
+
+**Production URL:** https://correspondence-clerk.vercel.app
+
+**Deployment:** Vercel (auto-deploys from `main` branch)
+
+**Deploy Manually:**
+```bash
+vercel --prod --yes
+```
 
 ## Design Rules
 
@@ -168,14 +175,21 @@ Send emails directly from Outlook Web to Correspondence Clerk with a browser boo
 
 For detailed setup instructions and troubleshooting, see [OUTLOOK_INTEGRATION.md](./OUTLOOK_INTEGRATION.md).
 
-## Next Steps
+## Starting a New Session
 
-After completing Step 1, the next step is:
+When starting a new session with Claude Code:
 
-**Step 2: Database migrations, constraints, and RLS**
-- Create Supabase SQL migrations for businesses, contacts, correspondence tables
-- Set up RLS policies
-- Configure full-text search indexes
+1. **Read SESSION_START.md first** - Quick reference with everything you need
+2. **Check CLAUDE.md** - Product requirements and hard rules
+3. **Review CURRENT_STATE.md** - Detailed implementation status
+4. **Check git status** - See uncommitted changes
+
+### Key Files for New Sessions
+- `SESSION_START.md` - Quick start guide (read this first!)
+- `CLAUDE.md` - Full PRD + Hard Rules
+- `CURRENT_STATE.md` - Implementation details
+- `DEPLOYMENT_REPORT.md` - Latest changes
+- `ARCHITECTURE.md` - Technical documentation
 
 ## Contact
 

@@ -37,12 +37,12 @@ $filepath = Join-Path $OutputDir $filename
 # Save image
 $clipboard.Save($filepath, [System.Drawing.Imaging.ImageFormat]::Png)
 
-Write-Host "✅ Screenshot saved!" -ForegroundColor Green
+Write-Host "Screenshot saved!" -ForegroundColor Green
 Write-Host ""
 Write-Host "File path:" -ForegroundColor Cyan
 Write-Host "  $filepath"
 Write-Host ""
-Write-Host "📋 Path copied to clipboard (ready to paste)!" -ForegroundColor Yellow
+Write-Host "Path copied to clipboard (ready to paste)!" -ForegroundColor Yellow
 
 # Copy the path to clipboard for easy pasting
 Set-Clipboard -Value $filepath

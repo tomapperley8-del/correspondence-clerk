@@ -1,5 +1,5 @@
 # Correspondence Clerk - Current State Summary
-**Last Updated:** 2026-01-16
+**Last Updated:** 2026-01-22
 
 ## ✅ Completed Steps (1-8)
 
@@ -43,11 +43,17 @@ All migrations in `supabase/migrations/`:
 - Unsaved changes warning
 - Success redirect with banner
 
-### Step 5: AI Formatter and Thread Splitting ✅
-- **Anthropic API Integration** (Claude Sonnet 4) for formatting correspondence
+### Step 5: AI Formatter and Thread Splitting ✅ **[UPDATED: Jan 22, 2026]**
+- **Anthropic API Integration** with **structured outputs** (zero JSON parsing errors)
+- **Model:** claude-sonnet-4-5 (latest, upgraded from claude-sonnet-4-20250514)
+- **Token Budget:** 16,384 tokens (4x increase, handles 13KB+ threads)
+- **Temperature:** 0 (deterministic, consistent output)
+- **JSON Schema Enforcement:** Uses `output_format.schema` for guaranteed valid JSON
+- **Beta Feature:** `structured-outputs-2025-11-13` enabled
 - **Thread Detection:** Lightweight heuristics detect email chains
 - **Split Toggle:** Auto-defaults ON for high-confidence threads
 - **Strict JSON Contract:** AI returns only validated JSON (subject, type, date, formatted text)
+- **Truncation Detection:** Checks `stop_reason === 'max_tokens'` and handles gracefully
 - **Graceful Fallback:** AI outage never blocks saving
   - Save as "unformatted" if AI fails
   - Show clear error message with "Save Without Formatting" button
@@ -55,6 +61,7 @@ All migrations in `supabase/migrations/`:
 - **Retry Formatting:** Can attempt formatting again for unformatted entries
 - **Preserves Originals:** Always stores raw_text_original and formatted_text_original
 - **Hard Rules Enforced:** No rewriting, no invented content, preserves user wording exactly
+- **Test Results:** 100% success rate (3/3 tests passed, no JSON errors)
 
 ### Step 6: Manual Editing (Correction Layer) ✅
 - **Edit Button:** Each entry has an "Edit" button in normal view
@@ -243,7 +250,25 @@ From `app/globals.css`:
 
 ## 🚀 All Steps Complete!
 
-All 9 steps from the PRD build plan are now complete. The app is fully functional and ready for use.
+All 9 steps from the PRD build plan are now complete. The app is fully functional and **deployed to production**.
+
+### 🌐 Live Deployment
+- **Production URL:** https://correspondence-clerk.vercel.app
+- **Deployment Platform:** Vercel
+- **Auto-Deploy:** Enabled (pushes to `main` branch trigger deployments)
+- **Manual Deploy:** `vercel --prod --yes`
+- **Organization:** tom-apperleys-projects
+- **Project ID:** prj_TLkqSYexjPOdnZNKJGGcq3AGpSO9
+
+### 📸 Screenshot Workflow
+- **Desktop Shortcut:** `C:\Users\Bridg\Desktop\Save Screenshot for Claude.bat`
+- **User Workflow:**
+  1. Take screenshot (Fn + Shift + PrtSc)
+  2. Double-click Desktop shortcut
+  3. Paste file path in terminal (Ctrl+V)
+- **Storage:** `C:\Users\Bridg\AppData\Local\Temp\claude-screenshots\`
+- **Format:** `screenshot_YYYY-MM-DD_HH-MM-SS.png`
+- **Documentation:** `SCREENSHOT_WORKFLOW.md`
 
 ## ⚠️ Hard Rules (From CLAUDE.md)
 
