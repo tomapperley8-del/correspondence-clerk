@@ -54,7 +54,12 @@
       "Bash(npx vercel:*)",
       "Bash(git checkout:*)",
       "WebFetch(domain:correspondence-clerk.vercel.app)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(npx tsx:*)",
+      "Bash(vercel ls:*)",
+      "Bash(vercel inspect:*)",
+      "Bash(where:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -Command:*)"
     ]
   }
 }

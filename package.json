@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "update-docs": "tsx scripts/update-docs.ts",
-    "export-user-guide": "tsx scripts/export-user-guide-to-gdoc.ts"
+    "export-user-guide": "tsx scripts/export-user-guide-to-gdoc.ts",
+    "screenshot": "powershell -ExecutionPolicy Bypass -File scripts/paste-screenshot.ps1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
