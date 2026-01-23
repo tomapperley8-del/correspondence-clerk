@@ -132,7 +132,7 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
       const margin = 20
-      const contentWidth = pageWidth - margin * 2
+      const contentWidth = pageWidth - margin * 2 - 5 // Safety buffer for jsPDF precision
       let yPos = margin
 
       // Helper function to add new page if needed
@@ -167,7 +167,7 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
       doc.setFont('helvetica', 'bold')
       const titleLines = doc.splitTextToSize(business.name, contentWidth)
       titleLines.forEach((line: string) => {
-        doc.text(line, pageWidth / 2, yPos, { align: 'center' })
+        doc.text(line, pageWidth / 2, yPos, { align: 'center', maxWidth: contentWidth })
         yPos += 12
       })
 
@@ -221,13 +221,21 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
           doc.setFontSize(11)
 
           contact.emails.forEach((email: string) => {
-            doc.text(`Email: ${email}`, margin, yPos)
-            yPos += 6
+            const emailLines = doc.splitTextToSize(`Email: ${email}`, contentWidth)
+            emailLines.forEach((line: string) => {
+              checkPageBreak(6)
+              doc.text(line, margin, yPos)
+              yPos += 6
+            })
           })
 
           contact.phones.forEach((phone: string) => {
-            doc.text(`Phone: ${phone}`, margin, yPos)
-            yPos += 6
+            const phoneLines = doc.splitTextToSize(`Phone: ${phone}`, contentWidth)
+            phoneLines.forEach((line: string) => {
+              checkPageBreak(6)
+              doc.text(line, margin, yPos)
+              yPos += 6
+            })
           })
 
           yPos += 8
@@ -267,6 +275,7 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
 
           const metaLines = doc.splitTextToSize(metaLine, contentWidth)
           metaLines.forEach((line: string) => {
+            checkPageBreak(6)
             doc.text(line, margin, yPos)
             yPos += 5
           })

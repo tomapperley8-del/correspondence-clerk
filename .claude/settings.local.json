@@ -60,7 +60,8 @@
       "Bash(vercel inspect:*)",
       "Bash(where:*)",
       "Bash(powershell -ExecutionPolicy Bypass -Command:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git log:*)"
     ]
   }
 }

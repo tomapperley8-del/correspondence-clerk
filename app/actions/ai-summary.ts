@@ -81,6 +81,24 @@ export async function generateCorrespondenceSummary(businessId: string) {
       const contractOnlyMessage = await anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 150,
+        temperature: 1,
+        // @ts-ignore - response_format is supported but may not be in types yet
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'contract_summary',
+            strict: true,
+            schema: {
+              type: 'object',
+              properties: {
+                correspondence_summary: { type: 'string' },
+                contract_status: { type: ['string', 'null'] },
+              },
+              required: ['correspondence_summary', 'contract_status'],
+              additionalProperties: false,
+            },
+          },
+        },
         messages: [
           {
             role: 'user',
@@ -97,13 +115,14 @@ Provide a brief 1-sentence contract status: Is it expired? Expiring soon (within
         ],
       })
 
-      const contractStatusText =
-        contractOnlyMessage.content[0].type === 'text' ? contractOnlyMessage.content[0].text : null
+      // Parse guaranteed valid JSON from structured output
+      const responseText = contractOnlyMessage.content[0].type === 'text' ? contractOnlyMessage.content[0].text : '{}'
+      const parsed = JSON.parse(responseText)
 
       return {
         data: {
           correspondence_summary: 'No correspondence in the last 12 months.',
-          contract_status: contractStatusText,
+          contract_status: parsed.contract_status || null,
         },
       }
     }
@@ -151,6 +170,24 @@ Provide a brief contract status statement (1 sentence) if contract data exists. 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 300,
+      temperature: 1,
+      // @ts-ignore - response_format is supported but may not be in types yet
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'correspondence_summary',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              correspondence_summary: { type: 'string' },
+              contract_status: { type: ['string', 'null'] },
+            },
+            required: ['correspondence_summary', 'contract_status'],
+            additionalProperties: false,
+          },
+        },
+      },
       messages: [
         {
           role: 'user',
@@ -167,37 +204,21 @@ IMPORTANT: Be aware of dates and use temporal language to indicate recency. For 
 Do not invent information. Only summarize what is actually in the correspondence. Be concise and factual.
 ${contractContext}
 
-Return your response in JSON format:
-{
-  "correspondence_summary": "Your 1-2 sentence summary here",
-  "contract_status": "Your 1 sentence contract analysis here, or null if no contract data"
-}
-
 Correspondence:
 ${correspondenceText}`,
         },
       ],
     })
 
-    // Extract and parse JSON response
+    // Parse guaranteed valid JSON from structured output
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '{}'
+    const parsed = JSON.parse(responseText)
 
-    try {
-      // Try to parse as JSON
-      const parsed = JSON.parse(responseText)
-      const result: AISummaryResult = {
+    return {
+      data: {
         correspondence_summary: parsed.correspondence_summary || 'Unable to generate summary.',
         contract_status: parsed.contract_status || null,
-      }
-      return { data: result }
-    } catch (parseError) {
-      // Fallback: treat entire response as correspondence summary
-      return {
-        data: {
-          correspondence_summary: responseText.trim(),
-          contract_status: null,
-        },
-      }
+      },
     }
   } catch (err) {
     console.error('AI Summary Error:', err)

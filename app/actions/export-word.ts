@@ -239,6 +239,8 @@ export async function exportToWord(businessId: string) {
               }),
             ],
             spacing: { after: 200 },
+            // Add word-wrap behavior for long metadata lines
+            contextualSpacing: true,
           })
         )
 

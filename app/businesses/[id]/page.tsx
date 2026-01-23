@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
-import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, type Correspondence } from '@/app/actions/correspondence'
+import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, updateCorrespondenceDirection, type Correspondence } from '@/app/actions/correspondence'
 import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
 import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
@@ -39,6 +39,7 @@ export default function BusinessDetailPage({
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [editedText, setEditedText] = useState<string>('')
   const [editedDate, setEditedDate] = useState<string>('')
+  const [editedDirection, setEditedDirection] = useState<'received' | 'sent' | ''>('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -250,6 +251,7 @@ export default function BusinessDetailPage({
       entry.formatted_text_original ||
       entry.raw_text_original
     )
+    setEditedDirection(entry.direction || '')  // Add direction
     // Set date in YYYY-MM-DD format for the input field
     if (entry.entry_date) {
       const date = new Date(entry.entry_date)
@@ -264,6 +266,7 @@ export default function BusinessDetailPage({
     setEditingEntryId(null)
     setEditedText('')
     setEditedDate('')
+    setEditedDirection('')  // Add direction reset
   }
 
   const handleSaveEdit = async (entryId: string) => {
@@ -274,22 +277,52 @@ export default function BusinessDetailPage({
 
     setSavingEdit(true)
 
-    // Convert edited date to ISO format if provided
-    const dateToSave = editedDate ? new Date(editedDate).toISOString() : null
+    try {
+      // Convert edited date to ISO format if provided
+      const dateToSave = editedDate ? new Date(editedDate).toISOString() : null
 
-    const result = await updateFormattedText(entryId, editedText, dateToSave)
+      // Find the original entry to check if direction changed
+      const originalEntry = correspondence.find(e => e.id === entryId)
+      const directionChanged = originalEntry && originalEntry.direction !== (editedDirection || null)
 
-    if ('error' in result) {
-      alert(`Error saving: ${result.error}`)
-    } else {
+      // Update formatted text and date
+      const textResult = await updateFormattedText(entryId, editedText, dateToSave)
+
+      if ('error' in textResult) {
+        alert(`Error saving: ${textResult.error}`)
+        setSavingEdit(false)
+        return
+      }
+
+      // Update direction if changed
+      if (directionChanged) {
+        const directionResult = await updateCorrespondenceDirection(
+          entryId,
+          editedDirection === '' ? null : editedDirection as 'received' | 'sent'
+        )
+
+        if ('error' in directionResult) {
+          alert(`Error updating direction: ${directionResult.error}`)
+          setSavingEdit(false)
+          return
+        }
+
+        // Trigger AI summary refresh if direction changed
+        setSummaryRefreshTrigger(prev => prev + 1)
+      }
+
       // Reload correspondence to show updated entry
       if (id) {
         const correspondenceResult = await getCorrespondenceByBusiness(id)
         setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
       }
+
       setEditingEntryId(null)
       setEditedText('')
       setEditedDate('')
+      setEditedDirection('')
+    } catch (err) {
+      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
 
     setSavingEdit(false)
@@ -438,24 +471,48 @@ export default function BusinessDetailPage({
 
         {/* Body text or edit textarea */}
         {isEditing ? (
-          <div className="mb-3">
+          <div className="bg-yellow-50 border-2 border-yellow-600 p-4 mb-4">
+            <p className="text-sm font-semibold text-yellow-900 mb-3">
+              Editing entry (manual correction)
+            </p>
+
+            {/* Direction Dropdown */}
             <div className="mb-3">
               <label className="block text-sm font-semibold text-gray-900 mb-1">
-                Entry Date
+                Direction:
+              </label>
+              <select
+                value={editedDirection}
+                onChange={(e) => setEditedDirection(e.target.value as 'received' | 'sent' | '')}
+                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+              >
+                <option value="">-- Unknown Direction --</option>
+                <option value="received">Received</option>
+                <option value="sent">Sent</option>
+              </select>
+            </div>
+
+            {/* Date Input */}
+            <div className="mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-1">
+                Entry Date:
               </label>
               <input
                 type="date"
                 value={editedDate}
                 onChange={(e) => setEditedDate(e.target.value)}
-                className="px-3 py-2 border-2 border-gray-300 focus:outline-none focus:border-blue-600 text-sm"
+                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
               />
             </div>
+
+            {/* Text Textarea */}
             <textarea
               value={editedText}
               onChange={(e) => setEditedText(e.target.value)}
-              className="w-full min-h-[200px] px-3 py-2 border-2 border-blue-600 focus:outline-none focus:border-blue-700 font-mono text-sm"
+              className="w-full min-h-[200px] px-3 py-2 border-2 border-gray-300 text-sm font-mono focus:border-blue-600 focus:outline-none"
             />
-            <div className="flex gap-2 mt-2">
+
+            <div className="flex gap-2 mt-3">
               <Button
                 onClick={() => handleSaveEdit(entry.id)}
                 disabled={savingEdit}
