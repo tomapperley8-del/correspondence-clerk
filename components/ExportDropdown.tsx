@@ -132,7 +132,7 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
       const margin = 20
-      const contentWidth = pageWidth - margin * 2 - 5 // Safety buffer for jsPDF precision
+      const contentWidth = pageWidth - margin * 2 - 10 // Safety buffer for jsPDF precision (increased from 5 to 10)
       let yPos = margin
 
       // Helper function to add new page if needed

@@ -78,25 +78,22 @@ export async function generateCorrespondenceSummary(businessId: string) {
       }
 
       // Generate contract analysis only
-      const contractOnlyMessage = await anthropic.messages.create({
+      // @ts-ignore - beta.messages is not in types yet
+      const contractOnlyMessage = await anthropic.beta.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 150,
         temperature: 1,
-        // @ts-ignore - response_format is supported but may not be in types yet
-        response_format: {
+        betas: ['structured-outputs-2025-11-13'],
+        output_format: {
           type: 'json_schema',
-          json_schema: {
-            name: 'contract_summary',
-            strict: true,
-            schema: {
-              type: 'object',
-              properties: {
-                correspondence_summary: { type: 'string' },
-                contract_status: { type: ['string', 'null'] },
-              },
-              required: ['correspondence_summary', 'contract_status'],
-              additionalProperties: false,
+          schema: {
+            type: 'object',
+            properties: {
+              correspondence_summary: { type: 'string' },
+              contract_status: { type: ['string', 'null'] },
             },
+            required: ['correspondence_summary', 'contract_status'],
+            additionalProperties: false,
           },
         },
         messages: [
@@ -167,25 +164,22 @@ Provide a brief contract status statement (1 sentence) if contract data exists. 
       : ''
 
     // Call Anthropic API for summary with structured output
-    const message = await anthropic.messages.create({
+    // @ts-ignore - beta.messages is not in types yet
+    const message = await anthropic.beta.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 300,
       temperature: 1,
-      // @ts-ignore - response_format is supported but may not be in types yet
-      response_format: {
+      betas: ['structured-outputs-2025-11-13'],
+      output_format: {
         type: 'json_schema',
-        json_schema: {
-          name: 'correspondence_summary',
-          strict: true,
-          schema: {
-            type: 'object',
-            properties: {
-              correspondence_summary: { type: 'string' },
-              contract_status: { type: ['string', 'null'] },
-            },
-            required: ['correspondence_summary', 'contract_status'],
-            additionalProperties: false,
+        schema: {
+          type: 'object',
+          properties: {
+            correspondence_summary: { type: 'string' },
+            contract_status: { type: ['string', 'null'] },
           },
+          required: ['correspondence_summary', 'contract_status'],
+          additionalProperties: false,
         },
       },
       messages: [
