@@ -28,6 +28,9 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12 // 4 rows of 3 cards
 
+  // Check if bookmarklet is installed
+  const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
+
   useEffect(() => {
     async function loadBusinesses() {
       const result = await getBusinesses()
@@ -60,6 +63,11 @@ export default function DashboardPage() {
       setCurrentPage(1)
     }
   }, [searchQuery, filterType, selectedCategory, businesses, currentPage, itemsPerPage])
+
+  useEffect(() => {
+    const installed = localStorage.getItem('bookmarklet-installed')
+    setBookmarkletInstalled(!!installed)
+  }, [])
 
   if (loading) {
     return (
@@ -161,13 +169,6 @@ export default function DashboardPage() {
       {children}
     </button>
   )
-
-  // Check if bookmarklet is installed
-  const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
-  useEffect(() => {
-    const installed = localStorage.getItem('bookmarklet-installed')
-    setBookmarkletInstalled(!!installed)
-  }, [])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
