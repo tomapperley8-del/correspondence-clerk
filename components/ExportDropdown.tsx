@@ -267,16 +267,18 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
             yPos += 8
           })
 
-          // Meta line
-          doc.setFontSize(10)
-          doc.setFont('helvetica', 'italic')
+          // Meta line - use normal font (not italic) for more accurate text measurement
+          doc.setFontSize(9)
+          doc.setFont('helvetica', 'normal')
           let metaLine = entry.date
           if (entry.direction) metaLine += ` | ${entry.direction}`
           if (entry.type) metaLine += ` | ${entry.type}`
           metaLine += ` | ${entry.contactName}`
           if (entry.contactRole) metaLine += `, ${entry.contactRole}`
 
-          const metaLines = doc.splitTextToSize(metaLine, contentWidth)
+          // Use even more conservative width for long metadata lines
+          const metaContentWidth = contentWidth - 10 // Extra 10mm buffer for metadata
+          const metaLines = doc.splitTextToSize(metaLine, metaContentWidth)
           metaLines.forEach((line: string) => {
             checkPageBreak(6)
             doc.text(line, margin, yPos)
