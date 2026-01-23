@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
@@ -8,6 +8,7 @@ export default function BookmarkletPage() {
   const [bookmarkletCode, setBookmarkletCode] = useState<string>('')
   const [copied, setCopied] = useState(false)
   const [installed, setInstalled] = useState(false)
+  const bookmarkletLinkRef = useRef<HTMLAnchorElement>(null)
 
   useEffect(() => {
     // Fetch the bookmarklet code for the current environment
@@ -26,6 +27,13 @@ export default function BookmarkletPage() {
       setInstalled(true)
     }
   }, [])
+
+  // Set the href directly via DOM after mount to bypass React's security check
+  useEffect(() => {
+    if (bookmarkletCode && bookmarkletLinkRef.current) {
+      bookmarkletLinkRef.current.href = bookmarkletCode
+    }
+  }, [bookmarkletCode])
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(bookmarkletCode)
@@ -82,8 +90,7 @@ export default function BookmarkletPage() {
               <div className="mt-3 p-4 bg-gray-100 border-2 border-gray-300 text-center">
                 {bookmarkletCode ? (
                   <a
-                    // eslint-disable-next-line no-script-url
-                    href={bookmarkletCode}
+                    ref={bookmarkletLinkRef}
                     className="inline-block px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 cursor-move"
                     onClick={(e) => e.preventDefault()}
                     title="Drag this to your bookmarks bar"
