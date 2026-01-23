@@ -82,9 +82,16 @@ export default function BookmarkletPage() {
               <div className="mt-3 p-4 bg-gray-100 border-2 border-gray-300 text-center">
                 {bookmarkletCode ? (
                   <a
-                    href={bookmarkletCode}
+                    href="#"
                     className="inline-block px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 cursor-move"
                     onClick={(e) => e.preventDefault()}
+                    onDragStart={(e) => {
+                      // Set the bookmarklet code as the drag data
+                      e.dataTransfer.setData('text/uri-list', bookmarkletCode)
+                      e.dataTransfer.setData('text/plain', bookmarkletCode)
+                    }}
+                    draggable="true"
+                    title="Drag this to your bookmarks bar"
                   >
                     📧 Import from Outlook
                   </a>
