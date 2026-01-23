@@ -78,24 +78,9 @@ export async function generateCorrespondenceSummary(businessId: string) {
       }
 
       // Generate contract analysis only
-      // @ts-ignore - beta.messages is not in types yet
-      const contractOnlyMessage = await anthropic.beta.messages.create({
+      const contractOnlyMessage = await anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 150,
-        temperature: 1,
-        betas: ['structured-outputs-2025-11-13'],
-        output_format: {
-          type: 'json_schema',
-          schema: {
-            type: 'object',
-            properties: {
-              correspondence_summary: { type: 'string' },
-              contract_status: { type: ['string', 'null'] },
-            },
-            required: ['correspondence_summary', 'contract_status'],
-            additionalProperties: false,
-          },
-        },
         messages: [
           {
             role: 'user',
@@ -107,19 +92,18 @@ Analyze this contract:
 - Deal Terms: ${business.deal_terms || 'Not set'}
 - Contract Amount: ${business.contract_amount ? `£${business.contract_amount.toLocaleString('en-GB')}` : 'Not set'}
 
-Provide a brief 1-sentence contract status: Is it expired? Expiring soon (within 3 months)? Key points from deal terms?`,
+Provide ONLY a brief 1-sentence contract status. Just the sentence, no JSON, no formatting.`,
           },
         ],
       })
 
-      // Parse guaranteed valid JSON from structured output
-      const responseText = contractOnlyMessage.content[0].type === 'text' ? contractOnlyMessage.content[0].text : '{}'
-      const parsed = JSON.parse(responseText)
+      const contractStatusText =
+        contractOnlyMessage.content[0].type === 'text' ? contractOnlyMessage.content[0].text.trim() : null
 
       return {
         data: {
           correspondence_summary: 'No correspondence in the last 12 months.',
-          contract_status: parsed.contract_status || null,
+          contract_status: contractStatusText,
         },
       }
     }
@@ -163,25 +147,10 @@ If contract dates are provided, analyze:
 Provide a brief contract status statement (1 sentence) if contract data exists. If no contract data, return null for contract_status.`
       : ''
 
-    // Call Anthropic API for summary with structured output
-    // @ts-ignore - beta.messages is not in types yet
-    const message = await anthropic.beta.messages.create({
+    // Call Anthropic API for summary - request clean text output
+    const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 300,
-      temperature: 1,
-      betas: ['structured-outputs-2025-11-13'],
-      output_format: {
-        type: 'json_schema',
-        schema: {
-          type: 'object',
-          properties: {
-            correspondence_summary: { type: 'string' },
-            contract_status: { type: ['string', 'null'] },
-          },
-          required: ['correspondence_summary', 'contract_status'],
-          additionalProperties: false,
-        },
-      },
       messages: [
         {
           role: 'user',
@@ -189,14 +158,11 @@ Provide a brief contract status statement (1 sentence) if contract data exists. 
 
 Based on the following correspondence entries from the last 12 months, provide a VERY BRIEF summary in 1-2 sentences. Focus on: the main topics discussed, current relationship status, and any pending actions or important developments.
 
-IMPORTANT: Be aware of dates and use temporal language to indicate recency. For example:
-- "Last contacted 2 weeks ago..."
-- "Most recent discussion in October was about..."
-- "No contact since September..."
-- "Recent exchange last week regarding..."
-
-Do not invent information. Only summarize what is actually in the correspondence. Be concise and factual.
-${contractContext}
+IMPORTANT:
+- Be aware of dates and use temporal language to indicate recency
+- Do not invent information. Only summarize what is actually in the correspondence
+- Be concise and factual
+- Return ONLY the summary text, no JSON, no formatting, no preamble
 
 Correspondence:
 ${correspondenceText}`,
@@ -204,14 +170,36 @@ ${correspondenceText}`,
       ],
     })
 
-    // Parse guaranteed valid JSON from structured output
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : '{}'
-    const parsed = JSON.parse(responseText)
+    const correspondenceSummary = message.content[0].type === 'text' ? message.content[0].text.trim() : 'Unable to generate summary.'
+
+    // If contract data exists, get contract status
+    let contractStatus: string | null = null
+    if (hasContractData) {
+      const contractMessage = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 100,
+        messages: [
+          {
+            role: 'user',
+            content: `Today's date is ${todayFormatted}.
+
+Analyze this contract:
+- Start Date: ${business.contract_start ? new Date(business.contract_start).toLocaleDateString('en-GB') : 'Not set'}
+- End Date: ${business.contract_end ? new Date(business.contract_end).toLocaleDateString('en-GB') : 'Not set'}
+- Deal Terms: ${business.deal_terms || 'Not set'}
+- Contract Amount: ${business.contract_amount ? `£${business.contract_amount.toLocaleString('en-GB')}` : 'Not set'}
+
+Provide ONLY a brief 1-sentence contract status. Just the sentence, no JSON, no formatting.`,
+          },
+        ],
+      })
+      contractStatus = contractMessage.content[0].type === 'text' ? contractMessage.content[0].text.trim() : null
+    }
 
     return {
       data: {
-        correspondence_summary: parsed.correspondence_summary || 'Unable to generate summary.',
-        contract_status: parsed.contract_status || null,
+        correspondence_summary: correspondenceSummary,
+        contract_status: contractStatus,
       },
     }
   } catch (err) {

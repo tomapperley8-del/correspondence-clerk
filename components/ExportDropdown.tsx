@@ -132,7 +132,10 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
       const margin = 20
-      const contentWidth = pageWidth - margin * 2 - 10 // Safety buffer for jsPDF precision (increased from 5 to 10)
+      // Maximum safe content width: A4 is 210mm, with 20mm margins on each side
+      // jsPDF's splitTextToSize is imprecise with italic fonts, so use very conservative width
+      // 210mm - 40mm (margins) - 25mm (safety buffer) = 145mm safe area
+      const contentWidth = pageWidth - margin * 2 - 25
       let yPos = margin
 
       // Helper function to add new page if needed
