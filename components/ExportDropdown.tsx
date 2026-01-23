@@ -132,10 +132,9 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
       const margin = 20
-      // Maximum safe content width: A4 is 210mm, with 20mm margins on each side
-      // jsPDF's splitTextToSize is imprecise with italic fonts, so use very conservative width
-      // 210mm - 40mm (margins) - 25mm (safety buffer) = 145mm safe area
-      const contentWidth = pageWidth - margin * 2 - 25
+      // Safe content width with buffer for jsPDF measurement imprecision
+      // We manually split metadata lines, so splitTextToSize only used for body text
+      const contentWidth = pageWidth - margin * 2 - 10 // 160mm safe area
       let yPos = margin
 
       // Helper function to add new page if needed
@@ -267,24 +266,27 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
             yPos += 8
           })
 
-          // Meta line - use normal font (not italic) for more accurate text measurement
+          // Meta information - split into multiple lines to avoid overflow
+          // jsPDF's splitTextToSize is unreliable, so we manually split the metadata
           doc.setFontSize(9)
           doc.setFont('helvetica', 'normal')
-          let metaLine = entry.date
-          if (entry.direction) metaLine += ` | ${entry.direction}`
-          if (entry.type) metaLine += ` | ${entry.type}`
-          metaLine += ` | ${entry.contactName}`
-          if (entry.contactRole) metaLine += `, ${entry.contactRole}`
 
-          // Use even more conservative width for long metadata lines
-          const metaContentWidth = contentWidth - 10 // Extra 10mm buffer for metadata
-          const metaLines = doc.splitTextToSize(metaLine, metaContentWidth)
-          metaLines.forEach((line: string) => {
-            checkPageBreak(6)
-            doc.text(line, margin, yPos)
-            yPos += 5
-          })
+          // Line 1: Date | Direction | Type
+          let metaLine1 = entry.date
+          if (entry.direction) metaLine1 += ` | ${entry.direction}`
+          if (entry.type) metaLine1 += ` | ${entry.type}`
+
+          checkPageBreak(6)
+          doc.text(metaLine1, margin, yPos)
           yPos += 5
+
+          // Line 2: Contact Name, Role
+          let metaLine2 = entry.contactName
+          if (entry.contactRole) metaLine2 += `, ${entry.contactRole}`
+
+          checkPageBreak(6)
+          doc.text(metaLine2, margin, yPos)
+          yPos += 6
 
           // Entry text
           doc.setFontSize(11)
