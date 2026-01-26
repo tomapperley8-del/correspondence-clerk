@@ -8,7 +8,7 @@
 
 **Project:** Correspondence Clerk - Web app that turns messy correspondence into clean, chronological letter files
 **Status:** ✅ Fully functional and deployed to production
-**Last Major Update:** January 22, 2026 - AI formatting errors eliminated with structured outputs
+**Last Major Update:** January 26, 2026 - Bookmarklet race condition fix (href now set before drag allowed)
 
 ---
 
@@ -79,7 +79,7 @@ Environment:
 
 ---
 
-## 🎯 Current State (All 9 Steps Complete)
+## 🎯 Current State (All 10 Steps Complete)
 
 ### ✅ Step 1: Foundation and Auth
 - Next.js 15 + Supabase Auth working
@@ -126,6 +126,14 @@ Environment:
 - Export button on business detail page
 - Uses MCP Google Workspace integration
 - Print-ready formatting
+
+### ✅ Step 10: Outlook Web Integration **[LATEST: Jan 26, 2026]**
+- Bookmarklet for one-click email import from Outlook Web
+- Install pages: `/install-bookmarklet` and `/bookmarklet`
+- Extracts subject, body, from, to, date from Outlook Web
+- Pre-fills new entry form via postMessage API
+- **Fixed:** Race condition where href wasn't set before drag
+- Works on outlook.com, outlook.office.com, outlook.live.com
 
 ---
 
@@ -213,7 +221,12 @@ npx supabase db push             # Push migrations to remote
 
 **None currently!** All features working as expected.
 
-**Latest Fix (Jan 22, 2026):**
+**Latest Fix (Jan 26, 2026):**
+- Fixed bookmarklet race condition - href now confirmed set before allowing drag
+- Added `isReady` state to prevent dragging empty/invalid bookmarks
+- Bookmarklet now works reliably on Vercel deployment
+
+**Previous Fix (Jan 22, 2026):**
 - Eliminated JSON parsing errors with Anthropic structured outputs
 - 100% success rate on test suite (3/3 tests passed)
 - Handles long email threads (13KB+) without errors
@@ -310,5 +323,5 @@ You now have all the context needed. Ask the user what they want to work on toda
 
 ---
 
-**Last Updated:** January 22, 2026
-**Version:** v1.0 - All 9 steps complete, AI formatting fixed, deployed to production
+**Last Updated:** January 26, 2026
+**Version:** v1.1 - All 10 steps complete, bookmarklet fix deployed, production ready

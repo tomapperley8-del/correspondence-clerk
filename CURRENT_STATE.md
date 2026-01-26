@@ -1,5 +1,5 @@
 # Correspondence Clerk - Current State Summary
-**Last Updated:** 2026-01-22
+**Last Updated:** 2026-01-26
 
 ## ✅ Completed Steps (1-8)
 
@@ -143,6 +143,34 @@ All migrations in `supabase/migrations/`:
   - Shows error message if export fails
   - Loading state ("Exporting...") during export
 
+### Step 10: Outlook Web Integration (Bookmarklet) ✅ **[UPDATED: Jan 26, 2026]**
+- **Bookmarklet Install Pages:**
+  - `/install-bookmarklet` - Public landing page with instructions
+  - `/bookmarklet` - Alternate install page (dashboard linked)
+- **How it works:**
+  - User drags bookmarklet button to browser bookmarks bar
+  - When viewing email in Outlook Web, clicking bookmark extracts email data
+  - Opens Correspondence Clerk `/new-entry` with form pre-filled
+  - Uses `postMessage` API to bypass cross-domain restrictions
+- **Email Data Extraction:**
+  - Subject, body, from (name + email), to, date
+  - Parses Outlook Web DOM for `[role="heading"]` elements
+  - Handles British date format (DD/MM/YYYY HH:MM)
+- **Supported Domains:**
+  - outlook.com (consumer)
+  - outlook.office.com (Office 365)
+  - outlook.live.com
+- **Bug Fix (Jan 26, 2026):**
+  - Fixed race condition where `href` wasn't set before user could drag
+  - Added `isReady` state to prevent drag until `javascript:` href confirmed
+  - Keeps anchor element always mounted (toggles visibility via className)
+  - Shows "Preparing bookmarklet..." / "Loading bookmarklet..." until ready
+- **Key Files:**
+  - `app/install-bookmarklet/page.tsx` - Public install page
+  - `app/bookmarklet/page.tsx` - Dashboard-linked install page
+  - `app/api/bookmarklet-code/route.ts` - API endpoint for bookmarklet code
+  - `public/outlook-bookmarklet-simple.js` - Bookmarklet source
+
 ## 🗄️ Database Schema Summary
 
 ### businesses
@@ -250,7 +278,7 @@ From `app/globals.css`:
 
 ## 🚀 All Steps Complete!
 
-All 9 steps from the PRD build plan are now complete. The app is fully functional and **deployed to production**.
+All 10 steps from the PRD build plan are now complete. The app is fully functional and **deployed to production**.
 
 ### 🌐 Live Deployment
 - **Production URL:** https://correspondence-clerk.vercel.app
@@ -321,6 +349,13 @@ All 9 steps from the PRD build plan are now complete. The app is fully functiona
 - [x] Delete businesses with double confirmation
 - [x] Edit contact modal with name, email, role, phone
 
+### ✅ Outlook Integration (Bookmarklet)
+- [x] Bookmarklet install page with drag-and-drop button
+- [x] Bookmarklet extracts email data from Outlook Web
+- [x] Pre-fills new entry form with extracted data
+- [x] Works on outlook.com, outlook.office.com, outlook.live.com
+- [x] Fixed: Bookmarklet href set before allowing drag (Jan 26, 2026)
+
 ### 🔲 Ready for User Testing
 - [ ] Google Docs export (requires MCP setup with Google authentication)
 
@@ -335,7 +370,7 @@ app/
     ai-formatter.ts        # AI formatting + retry logic
     search.ts              # Full-text search
     import-mastersheet.ts  # CSV import with duplicate merging
-    export-google-docs.ts  # ✨ NEW: Google Docs export via MCP
+    export-google-docs.ts  # Google Docs export via MCP
   dashboard/
     page.tsx              # Search, filters, sort options
   businesses/[id]/
@@ -347,9 +382,14 @@ app/
   admin/
     import/
       page.tsx            # Mastersheet import UI
+  install-bookmarklet/
+    page.tsx              # ✨ Public bookmarklet install page (fixed Jan 26)
+  bookmarklet/
+    page.tsx              # ✨ Dashboard-linked bookmarklet install page (fixed Jan 26)
   api/
     businesses/route.ts   # GET all businesses
     contacts/route.ts     # GET contacts by business
+    bookmarklet-code/route.ts # ✨ Bookmarklet code API endpoint
 
 components/
   BusinessSelector.tsx        # Search dropdown + Add New
@@ -381,7 +421,7 @@ MIGRATION_INSTRUCTIONS.md # ✨ NEW: Migration guide
 
 ## 🎯 Current Position
 
-**All 9 steps from the PRD are complete!**
+**All 10 steps from the PRD are complete!**
 
 The Correspondence Clerk is fully implemented with all core features:
 - Authentication and user management
@@ -393,6 +433,7 @@ The Correspondence Clerk is fully implemented with all core features:
 - Mastersheet CSV import with duplicate merging
 - Dashboard with search, filters, and sorting
 - Google Docs export via MCP
+- Outlook Web integration via bookmarklet
 
 Ready for user testing and deployment!
 
@@ -431,7 +472,8 @@ None currently! Everything implemented is working as expected.
 - Google Docs export via MCP implemented ✅
 - ANTHROPIC_API_KEY is configured in .env.local ✅
 - Mastersheet.csv added to .gitignore ✅
-- **All 9 steps complete!** ✅
+- **Outlook bookmarklet fixed (Jan 26, 2026)** - href race condition resolved ✅
+- **All 10 steps complete!** ✅
 
 **User Testing Required:**
 - Test Google Docs export with actual MCP Google authentication
