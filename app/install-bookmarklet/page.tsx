@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 
 export default function InstallBookmarkletPage() {
   const [activeVersion, setActiveVersion] = useState<'production' | 'local'>('production')
+  const [isReady, setIsReady] = useState(false)
   const bookmarkletRef = useRef<HTMLAnchorElement>(null)
 
   // Production bookmarklet code - Uses postMessage to bypass cross-domain auth issues
@@ -16,9 +17,15 @@ export default function InstallBookmarkletPage() {
   const currentUrl = activeVersion === 'production' ? 'https://correspondence-clerk.vercel.app' : 'http://localhost:3000'
 
   // Set href after mount to bypass React's javascript: URL blocking
+  // Only mark as ready after verifying href was actually set
   useEffect(() => {
-    if (bookmarkletRef.current) {
+    setIsReady(false) // Reset when version changes
+    if (bookmarkletRef.current && currentCode) {
       bookmarkletRef.current.href = currentCode
+      // Verify href was actually set before allowing drag
+      if (bookmarkletRef.current.href.startsWith('javascript:')) {
+        setIsReady(true)
+      }
     }
   }, [currentCode])
 
@@ -62,13 +69,23 @@ export default function InstallBookmarkletPage() {
           </h2>
           <p className="text-xl mb-8 text-[#777]">👇 Drag this button to your bookmarks bar</p>
 
+          {/* Always keep anchor mounted, toggle visibility based on isReady */}
           <a
             ref={bookmarkletRef}
-            className="inline-block px-12 py-6 bg-[#98bf64] text-white text-xl font-bold no-underline border-3 border-dashed border-[#333] cursor-move transition-all hover:bg-[#7a9d4f] hover:scale-105"
-            draggable="true"
+            className={isReady
+              ? "inline-block px-12 py-6 bg-[#98bf64] text-white text-xl font-bold no-underline border-3 border-dashed border-[#333] cursor-move transition-all hover:bg-[#7a9d4f] hover:scale-105"
+              : "hidden"
+            }
+            draggable={isReady ? "true" : "false"}
+            aria-hidden={!isReady}
           >
             📧 Send to Correspondence {activeVersion === 'local' && '(Local)'}
           </a>
+          {!isReady && (
+            <div className="inline-block px-12 py-6 bg-gray-400 text-white text-xl font-bold border-3 border-dashed border-[#333]">
+              Preparing bookmarklet...
+            </div>
+          )}
 
           <p className="mt-5 text-sm text-[#777]">
             Points to: <code className="bg-white px-2 py-1">{currentUrl}</code>

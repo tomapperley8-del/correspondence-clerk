@@ -8,6 +8,7 @@ export default function BookmarkletPage() {
   const [bookmarkletCode, setBookmarkletCode] = useState<string>('')
   const [copied, setCopied] = useState(false)
   const [installed, setInstalled] = useState(false)
+  const [isReady, setIsReady] = useState(false)
   const bookmarkletLinkRef = useRef<HTMLAnchorElement>(null)
 
   useEffect(() => {
@@ -29,9 +30,14 @@ export default function BookmarkletPage() {
   }, [])
 
   // Set the href directly via DOM after mount to bypass React's security check
+  // Only mark as ready after verifying href was actually set
   useEffect(() => {
     if (bookmarkletCode && bookmarkletLinkRef.current) {
       bookmarkletLinkRef.current.href = bookmarkletCode
+      // Verify href was actually set before allowing drag
+      if (bookmarkletLinkRef.current.href.startsWith('javascript:')) {
+        setIsReady(true)
+      }
     }
   }, [bookmarkletCode])
 
@@ -88,16 +94,20 @@ export default function BookmarkletPage() {
             <li>
               Drag the button below to your bookmarks bar:
               <div className="mt-3 p-4 bg-gray-100 border-2 border-gray-300 text-center">
-                {bookmarkletCode ? (
-                  <a
-                    ref={bookmarkletLinkRef}
-                    className="inline-block px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 cursor-move"
-                    onClick={(e) => e.preventDefault()}
-                    title="Drag this to your bookmarks bar"
-                  >
-                    📧 Import from Outlook
-                  </a>
-                ) : (
+                {/* Always keep anchor mounted, toggle visibility based on isReady */}
+                <a
+                  ref={bookmarkletLinkRef}
+                  className={isReady
+                    ? "inline-block px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 cursor-move"
+                    : "hidden"
+                  }
+                  onClick={(e) => e.preventDefault()}
+                  title="Drag this to your bookmarks bar"
+                  aria-hidden={!isReady}
+                >
+                  📧 Import from Outlook
+                </a>
+                {!isReady && (
                   <div className="text-gray-500">Loading bookmarklet...</div>
                 )}
               </div>
