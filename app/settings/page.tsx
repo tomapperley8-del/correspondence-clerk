@@ -192,6 +192,30 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {/* Tools Section */}
+      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-4 text-gray-900">Tools</h2>
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">
+                Outlook Email Import Tool
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Install a bookmarklet to import emails directly from Outlook Web
+                with one click.
+              </p>
+            </div>
+            <Link
+              href="/bookmarklet"
+              className="shrink-0 px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 border-2 border-blue-600"
+            >
+              Install
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* Back to Dashboard */}
       <Button
         variant="outline"

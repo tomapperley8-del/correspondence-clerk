@@ -536,16 +536,19 @@ Edits are for corrections (typos, clarifications), not for rewriting history. Yo
 
 ### What if Outlook integration isn't working?
 
-Currently, Correspondence Clerk uses manual copy-paste from Outlook (or any email client). There's no direct integration.
+Correspondence Clerk has a bookmarklet tool that imports emails directly from Outlook Web with one click.
 
-**To file an Outlook email:**
-1. Open the email in Outlook
+**To install the Email Import Tool:**
+1. Go to Settings > Tools (or visit /bookmarklet directly)
+2. Drag the bookmarklet button to your bookmarks bar
+3. When viewing an email in Outlook Web, click the bookmarklet
+4. Correspondence Clerk opens with the email pre-filled
+
+**Manual alternative (any email client):**
+1. Open the email in Outlook (or any email client)
 2. Select all (Ctrl+A) and copy (Ctrl+C)
 3. Paste into Correspondence Clerk's New Entry page
 4. File as usual
-
-**Future enhancement:**
-Direct Outlook integration may be added to streamline this workflow.
 
 ### What if contact details are missing?
 
@@ -634,19 +637,32 @@ For important threads, review the preview before confirming the split.
 - Click "Add New Contact" to create one
 - You must name a real person (no placeholders)
 
-### Outlook Integration Not Working
+### Outlook Email Import Tool Not Working
 
-**Current status:**
-There's no direct Outlook integration yet. You must manually copy-paste.
+**Check these first:**
+- Are you on Outlook Web (outlook.office.com or outlook.live.com)?
+- Is an email fully open (not just selected in the list)?
+- Did you allow popups for Outlook in your browser?
 
-**Workaround:**
-1. Open email in Outlook
-2. Select all (Ctrl+A) and copy (Ctrl+C)
-3. Paste into Correspondence Clerk
-4. File as usual
+**Common errors:**
 
-**Future:**
-Outlook add-in or integration may be developed to streamline this.
+"Please open while viewing an email in Outlook Web"
+- The bookmarklet only works on Outlook Web, not the desktop app
+
+"Could not extract email body"
+- Make sure the email is fully loaded before clicking the bookmarklet
+- Try refreshing the page and clicking again
+
+"Popup blocked"
+- Allow popups for Outlook in your browser's address bar
+
+**Reinstall the bookmarklet:**
+If nothing works, try reinstalling from Settings > Tools.
+
+**Manual alternative:**
+You can always copy-paste manually:
+1. Select all (Ctrl+A) and copy (Ctrl+C)
+2. Paste into Correspondence Clerk's New Entry page
 
 ### Contact Details Missing
 
