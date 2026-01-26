@@ -130,9 +130,11 @@ Environment:
 ### ✅ Step 10: Outlook Web Integration **[LATEST: Jan 26, 2026]**
 - Bookmarklet for one-click email import from Outlook Web
 - Install pages: `/install-bookmarklet` and `/bookmarklet`
+- **Settings > Tools** section links to bookmarklet (for returning users)
 - Extracts subject, body, from, to, date from Outlook Web
 - Pre-fills new entry form via postMessage API
 - **Fixed:** Race condition where href wasn't set before drag
+- **Fixed:** API now always uses production URL (not preview deployment)
 - Works on outlook.com, outlook.office.com, outlook.live.com
 
 ---
@@ -221,10 +223,13 @@ npx supabase db push             # Push migrations to remote
 
 **None currently!** All features working as expected.
 
-**Latest Fix (Jan 26, 2026):**
+**Latest Fixes (Jan 26, 2026):**
 - Fixed bookmarklet race condition - href now confirmed set before allowing drag
 - Added `isReady` state to prevent dragging empty/invalid bookmarks
-- Bookmarklet now works reliably on Vercel deployment
+- **Fixed bookmarklet API to always use production URL** (not preview deployment URL)
+- API now returns self-contained postMessage bookmarklet (no external script loading)
+- Added **Settings > Tools** section so users can find bookmarklet after dismissing banner
+- Updated USER_GUIDE.md with bookmarklet instructions and troubleshooting
 
 **Previous Fix (Jan 22, 2026):**
 - Eliminated JSON parsing errors with Anthropic structured outputs

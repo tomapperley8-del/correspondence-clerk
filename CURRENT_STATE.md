@@ -147,6 +147,7 @@ All migrations in `supabase/migrations/`:
 - **Bookmarklet Install Pages:**
   - `/install-bookmarklet` - Public landing page with instructions
   - `/bookmarklet` - Alternate install page (dashboard linked)
+  - **Settings > Tools** - Link to bookmarklet installer (for returning users)
 - **How it works:**
   - User drags bookmarklet button to browser bookmarks bar
   - When viewing email in Outlook Web, clicking bookmark extracts email data
@@ -160,16 +161,23 @@ All migrations in `supabase/migrations/`:
   - outlook.com (consumer)
   - outlook.office.com (Office 365)
   - outlook.live.com
-- **Bug Fix (Jan 26, 2026):**
+- **Bug Fixes (Jan 26, 2026):**
   - Fixed race condition where `href` wasn't set before user could drag
   - Added `isReady` state to prevent drag until `javascript:` href confirmed
   - Keeps anchor element always mounted (toggles visibility via className)
   - Shows "Preparing bookmarklet..." / "Loading bookmarklet..." until ready
+  - **Fixed API to always use production URL** (not preview deployment URL)
+  - API now returns self-contained postMessage bookmarklet (no external script)
+- **Discoverability:**
+  - New users: Prominent banner on Dashboard with "Install Email Import Tool" button
+  - Returning users: Settings > Tools section with install link
+  - User guide updated with bookmarklet instructions
 - **Key Files:**
   - `app/install-bookmarklet/page.tsx` - Public install page
   - `app/bookmarklet/page.tsx` - Dashboard-linked install page
-  - `app/api/bookmarklet-code/route.ts` - API endpoint for bookmarklet code
-  - `public/outlook-bookmarklet-simple.js` - Bookmarklet source
+  - `app/api/bookmarklet-code/route.ts` - API endpoint (hardcoded production URL)
+  - `app/settings/page.tsx` - Tools section with bookmarklet link
+  - `docs/USER_GUIDE.md` - Updated with bookmarklet instructions
 
 ## 🗄️ Database Schema Summary
 
@@ -472,7 +480,12 @@ None currently! Everything implemented is working as expected.
 - Google Docs export via MCP implemented ✅
 - ANTHROPIC_API_KEY is configured in .env.local ✅
 - Mastersheet.csv added to .gitignore ✅
-- **Outlook bookmarklet fixed (Jan 26, 2026)** - href race condition resolved ✅
+- **Outlook bookmarklet fixed (Jan 26, 2026):**
+  - href race condition resolved ✅
+  - API now always uses production URL (not preview deployment) ✅
+  - Self-contained postMessage bookmarklet (no external script) ✅
+  - Settings > Tools section added for returning users ✅
+  - User guide updated with bookmarklet instructions ✅
 - **All 10 steps complete!** ✅
 
 **User Testing Required:**
