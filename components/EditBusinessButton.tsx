@@ -18,6 +18,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
     status: business.status || '',
     is_club_card: business.is_club_card,
     is_advertiser: business.is_advertiser,
+    notes: business.notes || '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,6 +32,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       status: formData.status || undefined,
       is_club_card: formData.is_club_card,
       is_advertiser: formData.is_advertiser,
+      notes: formData.notes || undefined,
     })
 
     if ('error' in result) {
@@ -50,6 +52,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       status: business.status || '',
       is_club_card: business.is_club_card,
       is_advertiser: business.is_advertiser,
+      notes: business.notes || '',
     })
     setError(null)
     setIsOpen(false)
@@ -170,7 +173,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
           </div>
 
           {/* Advertiser Checkbox */}
-          <div className="mb-6">
+          <div className="mb-4">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -184,6 +187,20 @@ export function EditBusinessButton({ business }: { business: Business }) {
                 Advertiser
               </span>
             </label>
+          </div>
+
+          {/* Notes */}
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Internal notes about this business..."
+              rows={4}
+              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none resize-y"
+            />
           </div>
 
           {/* Buttons */}

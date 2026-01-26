@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
-import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, updateCorrespondenceDirection, type Correspondence } from '@/app/actions/correspondence'
+import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, type Correspondence } from '@/app/actions/correspondence'
 import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
 import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
@@ -40,6 +40,7 @@ export default function BusinessDetailPage({
   const [editedText, setEditedText] = useState<string>('')
   const [editedDate, setEditedDate] = useState<string>('')
   const [editedDirection, setEditedDirection] = useState<'received' | 'sent' | ''>('')
+  const [editedContactId, setEditedContactId] = useState<string>('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -251,7 +252,8 @@ export default function BusinessDetailPage({
       entry.formatted_text_original ||
       entry.raw_text_original
     )
-    setEditedDirection(entry.direction || '')  // Add direction
+    setEditedDirection(entry.direction || '')
+    setEditedContactId(entry.contact_id)
     // Set date in YYYY-MM-DD format for the input field
     if (entry.entry_date) {
       const date = new Date(entry.entry_date)
@@ -266,7 +268,8 @@ export default function BusinessDetailPage({
     setEditingEntryId(null)
     setEditedText('')
     setEditedDate('')
-    setEditedDirection('')  // Add direction reset
+    setEditedDirection('')
+    setEditedContactId('')
   }
 
   const handleSaveEdit = async (entryId: string) => {
@@ -281,9 +284,10 @@ export default function BusinessDetailPage({
       // Convert edited date to ISO format if provided
       const dateToSave = editedDate ? new Date(editedDate).toISOString() : null
 
-      // Find the original entry to check if direction changed
+      // Find the original entry to check if direction or contact changed
       const originalEntry = correspondence.find(e => e.id === entryId)
       const directionChanged = originalEntry && originalEntry.direction !== (editedDirection || null)
+      const contactChanged = originalEntry && originalEntry.contact_id !== editedContactId
 
       // Update formatted text and date
       const textResult = await updateFormattedText(entryId, editedText, dateToSave)
@@ -311,6 +315,17 @@ export default function BusinessDetailPage({
         setSummaryRefreshTrigger(prev => prev + 1)
       }
 
+      // Update contact if changed
+      if (contactChanged && editedContactId) {
+        const contactResult = await updateCorrespondenceContact(entryId, editedContactId)
+
+        if ('error' in contactResult) {
+          alert(`Error updating contact: ${contactResult.error}`)
+          setSavingEdit(false)
+          return
+        }
+      }
+
       // Reload correspondence to show updated entry
       if (id) {
         const correspondenceResult = await getCorrespondenceByBusiness(id)
@@ -321,6 +336,7 @@ export default function BusinessDetailPage({
       setEditedText('')
       setEditedDate('')
       setEditedDirection('')
+      setEditedContactId('')
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
@@ -489,6 +505,24 @@ export default function BusinessDetailPage({
                 <option value="">-- Unknown Direction --</option>
                 <option value="received">Received</option>
                 <option value="sent">Sent</option>
+              </select>
+            </div>
+
+            {/* Contact Dropdown */}
+            <div className="mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-1">
+                Contact:
+              </label>
+              <select
+                value={editedContactId}
+                onChange={(e) => setEditedContactId(e.target.value)}
+                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+              >
+                {contacts.map((contact) => (
+                  <option key={contact.id} value={contact.id}>
+                    {contact.name}{contact.role ? ` (${contact.role})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
 

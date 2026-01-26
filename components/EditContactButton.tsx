@@ -18,6 +18,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
   const [phones, setPhones] = useState<string[]>(
     contact.phones && contact.phones.length > 0 ? contact.phones : ['']
   )
+  const [notes, setNotes] = useState(contact.notes || '')
 
   const handleAddEmail = () => {
     setEmails([...emails, ''])
@@ -61,6 +62,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
       role: role || undefined,
       emails: filteredEmails,
       phones: filteredPhones,
+      notes: notes || undefined,
     })
 
     if ('error' in result) {
@@ -78,6 +80,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
     setRole(contact.role || '')
     setEmails(contact.emails && contact.emails.length > 0 ? contact.emails : [''])
     setPhones(contact.phones && contact.phones.length > 0 ? contact.phones : [''])
+    setNotes(contact.notes || '')
     setError(null)
     setIsOpen(false)
   }
@@ -213,6 +216,21 @@ export function EditContactButton({ contact }: { contact: Contact }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Internal notes about this contact..."
+              rows={3}
+              disabled={saving}
+              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none resize-y"
+            />
           </div>
 
           {/* Buttons */}

@@ -14,6 +14,7 @@ export type Contact = {
   phone: string | null // Deprecated: use phones array
   emails: string[]
   phones: string[]
+  notes: string | null
   organization_id: string
   created_at: string
   updated_at: string
@@ -87,6 +88,7 @@ export async function createContact(formData: {
   phone?: string
   emails?: string[]
   phones?: string[]
+  notes?: string
 }) {
   const supabase = await createClient()
   const {
@@ -128,6 +130,7 @@ export async function createContact(formData: {
       phone: phonesArray[0] || null, // Keep for backward compatibility
       emails: JSON.stringify(emailsArray),
       phones: JSON.stringify(phonesArray),
+      notes: formData.notes?.trim() || null,
       organization_id: organizationId,
     })
     .select()
@@ -161,6 +164,7 @@ export async function updateContact(
     phone?: string
     emails?: string[]
     phones?: string[]
+    notes?: string
   }
 ) {
   const supabase = await createClient()
@@ -203,6 +207,7 @@ export async function updateContact(
   }
 
   if (formData.role !== undefined) updateData.role = formData.role?.trim() || null
+  if (formData.notes !== undefined) updateData.notes = formData.notes?.trim() || null
 
   const { data, error } = await supabase
     .from('contacts')

@@ -21,6 +21,7 @@ export type Business = {
   address: string | null
   email: string | null
   phone: string | null
+  notes: string | null
   last_contacted_at: string | null
   mastersheet_source_ids: any
   organization_id: string
@@ -135,6 +136,7 @@ export async function updateBusiness(
     address?: string
     email?: string
     phone?: string
+    notes?: string
     last_contacted_at?: string
   }
 ) {
@@ -162,6 +164,7 @@ export async function updateBusiness(
   if (formData.address !== undefined) updateData.address = formData.address
   if (formData.email !== undefined) updateData.email = formData.email
   if (formData.phone !== undefined) updateData.phone = formData.phone
+  if (formData.notes !== undefined) updateData.notes = formData.notes
   if (formData.last_contacted_at !== undefined)
     updateData.last_contacted_at = formData.last_contacted_at
 

@@ -256,6 +256,71 @@ export async function deleteCorrespondence(id: string) {
 }
 
 /**
+ * Update correspondence contact_id (reassign to different contact)
+ * Verifies the new contact belongs to the same business
+ */
+export async function updateCorrespondenceContact(
+  correspondenceId: string,
+  newContactId: string
+) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  try {
+    // Get the correspondence to find its business_id
+    const { data: correspondence, error: fetchError } = await supabase
+      .from('correspondence')
+      .select('business_id')
+      .eq('id', correspondenceId)
+      .single()
+
+    if (fetchError || !correspondence) {
+      return { error: 'Correspondence not found' }
+    }
+
+    // Verify the new contact belongs to the same business
+    const { data: contact, error: contactError } = await supabase
+      .from('contacts')
+      .select('id, business_id')
+      .eq('id', newContactId)
+      .single()
+
+    if (contactError || !contact) {
+      return { error: 'Contact not found' }
+    }
+
+    if (contact.business_id !== correspondence.business_id) {
+      return { error: 'Contact must belong to the same business' }
+    }
+
+    // Update the correspondence with the new contact_id
+    const { error: updateError } = await supabase
+      .from('correspondence')
+      .update({
+        contact_id: newContactId,
+        edited_at: new Date().toISOString(),
+        edited_by: user.id,
+      })
+      .eq('id', correspondenceId)
+
+    if (updateError) {
+      return { error: updateError.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    return { error: errorMessage }
+  }
+}
+
+/**
  * Check if correspondence with same content already exists for this business
  * Returns existing entry if duplicate found
  *
