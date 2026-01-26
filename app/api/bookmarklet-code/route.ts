@@ -1,74 +1,27 @@
 import { NextResponse } from 'next/server'
 
 /**
- * API route to generate bookmarklet code with the correct domain
- * This ensures the bookmarklet points to the current environment (dev/prod)
+ * API route to generate bookmarklet code
+ * Always returns the production URL to avoid preview deployment issues
+ * Uses self-contained postMessage approach (no external script loading)
  */
-export async function GET(request: Request) {
-  // Get the origin from the request headers
-  const origin = request.headers.get('origin') ||
-                 request.headers.get('referer')?.split('/').slice(0, 3).join('/') ||
-                 'http://localhost:3000'
 
-  // Generate the bookmarklet code
-  const bookmarkletCode = generateBookmarkletCode(origin)
+const PRODUCTION_URL = 'https://correspondence-clerk.vercel.app'
+
+export async function GET() {
+  const bookmarkletCode = generateBookmarkletCode()
 
   return NextResponse.json({
     code: bookmarkletCode,
-    origin,
+    origin: PRODUCTION_URL,
   })
 }
 
-function generateBookmarkletCode(baseUrl: string): string {
-  // The full bookmarklet code that will be minified
-  const code = `
-(function(){
-  function sendToCorrespondenceClerk(){
-    if(!window.location.hostname.includes('outlook')&&!window.location.hostname.includes('office.com')&&!window.location.hostname.includes('live.com')){
-      alert('Please open this bookmarklet while viewing an email in Outlook Web.');
-      return;
-    }
-    if(!window.extractOutlookEmail){
-      loadExtractor();
-      setTimeout(processEmail,500);
-    }else{
-      processEmail();
-    }
-  }
-  function loadExtractor(){
-    var script=document.createElement('script');
-    script.src='${baseUrl}/outlook-extractor.js';
-    script.onerror=function(){
-      alert('Could not load email extractor. Please ensure Correspondence Clerk is accessible.');
-    };
-    document.head.appendChild(script);
-  }
-  function processEmail(){
-    try{
-      var emailData=window.extractOutlookEmail();
-      if(!emailData||emailData.error){
-        alert('Could not extract email data. Error: '+(emailData?.error||'Unknown error'));
-        return;
-      }
-      var params=new URLSearchParams({
-        emailSubject:emailData.subject||'',
-        emailBody:emailData.body||'',
-        emailFrom:emailData.from.name?emailData.from.name+' <'+emailData.from.email+'>':emailData.from.email,
-        emailDate:emailData.date,
-        emailTo:emailData.to.map(function(t){return t.name?t.name+' <'+t.email+'>':t.email;}).join(', '),
-        emailRawContent:encodeURIComponent(emailData.raw_content||'')
-      });
-      var prefillUrl='${baseUrl}/new-entry?'+params.toString();
-      window.open(prefillUrl,'_blank');
-    }catch(error){
-      console.error('Bookmarklet error:',error);
-      alert('Error processing email: '+error.message);
-    }
-  }
-  sendToCorrespondenceClerk();
-})();
-  `.trim()
+function generateBookmarkletCode(): string {
+  // Self-contained bookmarklet with inline extraction logic
+  // Uses postMessage to send data (avoids URL length limits)
+  // Matches the working implementation from /install-bookmarklet
+  const code = `javascript:(function(){var url='${PRODUCTION_URL}';if(!window.location.hostname.includes('outlook')&&!window.location.hostname.includes('office.com')&&!window.location.hostname.includes('live.com')){alert('Please open while viewing an email in Outlook Web.');return;}function parseEmailAddress(text){if(!text)return{email:'',name:''};var emailRegex=/[\\w\\.-]+@[\\w\\.-]+\\.\\w+/;var match=text.match(emailRegex);var email=match?match[0]:'';var name='';if(text.includes('<')&&text.includes('>')){name=text.substring(0,text.indexOf('<')).trim();}else if(text!==email&&!text.includes('@')){name=text.trim();}return{email:email,name:name};}function extractBodyText(element){if(!element)return'';var clone=element.cloneNode(true);var sigs=clone.querySelectorAll('[class*="signature"],[id*="signature"]');sigs.forEach(function(s){s.remove();});var quoted=clone.querySelectorAll('[class*="quote"],[class*="reply"]');quoted.forEach(function(q){q.remove();});var text=clone.textContent||clone.innerText||'';text=text.replace(/\\n\\s*\\n\\s*\\n/g,'\\n\\n');return text.trim();}try{var subject='',body='',from={email:'',name:''},to=[],date=new Date().toISOString();var headings=document.querySelectorAll('[role="heading"]');var fromText='',toText='',dateText='';headings.forEach(function(h){var txt=h.textContent.trim();if(txt.includes('<')&&txt.includes('@')&&txt.includes('>')){fromText=txt;}else if(txt.startsWith('To:')||txt.startsWith('To:\\u200b')){toText=txt.replace(/^To:\\u200b?/,'').trim();}else if(txt.match(/\\d{2}\\/\\d{2}\\/\\d{4}\\s+\\d{2}:\\d{2}/)){dateText=txt;}});if(fromText){from=parseEmailAddress(fromText);}if(toText){to=[parseEmailAddress(toText)];}if(dateText){var parts=dateText.match(/(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{2}):(\\d{2})/);if(parts){var d=new Date(parts[3],parts[2]-1,parts[1],parts[4],parts[5]);if(!isNaN(d.getTime()))date=d.toISOString();}}var subjectCandidates=document.querySelectorAll('h1,h2,h3,h4,[role="heading"]');for(var i=0;i<subjectCandidates.length;i++){var txt=subjectCandidates[i].textContent.trim();if(txt.length>5&&txt.length<200&&!txt.includes('@')&&!txt.startsWith('To:')&&!txt.startsWith('Cc:')&&!txt.match(/\\d{2}\\/\\d{2}\\/\\d{4}/)&&txt!=='Navigation pane'&&txt!=='Inbox'){subject=txt;break;}}var bodyEl=document.querySelector('[role="document"]')||document.querySelector('.customScrollBar')||document.querySelector('[role="main"]');body=extractBodyText(bodyEl);if(!body){alert('Could not extract email body.');return;}var fromStr=from.name?from.name+' <'+from.email+'>':from.email;var toStr=to.map(function(t){return t.name?t.name+' <'+t.email+'>':t.email;}).join(', ');var rawContent='From: '+fromStr+'\\nTo: '+toStr+'\\nDate: '+new Date(date).toLocaleString('en-GB')+'\\nSubject: '+subject+'\\n\\n'+body;var emailData={emailSubject:subject,emailBody:body,emailFrom:fromStr,emailFromEmail:from.email,emailFromName:from.name,emailDate:date,emailTo:toStr,emailRawContent:rawContent};var newWin=window.open(url+'/new-entry?awaitingEmail=1','_blank');if(!newWin){alert('Popup blocked. Please allow popups for Outlook.');return;}var attempts=0;var maxAttempts=50;var interval=setInterval(function(){attempts++;if(attempts>maxAttempts){clearInterval(interval);return;}try{newWin.postMessage({type:'OUTLOOK_EMAIL_DATA',data:emailData},url);}catch(e){}},200);}catch(error){alert('Error: '+error.message);}})();`
 
-  // Return as javascript: protocol URL
-  return `javascript:${encodeURIComponent(code)}`
+  return code
 }

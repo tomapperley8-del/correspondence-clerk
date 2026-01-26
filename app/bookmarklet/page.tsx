@@ -195,8 +195,7 @@ export default function BookmarkletPage() {
         <div className="space-y-4">
           <div>
             <h3 className="font-semibold mb-2">
-              "Please open this bookmarklet while viewing an email in Outlook
-              Web"
+              "Please open while viewing an email in Outlook Web"
             </h3>
             <p className="text-gray-700 text-sm">
               Make sure you are viewing an email in Outlook Web (outlook.office.com
@@ -207,23 +206,32 @@ export default function BookmarkletPage() {
 
           <div>
             <h3 className="font-semibold mb-2">
-              "Could not load email extractor"
+              "Could not extract email body"
             </h3>
             <p className="text-gray-700 text-sm">
-              This error means the bookmarklet cannot reach Correspondence Clerk.
-              Make sure you are connected to the internet and that Correspondence
-              Clerk is accessible.
+              Make sure you have an email fully open (not just selected in the inbox).
+              Wait for the email to fully load before clicking the bookmarklet.
+              Outlook Web may have updated its layout - please report this issue.
             </p>
           </div>
 
           <div>
             <h3 className="font-semibold mb-2">
-              "Could not extract email data"
+              "Popup blocked. Please allow popups for Outlook"
             </h3>
             <p className="text-gray-700 text-sm">
-              Outlook Web may have updated its layout. Please report this issue
-              and we will update the extractor script. In the meantime, you can
-              manually copy and paste the email content into Correspondence Clerk.
+              Your browser is blocking the new tab from opening. Click the popup
+              blocker icon in your address bar and allow popups for Outlook, then
+              try again.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="font-semibold mb-2">Email data doesn't appear in form</h3>
+            <p className="text-gray-700 text-sm">
+              If Correspondence Clerk opens but fields are empty, make sure you're
+              logged in and try clicking the bookmarklet again. Check your browser
+              console for errors (F12 → Console tab).
             </p>
           </div>
 
