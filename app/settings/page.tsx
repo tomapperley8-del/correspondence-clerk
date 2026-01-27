@@ -199,11 +199,11 @@ export default function SettingsPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="font-semibold text-gray-900">
-                Outlook Email Import Tool
+                Email Import Tool
               </h3>
               <p className="text-sm text-gray-600 mt-1">
                 Install a bookmarklet to import emails directly from Outlook Web
-                with one click.
+                or Gmail with one click.
               </p>
             </div>
             <Link

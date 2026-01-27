@@ -4,7 +4,10 @@ import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
+type Provider = 'outlook' | 'gmail'
+
 export default function BookmarkletPage() {
+  const [provider, setProvider] = useState<Provider>('outlook')
   const [bookmarkletCode, setBookmarkletCode] = useState<string>('')
   const [copied, setCopied] = useState(false)
   const [installed, setInstalled] = useState(false)
@@ -12,8 +15,11 @@ export default function BookmarkletPage() {
   const bookmarkletLinkRef = useRef<HTMLAnchorElement>(null)
 
   useEffect(() => {
-    // Fetch the bookmarklet code for the current environment
-    fetch('/api/bookmarklet-code')
+    setIsReady(false)
+    setBookmarkletCode('')
+
+    // Fetch the bookmarklet code for the selected provider
+    fetch(`/api/bookmarklet-code?provider=${provider}`)
       .then((res) => res.json())
       .then((data) => {
         setBookmarkletCode(data.code)
@@ -21,13 +27,13 @@ export default function BookmarkletPage() {
       .catch((err) => {
         console.error('Failed to fetch bookmarklet code:', err)
       })
+  }, [provider])
 
-    // Check if bookmarklet might be installed (basic heuristic)
-    const hasBookmarkletStorage = localStorage.getItem('bookmarklet-installed')
-    if (hasBookmarkletStorage) {
-      setInstalled(true)
-    }
-  }, [])
+  // Check installed status when provider changes
+  useEffect(() => {
+    const hasBookmarkletStorage = localStorage.getItem(`bookmarklet-installed-${provider}`)
+    setInstalled(!!hasBookmarkletStorage)
+  }, [provider])
 
   // Set the href directly via DOM after mount to bypass React's security check
   // Only mark as ready after verifying href was actually set
@@ -48,9 +54,12 @@ export default function BookmarkletPage() {
   }
 
   const handleMarkInstalled = () => {
-    localStorage.setItem('bookmarklet-installed', 'true')
+    localStorage.setItem(`bookmarklet-installed-${provider}`, 'true')
     setInstalled(true)
   }
+
+  const providerLabel = provider === 'outlook' ? 'Outlook' : 'Gmail'
+  const providerDomain = provider === 'outlook' ? 'outlook.office.com or outlook.live.com' : 'mail.google.com'
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -59,21 +68,45 @@ export default function BookmarkletPage() {
           href="/dashboard"
           className="text-blue-600 hover:text-blue-800 hover:underline"
         >
-          ← Back to Dashboard
+          &larr; Back to Dashboard
         </Link>
       </div>
 
       <h1 className="text-3xl font-bold mb-6">Install Email Import Tool</h1>
+
+      {/* Provider Toggle */}
+      <div className="flex gap-0 mb-6">
+        <button
+          onClick={() => setProvider('outlook')}
+          className={`px-6 py-3 font-semibold border-2 ${
+            provider === 'outlook'
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-600'
+          }`}
+        >
+          Outlook
+        </button>
+        <button
+          onClick={() => setProvider('gmail')}
+          className={`px-6 py-3 font-semibold border-2 border-l-0 ${
+            provider === 'gmail'
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-600'
+          }`}
+        >
+          Gmail
+        </button>
+      </div>
 
       {/* What it does */}
       <div className="bg-white border-2 border-gray-300 p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">What This Tool Does</h2>
         <p className="text-gray-700 mb-4">
           The Email Import Tool is a bookmarklet that allows you to import emails
-          directly from Outlook Web into Correspondence Clerk with one click.
+          directly from {providerLabel} into Correspondence Clerk with one click.
         </p>
         <p className="text-gray-700">
-          When you click the bookmarklet while viewing an email in Outlook Web,
+          When you click the bookmarklet while viewing an email in {providerLabel},
           it will automatically extract the email details (subject, sender, date,
           body) and open Correspondence Clerk with the form pre-filled, ready to
           save.
@@ -105,7 +138,7 @@ export default function BookmarkletPage() {
                   title="Drag this to your bookmarks bar"
                   aria-hidden={!isReady}
                 >
-                  📧 Import from Outlook
+                  Import from {providerLabel}
                 </a>
                 {!isReady && (
                   <div className="text-gray-500">Loading bookmarklet...</div>
@@ -113,7 +146,7 @@ export default function BookmarkletPage() {
               </div>
             </li>
             <li>
-              Open an email in Outlook Web (outlook.office.com or outlook.live.com)
+              Open an email in {providerLabel} ({providerDomain})
             </li>
             <li>Click the bookmarklet in your bookmarks bar</li>
             <li>
@@ -137,10 +170,10 @@ export default function BookmarkletPage() {
           <ol className="list-decimal list-inside space-y-2 text-gray-700 mb-4">
             <li>Copy the bookmarklet code below</li>
             <li>
-              Create a new bookmark in your browser (Right-click bookmarks bar →
+              Create a new bookmark in your browser (Right-click bookmarks bar &rarr;
               Add page)
             </li>
-            <li>Name it "Import from Outlook" (or any name you prefer)</li>
+            <li>Name it &quot;Import from {providerLabel}&quot; (or any name you prefer)</li>
             <li>Paste the code as the URL</li>
             <li>Save the bookmark</li>
           </ol>
@@ -173,15 +206,15 @@ export default function BookmarkletPage() {
               onClick={handleMarkInstalled}
               className="w-full bg-green-600 text-white hover:bg-green-700"
             >
-              ✓ I've Installed the Bookmarklet
+              I have Installed the {providerLabel} Bookmarklet
             </Button>
           ) : (
             <div className="text-center p-4 bg-green-50 border-2 border-green-600">
               <p className="text-green-800 font-semibold">
-                ✓ Bookmarklet Installed
+                {providerLabel} Bookmarklet Installed
               </p>
               <p className="text-sm text-gray-700 mt-2">
-                You can now import emails from Outlook Web with one click.
+                You can now import emails from {providerLabel} with one click.
               </p>
             </div>
           )}
@@ -195,58 +228,59 @@ export default function BookmarkletPage() {
         <div className="space-y-4">
           <div>
             <h3 className="font-semibold mb-2">
-              "Please open while viewing an email in Outlook Web"
+              &quot;Please open while viewing an email in {providerLabel}&quot;
             </h3>
             <p className="text-gray-700 text-sm">
-              Make sure you are viewing an email in Outlook Web (outlook.office.com
-              or outlook.live.com) when you click the bookmarklet. It will not
-              work on other websites.
+              Make sure you are viewing an email in {providerLabel} ({providerDomain})
+              when you click the bookmarklet. It will not work on other websites.
             </p>
           </div>
 
           <div>
             <h3 className="font-semibold mb-2">
-              "Could not extract email body"
+              &quot;Could not extract email body&quot;
             </h3>
             <p className="text-gray-700 text-sm">
               Make sure you have an email fully open (not just selected in the inbox).
               Wait for the email to fully load before clicking the bookmarklet.
-              Outlook Web may have updated its layout - please report this issue.
+              {provider === 'gmail'
+                ? ' Gmail may have updated its layout - please report this issue.'
+                : ' Outlook Web may have updated its layout - please report this issue.'}
             </p>
           </div>
 
           <div>
             <h3 className="font-semibold mb-2">
-              "Popup blocked. Please allow popups for Outlook"
+              &quot;Popup blocked. Please allow popups for {providerLabel}&quot;
             </h3>
             <p className="text-gray-700 text-sm">
               Your browser is blocking the new tab from opening. Click the popup
-              blocker icon in your address bar and allow popups for Outlook, then
+              blocker icon in your address bar and allow popups for {providerLabel}, then
               try again.
             </p>
           </div>
 
           <div>
-            <h3 className="font-semibold mb-2">Email data doesn't appear in form</h3>
+            <h3 className="font-semibold mb-2">Email data doesn&apos;t appear in form</h3>
             <p className="text-gray-700 text-sm">
-              If Correspondence Clerk opens but fields are empty, make sure you're
+              If Correspondence Clerk opens but fields are empty, make sure you&apos;re
               logged in and try clicking the bookmarklet again. Check your browser
-              console for errors (F12 → Console tab).
+              console for errors (F12 &rarr; Console tab).
             </p>
           </div>
 
           <div>
             <h3 className="font-semibold mb-2">Bookmarklet does nothing</h3>
             <p className="text-gray-700 text-sm">
-              Check your browser console for errors (F12 → Console tab). Make
+              Check your browser console for errors (F12 &rarr; Console tab). Make
               sure you copied the entire bookmarklet code including the
-              "javascript:" prefix.
+              &quot;javascript:&quot; prefix.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Screenshot/Demo Section */}
+      {/* How It Works */}
       <div className="bg-white border-2 border-gray-300 p-6">
         <h2 className="text-xl font-semibold mb-4">How It Works</h2>
         <div className="space-y-4 text-gray-700">
@@ -255,9 +289,9 @@ export default function BookmarkletPage() {
               1
             </div>
             <div>
-              <h3 className="font-semibold mb-1">Open an email in Outlook Web</h3>
+              <h3 className="font-semibold mb-1">Open an email in {providerLabel}</h3>
               <p className="text-sm">
-                Navigate to outlook.office.com or outlook.live.com and open any
+                Navigate to {providerDomain} and open any
                 email you want to import.
               </p>
             </div>

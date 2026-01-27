@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ContractTimeline } from '@/components/ContractTimeline'
+import { ContractStatusBadge } from '@/components/ContractStatusBadge'
 import type { Business } from '@/app/actions/businesses'
 
 interface ContractDetailsCardProps {
@@ -192,11 +192,11 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
         </p>
       ) : (
         <div className="space-y-4">
-          {/* Contract Timeline */}
+          {/* Contract Period */}
           {business.contract_start && business.contract_end && (
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">Contract Period:</h4>
-              <ContractTimeline
+              <ContractStatusBadge
                 startDate={business.contract_start}
                 endDate={business.contract_end}
               />

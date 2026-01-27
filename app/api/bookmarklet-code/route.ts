@@ -1,27 +1,41 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 /**
  * API route to generate bookmarklet code
  * Always returns the production URL to avoid preview deployment issues
  * Uses self-contained postMessage approach (no external script loading)
+ * Supports ?provider=outlook (default) or ?provider=gmail
  */
 
 const PRODUCTION_URL = 'https://correspondence-clerk.vercel.app'
 
-export async function GET() {
-  const bookmarkletCode = generateBookmarkletCode()
+export async function GET(request: NextRequest) {
+  const provider = request.nextUrl.searchParams.get('provider') || 'outlook'
+
+  const bookmarkletCode = provider === 'gmail'
+    ? generateGmailBookmarkletCode()
+    : generateOutlookBookmarkletCode()
 
   return NextResponse.json({
     code: bookmarkletCode,
     origin: PRODUCTION_URL,
+    provider,
   })
 }
 
-function generateBookmarkletCode(): string {
+function generateOutlookBookmarkletCode(): string {
   // Self-contained bookmarklet with inline extraction logic
   // Uses postMessage to send data (avoids URL length limits)
   // Matches the working implementation from /install-bookmarklet
   const code = `javascript:(function(){var url='${PRODUCTION_URL}';if(!window.location.hostname.includes('outlook')&&!window.location.hostname.includes('office.com')&&!window.location.hostname.includes('live.com')){alert('Please open while viewing an email in Outlook Web.');return;}function parseEmailAddress(text){if(!text)return{email:'',name:''};var emailRegex=/[\\w\\.-]+@[\\w\\.-]+\\.\\w+/;var match=text.match(emailRegex);var email=match?match[0]:'';var name='';if(text.includes('<')&&text.includes('>')){name=text.substring(0,text.indexOf('<')).trim();}else if(text!==email&&!text.includes('@')){name=text.trim();}return{email:email,name:name};}function extractBodyText(element){if(!element)return'';var clone=element.cloneNode(true);var sigs=clone.querySelectorAll('[class*="signature"],[id*="signature"]');sigs.forEach(function(s){s.remove();});var quoted=clone.querySelectorAll('[class*="quote"],[class*="reply"]');quoted.forEach(function(q){q.remove();});var text=clone.textContent||clone.innerText||'';text=text.replace(/\\n\\s*\\n\\s*\\n/g,'\\n\\n');return text.trim();}try{var subject='',body='',from={email:'',name:''},to=[],date=new Date().toISOString();var headings=document.querySelectorAll('[role="heading"]');var fromText='',toText='',dateText='';headings.forEach(function(h){var txt=h.textContent.trim();if(txt.includes('<')&&txt.includes('@')&&txt.includes('>')){fromText=txt;}else if(txt.startsWith('To:')||txt.startsWith('To:\\u200b')){toText=txt.replace(/^To:\\u200b?/,'').trim();}else if(txt.match(/\\d{2}\\/\\d{2}\\/\\d{4}\\s+\\d{2}:\\d{2}/)){dateText=txt;}});if(fromText){from=parseEmailAddress(fromText);}if(toText){to=[parseEmailAddress(toText)];}if(dateText){var parts=dateText.match(/(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{2}):(\\d{2})/);if(parts){var d=new Date(parts[3],parts[2]-1,parts[1],parts[4],parts[5]);if(!isNaN(d.getTime()))date=d.toISOString();}}var subjectCandidates=document.querySelectorAll('h1,h2,h3,h4,[role="heading"]');for(var i=0;i<subjectCandidates.length;i++){var txt=subjectCandidates[i].textContent.trim();if(txt.length>5&&txt.length<200&&!txt.includes('@')&&!txt.startsWith('To:')&&!txt.startsWith('Cc:')&&!txt.match(/\\d{2}\\/\\d{2}\\/\\d{4}/)&&txt!=='Navigation pane'&&txt!=='Inbox'){subject=txt;break;}}var bodyEl=document.querySelector('[role="document"]')||document.querySelector('.customScrollBar')||document.querySelector('[role="main"]');body=extractBodyText(bodyEl);if(!body){alert('Could not extract email body.');return;}var fromStr=from.name?from.name+' <'+from.email+'>':from.email;var toStr=to.map(function(t){return t.name?t.name+' <'+t.email+'>':t.email;}).join(', ');var rawContent='From: '+fromStr+'\\nTo: '+toStr+'\\nDate: '+new Date(date).toLocaleString('en-GB')+'\\nSubject: '+subject+'\\n\\n'+body;var emailData={emailSubject:subject,emailBody:body,emailFrom:fromStr,emailFromEmail:from.email,emailFromName:from.name,emailDate:date,emailTo:toStr,emailRawContent:rawContent};var newWin=window.open(url+'/new-entry?awaitingEmail=1','_blank');if(!newWin){alert('Popup blocked. Please allow popups for Outlook.');return;}var attempts=0;var maxAttempts=50;var interval=setInterval(function(){attempts++;if(attempts>maxAttempts){clearInterval(interval);return;}try{newWin.postMessage({type:'OUTLOOK_EMAIL_DATA',data:emailData},url);}catch(e){}},200);}catch(error){alert('Error: '+error.message);}})();`
+
+  return code
+}
+
+function generateGmailBookmarkletCode(): string {
+  // Self-contained Gmail bookmarklet with inline extraction logic
+  // Uses postMessage to send data (avoids URL length limits)
+  const code = `javascript:(function(){var url='${PRODUCTION_URL}';if(!window.location.hostname.includes('mail.google.com')){alert('Please open while viewing an email in Gmail.');return;}function parseEmailAddress(text){if(!text)return{email:'',name:''};var emailRegex=/[\\w\\.-]+@[\\w\\.-]+\\.\\w+/;var match=text.match(emailRegex);var email=match?match[0]:'';var name='';if(text.includes('<')&&text.includes('>')){name=text.substring(0,text.indexOf('<')).trim();}else if(text!==email&&!text.includes('@')){name=text.trim();}return{email:email,name:name};}function extractBodyText(element){if(!element)return'';var clone=element.cloneNode(true);var sigs=clone.querySelectorAll('.gmail_signature,[data-smartmail="gmail_signature"]');sigs.forEach(function(s){s.remove();});var quoted=clone.querySelectorAll('.gmail_quote,[class*="gmail_quote"]');quoted.forEach(function(q){q.remove();});var text=clone.textContent||clone.innerText||'';text=text.replace(/\\n\\s*\\n\\s*\\n/g,'\\n\\n');return text.trim();}try{var subject='',body='',from={email:'',name:''},to=[],date=new Date().toISOString();var subjectSelectors=['h2[data-thread-perm-id]','h2.hP','div.ha h2'];for(var s=0;s<subjectSelectors.length;s++){var subjectEl=document.querySelector(subjectSelectors[s]);if(subjectEl&&subjectEl.textContent){subject=subjectEl.textContent.trim();break;}}if(!subject){var mainH2s=document.querySelectorAll('[role="main"] h2');for(var h=0;h<mainH2s.length;h++){var txt=mainH2s[h].textContent.trim();if(txt&&txt.length>0&&txt.length<500){subject=txt;break;}}}var fromSelectors=['span[email][name]','span[email]','.gD','[data-hovercard-id]'];for(var f=0;f<fromSelectors.length;f++){var fromEl=document.querySelector(fromSelectors[f]);if(fromEl){var emailAttr=fromEl.getAttribute('email');var nameAttr=fromEl.getAttribute('name')||fromEl.textContent.trim();if(emailAttr){from={email:emailAttr,name:nameAttr||''};break;}}}var toEls=document.querySelectorAll('.hb span[email],.g2');if(toEls.length>0){to=Array.from(toEls).map(function(el){var emailAttr=el.getAttribute('email');var nameAttr=el.getAttribute('name')||el.textContent.trim();return emailAttr?{email:emailAttr,name:nameAttr||''}:parseEmailAddress(el.textContent);}).filter(function(t){return t.email;});}var dateSelectors=['span.g3','span[data-timestamp]'];for(var d=0;d<dateSelectors.length;d++){var dateEl=document.querySelector(dateSelectors[d]);if(dateEl){var timestamp=dateEl.getAttribute('data-timestamp');if(timestamp){var parsed=new Date(parseInt(timestamp));if(!isNaN(parsed.getTime())){date=parsed.toISOString();break;}}var title=dateEl.getAttribute('title');if(title){var parsed2=new Date(title);if(!isNaN(parsed2.getTime())){date=parsed2.toISOString();break;}}}}var bodySelectors=['.a3s.aiL','.a3s','[data-message-id] .ii.gt','.ii.gt'];for(var b=0;b<bodySelectors.length;b++){var bodyEl=document.querySelector(bodySelectors[b]);if(bodyEl){body=extractBodyText(bodyEl);if(body)break;}}if(!body){alert('Could not extract email body from Gmail.');return;}var fromStr=from.name?from.name+' <'+from.email+'>':from.email;var toStr=to.map(function(t){return t.name?t.name+' <'+t.email+'>':t.email;}).join(', ');var rawContent='From: '+fromStr+'\\nTo: '+toStr+'\\nDate: '+new Date(date).toLocaleString('en-GB')+'\\nSubject: '+subject+'\\n\\n'+body;var emailData={emailSubject:subject,emailBody:body,emailFrom:fromStr,emailFromEmail:from.email,emailFromName:from.name,emailDate:date,emailTo:toStr,emailRawContent:rawContent,emailSourceMetadata:JSON.stringify({message_id:null,thread_id:null,web_link:window.location.href,import_source:'gmail_web'})};var newWin=window.open(url+'/new-entry?awaitingEmail=1','_blank');if(!newWin){alert('Popup blocked. Please allow popups for Gmail.');return;}var attempts=0;var maxAttempts=50;var interval=setInterval(function(){attempts++;if(attempts>maxAttempts){clearInterval(interval);return;}try{newWin.postMessage({type:'EMAIL_DATA',data:emailData},url);}catch(e){}},200);}catch(error){alert('Error: '+error.message);}})();`
 
   return code
 }

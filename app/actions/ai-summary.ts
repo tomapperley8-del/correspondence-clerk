@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getCorrespondenceByBusiness } from './correspondence'
-import { getBusinessById, type Business } from './businesses'
+import { getBusinessById } from './businesses'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({
@@ -10,14 +10,14 @@ const anthropic = new Anthropic({
 })
 
 export type AISummaryResult = {
-  correspondence_summary: string
-  contract_status: string | null
+  summary: string
 }
 
 /**
- * Generate a very brief AI summary of the last 12 months of correspondence
- * and analyze contract status if contract data exists
- * Returns summary + contract analysis
+ * Generate a combined AI summary of the last 12 months of correspondence
+ * and contract status (if contract data exists).
+ * Returns a single summary string that naturally incorporates contract info
+ * when notable (expiring soon, recently started, or expired).
  */
 export async function generateCorrespondenceSummary(businessId: string) {
   const supabase = await createClient()
@@ -49,7 +49,7 @@ export async function generateCorrespondenceSummary(businessId: string) {
 
     const correspondence = correspondenceResult.data || []
 
-    // Get current date for temporal awareness (needed for contract analysis)
+    // Get current date for temporal awareness
     const today = new Date()
     const todayFormatted = today.toLocaleDateString('en-GB', {
       day: 'numeric',
@@ -63,21 +63,27 @@ export async function generateCorrespondenceSummary(businessId: string) {
       return entryDate >= twelveMonthsAgo
     })
 
-    // If no recent correspondence, return a message (but still analyze contract if exists)
-    if (recentEntries.length === 0) {
-      // Still analyze contract even if no correspondence
-      const hasContractData = business.contract_start || business.contract_end || business.deal_terms
+    // Build contract context
+    const hasContractData = business.contract_start || business.contract_end || business.deal_terms
+    const contractContext = hasContractData
+      ? `\n\nCONTRACT INFORMATION (mention ONLY if notable - expiring within 90 days, recently started, or expired):
+- Start Date: ${business.contract_start ? new Date(business.contract_start).toLocaleDateString('en-GB') : 'Not set'}
+- End Date: ${business.contract_end ? new Date(business.contract_end).toLocaleDateString('en-GB') : 'Not set'}
+- Deal Terms: ${business.deal_terms || 'Not set'}
+- Contract Amount: ${business.contract_amount ? `£${business.contract_amount.toLocaleString('en-GB')}` : 'Not set'}`
+      : ''
 
+    // If no recent correspondence
+    if (recentEntries.length === 0) {
       if (!hasContractData) {
         return {
           data: {
-            correspondence_summary: 'No correspondence in the last 12 months.',
-            contract_status: null,
+            summary: 'No correspondence in the last 12 months.',
           },
         }
       }
 
-      // Generate contract analysis only
+      // Generate contract-only summary
       const contractOnlyMessage = await anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 150,
@@ -86,24 +92,23 @@ export async function generateCorrespondenceSummary(businessId: string) {
             role: 'user',
             content: `Today's date is ${todayFormatted}.
 
-Analyze this contract:
+No correspondence in the last 12 months, but this business has contract information:
 - Start Date: ${business.contract_start ? new Date(business.contract_start).toLocaleDateString('en-GB') : 'Not set'}
 - End Date: ${business.contract_end ? new Date(business.contract_end).toLocaleDateString('en-GB') : 'Not set'}
 - Deal Terms: ${business.deal_terms || 'Not set'}
 - Contract Amount: ${business.contract_amount ? `£${business.contract_amount.toLocaleString('en-GB')}` : 'Not set'}
 
-Provide ONLY a brief 1-sentence contract status. Just the sentence, no JSON, no formatting.`,
+Provide a brief 1-2 sentence summary noting the lack of recent correspondence and the contract status. Just the text, no JSON, no formatting.`,
           },
         ],
       })
 
-      const contractStatusText =
-        contractOnlyMessage.content[0].type === 'text' ? contractOnlyMessage.content[0].text.trim() : null
+      const summaryText =
+        contractOnlyMessage.content[0].type === 'text' ? contractOnlyMessage.content[0].text.trim() : 'No correspondence in the last 12 months.'
 
       return {
         data: {
-          correspondence_summary: 'No correspondence in the last 12 months.',
-          contract_status: contractStatusText,
+          summary: summaryText,
         },
       }
     }
@@ -128,26 +133,7 @@ Provide ONLY a brief 1-sentence contract status. Just the sentence, no JSON, no 
       })
       .join('\n\n')
 
-    // Build contract context for AI if contract data exists
-    const hasContractData = business.contract_start || business.contract_end || business.deal_terms
-    const contractContext = hasContractData
-      ? `
-
-CONTRACT INFORMATION:
-- Start Date: ${business.contract_start ? new Date(business.contract_start).toLocaleDateString('en-GB') : 'Not set'}
-- End Date: ${business.contract_end ? new Date(business.contract_end).toLocaleDateString('en-GB') : 'Not set'}
-- Deal Terms: ${business.deal_terms || 'Not set'}
-- Contract Amount: ${business.contract_amount ? `£${business.contract_amount.toLocaleString('en-GB')}` : 'Not set'}
-
-If contract dates are provided, analyze:
-1. Is the contract expired (end date < today)?
-2. Is it expiring soon (within 3 months)?
-3. What are the key points from the deal terms?
-
-Provide a brief contract status statement (1 sentence) if contract data exists. If no contract data, return null for contract_status.`
-      : ''
-
-    // Call Anthropic API for summary - request clean text output
+    // Single combined AI call
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 300,
@@ -157,11 +143,13 @@ Provide a brief contract status statement (1 sentence) if contract data exists. 
           content: `You are summarizing correspondence between a business and a client. Today's date is ${todayFormatted}.
 
 Based on the following correspondence entries from the last 12 months, provide a VERY BRIEF summary in 1-2 sentences. Focus on: the main topics discussed, current relationship status, and any pending actions or important developments.
+${contractContext}
 
 IMPORTANT:
 - Be aware of dates and use temporal language to indicate recency
 - Do not invent information. Only summarize what is actually in the correspondence
 - Be concise and factual
+- If contract info is provided, only mention it if it is notable (expiring soon, recently started, or expired). Do not repeat contract dates verbatim.
 - Return ONLY the summary text, no JSON, no formatting, no preamble
 
 Correspondence:
@@ -170,36 +158,11 @@ ${correspondenceText}`,
       ],
     })
 
-    const correspondenceSummary = message.content[0].type === 'text' ? message.content[0].text.trim() : 'Unable to generate summary.'
-
-    // If contract data exists, get contract status
-    let contractStatus: string | null = null
-    if (hasContractData) {
-      const contractMessage = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 100,
-        messages: [
-          {
-            role: 'user',
-            content: `Today's date is ${todayFormatted}.
-
-Analyze this contract:
-- Start Date: ${business.contract_start ? new Date(business.contract_start).toLocaleDateString('en-GB') : 'Not set'}
-- End Date: ${business.contract_end ? new Date(business.contract_end).toLocaleDateString('en-GB') : 'Not set'}
-- Deal Terms: ${business.deal_terms || 'Not set'}
-- Contract Amount: ${business.contract_amount ? `£${business.contract_amount.toLocaleString('en-GB')}` : 'Not set'}
-
-Provide ONLY a brief 1-sentence contract status. Just the sentence, no JSON, no formatting.`,
-          },
-        ],
-      })
-      contractStatus = contractMessage.content[0].type === 'text' ? contractMessage.content[0].text.trim() : null
-    }
+    const summary = message.content[0].type === 'text' ? message.content[0].text.trim() : 'Unable to generate summary.'
 
     return {
       data: {
-        correspondence_summary: correspondenceSummary,
-        contract_status: contractStatus,
+        summary,
       },
     }
   } catch (err) {

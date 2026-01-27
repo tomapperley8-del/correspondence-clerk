@@ -220,11 +220,12 @@ ${emailData.emailBody || ''}`
         // Validate origin for security
         if (!event.origin.includes('outlook') &&
             !event.origin.includes('office.com') &&
-            !event.origin.includes('live.com')) {
+            !event.origin.includes('live.com') &&
+            !event.origin.includes('mail.google.com')) {
           return
         }
 
-        if (event.data && event.data.type === 'OUTLOOK_EMAIL_DATA') {
+        if (event.data && (event.data.type === 'OUTLOOK_EMAIL_DATA' || event.data.type === 'EMAIL_DATA')) {
           const emailData = event.data.data
 
           // Pre-fill form with received data
@@ -790,7 +791,7 @@ ${emailBody || ''}`
     }
   }
 
-  // Check if email was imported from Outlook
+  // Check if email was imported from email client
   const emailImported = !!(
     searchParams.get('emailSubject') ||
     searchParams.get('emailBody') ||
@@ -813,7 +814,7 @@ ${emailBody || ''}`
       {emailImported && (
         <div className="mb-6 border-2 border-blue-600 bg-blue-50 px-4 py-3">
           <p className="text-blue-900 font-semibold text-sm">
-            Email imported from Outlook
+            Email imported
           </p>
           <p className="text-blue-700 text-sm mt-1">
             Please verify business and contact selection, then save the entry.

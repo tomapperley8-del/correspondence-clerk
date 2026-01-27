@@ -3,12 +3,13 @@ import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 
-// Allowed origins for CORS (Outlook domains)
+// Allowed origins for CORS (Outlook and Gmail domains)
 const ALLOWED_ORIGINS = [
   'https://outlook.office.com',
   'https://outlook.office365.com',
   'https://outlook.live.com',
   'https://outlook-sdf.office.com',
+  'https://mail.google.com',
 ]
 
 // Helper to get CORS headers
