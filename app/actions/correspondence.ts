@@ -1,7 +1,22 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { z } from 'zod'
+
+const createCorrespondenceSchema = z.object({
+  business_id: z.string().uuid('Invalid business ID'),
+  contact_id: z.string().uuid('Invalid contact ID'),
+  raw_text_original: z.string().min(1, 'Correspondence text is required').max(100000, 'Text too long'),
+  entry_date: z.string().optional(),
+  subject: z.string().max(500).optional(),
+  type: z.enum(['Email', 'Call', 'Meeting']).optional(),
+  direction: z.enum(['received', 'sent']).optional(),
+  action_needed: z.enum(['none', 'prospect', 'follow_up', 'waiting_on_them', 'invoice', 'renewal']).optional(),
+  due_at: z.string().optional(),
+  ai_metadata: z.any().optional(),
+})
 
 export type Correspondence = {
   id: string
@@ -93,13 +108,19 @@ export async function createCorrespondence(formData: {
     return { error: 'Unauthorized' }
   }
 
+  // Validate input
+  const parsed = createCorrespondenceSchema.safeParse(formData)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message }
+  }
+
   // Get user's organization
   const organizationId = await getCurrentUserOrganizationId()
   if (!organizationId) {
     return { error: 'No organization found' }
   }
 
-  const { data, error} = await supabase
+  const { data, error } = await supabase
     .from('correspondence')
     .insert({
       business_id: formData.business_id,
@@ -129,6 +150,10 @@ export async function createCorrespondence(formData: {
       last_contacted_at: formData.entry_date || new Date().toISOString(),
     })
     .eq('id', formData.business_id)
+
+  revalidatePath(`/businesses/${formData.business_id}`)
+  revalidatePath('/dashboard')
+  revalidatePath('/search')
 
   return { data }
 }
@@ -172,11 +197,16 @@ export async function updateFormattedText(
     .from('correspondence')
     .update(updateData)
     .eq('id', correspondenceId)
-    .select()
+    .select('*, business_id')
     .single()
 
   if (error) {
     return { error: error.message }
+  }
+
+  if (data?.business_id) {
+    revalidatePath(`/businesses/${data.business_id}`)
+    revalidatePath('/search')
   }
 
   return { data }
@@ -248,9 +278,10 @@ export async function deleteCorrespondence(id: string) {
   }
 
   if (entry) {
-    // Note: We don't update last_contacted_at when deleting
-    // That would require recalculating from remaining entries
+    revalidatePath(`/businesses/${entry.business_id}`)
   }
+  revalidatePath('/dashboard')
+  revalidatePath('/search')
 
   return { success: true }
 }
@@ -313,6 +344,8 @@ export async function updateCorrespondenceContact(
       return { error: updateError.message }
     }
 
+    revalidatePath(`/businesses/${correspondence.business_id}`)
+
     return { success: true }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
@@ -371,38 +404,21 @@ export async function checkForDuplicates(
     }
   }
 
-  // Second check: Get all entries for this business and check if pasted text
-  // matches their formatted text (catches when user copies from page display)
-  const { data: allEntries } = await supabase
+  // Second check: SQL-level text comparison instead of fetching all rows
+  // Catches when user copies from page display (formatted text matches raw paste)
+  const normalizedPasted = rawText.trim().toLowerCase()
+  const { data: textMatch } = await supabase
     .from('correspondence')
     .select('*, contact:contacts(name, role)')
     .eq('business_id', businessId)
+    .or(`formatted_text_current.ilike.${normalizedPasted},formatted_text_original.ilike.${normalizedPasted}`)
+    .limit(1)
+    .maybeSingle()
 
-  if (allEntries && allEntries.length > 0) {
-    const normalizedPasted = rawText.trim().toLowerCase()
-
-    for (const entry of allEntries) {
-      // Check formatted_text_current
-      if (entry.formatted_text_current) {
-        const normalizedFormatted = entry.formatted_text_current.trim().toLowerCase()
-        if (normalizedPasted === normalizedFormatted) {
-          return {
-            isDuplicate: true,
-            existingEntry: entry as Correspondence,
-          }
-        }
-      }
-
-      // Check formatted_text_original as fallback
-      if (entry.formatted_text_original) {
-        const normalizedOriginal = entry.formatted_text_original.trim().toLowerCase()
-        if (normalizedPasted === normalizedOriginal) {
-          return {
-            isDuplicate: true,
-            existingEntry: entry as Correspondence,
-          }
-        }
-      }
+  if (textMatch) {
+    return {
+      isDuplicate: true,
+      existingEntry: textMatch as Correspondence,
     }
   }
 

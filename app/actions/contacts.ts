@@ -3,6 +3,30 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { z } from 'zod'
+
+const emailSchema = z.string().email('Invalid email format').max(254)
+
+const createContactSchema = z.object({
+  business_id: z.string().uuid('Invalid business ID'),
+  name: z.string().min(1, 'Contact name is required').max(200, 'Contact name too long'),
+  email: z.string().email('Invalid email format').max(254).or(z.literal('')).optional(),
+  role: z.string().max(200).optional(),
+  phone: z.string().max(50).optional(),
+  emails: z.array(emailSchema.or(z.literal(''))).optional(),
+  phones: z.array(z.string().max(50)).optional(),
+  notes: z.string().max(5000).optional(),
+})
+
+const updateContactSchema = z.object({
+  name: z.string().min(1, 'Contact name is required').max(200).optional(),
+  email: z.string().email('Invalid email format').max(254).or(z.literal('')).optional(),
+  role: z.string().max(200).optional(),
+  phone: z.string().max(50).optional(),
+  emails: z.array(emailSchema.or(z.literal(''))).optional(),
+  phones: z.array(z.string().max(50)).optional(),
+  notes: z.string().max(5000).optional(),
+})
 
 export type Contact = {
   id: string
@@ -99,6 +123,12 @@ export async function createContact(formData: {
     return { error: 'Unauthorized' }
   }
 
+  // Validate input
+  const parsed = createContactSchema.safeParse(formData)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message }
+  }
+
   // Get user's organization
   const organizationId = await getCurrentUserOrganizationId()
   if (!organizationId) {
@@ -174,6 +204,12 @@ export async function updateContact(
 
   if (!user) {
     return { error: 'Unauthorized' }
+  }
+
+  // Validate input
+  const parsed = updateContactSchema.safeParse(formData)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message }
   }
 
   const updateData: any = {}

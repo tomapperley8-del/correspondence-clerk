@@ -3,6 +3,28 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { z } from 'zod'
+
+const createBusinessSchema = z.object({
+  name: z.string().min(1, 'Business name is required').max(200, 'Business name too long'),
+  category: z.string().max(100).optional(),
+  status: z.string().max(100).optional(),
+  is_club_card: z.boolean().optional(),
+  is_advertiser: z.boolean().optional(),
+})
+
+const updateBusinessSchema = z.object({
+  name: z.string().min(1, 'Business name is required').max(200).optional(),
+  category: z.string().max(100).optional(),
+  status: z.string().max(100).optional(),
+  is_club_card: z.boolean().optional(),
+  is_advertiser: z.boolean().optional(),
+  address: z.string().max(500).optional(),
+  email: z.string().email('Invalid email format').max(254).or(z.literal('')).optional(),
+  phone: z.string().max(50).optional(),
+  notes: z.string().max(5000).optional(),
+  last_contacted_at: z.string().optional(),
+})
 
 export type Business = {
   id: string
@@ -90,6 +112,12 @@ export async function createBusiness(formData: {
     return { error: 'Unauthorized' }
   }
 
+  // Validate input
+  const parsed = createBusinessSchema.safeParse(formData)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message }
+  }
+
   // Get user's organization
   const organizationId = await getCurrentUserOrganizationId()
   if (!organizationId) {
@@ -149,6 +177,12 @@ export async function updateBusiness(
     return { error: 'Unauthorized' }
   }
 
+  // Validate input
+  const parsed = updateBusinessSchema.safeParse(formData)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message }
+  }
+
   const updateData: any = {}
 
   if (formData.name !== undefined) {
@@ -181,6 +215,7 @@ export async function updateBusiness(
 
   revalidatePath('/dashboard')
   revalidatePath(`/businesses/${id}`)
+  revalidatePath('/search')
   return { data }
 }
 
@@ -201,5 +236,6 @@ export async function deleteBusiness(id: string) {
   }
 
   revalidatePath('/dashboard')
+  revalidatePath('/search')
   return { success: true }
 }

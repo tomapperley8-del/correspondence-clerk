@@ -83,6 +83,15 @@ function NewEntryPageContent() {
   const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false)
   const [autoMatchedContactId, setAutoMatchedContactId] = useState<string | null>(null)
 
+  // Inline error/warning state (replaces browser alerts)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionWarning, setActionWarning] = useState<string | null>(null)
+
+  // AI Preview state (Phase 4)
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewData, setPreviewData] = useState<AIFormatterResponse | null>(null)
+  const [previewText, setPreviewText] = useState<string>('')
+
   // Business email suggestion state (Feature #1)
   const [suggestedBusinessEmail, setSuggestedBusinessEmail] = useState<string | null>(null)
   const [showBusinessEmailPrompt, setShowBusinessEmailPrompt] = useState(false)
@@ -204,7 +213,7 @@ ${emailData.emailBody || ''}`
       console.groupEnd()
     } catch (error) {
       console.error('Error fetching email data:', error)
-      alert('Failed to load email data. The link may have expired (tokens are valid for 1 hour). Please try the bookmarklet again or copy the email manually.')
+      setActionError('Failed to load email data. The link may have expired (tokens are valid for 1 hour). Please try the bookmarklet again or copy the email manually.')
     } finally {
       setIsLoading(false)
     }
@@ -345,7 +354,7 @@ ${emailBody || ''}`
 
       // Show warning if email was truncated
       if (truncated === '1') {
-        alert('Note: This email was truncated due to length. The first 3000 characters have been imported. You may need to copy additional content manually from Outlook.')
+        setActionWarning('Note: This email was truncated due to length. The first 3000 characters have been imported. You may need to copy additional content manually from Outlook.')
       }
 
       // Detect direction from email (if "from" contains user's domain, it's sent)
@@ -561,11 +570,11 @@ ${emailBody || ''}`
         setSuggestedBusinessEmail(null)
       } else {
         console.error('Failed to update business email')
-        alert('Failed to add email to business')
+        setActionError('Failed to add email to business')
       }
     } catch (error) {
       console.error('Error updating business email:', error)
-      alert('Error adding email to business')
+      setActionError('Error adding email to business')
     }
   }
 
@@ -671,30 +680,57 @@ ${emailBody || ''}`
       setShowMatchPreview(true)
       setIsLoading(false)
     } else {
-      // Single entry - save directly without contact matching
-      const result = await createFormattedCorrespondence(
-        {
-          business_id: selectedBusinessId!,
-          contact_id: selectedContactId!,
-          raw_text_original: rawText,
-          entry_date,
-          type: entryType || undefined,
-          direction: direction || undefined,
-          action_needed: actionNeeded,
-          due_at: dueAt || undefined,
-          email_source: emailSourceMetadata || undefined,
-        },
-        formatResult.data
-      )
-
-      if ('error' in result) {
-        alert(`Error saving: ${result.error}`)
-        setIsLoading(false)
-      } else {
-        setIsDirty(false)
-        router.push(`/businesses/${selectedBusinessId}?saved=true`)
-      }
+      // Single entry - show preview before saving
+      setPreviewData(formatResult.data)
+      // Extract formatted text for preview display
+      const data = formatResult.data as any
+      setPreviewText(data.formatted_text || data.entries?.[0]?.formatted_text || '')
+      setShowPreview(true)
+      setIsLoading(false)
     }
+  }
+
+  const handleConfirmPreview = async () => {
+    if (!previewData || !selectedBusinessId || !selectedContactId) return
+
+    setIsLoading(true)
+    setShowPreview(false)
+    setActionError(null)
+
+    // Combine date and time
+    const entry_date = entryTime
+      ? `${entryDateOnly}T${entryTime}:00`
+      : `${entryDateOnly}T12:00:00`
+
+    const result = await createFormattedCorrespondence(
+      {
+        business_id: selectedBusinessId,
+        contact_id: selectedContactId,
+        raw_text_original: rawText,
+        entry_date,
+        type: entryType || undefined,
+        direction: direction || undefined,
+        action_needed: actionNeeded,
+        due_at: dueAt || undefined,
+        email_source: emailSourceMetadata || undefined,
+      },
+      previewData
+    )
+
+    if ('error' in result) {
+      setActionError(`Error saving: ${result.error}`)
+      setIsLoading(false)
+    } else {
+      setIsDirty(false)
+      router.push(`/businesses/${selectedBusinessId}?saved=true`)
+    }
+  }
+
+  const handleEditPreview = () => {
+    // Close preview and let user edit the raw text
+    setShowPreview(false)
+    setPreviewData(null)
+    setPreviewText('')
   }
 
   const handleConfirmMatches = async (confirmedMatches: ContactMatchResult[]) => {
@@ -726,7 +762,7 @@ ${emailBody || ''}`
     )
 
     if ('error' in result) {
-      alert(`Error saving: ${result.error}`)
+      setActionError(`Error saving: ${result.error}`)
       setIsLoading(false)
     } else {
       setIsDirty(false)
@@ -767,7 +803,7 @@ ${emailBody || ''}`
     })
 
     if ('error' in result) {
-      alert(`Error saving: ${result.error}`)
+      setActionError(`Error saving: ${result.error}`)
       setIsLoading(false)
     } else {
       setIsDirty(false)
@@ -810,6 +846,38 @@ ${emailBody || ''}`
       )}
 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">New Entry</h1>
+
+      {/* Action Error Banner */}
+      {actionError && (
+        <div role="alert" className="bg-red-50 border-2 border-red-600 p-4 mb-6">
+          <div className="flex justify-between items-start">
+            <p className="text-sm text-red-900 font-semibold">{actionError}</p>
+            <button
+              onClick={() => setActionError(null)}
+              className="text-red-900 hover:text-red-700 text-sm font-bold ml-4"
+              aria-label="Dismiss error"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Action Warning Banner */}
+      {actionWarning && (
+        <div role="status" className="bg-yellow-50 border-2 border-yellow-600 p-4 mb-6">
+          <div className="flex justify-between items-start">
+            <p className="text-sm text-yellow-900">{actionWarning}</p>
+            <button
+              onClick={() => setActionWarning(null)}
+              className="text-yellow-900 hover:text-yellow-700 text-sm font-bold ml-4"
+              aria-label="Dismiss warning"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {emailImported && (
         <div className="mb-6 border-2 border-blue-600 bg-blue-50 px-4 py-3">
@@ -1159,6 +1227,58 @@ ${emailBody || ''}`
           </Button>
         </div>
       </form>
+
+      {/* AI Format Preview Panel */}
+      {showPreview && previewData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white border-2 border-gray-800 p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Preview Formatted Entry</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Review the AI-formatted text below. You can save as-is, go back to edit, or retry formatting.
+            </p>
+
+            {/* Preview Subject */}
+            {(previewData as any).subject && (
+              <div className="mb-3">
+                <span className="text-sm font-semibold text-gray-700">Subject: </span>
+                <span className="text-sm text-gray-900">{(previewData as any).subject}</span>
+              </div>
+            )}
+
+            {/* Preview Formatted Text */}
+            <div className="bg-gray-50 border-2 border-gray-300 p-4 mb-4 max-h-[50vh] overflow-y-auto">
+              <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono">
+                {previewText || 'No formatted text available'}
+              </pre>
+            </div>
+
+            {/* Preview Actions */}
+            <div className="flex gap-3">
+              <Button
+                onClick={handleConfirmPreview}
+                disabled={isLoading}
+                className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              >
+                {isLoading ? 'Saving...' : 'Save Entry'}
+              </Button>
+              <Button
+                onClick={handleEditPreview}
+                disabled={isLoading}
+                className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-6 py-3"
+              >
+                Back to Edit
+              </Button>
+              <Button
+                onClick={handleSaveUnformatted}
+                disabled={isLoading}
+                className="bg-orange-100 text-orange-900 hover:bg-orange-200 px-6 py-3"
+              >
+                Save Without Formatting
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Business Modal */}
       <AddBusinessModal

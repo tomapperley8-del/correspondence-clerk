@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createContact } from '@/app/actions/contacts'
 import type { Contact } from '@/app/actions/contacts'
+import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 
 interface AddContactModalProps {
   isOpen: boolean
@@ -26,6 +27,7 @@ export function AddContactModal({
   const [phones, setPhones] = useState<string[]>([''])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const modalRef = useModalKeyboard(isOpen, onClose)
 
   const handleAddEmail = () => {
     setEmails([...emails, ''])
@@ -92,7 +94,7 @@ export function AddContactModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white border-2 border-gray-800 w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Add New Contact" className="bg-white border-2 border-gray-800 w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-6">Add New Contact</h2>
 
         {error && (

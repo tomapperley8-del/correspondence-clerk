@@ -377,44 +377,51 @@ export async function importMastersheet(): Promise<
           }
         })
 
+        // Batch: fetch all existing contacts for this business once
+        const { data: existingContacts } = await supabase
+          .from('contacts')
+          .select('id, normalized_email, name')
+          .eq('business_id', businessId)
+
+        const existingEmailSet = new Set(
+          (existingContacts || [])
+            .filter(c => c.normalized_email)
+            .map(c => c.normalized_email!.toLowerCase())
+        )
+
         for (const contact of uniqueContacts.values()) {
           if (!contact.name) continue
 
-          // Check if contact already exists
           const normalizedEmail = contact.email
             ? normalizeEmail(contact.email)
             : null
 
-          let existingContact = null
-          if (normalizedEmail) {
-            const { data } = await supabase
-              .from('contacts')
-              .select('id')
-              .eq('business_id', businessId)
-              .eq('normalized_email', normalizedEmail)
-              .single()
-            existingContact = data
+          // Check existence in-memory instead of per-contact query
+          if (normalizedEmail && existingEmailSet.has(normalizedEmail)) {
+            continue // Already exists
           }
 
-          if (!existingContact) {
-            // Create new contact
-            const { error: contactError } = await supabase
-              .from('contacts')
-              .insert({
-                business_id: businessId,
-                name: contact.name,
-                email: contact.email || null,
-                normalized_email: normalizedEmail,
-                phone: contact.phone || null,
-                organization_id: organizationId,
-              })
+          // Create new contact
+          const { error: contactError } = await supabase
+            .from('contacts')
+            .insert({
+              business_id: businessId,
+              name: contact.name,
+              email: contact.email || null,
+              normalized_email: normalizedEmail,
+              phone: contact.phone || null,
+              organization_id: organizationId,
+            })
 
-            if (contactError) {
-              report.warnings.push(
-                `Failed to create contact "${contact.name}" for "${name}": ${contactError.message}`
-              )
-            } else {
-              report.contactsCreated++
+          if (contactError) {
+            report.warnings.push(
+              `Failed to create contact "${contact.name}" for "${name}": ${contactError.message}`
+            )
+          } else {
+            report.contactsCreated++
+            // Update in-memory set so subsequent contacts in this batch are also deduped
+            if (normalizedEmail) {
+              existingEmailSet.add(normalizedEmail)
             }
           }
         }

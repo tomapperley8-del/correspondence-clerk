@@ -34,6 +34,7 @@ function ContactSelectorComponent({
   const [editedEmails, setEditedEmails] = useState<string[]>([])
   const [editedPhones, setEditedPhones] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const selectedContact = contacts.find((c) => c.id === selectedContactId)
 
@@ -67,6 +68,7 @@ function ContactSelectorComponent({
     if (!selectedContact) return
 
     setIsSaving(true)
+    setSaveError(null)
 
     try {
       const response = await fetch('/api/contacts/update-details', {
@@ -86,12 +88,13 @@ function ContactSelectorComponent({
           onContactUpdated(data)
         }
         setIsEditing(false)
+        setSaveError(null)
       } else {
-        alert('Failed to update contact details')
+        setSaveError('Failed to update contact details')
       }
     } catch (error) {
       console.error('Error updating contact:', error)
-      alert('Error updating contact details')
+      setSaveError('Error updating contact details')
     } finally {
       setIsSaving(false)
     }
@@ -287,6 +290,13 @@ function ContactSelectorComponent({
               + Add Phone
             </Button>
           </div>
+
+          {/* Error Display */}
+          {saveError && (
+            <div className="mb-3 bg-red-50 border-2 border-red-600 p-2" role="alert">
+              <p className="text-xs text-red-800">{saveError}</p>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-2">

@@ -110,7 +110,7 @@ export function Navigation() {
   }
 
   return (
-    <nav className="bg-black border-b-2 border-black">
+    <nav aria-label="Main navigation" className="bg-black border-b-2 border-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">

@@ -24,6 +24,9 @@ export default function DashboardPage() {
   const [showActionNeeded, setShowActionNeeded] = useState(false)
   const [showOverdue, setShowOverdue] = useState(false)
 
+  // View mode: grid or list
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12 // 4 rows of 3 cards
@@ -67,7 +70,27 @@ export default function DashboardPage() {
   useEffect(() => {
     const installed = localStorage.getItem('bookmarklet-installed')
     setBookmarkletInstalled(!!installed)
+
+    // Restore dashboard preferences from localStorage
+    try {
+      const savedPrefs = localStorage.getItem('dashboard_prefs')
+      if (savedPrefs) {
+        const prefs = JSON.parse(savedPrefs)
+        if (prefs.filterType) setFilterType(prefs.filterType)
+        if (prefs.selectedCategory) setSelectedCategory(prefs.selectedCategory)
+        if (prefs.sortBy) setSortBy(prefs.sortBy)
+        if (prefs.viewMode) setViewMode(prefs.viewMode)
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
   }, [])
+
+  // Persist filter preferences to localStorage
+  useEffect(() => {
+    const prefs = { filterType, selectedCategory, sortBy, viewMode }
+    localStorage.setItem('dashboard_prefs', JSON.stringify(prefs))
+  }, [filterType, selectedCategory, sortBy, viewMode])
 
   if (loading) {
     return (
@@ -312,12 +335,36 @@ export default function DashboardPage() {
               </select>
             </div>
 
-            {/* Results count */}
-            <div className="mt-4 pt-4 border-t-2 border-gray-300">
+            {/* Results count and view toggle */}
+            <div className="mt-4 pt-4 border-t-2 border-gray-300 flex justify-between items-center">
               <p className="text-sm text-gray-600">
                 Showing {filtered.length} of {businesses.length} businesses
                 {totalPages > 1 && ` (Page ${currentPage} of ${totalPages})`}
               </p>
+              <div className="flex border-2 border-gray-300">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`px-3 py-1 text-sm font-medium ${
+                    viewMode === 'grid'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                  }`}
+                  aria-label="Grid view"
+                >
+                  Grid
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
+                    viewMode === 'list'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                  }`}
+                  aria-label="List view"
+                >
+                  List
+                </button>
+              </div>
             </div>
           </div>
 
@@ -330,6 +377,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
+            {viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {paginatedBusinesses.map((business) => (
                 <Link
@@ -386,6 +434,61 @@ export default function DashboardPage() {
                 </Link>
               ))}
             </div>
+            ) : (
+            /* List View */
+            <div className="bg-white border-2 border-gray-300">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b-2 border-gray-300 bg-gray-50">
+                    <th className="text-left px-4 py-3 text-sm font-bold text-gray-900">Name</th>
+                    <th className="text-left px-4 py-3 text-sm font-bold text-gray-900 hidden md:table-cell">Category</th>
+                    <th className="text-left px-4 py-3 text-sm font-bold text-gray-900 hidden md:table-cell">Status</th>
+                    <th className="text-left px-4 py-3 text-sm font-bold text-gray-900 hidden lg:table-cell">Type</th>
+                    <th className="text-left px-4 py-3 text-sm font-bold text-gray-900">Last Contact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedBusinesses.map((business) => (
+                    <tr key={business.id} className="border-b border-gray-200 hover:bg-blue-50">
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/businesses/${business.id}`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                        >
+                          {business.name}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                        {business.category || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                        {business.status || '-'}
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <div className="flex gap-1">
+                          {business.is_club_card && (
+                            <span className="text-xs bg-blue-100 px-2 py-0.5 text-blue-800">CC</span>
+                          )}
+                          {business.is_advertiser && (
+                            <span className="text-xs bg-green-100 px-2 py-0.5 text-green-800">Ad</span>
+                          )}
+                          {!business.is_club_card && !business.is_advertiser && (
+                            <span className="text-xs text-gray-400">-</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {business.last_contacted_at
+                          ? new Date(business.last_contacted_at).toLocaleDateString('en-GB')
+                          : <span className="italic text-gray-400">None</span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
 
             {/* Pagination Controls */}
             {totalPages > 1 && (

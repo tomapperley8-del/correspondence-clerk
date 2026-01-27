@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { exportToGoogleDocs } from '@/app/actions/export-google-docs'
 import { exportToWord } from '@/app/actions/export-word'
 import { getPdfExportData } from '@/app/actions/export-pdf-data'
-import { jsPDF } from 'jspdf'
+// jsPDF is lazy-loaded when PDF export is triggered (see handlePdfExport)
 
 export function ExportDropdown({ businessId }: { businessId: string }) {
   const [exporting, setExporting] = useState(false)
@@ -127,7 +127,8 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
 
       const { business, contacts, entries, exportDate } = result.data
 
-      // Create PDF
+      // Lazy-load jsPDF only when needed
+      const { jsPDF } = await import('jspdf')
       const doc = new jsPDF()
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()

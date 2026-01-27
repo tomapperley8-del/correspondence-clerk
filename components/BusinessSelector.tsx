@@ -54,10 +54,14 @@ function BusinessSelectorComponent({
             onFocus={() => setIsOpen(true)}
             placeholder="Search for a business..."
             className={`w-full ${error ? 'border-red-600' : ''}`}
+            role="combobox"
+            aria-expanded={isOpen}
+            aria-controls="business-listbox"
+            aria-label="Search for a business"
           />
 
           {isOpen && (
-            <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-800 max-h-60 overflow-y-auto">
+            <div id="business-listbox" role="listbox" aria-label="Business options" className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-800 max-h-60 overflow-y-auto">
               {filteredBusinesses.length === 0 ? (
                 <div className="p-4 text-center">
                   <p className="text-gray-600 text-sm mb-3">

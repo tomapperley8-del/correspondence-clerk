@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createBusiness } from '@/app/actions/businesses'
 import type { Business } from '@/app/actions/businesses'
+import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 
 interface AddBusinessModalProps {
   isOpen: boolean
@@ -25,6 +26,7 @@ export function AddBusinessModal({
   const [isAdvertiser, setIsAdvertiser] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const modalRef = useModalKeyboard(isOpen, onClose)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,7 +62,7 @@ export function AddBusinessModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white border-2 border-gray-800 w-full max-w-2xl p-6">
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Add New Business" className="bg-white border-2 border-gray-800 w-full max-w-2xl p-6">
         <h2 className="text-xl font-bold mb-6">Add New Business</h2>
 
         {error && (

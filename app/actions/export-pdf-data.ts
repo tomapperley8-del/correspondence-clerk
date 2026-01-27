@@ -32,7 +32,7 @@ export async function getPdfExportData(businessId: string) {
     const contacts = 'error' in contactsResult ? [] : contactsResult.data || []
 
     // Get all correspondence (no limit)
-    const correspondenceResult = await getCorrespondenceByBusiness(businessId, 1000, 0)
+    const correspondenceResult = await getCorrespondenceByBusiness(businessId, 10000, 0)
     const correspondence = 'error' in correspondenceResult ? [] : correspondenceResult.data || []
 
     // Sort correspondence chronologically (oldest first)

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
 import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, type Correspondence } from '@/app/actions/correspondence'
@@ -17,6 +18,8 @@ import { CorrespondenceSummary } from '@/components/CorrespondenceSummary'
 import { ActionSuggestions } from '@/components/ActionSuggestions'
 import { ContractDetailsCard } from '@/components/ContractDetailsCard'
 import { SuccessBanner } from '@/components/SuccessBanner'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { CopyButton } from '@/components/CopyButton'
 import { retryFormatting } from '@/app/actions/ai-formatter'
 
 export default function BusinessDetailPage({
@@ -43,6 +46,13 @@ export default function BusinessDetailPage({
   const [editedContactId, setEditedContactId] = useState<string>('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Error and confirmation state
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [showDeleteContactConfirm, setShowDeleteContactConfirm] = useState(false)
+  const [contactToDelete, setContactToDelete] = useState<{id: string, name: string} | null>(null)
+  const [showDeleteEntryConfirm, setShowDeleteEntryConfirm] = useState(false)
+  const [entryToDelete, setEntryToDelete] = useState<{id: string, subject?: string} | null>(null)
 
   // Feature #3: AI summary refresh trigger
   const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0)
@@ -99,14 +109,17 @@ export default function BusinessDetailPage({
     async function loadData() {
       if (!id) return // Type guard for nested function
 
-      const businessResult = await getBusinessById(id)
+      // Fetch all data in parallel for faster page load
+      const [businessResult, contactsResult, correspondenceResult] = await Promise.all([
+        getBusinessById(id),
+        getContactsByBusiness(id),
+        getCorrespondenceByBusiness(id),
+      ])
+
       if ('error' in businessResult || !businessResult.data) {
         router.push('/dashboard')
         return
       }
-
-      const contactsResult = await getContactsByBusiness(id)
-      const correspondenceResult = await getCorrespondenceByBusiness(id)
 
       setBusiness(businessResult.data)
       setContacts('error' in contactsResult ? [] : contactsResult.data || [])
@@ -229,11 +242,12 @@ export default function BusinessDetailPage({
 
   const handleFormatLater = async (entryId: string) => {
     setFormattingInProgress(entryId)
+    setActionError(null)
 
     const result = await retryFormatting(entryId)
 
     if ('error' in result) {
-      alert(`Formatting failed: ${result.error}`)
+      setActionError(`Formatting failed: ${result.error}`)
     } else {
       // Reload correspondence to show updated entry
       if (id) {
@@ -247,6 +261,7 @@ export default function BusinessDetailPage({
 
   const handleStartEdit = (entry: Correspondence) => {
     setEditingEntryId(entry.id)
+    setActionError(null)
     setEditedText(
       entry.formatted_text_current ||
       entry.formatted_text_original ||
@@ -270,15 +285,17 @@ export default function BusinessDetailPage({
     setEditedDate('')
     setEditedDirection('')
     setEditedContactId('')
+    setActionError(null)
   }
 
   const handleSaveEdit = async (entryId: string) => {
     if (!editedText.trim()) {
-      alert('Entry text cannot be empty')
+      setActionError('Entry text cannot be empty')
       return
     }
 
     setSavingEdit(true)
+    setActionError(null)
 
     try {
       // Convert edited date to ISO format if provided
@@ -293,7 +310,7 @@ export default function BusinessDetailPage({
       const textResult = await updateFormattedText(entryId, editedText, dateToSave)
 
       if ('error' in textResult) {
-        alert(`Error saving: ${textResult.error}`)
+        setActionError(`Error saving: ${textResult.error}`)
         setSavingEdit(false)
         return
       }
@@ -306,7 +323,7 @@ export default function BusinessDetailPage({
         )
 
         if ('error' in directionResult) {
-          alert(`Error updating direction: ${directionResult.error}`)
+          setActionError(`Error updating direction: ${directionResult.error}`)
           setSavingEdit(false)
           return
         }
@@ -320,7 +337,7 @@ export default function BusinessDetailPage({
         const contactResult = await updateCorrespondenceContact(entryId, editedContactId)
 
         if ('error' in contactResult) {
-          alert(`Error updating contact: ${contactResult.error}`)
+          setActionError(`Error updating contact: ${contactResult.error}`)
           setSavingEdit(false)
           return
         }
@@ -338,21 +355,27 @@ export default function BusinessDetailPage({
       setEditedDirection('')
       setEditedContactId('')
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setActionError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
 
     setSavingEdit(false)
   }
 
   const handleDeleteContact = async (contactId: string, contactName: string) => {
-    if (!confirm(`Are you sure you want to delete contact "${contactName}"?`)) {
-      return
-    }
+    setContactToDelete({ id: contactId, name: contactName })
+    setShowDeleteContactConfirm(true)
+  }
 
-    const result = await deleteContact(contactId)
+  const confirmDeleteContact = async () => {
+    if (!contactToDelete) return
+
+    setShowDeleteContactConfirm(false)
+    setActionError(null)
+
+    const result = await deleteContact(contactToDelete.id)
 
     if ('error' in result) {
-      alert(`Error deleting contact: ${result.error}`)
+      setActionError(`Error deleting contact: ${result.error}`)
     } else {
       // Reload contacts
       if (id) {
@@ -360,17 +383,25 @@ export default function BusinessDetailPage({
         setContacts('error' in contactsResult ? [] : contactsResult.data || [])
       }
     }
+
+    setContactToDelete(null)
   }
 
   const handleDeleteEntry = async (entryId: string, subject: string) => {
-    if (!confirm(`Are you sure you want to delete this entry${subject ? ` "${subject}"` : ''}? This cannot be undone.`)) {
-      return
-    }
+    setEntryToDelete({ id: entryId, subject: subject || undefined })
+    setShowDeleteEntryConfirm(true)
+  }
 
-    const result = await deleteCorrespondence(entryId)
+  const confirmDeleteEntry = async () => {
+    if (!entryToDelete) return
+
+    setShowDeleteEntryConfirm(false)
+    setActionError(null)
+
+    const result = await deleteCorrespondence(entryToDelete.id)
 
     if ('error' in result) {
-      alert(`Error deleting entry: ${result.error}`)
+      setActionError(`Error deleting entry: ${result.error}`)
     } else {
       // Reload correspondence
       if (id) {
@@ -378,6 +409,8 @@ export default function BusinessDetailPage({
         setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
       }
     }
+
+    setEntryToDelete(null)
   }
 
   // Feature #3: Handle contract details update with AI summary refresh
@@ -600,12 +633,12 @@ export default function BusinessDetailPage({
                     try {
                       window.open(webLink, '_blank', 'noopener,noreferrer')
                     } catch (error) {
-                      alert('Could not open email link. The email may have been moved or deleted in Outlook.')
+                      setActionError('Could not open email link. The email may have been moved or deleted in Outlook.')
                     }
                   }}
                   className="bg-blue-100 text-blue-900 hover:bg-blue-200 px-3 py-1 text-xs"
                 >
-                  📧 View Original Email
+                  View Original Email
                 </Button>
               )}
             </div>
@@ -632,17 +665,32 @@ export default function BusinessDetailPage({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Breadcrumbs */}
+      <Breadcrumbs items={[
+        { label: 'Dashboard', href: '/dashboard' },
+        { label: business.name },
+      ]} />
+
       {/* Success Banner */}
       {saved && <SuccessBanner message="Entry saved successfully" />}
 
+      {/* Action Error Banner */}
+      {actionError && (
+        <div role="alert" className="bg-red-50 border-2 border-red-600 p-4 mb-6">
+          <div className="flex justify-between items-start">
+            <p className="text-sm text-red-900 font-semibold">{actionError}</p>
+            <button
+              onClick={() => setActionError(null)}
+              className="text-red-900 hover:text-red-700 text-sm font-bold ml-4"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
-        <Link
-          href="/dashboard"
-          className="text-blue-600 hover:text-blue-800 hover:underline text-sm mb-2 inline-block"
-        >
-          ← Back to Dashboard
-        </Link>
         <div className="flex justify-between items-start mb-2">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{business.name}</h1>
@@ -777,13 +825,14 @@ export default function BusinessDetailPage({
                     {contact.emails && contact.emails.length > 0 && (
                       <div className="mt-1">
                         {contact.emails.map((email, index) => (
-                          <p key={index} className="text-sm text-gray-600">
+                          <p key={index} className="text-sm text-gray-600 flex items-center">
                             <a
                               href={`mailto:${email}`}
                               className="text-blue-600 hover:text-blue-800 hover:underline"
                             >
                               {email}
                             </a>
+                            <CopyButton text={email} />
                           </p>
                         ))}
                       </div>
@@ -791,13 +840,14 @@ export default function BusinessDetailPage({
                     {contact.phones && contact.phones.length > 0 && (
                       <div>
                         {contact.phones.map((phone, index) => (
-                          <p key={index} className="text-sm text-gray-600">
+                          <p key={index} className="text-sm text-gray-600 flex items-center">
                             <a
                               href={`tel:${phone}`}
                               className="text-blue-600 hover:text-blue-800 hover:underline"
                             >
                               {phone}
                             </a>
+                            <CopyButton text={phone} />
                           </p>
                         ))}
                       </div>
@@ -1002,6 +1052,28 @@ export default function BusinessDetailPage({
           </>
         )}
       </div>
+
+      {/* Delete Contact Confirmation Dialog */}
+      <ConfirmDialog
+        open={showDeleteContactConfirm}
+        onOpenChange={setShowDeleteContactConfirm}
+        title="Delete Contact"
+        description={`Are you sure you want to delete contact "${contactToDelete?.name}"?`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteContact}
+      />
+
+      {/* Delete Entry Confirmation Dialog */}
+      <ConfirmDialog
+        open={showDeleteEntryConfirm}
+        onOpenChange={setShowDeleteEntryConfirm}
+        title="Delete Entry"
+        description={`Are you sure you want to delete this entry${entryToDelete?.subject ? ` "${entryToDelete.subject}"` : ''}? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteEntry}
+      />
     </div>
   )
 }

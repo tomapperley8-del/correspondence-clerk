@@ -3,6 +3,7 @@
  * Provides utilities for getting current user's organization
  */
 
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -10,8 +11,9 @@ import { createClient } from '@/lib/supabase/server'
  * Returns null if user is not authenticated or has no profile
  *
  * This is used by server actions to include organization_id when creating records
+ * Cached per request via React cache() — multiple calls in the same request only query once
  */
-export async function getCurrentUserOrganizationId(): Promise<string | null> {
+export const getCurrentUserOrganizationId = cache(async (): Promise<string | null> => {
   const supabase = await createClient()
 
   // Get current user
@@ -36,7 +38,7 @@ export async function getCurrentUserOrganizationId(): Promise<string | null> {
   }
 
   return profile.organization_id
-}
+})
 
 /**
  * Get the current user's full profile including organization info

@@ -181,19 +181,12 @@ export async function getOrganizationMembers() {
     return { error: error.message }
   }
 
-  // Get email addresses from auth.users for each profile
-  // Note: This requires iterating because we can't directly join with auth.users in a single query
-  const membersWithEmails = await Promise.all(
-    data.map(async (profile) => {
-      const { data: userData } = await supabase.auth.admin.getUserById(
-        profile.id
-      )
-      return {
-        ...profile,
-        email: userData.user?.email || null,
-      }
-    })
-  )
+  // Use display_name as email proxy — user_profiles stores display_name which defaults to email
+  // This avoids N+1 calls to auth.admin.getUserById for each member
+  const membersWithEmails = data.map((profile) => ({
+    ...profile,
+    email: profile.display_name || null,
+  }))
 
   return { data: membersWithEmails }
 }

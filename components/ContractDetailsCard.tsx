@@ -15,6 +15,7 @@ interface ContractDetailsCardProps {
 export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [editedData, setEditedData] = useState({
     contract_start: business.contract_start || '',
     contract_end: business.contract_end || '',
@@ -40,6 +41,7 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
 
   const handleSaveEdit = async () => {
     setIsSaving(true)
+    setSaveError(null)
 
     try {
       const response = await fetch('/api/businesses/update-contract', {
@@ -57,13 +59,14 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
 
       if (response.ok) {
         setIsEditing(false)
+        setSaveError(null)
         onUpdate()
       } else {
-        alert('Failed to update contract details')
+        setSaveError('Failed to update contract details')
       }
     } catch (error) {
       console.error('Error updating contract:', error)
-      alert('Error updating contract details')
+      setSaveError('Error updating contract details')
     } finally {
       setIsSaving(false)
     }
@@ -149,6 +152,13 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
             className="w-full min-h-[100px] px-3 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none"
           />
         </div>
+
+        {/* Error Display */}
+        {saveError && (
+          <div className="mb-4 bg-red-50 border-2 border-red-600 p-3" role="alert">
+            <p className="text-sm text-red-800">{saveError}</p>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-2">

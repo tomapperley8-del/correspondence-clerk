@@ -182,16 +182,6 @@ export default function SettingsPage() {
         </form>
       </div>
 
-      {/* Future: Profile Picture */}
-      <div className="bg-gray-100 border-2 border-gray-300 p-6 mb-6">
-        <h2 className="text-xl font-bold mb-2 text-gray-600">
-          Profile Picture (Coming Soon)
-        </h2>
-        <p className="text-sm text-gray-600">
-          Profile picture upload will be available in a future update.
-        </p>
-      </div>
-
       {/* Tools Section */}
       <div className="bg-white border-2 border-gray-800 p-6 mb-6">
         <h2 className="text-xl font-bold mb-4 text-gray-900">Tools</h2>
