@@ -26,8 +26,6 @@ export interface ContactExtractionResult {
  * @returns ContactExtractionResult with extracted contacts
  */
 export function extractContactsFromText(text: string): ContactExtractionResult {
-  const contacts: ExtractedContact[] = [];
-
   // Find contacts section (everything before first dotted separator or correspondence headers)
   // Look for section that starts with "Contacts:" or similar
   const contactsSectionMatch = text.match(

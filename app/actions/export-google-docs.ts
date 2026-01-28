@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getBusinessById } from './businesses'
 import { getContactsByBusiness } from './contacts'
-import { getCorrespondenceByBusiness } from './correspondence'
+import { getCorrespondenceByBusiness, type Correspondence } from './correspondence'
 
 /**
  * Export business correspondence to Google Docs
@@ -32,7 +32,7 @@ export async function exportToGoogleDocs(businessId: string) {
     const contacts = 'error' in contactsResult ? [] : contactsResult.data || []
 
     // Get all correspondence using pagination
-    let allCorrespondence: any[] = []
+    let allCorrespondence: Correspondence[] = []
     let offset = 0
     const batchSize = 500
     while (true) {

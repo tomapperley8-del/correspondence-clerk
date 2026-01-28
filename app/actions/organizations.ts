@@ -106,7 +106,7 @@ export async function createOrganization(name: string) {
   }
 
   // Create user profile
-  const { data: profile, error: profileError } = await supabase
+  const { error: profileError } = await supabase
     .from('user_profiles')
     .insert({
       id: user.id,

@@ -43,7 +43,7 @@ export async function PATCH(request: Request) {
     }
 
     // Update contact
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
 
     if (role !== undefined) {
       updateData.role = role || null

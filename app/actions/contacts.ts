@@ -212,7 +212,7 @@ export async function updateContact(
     return { error: parsed.error.issues[0].message }
   }
 
-  const updateData: any = {}
+  const updateData: Record<string, unknown> = {}
 
   if (formData.name !== undefined) updateData.name = formData.name.trim()
 

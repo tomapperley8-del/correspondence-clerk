@@ -53,7 +53,7 @@ export async function PATCH(request: Request) {
     }
 
     // Update business contract fields
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
 
     if (contract_start !== undefined) updateData.contract_start = contract_start
     if (contract_end !== undefined) updateData.contract_end = contract_end

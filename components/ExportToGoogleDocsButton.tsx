@@ -27,7 +27,7 @@ export function ExportToGoogleDocsButton({ businessId }: { businessId: string })
       const { businessName, content } = result.data
 
       // Create Google Doc using MCP
-      // @ts-ignore - MCP tools are injected at runtime
+      // @ts-expect-error - MCP tools are injected at runtime
       const createResult = await mcp__google_workspace__createDocument({
         title: `${businessName} - Correspondence`,
         initialContent: content

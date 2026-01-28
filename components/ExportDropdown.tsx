@@ -7,6 +7,25 @@ import { exportToWord } from '@/app/actions/export-word'
 import { getPdfExportData } from '@/app/actions/export-pdf-data'
 // jsPDF is lazy-loaded when PDF export is triggered (see handlePdfExport)
 
+// Types for PDF export data
+interface PdfContact {
+  name: string
+  role: string
+  emails: string[]
+  phones: string[]
+}
+
+interface PdfEntry {
+  subject: string
+  date: string
+  direction: string
+  type: string
+  contactName: string
+  contactRole: string
+  text: string
+  action: string | null
+}
+
 export function ExportDropdown({ businessId }: { businessId: string }) {
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -32,14 +51,14 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
       const { businessName, content } = result.data
 
       // Create Google Doc using MCP
-      // @ts-ignore - MCP tools are injected at runtime
+      // @ts-expect-error - MCP tools are injected at runtime
       if (typeof mcp__google_workspace__createDocument === 'undefined') {
         setError('Google Workspace integration not available. Please ensure MCP is configured.')
         setExporting(false)
         return
       }
 
-      // @ts-ignore
+      // @ts-expect-error - MCP tools are injected at runtime
       const createResult = await mcp__google_workspace__createDocument({
         title: `${businessName} - Correspondence`,
         initialContent: content,
@@ -148,23 +167,6 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
         return false
       }
 
-      // Helper function to add text with wrapping
-      const addWrappedText = (text: string, fontSize: number, isBold: boolean = false) => {
-        doc.setFontSize(fontSize)
-        if (isBold) {
-          doc.setFont('helvetica', 'bold')
-        } else {
-          doc.setFont('helvetica', 'normal')
-        }
-
-        const lines = doc.splitTextToSize(text, contentWidth)
-        lines.forEach((line: string) => {
-          checkPageBreak(fontSize / 2 + 2)
-          doc.text(line, margin, yPos)
-          yPos += fontSize / 2 + 2
-        })
-      }
-
       // Cover Page
       doc.setFontSize(24)
       doc.setFont('helvetica', 'bold')
@@ -210,7 +212,7 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
         doc.text('CONTACTS', margin, yPos)
         yPos += 15
 
-        contacts.forEach((contact: any) => {
+        contacts.forEach((contact: PdfContact) => {
           checkPageBreak(30)
 
           doc.setFontSize(12)
@@ -255,7 +257,7 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
       yPos += 15
 
       if (entries.length > 0) {
-        entries.forEach((entry: any, index: number) => {
+        entries.forEach((entry: PdfEntry, index: number) => {
           checkPageBreak(40)
 
           // Subject

@@ -198,7 +198,7 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
 
       {!hasContractData ? (
         <p className="text-gray-600 text-sm">
-          No contract information recorded. Click "Edit Contract Details" to add dates, amounts, and terms.
+          No contract information recorded. Click &quot;Edit Contract Details&quot; to add dates, amounts, and terms.
         </p>
       ) : (
         <div className="space-y-4">

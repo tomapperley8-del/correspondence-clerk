@@ -45,7 +45,7 @@ export type Business = {
   phone: string | null
   notes: string | null
   last_contacted_at: string | null
-  mastersheet_source_ids: any
+  mastersheet_source_ids: string[] | null
   organization_id: string
   created_at: string
   updated_at: string
@@ -183,7 +183,7 @@ export async function updateBusiness(
     return { error: parsed.error.issues[0].message }
   }
 
-  const updateData: any = {}
+  const updateData: Record<string, unknown> = {}
 
   if (formData.name !== undefined) {
     updateData.name = formData.name.trim()

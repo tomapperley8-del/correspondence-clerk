@@ -11,10 +11,20 @@ import Link from 'next/link'
 
 const FOLDER_ID = '1Lmd4lRiynEUkxkspyrQmUqsNsXCcUJMD'
 
+interface ImportReport {
+  documentsProcessed: number
+  businessesMatched: number
+  contactsCreated: number
+  correspondenceCreated: number
+  businessesNotFound: string[]
+  warnings: string[]
+  errors: string[]
+}
+
 export default function ImportGoogleDocsPage() {
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState('')
-  const [report, setReport] = useState<any>(null)
+  const [report, setReport] = useState<ImportReport | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleImport = async () => {

@@ -6,7 +6,6 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 
 /**
  * Generate user-friendly database schema documentation
@@ -178,24 +177,6 @@ When filing correspondence, you can flag entries that need follow-up:
 **renewal** - Contract or membership renewal coming up
 
 These flags help the Dashboard sort businesses by what needs doing.`;
-}
-
-/**
- * Read and parse migration files to understand current schema
- */
-function readMigrations(): string[] {
-  const migrationsDir = path.join(process.cwd(), 'supabase', 'migrations');
-
-  try {
-    const files = fs.readdirSync(migrationsDir);
-    return files
-      .filter(f => f.endsWith('.sql') && !f.includes('COMBINED'))
-      .sort()
-      .map(f => fs.readFileSync(path.join(migrationsDir, f), 'utf-8'));
-  } catch (error) {
-    console.warn('Could not read migrations directory:', error);
-    return [];
-  }
 }
 
 /**

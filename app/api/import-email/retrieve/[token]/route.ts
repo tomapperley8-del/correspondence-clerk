@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
 
 // GET /api/import-email/retrieve/[token]
 // Retrieves email data by token and deletes it (one-time use)

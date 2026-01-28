@@ -15,7 +15,7 @@ const createCorrespondenceSchema = z.object({
   direction: z.enum(['received', 'sent']).optional(),
   action_needed: z.enum(['none', 'prospect', 'follow_up', 'waiting_on_them', 'invoice', 'renewal']).optional(),
   due_at: z.string().optional(),
-  ai_metadata: z.any().optional(),
+  ai_metadata: z.record(z.string(), z.unknown()).optional(),
 })
 
 export type Correspondence = {
@@ -40,7 +40,7 @@ export type Correspondence = {
   due_at: string | null
   formatting_status: 'formatted' | 'unformatted' | 'failed'
   content_hash: string | null
-  ai_metadata: any
+  ai_metadata: Record<string, unknown> | null
   organization_id: string
   created_at: string
   updated_at: string
@@ -97,7 +97,7 @@ export async function createCorrespondence(formData: {
   direction?: 'received' | 'sent'
   action_needed?: 'none' | 'prospect' | 'follow_up' | 'waiting_on_them' | 'invoice' | 'renewal'
   due_at?: string
-  ai_metadata?: any
+  ai_metadata?: Record<string, unknown>
 }) {
   const supabase = await createClient()
   const {

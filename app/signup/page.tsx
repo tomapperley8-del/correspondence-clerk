@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,7 +21,6 @@ function SignupPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [invitedEmail, setInvitedEmail] = useState<string | null>(null)
   const [organizationName, setOrganizationName] = useState<string | null>(null)
-  const router = useRouter()
   const supabase = createClient()
 
   // Validate invitation token on mount

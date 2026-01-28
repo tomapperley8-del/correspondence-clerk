@@ -1,6 +1,6 @@
 export interface RecoveryResult {
   success: boolean
-  data?: any
+  data?: unknown
   error?: string
   attemptedFixes?: string[]
 }
@@ -30,8 +30,8 @@ export function parseWithRecovery(rawText: string): RecoveryResult {
   }
 }
 
-function createUserFriendlyError(error: any): string {
-  const errorMsg = error.message || 'Unknown error'
+function createUserFriendlyError(error: unknown): string {
+  const errorMsg = error instanceof Error ? error.message : 'Unknown error'
 
   if (errorMsg.includes('Unterminated string')) {
     return 'The AI returned malformed text (unterminated string). This sometimes happens with very long or complex content. Your original text is preserved.'
@@ -74,15 +74,16 @@ function stripWrappingArtifacts(text: string): string {
   return cleaned.trim()
 }
 
-function logParsingError(original: string, error: any, cleaned: string): void {
+function logParsingError(original: string, error: unknown, cleaned: string): void {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error'
   console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.error('AI Response JSON Parsing Failed')
   console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.error('Timestamp:', new Date().toISOString())
-  console.error('Error:', error.message)
+  console.error('Error:', errorMessage)
 
   // Extract position from error message if available
-  const positionMatch = error.message.match(/position (\d+)/)
+  const positionMatch = errorMessage.match(/position (\d+)/)
   const position = positionMatch ? parseInt(positionMatch[1], 10) : null
 
   console.error('Response length:', original.length, 'bytes')

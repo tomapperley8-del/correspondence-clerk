@@ -60,7 +60,7 @@ export async function createFormattedCorrespondence(
       | 'invoice'
       | 'renewal'
     due_at?: string
-    email_source?: any
+    email_source?: Record<string, unknown>
   },
   aiResponse: AIFormatterResponse,
   contactMatches?: ContactMatchResult[]

@@ -35,7 +35,7 @@ console.log('')
 
 try {
   // Execute migration using raw SQL
-  const { data, error } = await supabase.rpc('exec_sql', { sql: migrationSQL })
+  const { error } = await supabase.rpc('exec_sql', { sql: migrationSQL })
 
   if (error) {
     // If rpc doesn't exist, try direct execution

@@ -158,14 +158,6 @@ export default function OrganizationSettingsPage() {
     }
   }
 
-  function copyInvitationLink(token: string) {
-    const baseUrl = window.location.origin
-    const inviteUrl = `${baseUrl}/invite/accept?token=${token}`
-    navigator.clipboard.writeText(inviteUrl)
-    setSuccess('Invitation link copied to clipboard')
-    setTimeout(() => setSuccess(null), 3000)
-  }
-
   if (isLoadingOrg) {
     return (
       <div className="container mx-auto px-4 py-8">

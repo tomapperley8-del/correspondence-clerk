@@ -27,6 +27,21 @@ export interface SearchFilters {
   sortBy?: 'relevance' | 'date_newest' | 'date_oldest'
 }
 
+// Type for the joined correspondence query result
+interface CorrespondenceSearchResult {
+  id: string
+  subject: string | null
+  formatted_text_current: string | null
+  formatted_text_original: string | null
+  raw_text_original: string | null
+  entry_date: string | null
+  direction: 'received' | 'sent' | null
+  type: 'Email' | 'Call' | 'Meeting' | null
+  business_id: string
+  businesses: { name: string }
+  contacts: { name: string }
+}
+
 /**
  * Full-text search across businesses and correspondence
  * Uses existing tsvector + GIN indexes
@@ -129,7 +144,7 @@ export async function searchAll(query: string, filters?: SearchFilters) {
     rank: 1, // Higher priority for business name matches
   }))
 
-  const correspondenceResults: SearchResult[] = (correspondence || []).map((c: any) => {
+  const correspondenceResults: SearchResult[] = ((correspondence ?? []) as unknown as CorrespondenceSearchResult[]).map((c) => {
     const text =
       c.formatted_text_current || c.formatted_text_original || c.raw_text_original || ''
     const snippet = text.length > 150 ? text.substring(0, 150) + '...' : text
@@ -142,9 +157,9 @@ export async function searchAll(query: string, filters?: SearchFilters) {
       business_id: c.business_id,
       business_name: c.businesses?.name || 'Unknown Business',
       contact_name: c.contacts?.name || 'Unknown Contact',
-      entry_date: c.entry_date,
-      direction: c.direction,
-      correspondence_type: c.type,
+      entry_date: c.entry_date ?? undefined,
+      direction: c.direction ?? undefined,
+      correspondence_type: c.type ?? undefined,
       rank: 2, // Lower priority than business matches
     }
   })

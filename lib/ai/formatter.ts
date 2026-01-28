@@ -11,7 +11,6 @@ import {
   SingleEntryResponse,
   ThreadSplitResponse,
 } from './types';
-import { parseWithRecovery } from './json-recovery';
 
 /**
  * JSON Schema for single entry formatting

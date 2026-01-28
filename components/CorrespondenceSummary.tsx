@@ -2,15 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { generateCorrespondenceSummary, type AISummaryResult } from '@/app/actions/ai-summary'
-import { type Business } from '@/app/actions/businesses'
 
 export function CorrespondenceSummary({
   businessId,
-  business,
   refreshTrigger,
 }: {
   businessId: string
-  business: Business
   refreshTrigger?: number
 }) {
   const [summary, setSummary] = useState<AISummaryResult | null>(null)

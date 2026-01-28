@@ -64,7 +64,7 @@ export function ContactMatchPreviewModal({
         <div className="space-y-4">
           <div className="bg-blue-50 border-2 border-blue-300 p-4">
             <p className="text-sm text-blue-900">
-              <strong>Multiple contacts detected!</strong> We've automatically matched each email to the person it's from or to.
+              <strong>Multiple contacts detected!</strong> We&apos;ve automatically matched each email to the person it&apos;s from or to.
               Review and adjust if needed before saving.
             </p>
           </div>
@@ -131,7 +131,7 @@ export function ContactMatchPreviewModal({
                       </select>
                       {match.contactId && match.matchedFrom && (
                         <p className="text-xs text-green-700 mt-1">
-                          ✓ Auto-matched from "{match.matchedFrom}"
+                          ✓ Auto-matched from &quot;{match.matchedFrom}&quot;
                         </p>
                       )}
                     </div>

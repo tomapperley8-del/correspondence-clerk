@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
 import crypto from 'crypto'
 
 // Allowed origins for CORS (Outlook and Gmail domains)
@@ -57,7 +56,7 @@ export async function POST(request: NextRequest) {
     const token = crypto.randomBytes(24).toString('hex')
 
     // Store in temporary table
-    const { data: tempData, error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from('temporary_email_data')
       .insert({
         user_id: user.id,

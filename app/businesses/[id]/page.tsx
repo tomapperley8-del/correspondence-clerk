@@ -171,7 +171,7 @@ export default function BusinessDetailPage({
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
 
     // Apply contact and direction filters
-    let filtered = correspondence.filter((e) => {
+    const filtered = correspondence.filter((e) => {
       // Contact filter
       if (contactFilter !== 'all' && e.contact_id !== contactFilter) {
         return false
@@ -443,7 +443,7 @@ export default function BusinessDetailPage({
       if (metadata.extracted_names?.length > 0) {
         return metadata.extracted_names[0]
       }
-    } catch (e) {
+    } catch {
       // Silently fail and fall back to contact name
     }
     return null
@@ -451,7 +451,6 @@ export default function BusinessDetailPage({
 
   const renderEntry = (entry: Correspondence) => {
     const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
-    const directionIcon = entry.direction === 'sent' ? '→' : entry.direction === 'received' ? '←' : null
     const isUnformatted = entry.formatting_status !== 'formatted'
     const isEdited = entry.edited_at !== null
     const isEditing = editingEntryId === entry.id
@@ -632,7 +631,7 @@ export default function BusinessDetailPage({
                     const webLink = (entry.ai_metadata as any).email_source.web_link
                     try {
                       window.open(webLink, '_blank', 'noopener,noreferrer')
-                    } catch (error) {
+                    } catch {
                       setActionError('Could not open email link. The email may have been moved or deleted in Outlook.')
                     }
                   }}
@@ -769,7 +768,7 @@ export default function BusinessDetailPage({
       </div>
 
       {/* AI Summary of Last 12 Months */}
-      <CorrespondenceSummary businessId={business.id} business={business} refreshTrigger={summaryRefreshTrigger} />
+      <CorrespondenceSummary businessId={business.id} refreshTrigger={summaryRefreshTrigger} />
 
       {/* AI Action Detection */}
       <ActionSuggestions businessId={business.id} />

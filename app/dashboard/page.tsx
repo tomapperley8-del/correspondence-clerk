@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getBusinesses, type Business } from '@/app/actions/businesses'
 import { AddBusinessButton } from '@/components/AddBusinessButton'
@@ -11,7 +10,6 @@ type FilterType = 'all' | 'club-card' | 'advertiser' | 'both' | 'prospect'
 type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
 
 export default function DashboardPage() {
-  const router = useRouter()
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -21,8 +19,6 @@ export default function DashboardPage() {
   const [filterType, setFilterType] = useState<FilterType>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortType>('recent')
-  const [showActionNeeded, setShowActionNeeded] = useState(false)
-  const [showOverdue, setShowOverdue] = useState(false)
 
   // View mode: grid or list
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
