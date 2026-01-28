@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { updateBusiness, deleteBusiness, type Business } from '@/app/actions/businesses'
 import { useRouter } from 'next/navigation'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 
 export function EditBusinessButton({ business }: { business: Business }) {
   const router = useRouter()
@@ -23,6 +24,25 @@ export function EditBusinessButton({ business }: { business: Business }) {
     is_club_card: business.is_club_card,
     is_advertiser: business.is_advertiser,
     notes: business.notes || '',
+  })
+
+  const handleCancel = () => {
+    setFormData({
+      name: business.name,
+      category: business.category || '',
+      status: business.status || '',
+      is_club_card: business.is_club_card,
+      is_advertiser: business.is_advertiser,
+      notes: business.notes || '',
+    })
+    setError(null)
+    setIsOpen(false)
+  }
+
+  const modalRef = useModalKeyboard(isOpen, handleCancel)
+  const finalDeleteRef = useModalKeyboard(showFinalDeleteConfirm, () => {
+    setShowFinalDeleteConfirm(false)
+    setDeleteConfirmText('')
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,19 +67,6 @@ export function EditBusinessButton({ business }: { business: Business }) {
       setIsOpen(false)
       window.location.reload()
     }
-  }
-
-  const handleCancel = () => {
-    setFormData({
-      name: business.name,
-      category: business.category || '',
-      status: business.status || '',
-      is_club_card: business.is_club_card,
-      is_advertiser: business.is_advertiser,
-      notes: business.notes || '',
-    })
-    setError(null)
-    setIsOpen(false)
   }
 
   const handleDeleteClick = () => {
@@ -105,8 +112,8 @@ export function EditBusinessButton({ business }: { business: Business }) {
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white border-2 border-gray-800 p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Edit Business</h2>
+        <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="edit-business-title" className="bg-white border-2 border-gray-800 p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <h2 id="edit-business-title" className="text-xl font-bold text-gray-900 mb-4">Edit Business</h2>
 
           {error && (
             <div className="bg-red-50 border-2 border-red-600 p-3 mb-4" role="alert">
@@ -267,8 +274,8 @@ export function EditBusinessButton({ business }: { business: Business }) {
       {/* Final delete confirmation with typed input */}
       {showFinalDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-          <div className="bg-white border-2 border-gray-800 p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold text-red-900 mb-2">Final Confirmation</h3>
+          <div ref={finalDeleteRef} role="alertdialog" aria-modal="true" aria-labelledby="final-delete-title" className="bg-white border-2 border-gray-800 p-6 max-w-md w-full mx-4">
+            <h3 id="final-delete-title" className="text-lg font-bold text-red-900 mb-2">Final Confirmation</h3>
             <p className="text-sm text-gray-700 mb-4">
               Type <strong>DELETE</strong> to confirm deletion of &quot;{business.name}&quot;:
             </p>

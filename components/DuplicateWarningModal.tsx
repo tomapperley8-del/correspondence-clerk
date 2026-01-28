@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { type Correspondence } from '@/app/actions/correspondence'
 import { useRouter } from 'next/navigation'
+import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 
 interface DuplicateWarningModalProps {
   isOpen: boolean
@@ -18,6 +19,7 @@ export function DuplicateWarningModal({
   onSaveAnyway,
 }: DuplicateWarningModalProps) {
   const router = useRouter()
+  const modalRef = useModalKeyboard(isOpen, onClose)
 
   if (!isOpen) return null
 
@@ -32,9 +34,9 @@ export function DuplicateWarningModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white border-2 border-orange-600 p-6 max-w-lg w-full mx-4">
+      <div ref={modalRef} role="alertdialog" aria-modal="true" aria-labelledby="duplicate-warning-title" className="bg-white border-2 border-gray-800 p-6 max-w-lg w-full mx-4">
         <div className="mb-4">
-          <h2 className="text-xl font-bold text-orange-900 mb-2">
+          <h2 id="duplicate-warning-title" className="text-xl font-bold text-orange-900 mb-2">
             ⚠ Possible Duplicate Entry
           </h2>
           <p className="text-sm text-gray-700">

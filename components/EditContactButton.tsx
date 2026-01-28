@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { updateContact, type Contact } from '@/app/actions/contacts'
+import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 
 export function EditContactButton({ contact }: { contact: Contact }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -19,6 +20,18 @@ export function EditContactButton({ contact }: { contact: Contact }) {
     contact.phones && contact.phones.length > 0 ? contact.phones : ['']
   )
   const [notes, setNotes] = useState(contact.notes || '')
+
+  const handleCancel = () => {
+    setName(contact.name)
+    setRole(contact.role || '')
+    setEmails(contact.emails && contact.emails.length > 0 ? contact.emails : [''])
+    setPhones(contact.phones && contact.phones.length > 0 ? contact.phones : [''])
+    setNotes(contact.notes || '')
+    setError(null)
+    setIsOpen(false)
+  }
+
+  const modalRef = useModalKeyboard(isOpen, handleCancel)
 
   const handleAddEmail = () => {
     setEmails([...emails, ''])
@@ -75,16 +88,6 @@ export function EditContactButton({ contact }: { contact: Contact }) {
     }
   }
 
-  const handleCancel = () => {
-    setName(contact.name)
-    setRole(contact.role || '')
-    setEmails(contact.emails && contact.emails.length > 0 ? contact.emails : [''])
-    setPhones(contact.phones && contact.phones.length > 0 ? contact.phones : [''])
-    setNotes(contact.notes || '')
-    setError(null)
-    setIsOpen(false)
-  }
-
   if (!isOpen) {
     return (
       <Button
@@ -98,8 +101,8 @@ export function EditContactButton({ contact }: { contact: Contact }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white border-2 border-gray-300 p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Edit Contact</h2>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="edit-contact-title" className="bg-white border-2 border-gray-800 p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <h2 id="edit-contact-title" className="text-xl font-bold text-gray-900 mb-4">Edit Contact</h2>
 
         {error && (
           <div className="bg-red-50 border-2 border-red-600 p-3 mb-4">

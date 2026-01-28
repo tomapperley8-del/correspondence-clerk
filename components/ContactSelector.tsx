@@ -135,10 +135,14 @@ function ContactSelectorComponent({
             placeholder={disabled ? "Select a business first..." : "Search for a contact..."}
             className={`w-full ${error ? 'border-red-600' : ''}`}
             disabled={disabled}
+            role="combobox"
+            aria-expanded={isOpen}
+            aria-controls="contact-listbox"
+            aria-label="Search contacts"
           />
 
           {isOpen && !disabled && (
-            <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-800 max-h-60 overflow-y-auto">
+            <div id="contact-listbox" role="listbox" className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-800 max-h-60 overflow-y-auto">
               {filteredContacts.length === 0 ? (
                 <div className="p-4 text-center">
                   <p className="text-gray-600 text-sm mb-3">

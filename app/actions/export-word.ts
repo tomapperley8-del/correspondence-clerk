@@ -42,9 +42,18 @@ export async function exportToWord(businessId: string) {
     const contactsResult = await getContactsByBusiness(businessId)
     const contacts = 'error' in contactsResult ? [] : contactsResult.data || []
 
-    // Get all correspondence (no limit)
-    const correspondenceResult = await getCorrespondenceByBusiness(businessId, 10000, 0)
-    const correspondence = 'error' in correspondenceResult ? [] : correspondenceResult.data || []
+    // Get all correspondence using pagination
+    let allCorrespondence: any[] = []
+    let offset = 0
+    const batchSize = 500
+    while (true) {
+      const batch = await getCorrespondenceByBusiness(businessId, batchSize, offset)
+      const batchData = 'error' in batch ? [] : batch.data || []
+      allCorrespondence = allCorrespondence.concat(batchData)
+      if (batchData.length < batchSize) break
+      offset += batchSize
+    }
+    const correspondence = allCorrespondence
 
     // Sort correspondence chronologically (oldest first)
     const sortedEntries = [...correspondence].sort((a, b) => {
