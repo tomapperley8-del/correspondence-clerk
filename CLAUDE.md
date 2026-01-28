@@ -121,14 +121,14 @@ All 10 steps complete and deployed:
 
 ## Recent Changes
 
+- **Jan 28, 2026:** Lint cleanup - fixed 52 issues (54→27 errors, 36→11 warnings). Removed unused code, replaced `any` types, fixed JSX entities.
 - **Jan 26, 2026:** Bookmarklet race condition fix (href set before drag), API uses production URL, Settings > Tools section added
 - **Jan 22, 2026:** Eliminated AI JSON errors with Anthropic structured outputs, 100% test success rate
-- **Jan 22, 2026:** 9 enhancement features deployed (contract UI, export formats, view controls, display names, etc.)
 
 ## Known Issues
 
 - Google Docs export requires MCP setup with Google authentication (not yet user-tested)
-- No other known issues
+- ~27 lint errors remain (react-hooks false positives, docx library `any` types) - intentionally skipped
 
 ## Reference Docs
 
