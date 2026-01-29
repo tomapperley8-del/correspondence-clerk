@@ -61,6 +61,9 @@ export default function BusinessDetailPage({
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest')
   const [contactFilter, setContactFilter] = useState<string>('all')
   const [directionFilter, setDirectionFilter] = useState<'all' | 'received' | 'sent' | 'conversation'>('all')
+  const [dateRange, setDateRange] = useState<'1m' | '6m' | '12m' | 'custom'>('12m')
+  const [customDateFrom, setCustomDateFrom] = useState<string>('')
+  const [customDateTo, setCustomDateTo] = useState<string>('')
 
   useEffect(() => {
     async function loadParams() {
@@ -84,6 +87,9 @@ export default function BusinessDetailPage({
         if (prefs.sortOrder) setSortOrder(prefs.sortOrder)
         if (prefs.contactFilter) setContactFilter(prefs.contactFilter)
         if (prefs.directionFilter) setDirectionFilter(prefs.directionFilter)
+        if (prefs.dateRange) setDateRange(prefs.dateRange)
+        if (prefs.customDateFrom) setCustomDateFrom(prefs.customDateFrom)
+        if (prefs.customDateTo) setCustomDateTo(prefs.customDateTo)
       } catch (e) {
         console.error('Error loading view preferences:', e)
       }
@@ -99,9 +105,12 @@ export default function BusinessDetailPage({
       sortOrder,
       contactFilter,
       directionFilter,
+      dateRange,
+      customDateFrom,
+      customDateTo,
     }
     localStorage.setItem(storageKey, JSON.stringify(prefs))
-  }, [id, sortOrder, contactFilter, directionFilter])
+  }, [id, sortOrder, contactFilter, directionFilter, dateRange, customDateFrom, customDateTo])
 
   useEffect(() => {
     if (!id) return
@@ -167,8 +176,28 @@ export default function BusinessDetailPage({
   // Feature #4: Split correspondence into recent and archive with filters applied
   // Memoize to prevent recalculation on every render
   const { recentEntries, archiveEntries } = useMemo(() => {
-    const twelveMonthsAgo = new Date()
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+    // Calculate cutoff date based on selected range
+    let cutoffDate: Date
+    if (dateRange === 'custom' && customDateFrom) {
+      cutoffDate = new Date(customDateFrom)
+    } else {
+      cutoffDate = new Date()
+      switch (dateRange) {
+        case '1m':
+          cutoffDate.setMonth(cutoffDate.getMonth() - 1)
+          break
+        case '6m':
+          cutoffDate.setMonth(cutoffDate.getMonth() - 6)
+          break
+        case '12m':
+        default:
+          cutoffDate.setMonth(cutoffDate.getMonth() - 12)
+          break
+      }
+    }
+
+    // For custom range, also use the "to" date if set
+    const endDate = dateRange === 'custom' && customDateTo ? new Date(customDateTo) : null
 
     // Apply contact and direction filters
     const filtered = correspondence.filter((e) => {
@@ -199,15 +228,27 @@ export default function BusinessDetailPage({
     }
 
     const recent = filtered
-      .filter((e) => new Date(e.entry_date || e.created_at) >= twelveMonthsAgo)
+      .filter((e) => {
+        const entryDate = new Date(e.entry_date || e.created_at)
+        const afterCutoff = entryDate >= cutoffDate
+        const beforeEnd = endDate ? entryDate <= endDate : true
+        return afterCutoff && beforeEnd
+      })
       .sort(sortFn)
 
     const archive = filtered
-      .filter((e) => new Date(e.entry_date || e.created_at) < twelveMonthsAgo)
+      .filter((e) => {
+        const entryDate = new Date(e.entry_date || e.created_at)
+        // In custom mode with end date, archive is entries outside the range
+        if (endDate) {
+          return entryDate < cutoffDate || entryDate > endDate
+        }
+        return entryDate < cutoffDate
+      })
       .sort(sortFn)
 
     return { recentEntries: recent, archiveEntries: archive }
-  }, [correspondence, contactFilter, directionFilter, sortOrder])
+  }, [correspondence, contactFilter, directionFilter, sortOrder, dateRange, customDateFrom, customDateTo])
 
   // Filter correspondence based on search query
   const filteredCorrespondence = useMemo(() => {
@@ -909,6 +950,87 @@ export default function BusinessDetailPage({
         {correspondence && correspondence.length > 0 && (
           <div className="border-t-2 border-gray-300 pt-4 mb-6">
             <div className="flex flex-wrap gap-4 items-center mb-3">
+              {/* Date Range */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-1">
+                  Show:
+                </label>
+                <div className="flex border-2 border-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => setDateRange('1m')}
+                    className={`px-3 py-1 text-sm font-medium ${
+                      dateRange === '1m'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    1 Month
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateRange('6m')}
+                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
+                      dateRange === '6m'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    6 Months
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateRange('12m')}
+                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
+                      dateRange === '12m'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    12 Months
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateRange('custom')}
+                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
+                      dateRange === 'custom'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Custom
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom Date Range Inputs */}
+              {dateRange === 'custom' && (
+                <div className="flex gap-2 items-end">
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700 block mb-1">
+                      From:
+                    </label>
+                    <input
+                      type="date"
+                      value={customDateFrom}
+                      onChange={(e) => setCustomDateFrom(e.target.value)}
+                      className="px-2 py-1 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700 block mb-1">
+                      To:
+                    </label>
+                    <input
+                      type="date"
+                      value={customDateTo}
+                      onChange={(e) => setCustomDateTo(e.target.value)}
+                      className="px-2 py-1 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Sort Order */}
               <div>
                 <label className="text-sm font-semibold text-gray-700 block mb-1">
@@ -1018,13 +1140,16 @@ export default function BusinessDetailPage({
               <p className="text-gray-600">
                 Showing {filteredCorrespondence.recent.length + filteredCorrespondence.archive.length} of {correspondence.length} entries
               </p>
-              {(sortOrder !== 'oldest' || contactFilter !== 'all' || directionFilter !== 'all') && (
+              {(sortOrder !== 'oldest' || contactFilter !== 'all' || directionFilter !== 'all' || dateRange !== '12m') && (
                 <button
                   type="button"
                   onClick={() => {
                     setSortOrder('oldest')
                     setContactFilter('all')
                     setDirectionFilter('all')
+                    setDateRange('12m')
+                    setCustomDateFrom('')
+                    setCustomDateTo('')
                   }}
                   className="text-blue-600 hover:text-blue-800 hover:underline"
                 >
@@ -1042,11 +1167,15 @@ export default function BusinessDetailPage({
           </p>
         ) : (
           <>
-            {/* Recent Section (Last 12 Months) */}
+            {/* Recent Section */}
             {filteredCorrespondence.recent.length > 0 && (
               <div className="mb-8">
                 <h3 className="font-bold text-gray-900 mb-4 text-lg">
-                  Recent (Last 12 Months)
+                  {dateRange === 'custom'
+                    ? `Selected Range${customDateFrom ? ` (${new Date(customDateFrom).toLocaleDateString('en-GB')}` : ''}${customDateTo ? ` - ${new Date(customDateTo).toLocaleDateString('en-GB')})` : customDateFrom ? ')' : ''}`
+                    : dateRange === '1m' ? 'Last Month'
+                    : dateRange === '6m' ? 'Last 6 Months'
+                    : 'Last 12 Months'}
                 </h3>
                 <div className="space-y-6">
                   {filteredCorrespondence.recent.map((entry) => renderEntry(entry))}
@@ -1054,14 +1183,14 @@ export default function BusinessDetailPage({
               </div>
             )}
 
-            {/* Archive Section (Older than 12 Months) */}
+            {/* Archive Section */}
             {filteredCorrespondence.archive.length > 0 && (
               <div>
                 <button
                   onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
                   className="w-full flex justify-between items-center font-bold text-gray-900 mb-4 text-lg hover:text-blue-600"
                 >
-                  <span>Archive ({filteredCorrespondence.archive.length} older entries)</span>
+                  <span>Archive ({filteredCorrespondence.archive.length} {dateRange === 'custom' ? 'other' : 'older'} entries)</span>
                   <span>{isArchiveExpanded ? '▼' : '▶'}</span>
                 </button>
                 {isArchiveExpanded && (
