@@ -21,8 +21,6 @@ export function EditBusinessButton({ business }: { business: Business }) {
     name: business.name,
     category: business.category || '',
     status: business.status || '',
-    is_club_card: business.is_club_card,
-    is_advertiser: business.is_advertiser,
     notes: business.notes || '',
   })
 
@@ -31,8 +29,6 @@ export function EditBusinessButton({ business }: { business: Business }) {
       name: business.name,
       category: business.category || '',
       status: business.status || '',
-      is_club_card: business.is_club_card,
-      is_advertiser: business.is_advertiser,
       notes: business.notes || '',
     })
     setError(null)
@@ -54,8 +50,6 @@ export function EditBusinessButton({ business }: { business: Business }) {
       name: formData.name,
       category: formData.category || undefined,
       status: formData.status || undefined,
-      is_club_card: formData.is_club_card,
-      is_advertiser: formData.is_advertiser,
       notes: formData.notes || undefined,
     })
 
@@ -164,45 +158,12 @@ export function EditBusinessButton({ business }: { business: Business }) {
                 className="w-full px-3 py-2 border-2 border-gray-300 bg-white focus:border-blue-600 focus:outline-none"
               >
                 <option value="">Select status...</option>
-                <option value="Active">Active</option>
                 <option value="Prospect">Prospect</option>
-                <option value="Former">Former</option>
                 <option value="Inactive">Inactive</option>
               </select>
-            </div>
-
-            {/* Club Card Checkbox */}
-            <div className="mb-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.is_club_card}
-                  onChange={(e) =>
-                    setFormData({ ...formData, is_club_card: e.target.checked })
-                  }
-                  className="w-4 h-4"
-                />
-                <span className="text-sm font-semibold text-gray-900">
-                  Club Card Member
-                </span>
-              </label>
-            </div>
-
-            {/* Advertiser Checkbox */}
-            <div className="mb-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.is_advertiser}
-                  onChange={(e) =>
-                    setFormData({ ...formData, is_advertiser: e.target.checked })
-                  }
-                  className="w-4 h-4"
-                />
-                <span className="text-sm font-semibold text-gray-900">
-                  Advertiser
-                </span>
-              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                Membership type (Club Card, Advertiser) is set in Contract Details
+              </p>
             </div>
 
             {/* Notes */}

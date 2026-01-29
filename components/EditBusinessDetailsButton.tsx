@@ -20,6 +20,7 @@ export function EditBusinessDetailsButton({
     address: business.address || '',
     email: business.email || '',
     phone: business.phone || '',
+    notes: business.notes || '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,6 +32,7 @@ export function EditBusinessDetailsButton({
       address: formData.address || undefined,
       email: formData.email || undefined,
       phone: formData.phone || undefined,
+      notes: formData.notes || undefined,
     })
 
     if ('error' in result) {
@@ -52,6 +54,7 @@ export function EditBusinessDetailsButton({
       address: business.address || '',
       email: business.email || '',
       phone: business.phone || '',
+      notes: business.notes || '',
     })
     setError(null)
     setIsOpen(false)
@@ -109,7 +112,7 @@ export function EditBusinessDetailsButton({
           </div>
 
           {/* Phone */}
-          <div className="mb-6">
+          <div className="mb-4">
             <label className="block text-sm font-semibold text-gray-900 mb-2">
               Phone
             </label>
@@ -119,6 +122,20 @@ export function EditBusinessDetailsButton({
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               placeholder="Business phone number"
               className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600"
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              Notes
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Internal notes about this business..."
+              rows={4}
+              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none resize-y"
             />
           </div>
 

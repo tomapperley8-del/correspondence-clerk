@@ -772,7 +772,7 @@ export default function BusinessDetailPage({
           </div>
           <EditBusinessButton business={business} />
         </div>
-        {(business.category || business.status) && (
+        {(business.category || business.status || business.membership_type) && (
           <div className="flex gap-2 mt-2">
             {business.category && (
               <span className="text-xs bg-gray-200 px-2 py-1 text-gray-700">
@@ -784,14 +784,24 @@ export default function BusinessDetailPage({
                 {business.status}
               </span>
             )}
-            {business.is_club_card && (
+            {business.membership_type === 'club_card' && (
               <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800">
                 Club Card
               </span>
             )}
-            {business.is_advertiser && (
+            {business.membership_type === 'advertiser' && (
               <span className="text-xs bg-green-100 px-2 py-1 text-green-800">
                 Advertiser
+              </span>
+            )}
+            {business.membership_type === 'former_club_card' && (
+              <span className="text-xs bg-gray-100 px-2 py-1 text-gray-600">
+                Former Club Card
+              </span>
+            )}
+            {business.membership_type === 'former_advertiser' && (
+              <span className="text-xs bg-gray-100 px-2 py-1 text-gray-600">
+                Former Advertiser
               </span>
             )}
           </div>
@@ -820,6 +830,12 @@ export default function BusinessDetailPage({
             <span className="font-semibold text-gray-700">Phone:</span>
             <span className="ml-2 text-gray-900">{business.phone || 'Not set'}</span>
           </div>
+          {business.notes && (
+            <div className="pt-2 border-t border-gray-200 mt-2">
+              <span className="font-semibold text-gray-700">Notes:</span>
+              <p className="mt-1 text-gray-900 whitespace-pre-wrap">{business.notes}</p>
+            </div>
+          )}
         </div>
       </div>
 

@@ -22,6 +22,7 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
     contract_amount: business.contract_amount?.toString() || '',
     contract_currency: business.contract_currency || 'GBP',
     deal_terms: business.deal_terms || '',
+    membership_type: business.membership_type || '',
   })
 
   const handleStartEdit = () => {
@@ -31,6 +32,7 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
       contract_amount: business.contract_amount?.toString() || '',
       contract_currency: business.contract_currency || 'GBP',
       deal_terms: business.deal_terms || '',
+      membership_type: business.membership_type || '',
     })
     setIsEditing(true)
   }
@@ -54,6 +56,7 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
           contract_amount: editedData.contract_amount ? parseFloat(editedData.contract_amount) : null,
           contract_currency: editedData.contract_currency,
           deal_terms: editedData.deal_terms || null,
+          membership_type: editedData.membership_type || null,
         }),
       })
 
@@ -72,7 +75,7 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
     }
   }
 
-  const hasContractData = business.contract_start || business.contract_end || business.contract_amount || business.deal_terms
+  const hasContractData = business.contract_start || business.contract_end || business.contract_amount || business.deal_terms || business.membership_type
 
   // Format currency amount
   const formatAmount = (amount: number | null, currency: string = 'GBP') => {
@@ -139,6 +142,25 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
           <p className="text-xs text-gray-600 mt-1">Enter amount without currency symbol</p>
         </div>
 
+        {/* Membership Type */}
+        <div className="mb-4">
+          <Label htmlFor="membershipType" className="block text-sm font-semibold mb-1">
+            Membership Type
+          </Label>
+          <select
+            id="membershipType"
+            value={editedData.membership_type}
+            onChange={(e) => setEditedData({ ...editedData, membership_type: e.target.value })}
+            className="w-full px-3 py-2 border-2 border-gray-300 bg-white focus:border-blue-600 focus:outline-none"
+          >
+            <option value="">None</option>
+            <option value="club_card">Club Card</option>
+            <option value="advertiser">Advertiser</option>
+            <option value="former_club_card">Former Club Card</option>
+            <option value="former_advertiser">Former Advertiser</option>
+          </select>
+        </div>
+
         {/* Deal Terms */}
         <div className="mb-4">
           <Label htmlFor="dealTerms" className="block text-sm font-semibold mb-1">
@@ -198,10 +220,30 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
 
       {!hasContractData ? (
         <p className="text-gray-600 text-sm">
-          No contract information recorded. Click &quot;Edit Contract Details&quot; to add dates, amounts, and terms.
+          No contract information recorded. Click &quot;Edit Contract Details&quot; to add membership type, dates, amounts, and terms.
         </p>
       ) : (
         <div className="space-y-4">
+          {/* Membership Type */}
+          {business.membership_type && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Membership Type:</h4>
+              <span className={`inline-block px-3 py-1 text-sm font-semibold ${
+                business.membership_type === 'club_card' ? 'bg-blue-100 text-blue-800' :
+                business.membership_type === 'advertiser' ? 'bg-green-100 text-green-800' :
+                business.membership_type === 'former_club_card' ? 'bg-gray-100 text-gray-700' :
+                business.membership_type === 'former_advertiser' ? 'bg-gray-100 text-gray-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
+                {business.membership_type === 'club_card' ? 'Club Card' :
+                 business.membership_type === 'advertiser' ? 'Advertiser' :
+                 business.membership_type === 'former_club_card' ? 'Former Club Card' :
+                 business.membership_type === 'former_advertiser' ? 'Former Advertiser' :
+                 business.membership_type}
+              </span>
+            </div>
+          )}
+
           {/* Contract Period */}
           {business.contract_start && business.contract_end && (
             <div>

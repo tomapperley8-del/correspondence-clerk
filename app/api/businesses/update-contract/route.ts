@@ -21,7 +21,7 @@ export async function PATCH(request: Request) {
 
     // Parse request body
     const body = await request.json()
-    const { businessId, contract_start, contract_end, contract_amount, contract_currency, deal_terms } = body
+    const { businessId, contract_start, contract_end, contract_amount, contract_currency, deal_terms, membership_type } = body
 
     if (!businessId) {
       return NextResponse.json(
@@ -60,6 +60,7 @@ export async function PATCH(request: Request) {
     if (contract_amount !== undefined) updateData.contract_amount = contract_amount
     if (contract_currency !== undefined) updateData.contract_currency = contract_currency
     if (deal_terms !== undefined) updateData.deal_terms = deal_terms
+    if (membership_type !== undefined) updateData.membership_type = membership_type
 
     const { data, error } = await supabase
       .from('businesses')

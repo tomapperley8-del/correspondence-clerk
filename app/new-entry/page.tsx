@@ -36,6 +36,7 @@ function NewEntryPageContent() {
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
   const [ccContactIds, setCcContactIds] = useState<string[]>([])
+  const [bccContactIds, setBccContactIds] = useState<string[]>([])
   const [rawText, setRawText] = useState('')
   const [subject, setSubject] = useState('')
   const [entryDateOnly, setEntryDateOnly] = useState(() => new Date().toISOString().slice(0, 10))
@@ -708,6 +709,7 @@ ${emailBody || ''}`
         business_id: selectedBusinessId,
         contact_id: selectedContactId,
         cc_contact_ids: ccContactIds.length > 0 ? ccContactIds : undefined,
+        bcc_contact_ids: bccContactIds.length > 0 ? bccContactIds : undefined,
         raw_text_original: rawText,
         entry_date,
         type: entryType || undefined,
@@ -752,6 +754,7 @@ ${emailBody || ''}`
         business_id: selectedBusinessId,
         contact_id: selectedContactId!, // Fallback contact (not used if matches provided)
         cc_contact_ids: ccContactIds.length > 0 ? ccContactIds : undefined,
+        bcc_contact_ids: bccContactIds.length > 0 ? bccContactIds : undefined,
         raw_text_original: rawText,
         entry_date,
         type: entryType || undefined,
@@ -796,6 +799,8 @@ ${emailBody || ''}`
     const result = await createUnformattedCorrespondence({
       business_id: selectedBusinessId!,
       contact_id: selectedContactId!,
+      cc_contact_ids: ccContactIds.length > 0 ? ccContactIds : undefined,
+      bcc_contact_ids: bccContactIds.length > 0 ? bccContactIds : undefined,
       raw_text_original: rawText,
       entry_date,
       subject: subject || undefined,
@@ -992,6 +997,55 @@ ${emailBody || ''}`
             {ccContactIds.length > 0 && (
               <p className="text-sm text-gray-600 mt-2">
                 {ccContactIds.length} contact{ccContactIds.length !== 1 ? 's' : ''} will be CC&apos;d
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* BCC Contacts Selector */}
+        {selectedBusinessId && contacts.length > 0 && (
+          <div>
+            <Label className="block mb-2 font-semibold">
+              BCC Contacts (optional)
+            </Label>
+            <div className="border-2 border-gray-300 p-3 bg-white">
+              {contacts.filter(c => c.id !== selectedContactId && !ccContactIds.includes(c.id)).length === 0 ? (
+                <p className="text-sm text-gray-500">No other contacts available to BCC</p>
+              ) : (
+                <div className="space-y-2">
+                  {contacts
+                    .filter(c => c.id !== selectedContactId && !ccContactIds.includes(c.id))
+                    .map(contact => (
+                      <label key={contact.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-2 -mx-2">
+                        <input
+                          type="checkbox"
+                          checked={bccContactIds.includes(contact.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setBccContactIds(prev => [...prev, contact.id])
+                            } else {
+                              setBccContactIds(prev => prev.filter(id => id !== contact.id))
+                            }
+                          }}
+                          className="mr-3 w-4 h-4"
+                        />
+                        <div className="flex-1">
+                          <span className="font-medium text-gray-900">{contact.name}</span>
+                          {contact.role && (
+                            <span className="text-gray-500 text-sm ml-2">({contact.role})</span>
+                          )}
+                          {contact.emails && contact.emails.length > 0 && (
+                            <span className="text-gray-400 text-sm ml-2">{contact.emails[0]}</span>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                </div>
+              )}
+            </div>
+            {bccContactIds.length > 0 && (
+              <p className="text-sm text-gray-600 mt-2">
+                {bccContactIds.length} contact{bccContactIds.length !== 1 ? 's' : ''} will be BCC&apos;d
               </p>
             )}
           </div>

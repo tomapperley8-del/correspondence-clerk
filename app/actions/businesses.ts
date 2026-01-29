@@ -11,6 +11,7 @@ const createBusinessSchema = z.object({
   status: z.string().max(100).optional(),
   is_club_card: z.boolean().optional(),
   is_advertiser: z.boolean().optional(),
+  membership_type: z.enum(['club_card', 'advertiser', 'former_club_card', 'former_advertiser']).nullable().optional(),
 })
 
 const updateBusinessSchema = z.object({
@@ -19,6 +20,7 @@ const updateBusinessSchema = z.object({
   status: z.string().max(100).optional(),
   is_club_card: z.boolean().optional(),
   is_advertiser: z.boolean().optional(),
+  membership_type: z.enum(['club_card', 'advertiser', 'former_club_card', 'former_advertiser']).nullable().optional(),
   address: z.string().max(500).optional(),
   email: z.string().email('Invalid email format').max(254).or(z.literal('')).optional(),
   phone: z.string().max(50).optional(),
@@ -34,6 +36,7 @@ export type Business = {
   status: string | null
   is_club_card: boolean
   is_advertiser: boolean
+  membership_type: 'club_card' | 'advertiser' | 'former_club_card' | 'former_advertiser' | null
   contract_start: string | null
   contract_end: string | null
   contract_currency: string | null
