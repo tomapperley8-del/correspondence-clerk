@@ -202,11 +202,10 @@ export default function DashboardPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <h2 className="text-xl font-bold text-gray-900 mb-2">
-                📧 Import Emails from Outlook
+                📧 Import Emails
               </h2>
               <p className="text-gray-700 mb-4">
-                Install the Email Import Tool to import emails directly from
-                Outlook Web with one click. No more copying and pasting.
+                Install the Email Import Tool to import emails from Outlook or Gmail with one click.
               </p>
               <Link
                 href="/bookmarklet"

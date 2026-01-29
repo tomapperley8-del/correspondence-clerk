@@ -38,8 +38,13 @@ function markdownToHtml(markdown: string): string {
   // Inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  // Links - internal links (starting with /) don't open in new tab
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+    if (url.startsWith('/') || url.startsWith('#')) {
+      return `<a href="${url}">${text}</a>`;
+    }
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  });
 
   // Unordered lists
   html = html.replace(/^\s*[-*]\s+(.*)$/gim, '<li>$1</li>');
@@ -177,36 +182,6 @@ export function HelpContent({ markdown }: HelpContentProps) {
             ))}
           </nav>
 
-          {/* Quick Links */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Links</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <button
-                  onClick={() => scrollToSection('common-questions-faq')}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  Common Questions
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => scrollToSection('troubleshooting')}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  Troubleshooting
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => scrollToSection('glossary')}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  Glossary
-                </button>
-              </li>
-            </ul>
-          </div>
         </div>
       </aside>
 
