@@ -310,16 +310,26 @@ export async function deleteContact(id: string) {
     }
   }
 
-  // Also check if contact is used as CC in any correspondence
-  const { data: ccUsage } = await supabase
+  // Also check if contact is used as CC or BCC in any correspondence
+  const { count: ccCount } = await supabase
     .from('correspondence')
-    .select('id')
+    .select('*', { count: 'exact', head: true })
     .contains('cc_contact_ids', [id])
-    .limit(1)
 
-  if (ccUsage && ccUsage.length > 0) {
+  if (ccCount && ccCount > 0) {
     return {
-      error: `Cannot delete "${contact.name}" because they are CC'd on correspondence entries. Please remove them from CC first.`
+      error: `Cannot delete "${contact.name}" because they are CC'd on ${ccCount} correspondence ${ccCount === 1 ? 'entry' : 'entries'}. Please remove them from CC first.`
+    }
+  }
+
+  const { count: bccCount } = await supabase
+    .from('correspondence')
+    .select('*', { count: 'exact', head: true })
+    .contains('bcc_contact_ids', [id])
+
+  if (bccCount && bccCount > 0) {
+    return {
+      error: `Cannot delete "${contact.name}" because they are BCC'd on ${bccCount} correspondence ${bccCount === 1 ? 'entry' : 'entries'}. Please remove them from BCC first.`
     }
   }
 

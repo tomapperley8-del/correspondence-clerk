@@ -16,15 +16,15 @@ const createBusinessSchema = z.object({
 
 const updateBusinessSchema = z.object({
   name: z.string().min(1, 'Business name is required').max(200).optional(),
-  category: z.string().max(100).optional(),
-  status: z.string().max(100).optional(),
+  category: z.string().max(100).nullable().optional(),
+  status: z.string().max(100).nullable().optional(),
   is_club_card: z.boolean().optional(),
   is_advertiser: z.boolean().optional(),
   membership_type: z.enum(['club_card', 'advertiser', 'former_club_card', 'former_advertiser']).nullable().optional(),
-  address: z.string().max(500).optional(),
-  email: z.string().email('Invalid email format').max(254).or(z.literal('')).optional(),
-  phone: z.string().max(50).optional(),
-  notes: z.string().max(5000).optional(),
+  address: z.string().max(500).nullable().optional(),
+  email: z.string().email('Invalid email format').max(254).or(z.literal('')).nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+  notes: z.string().max(5000).nullable().optional(),
   last_contacted_at: z.string().optional(),
 })
 
