@@ -361,7 +361,8 @@ export default function BusinessDetailPage({
     setSavingEdit(false)
   }
 
-  const handleDeleteContact = async (contactId: string, contactName: string) => {
+  const handleDeleteContact = (contactId: string, contactName: string) => {
+    // Set the contact to delete and show confirmation dialog
     setContactToDelete({ id: contactId, name: contactName })
     setShowDeleteContactConfirm(true)
   }
@@ -510,6 +511,20 @@ export default function BusinessDetailPage({
             <span className="text-sm text-gray-600">({entry.contact.role})</span>
           )}
         </div>
+
+        {/* CC Contacts */}
+        {entry.cc_contacts && entry.cc_contacts.length > 0 && (
+          <div className="text-sm text-gray-600 mt-1">
+            <span className="font-medium">CC: </span>
+            {entry.cc_contacts.map((cc: { id: string; name: string; role: string | null }, idx: number) => (
+              <span key={cc.id}>
+                {cc.name}
+                {cc.role && <span className="text-gray-400"> ({cc.role})</span>}
+                {idx < (entry.cc_contacts?.length || 0) - 1 && ', '}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Secondary meta line */}
         <div className="text-sm text-gray-600 mb-3">
@@ -849,6 +864,14 @@ export default function BusinessDetailPage({
                             <CopyButton text={phone} />
                           </p>
                         ))}
+                      </div>
+                    )}
+                    {contact.notes && (
+                      <div className="mt-2 text-sm text-gray-500 italic">
+                        <span className="font-medium not-italic text-gray-600">Notes: </span>
+                        {contact.notes.length > 150
+                          ? `${contact.notes.substring(0, 150)}...`
+                          : contact.notes}
                       </div>
                     )}
                   </div>

@@ -8,6 +8,7 @@ import { z } from 'zod'
 const createCorrespondenceSchema = z.object({
   business_id: z.string().uuid('Invalid business ID'),
   contact_id: z.string().uuid('Invalid contact ID'),
+  cc_contact_ids: z.array(z.string().uuid('Invalid CC contact ID')).optional(),
   raw_text_original: z.string().min(1, 'Correspondence text is required').max(100000, 'Text too long'),
   entry_date: z.string().optional(),
   subject: z.string().max(500).optional(),
@@ -22,6 +23,7 @@ export type Correspondence = {
   id: string
   business_id: string
   contact_id: string
+  cc_contact_ids: string[] | null
   user_id: string
   raw_text_original: string
   formatted_text_original: string | null
@@ -50,6 +52,11 @@ export type Correspondence = {
     name: string
     role: string | null
   }
+  cc_contacts?: Array<{
+    id: string
+    name: string
+    role: string | null
+  }>
 }
 
 export async function getCorrespondenceByBusiness(
@@ -84,12 +91,48 @@ export async function getCorrespondenceByBusiness(
     return { error: error.message }
   }
 
+  // Fetch CC contacts for entries that have them
+  if (data && data.length > 0) {
+    // Collect all unique CC contact IDs
+    const allCcContactIds = new Set<string>()
+    data.forEach((entry) => {
+      if (entry.cc_contact_ids && Array.isArray(entry.cc_contact_ids)) {
+        entry.cc_contact_ids.forEach((id: string) => allCcContactIds.add(id))
+      }
+    })
+
+    if (allCcContactIds.size > 0) {
+      // Fetch all CC contacts in one query
+      const { data: ccContacts } = await supabase
+        .from('contacts')
+        .select('id, name, role')
+        .in('id', Array.from(allCcContactIds))
+
+      // Create a map for quick lookup
+      const ccContactMap = new Map(
+        (ccContacts || []).map((c) => [c.id, c])
+      )
+
+      // Add cc_contacts to each entry
+      data.forEach((entry) => {
+        if (entry.cc_contact_ids && Array.isArray(entry.cc_contact_ids)) {
+          entry.cc_contacts = entry.cc_contact_ids
+            .map((id: string) => ccContactMap.get(id))
+            .filter(Boolean)
+        } else {
+          entry.cc_contacts = []
+        }
+      })
+    }
+  }
+
   return { data, count }
 }
 
 export async function createCorrespondence(formData: {
   business_id: string
   contact_id: string
+  cc_contact_ids?: string[]
   raw_text_original: string
   entry_date?: string
   subject?: string
@@ -125,6 +168,7 @@ export async function createCorrespondence(formData: {
     .insert({
       business_id: formData.business_id,
       contact_id: formData.contact_id,
+      cc_contact_ids: formData.cc_contact_ids || [],
       user_id: user.id,
       raw_text_original: formData.raw_text_original,
       entry_date: formData.entry_date || new Date().toISOString(),

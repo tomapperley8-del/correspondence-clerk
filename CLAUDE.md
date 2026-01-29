@@ -80,7 +80,7 @@ components/
 
 - **businesses** - name, category, status, is_club_card, is_advertiser, last_contacted_at
 - **contacts** - business_id, name, email, role, phone (unique per business+email)
-- **correspondence** - business_id, contact_id, raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, edited_at
+- **correspondence** - business_id, contact_id, cc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, edited_at
 - **RLS:** All authenticated users can read/write (v1 policy)
 
 ## Design Rules
@@ -118,9 +118,12 @@ All 10 steps complete and deployed:
 8. Mastersheet Import (CSV, duplicate merging, idempotent)
 9. Google Docs Export (MCP integration, print-ready)
 10. Outlook Bookmarklet (email import from Outlook Web, postMessage API)
+11. Gmail Bookmarklet (email import from Gmail, postMessage API)
+12. CC Contacts (optional additional contacts per correspondence entry)
 
 ## Recent Changes
 
+- **Jan 29, 2026:** Bug fixes (delete contact dialog, notes cursor jump, contact notes visibility, contact selection error). Added Gmail bookmarklet support, CC contacts feature, rewrote USER_GUIDE.md.
 - **Jan 28, 2026:** Lint cleanup - fixed 52 issues (54→27 errors, 36→11 warnings). Removed unused code, replaced `any` types, fixed JSX entities.
 - **Jan 26, 2026:** Bookmarklet race condition fix (href set before drag), API uses production URL, Settings > Tools section added
 - **Jan 22, 2026:** Eliminated AI JSON errors with Anthropic structured outputs, 100% test success rate

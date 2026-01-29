@@ -35,6 +35,7 @@ function NewEntryPageContent() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
+  const [ccContactIds, setCcContactIds] = useState<string[]>([])
   const [rawText, setRawText] = useState('')
   const [subject, setSubject] = useState('')
   const [entryDateOnly, setEntryDateOnly] = useState(() => new Date().toISOString().slice(0, 10))
@@ -706,6 +707,7 @@ ${emailBody || ''}`
       {
         business_id: selectedBusinessId,
         contact_id: selectedContactId,
+        cc_contact_ids: ccContactIds.length > 0 ? ccContactIds : undefined,
         raw_text_original: rawText,
         entry_date,
         type: entryType || undefined,
@@ -749,6 +751,7 @@ ${emailBody || ''}`
       {
         business_id: selectedBusinessId,
         contact_id: selectedContactId!, // Fallback contact (not used if matches provided)
+        cc_contact_ids: ccContactIds.length > 0 ? ccContactIds : undefined,
         raw_text_original: rawText,
         entry_date,
         type: entryType || undefined,
@@ -944,6 +947,55 @@ ${emailBody || ''}`
           disabled={!selectedBusinessId}
           onContactUpdated={handleContactUpdated}
         />
+
+        {/* CC Contacts Selector */}
+        {selectedBusinessId && contacts.length > 0 && (
+          <div>
+            <Label className="block mb-2 font-semibold">
+              CC Contacts (optional)
+            </Label>
+            <div className="border-2 border-gray-300 p-3 bg-white">
+              {contacts.filter(c => c.id !== selectedContactId).length === 0 ? (
+                <p className="text-sm text-gray-500">No other contacts available to CC</p>
+              ) : (
+                <div className="space-y-2">
+                  {contacts
+                    .filter(c => c.id !== selectedContactId)
+                    .map(contact => (
+                      <label key={contact.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-2 -mx-2">
+                        <input
+                          type="checkbox"
+                          checked={ccContactIds.includes(contact.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setCcContactIds(prev => [...prev, contact.id])
+                            } else {
+                              setCcContactIds(prev => prev.filter(id => id !== contact.id))
+                            }
+                          }}
+                          className="mr-3 w-4 h-4"
+                        />
+                        <div className="flex-1">
+                          <span className="font-medium text-gray-900">{contact.name}</span>
+                          {contact.role && (
+                            <span className="text-gray-500 text-sm ml-2">({contact.role})</span>
+                          )}
+                          {contact.emails && contact.emails.length > 0 && (
+                            <span className="text-gray-400 text-sm ml-2">{contact.emails[0]}</span>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                </div>
+              )}
+            </div>
+            {ccContactIds.length > 0 && (
+              <p className="text-sm text-gray-600 mt-2">
+                {ccContactIds.length} contact{ccContactIds.length !== 1 ? 's' : ''} will be CC&apos;d
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Entry Details Section */}
         <div className="bg-gray-50 border-2 border-gray-300 p-6">

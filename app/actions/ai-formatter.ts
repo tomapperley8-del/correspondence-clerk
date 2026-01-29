@@ -48,6 +48,7 @@ export async function createFormattedCorrespondence(
   formData: {
     business_id: string
     contact_id: string
+    cc_contact_ids?: string[]
     raw_text_original: string
     entry_date?: string
     type?: 'Email' | 'Call' | 'Meeting'
@@ -98,6 +99,7 @@ export async function createFormattedCorrespondence(
         return {
           business_id: formData.business_id,
           contact_id: contactId,
+          cc_contact_ids: formData.cc_contact_ids || [],
           user_id: user.id,
           raw_text_original: formData.raw_text_original,
           formatted_text_original: entry.formatted_text,
@@ -162,6 +164,7 @@ export async function createFormattedCorrespondence(
       .insert({
         business_id: formData.business_id,
         contact_id: formData.contact_id,
+        cc_contact_ids: formData.cc_contact_ids || [],
         user_id: user.id,
         raw_text_original: formData.raw_text_original,
         formatted_text_original: aiResponse.formatted_text,

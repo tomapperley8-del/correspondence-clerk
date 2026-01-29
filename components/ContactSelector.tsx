@@ -335,9 +335,9 @@ function ContactSelectorComponent({
                   {selectedContact.role}
                 </div>
               )}
-              {(selectedContact.emails || selectedContact.phones) && (
+              {((selectedContact.emails && selectedContact.emails.length > 0) || (selectedContact.phones && selectedContact.phones.length > 0)) && (
                 <div className="text-xs text-gray-600 mt-1">
-                  {selectedContact.emails && selectedContact.emails.length > 0 && (
+                  {Array.isArray(selectedContact.emails) && selectedContact.emails.length > 0 && (
                     <div>
                       {selectedContact.emails.map((email, idx) => (
                         <a
@@ -350,7 +350,7 @@ function ContactSelectorComponent({
                       ))}
                     </div>
                   )}
-                  {selectedContact.phones && selectedContact.phones.length > 0 && (
+                  {Array.isArray(selectedContact.phones) && selectedContact.phones.length > 0 && (
                     <div className="mt-1">
                       {selectedContact.phones.map((phone, idx) => (
                         <a

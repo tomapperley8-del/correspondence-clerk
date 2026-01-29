@@ -1,12 +1,23 @@
 import { useEffect, useRef, useCallback } from 'react'
 
+interface UseModalKeyboardOptions {
+  /** Whether to auto-focus the first focusable element when modal opens. Default: true */
+  autoFocus?: boolean
+}
+
 /**
  * Hook for modal keyboard support: Escape to close, focus trapping, focus return.
  * Attach the returned ref to the modal container element.
  */
-export function useModalKeyboard(isOpen: boolean, onClose: () => void) {
+export function useModalKeyboard(
+  isOpen: boolean,
+  onClose: () => void,
+  options: UseModalKeyboardOptions = {}
+) {
+  const { autoFocus = true } = options
   const modalRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
+  const hasAutoFocused = useRef(false)
 
   // Capture the trigger element when the modal opens
   useEffect(() => {
@@ -53,18 +64,28 @@ export function useModalKeyboard(isOpen: boolean, onClose: () => void) {
     [isOpen, onClose]
   )
 
+  // Reset auto-focus tracking when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      hasAutoFocused.current = false
+    }
+  }, [isOpen])
+
   useEffect(() => {
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown)
 
-      // Auto-focus first focusable element in modal
-      if (modalRef.current) {
+      // Auto-focus first focusable element in modal (only once per open)
+      if (autoFocus && modalRef.current && !hasAutoFocused.current) {
         const firstFocusable = modalRef.current.querySelector<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         )
         if (firstFocusable) {
           // Delay to allow modal to render
-          requestAnimationFrame(() => firstFocusable.focus())
+          requestAnimationFrame(() => {
+            firstFocusable.focus()
+            hasAutoFocused.current = true
+          })
         }
       }
     }
@@ -78,7 +99,7 @@ export function useModalKeyboard(isOpen: boolean, onClose: () => void) {
         triggerRef.current = null
       }
     }
-  }, [isOpen, handleKeyDown])
+  }, [isOpen, handleKeyDown, autoFocus])
 
   return modalRef
 }

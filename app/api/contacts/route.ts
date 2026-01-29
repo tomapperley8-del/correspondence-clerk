@@ -1,6 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+// Helper to parse JSONB fields from Supabase
+function parseContactArrayFields(contact: Record<string, unknown>) {
+  return {
+    ...contact,
+    emails: typeof contact.emails === 'string'
+      ? JSON.parse(contact.emails)
+      : (Array.isArray(contact.emails) ? contact.emails : []),
+    phones: typeof contact.phones === 'string'
+      ? JSON.parse(contact.phones)
+      : (Array.isArray(contact.phones) ? contact.phones : []),
+  }
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient()
   const {
@@ -28,7 +41,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data || [])
+    // Parse JSONB fields
+    const parsedData = (data || []).map(parseContactArrayFields)
+    return NextResponse.json(parsedData)
   }
 
   // Search by business ID
@@ -49,5 +64,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json(data)
+  // Parse JSONB fields
+  const parsedData = (data || []).map(parseContactArrayFields)
+  return NextResponse.json(parsedData)
 }
