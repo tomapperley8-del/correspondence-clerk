@@ -78,9 +78,9 @@ components/
 
 ### Database Tables
 
-- **businesses** - name, category, status, is_club_card, is_advertiser, last_contacted_at
-- **contacts** - business_id, name, email, role, phone (unique per business+email)
-- **correspondence** - business_id, contact_id, cc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, edited_at
+- **businesses** - name, category, status, membership_type (club_card/advertiser/former_club_card/former_advertiser), address, email, phone, notes, contract fields, last_contacted_at
+- **contacts** - business_id, name, emails[], phones[], role, notes (unique per business+email)
+- **correspondence** - business_id, contact_id, cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, edited_at
 - **RLS:** All authenticated users can read/write (v1 policy)
 
 ## Design Rules
@@ -106,11 +106,11 @@ User takes screenshot (Win+Shift+S) -> double-clicks "Save Screenshot for Claude
 
 ## Feature Status
 
-All 10 steps complete and deployed:
+All features complete and deployed:
 
 1. Foundation + Auth (Supabase email/password)
-2. Database migrations (7 migrations, all run)
-3. Dashboard + Business pages (search, filters, sort, two-section archive)
+2. Database migrations (10 migrations, all run)
+3. Dashboard + Business pages (search, filters, sort, flexible date range filter)
 4. New Entry flow (forced filing, date required/time optional, direction for emails)
 5. AI Formatter (Anthropic structured outputs, 0 JSON errors, 16K token budget, graceful fallback)
 6. Manual Editing (correction layer, preserves originals, "Corrected" badge)
@@ -120,10 +120,15 @@ All 10 steps complete and deployed:
 10. Outlook Bookmarklet (email import from Outlook Web, postMessage API)
 11. Gmail Bookmarklet (email import from Gmail, postMessage API)
 12. CC Contacts (optional additional contacts per correspondence entry)
+13. BCC Contacts (hidden recipients, tracked for search)
+14. Membership Type in Contract Details (club_card, advertiser, former_club_card, former_advertiser)
+15. Business Notes (in Business Details section)
+16. Flexible Date Range Filter (1m, 6m, 12m, custom range)
 
 ## Recent Changes
 
-- **Jan 29, 2026:** Bug fixes (delete contact dialog, notes cursor jump, contact notes visibility, contact selection error). Added Gmail bookmarklet support, CC contacts feature, rewrote USER_GUIDE.md.
+- **Jan 29, 2026 (PM):** Added BCC contacts, membership_type in Contract Details (replaces is_club_card/is_advertiser checkboxes), business notes in Business Details, flexible date range filter (1m/6m/12m/custom). Fixed notes deletion (nullable schema), contact deletion now checks for linked correspondence and shows helpful error. Simplified help page.
+- **Jan 29, 2026 (AM):** Bug fixes (delete contact dialog, notes cursor jump, contact notes visibility, contact selection error). Added Gmail bookmarklet support, CC contacts feature, rewrote USER_GUIDE.md.
 - **Jan 28, 2026:** Lint cleanup - fixed 52 issues (54→27 errors, 36→11 warnings). Removed unused code, replaced `any` types, fixed JSX entities.
 - **Jan 26, 2026:** Bookmarklet race condition fix (href set before drag), API uses production URL, Settings > Tools section added
 - **Jan 22, 2026:** Eliminated AI JSON errors with Anthropic structured outputs, 100% test success rate
