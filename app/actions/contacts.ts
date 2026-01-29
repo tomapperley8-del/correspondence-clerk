@@ -287,12 +287,41 @@ export async function deleteContact(id: string) {
     return { error: 'Unauthorized' }
   }
 
-  // Get business_id before deleting
+  // Get contact details before deleting
   const { data: contact } = await supabase
     .from('contacts')
-    .select('business_id')
+    .select('business_id, name')
     .eq('id', id)
     .single()
+
+  if (!contact) {
+    return { error: 'Contact not found' }
+  }
+
+  // Check if contact has any correspondence entries
+  const { count: correspondenceCount } = await supabase
+    .from('correspondence')
+    .select('*', { count: 'exact', head: true })
+    .eq('contact_id', id)
+
+  if (correspondenceCount && correspondenceCount > 0) {
+    return {
+      error: `Cannot delete "${contact.name}" because they have ${correspondenceCount} correspondence ${correspondenceCount === 1 ? 'entry' : 'entries'}. Please reassign or delete those entries first.`
+    }
+  }
+
+  // Also check if contact is used as CC in any correspondence
+  const { data: ccUsage } = await supabase
+    .from('correspondence')
+    .select('id')
+    .contains('cc_contact_ids', [id])
+    .limit(1)
+
+  if (ccUsage && ccUsage.length > 0) {
+    return {
+      error: `Cannot delete "${contact.name}" because they are CC'd on correspondence entries. Please remove them from CC first.`
+    }
+  }
 
   const { error } = await supabase.from('contacts').delete().eq('id', id)
 
@@ -300,9 +329,7 @@ export async function deleteContact(id: string) {
     return { error: error.message }
   }
 
-  if (contact) {
-    revalidatePath(`/businesses/${contact.business_id}`)
-  }
+  revalidatePath(`/businesses/${contact.business_id}`)
 
   return { success: true }
 }

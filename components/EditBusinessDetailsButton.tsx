@@ -29,10 +29,10 @@ export function EditBusinessDetailsButton({
     setError(null)
 
     const result = await updateBusiness(business.id, {
-      address: formData.address || undefined,
-      email: formData.email || undefined,
-      phone: formData.phone || undefined,
-      notes: formData.notes || undefined,
+      address: formData.address || null,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      notes: formData.notes || null,
     })
 
     if ('error' in result) {

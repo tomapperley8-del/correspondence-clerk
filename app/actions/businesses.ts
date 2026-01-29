@@ -160,14 +160,14 @@ export async function updateBusiness(
   id: string,
   formData: {
     name?: string
-    category?: string
-    status?: string
+    category?: string | null
+    status?: string | null
     is_club_card?: boolean
     is_advertiser?: boolean
-    address?: string
-    email?: string
-    phone?: string
-    notes?: string
+    address?: string | null
+    email?: string | null
+    phone?: string | null
+    notes?: string | null
     last_contacted_at?: string
   }
 ) {
