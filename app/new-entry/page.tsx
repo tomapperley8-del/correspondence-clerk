@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,7 @@ import { extractContactsFromText, type ExtractedContact } from '@/lib/contact-ex
 import { ContactExtractionModal } from '@/components/ContactExtractionModal'
 import { ContactMatchPreviewModal } from '@/components/ContactMatchPreviewModal'
 import { DuplicateWarningModal } from '@/components/DuplicateWarningModal'
+import { MultiContactSelector } from '@/components/MultiContactSelector'
 import { matchEntriesToContacts, type ContactMatchResult } from '@/lib/contact-matching'
 import { isThreadSplitResponse } from '@/lib/ai/types'
 import { checkForDuplicates, type Correspondence } from '@/app/actions/correspondence'
@@ -84,6 +85,7 @@ function NewEntryPageContent() {
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false)
   const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false)
   const [autoMatchedContactId, setAutoMatchedContactId] = useState<string | null>(null)
+  const autoMatchHandledRef = useRef(false)
 
   // Inline error/warning state (replaces browser alerts)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -432,15 +434,15 @@ ${emailBody || ''}`
         const data = await response.json()
         setContacts(data)
 
-        // If we have an auto-matched contact, select it
-        if (autoMatchedContactId && data.some((c: Contact) => c.id === autoMatchedContactId)) {
+        // If we have an auto-matched contact and haven't handled it yet, select it
+        if (autoMatchedContactId && !autoMatchHandledRef.current && data.some((c: Contact) => c.id === autoMatchedContactId)) {
           setSelectedContactId(autoMatchedContactId)
-          setAutoMatchedContactId(null) // Clear it so it doesn't interfere later
+          autoMatchHandledRef.current = true // Mark as handled to prevent re-selection
         }
         // Smart default: if only one contact, preselect it
         else if (data.length === 1) {
           setSelectedContactId(data[0].id)
-        } else {
+        } else if (!autoMatchHandledRef.current) {
           setSelectedContactId(null)
         }
       }
@@ -494,6 +496,10 @@ ${emailBody || ''}`
   }, [rawText])
 
   const handleBusinessSelect = async (businessId: string) => {
+    // Reset auto-match flag when business changes
+    if (businessId !== selectedBusinessId) {
+      autoMatchHandledRef.current = false
+    }
     setSelectedBusinessId(businessId || null)
     setErrors((prev) => ({ ...prev, business: undefined }))
 
@@ -954,101 +960,25 @@ ${emailBody || ''}`
         />
 
         {/* CC Contacts Selector */}
-        {selectedBusinessId && contacts.length > 0 && (
-          <div>
-            <Label className="block mb-2 font-semibold">
-              CC Contacts (optional)
-            </Label>
-            <div className="border-2 border-gray-300 p-3 bg-white">
-              {contacts.filter(c => c.id !== selectedContactId).length === 0 ? (
-                <p className="text-sm text-gray-500">No other contacts available to CC</p>
-              ) : (
-                <div className="space-y-2">
-                  {contacts
-                    .filter(c => c.id !== selectedContactId)
-                    .map(contact => (
-                      <label key={contact.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-2 -mx-2">
-                        <input
-                          type="checkbox"
-                          checked={ccContactIds.includes(contact.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setCcContactIds(prev => [...prev, contact.id])
-                            } else {
-                              setCcContactIds(prev => prev.filter(id => id !== contact.id))
-                            }
-                          }}
-                          className="mr-3 w-4 h-4"
-                        />
-                        <div className="flex-1">
-                          <span className="font-medium text-gray-900">{contact.name}</span>
-                          {contact.role && (
-                            <span className="text-gray-500 text-sm ml-2">({contact.role})</span>
-                          )}
-                          {contact.emails && contact.emails.length > 0 && (
-                            <span className="text-gray-400 text-sm ml-2">{contact.emails[0]}</span>
-                          )}
-                        </div>
-                      </label>
-                    ))}
-                </div>
-              )}
-            </div>
-            {ccContactIds.length > 0 && (
-              <p className="text-sm text-gray-600 mt-2">
-                {ccContactIds.length} contact{ccContactIds.length !== 1 ? 's' : ''} will be CC&apos;d
-              </p>
-            )}
-          </div>
+        {selectedBusinessId && contacts.length > 1 && (
+          <MultiContactSelector
+            label="CC Contacts (optional)"
+            contacts={contacts}
+            selectedIds={ccContactIds}
+            excludeIds={selectedContactId ? [selectedContactId] : []}
+            onSelectionChange={setCcContactIds}
+          />
         )}
 
         {/* BCC Contacts Selector */}
-        {selectedBusinessId && contacts.length > 0 && (
-          <div>
-            <Label className="block mb-2 font-semibold">
-              BCC Contacts (optional)
-            </Label>
-            <div className="border-2 border-gray-300 p-3 bg-white">
-              {contacts.filter(c => c.id !== selectedContactId && !ccContactIds.includes(c.id)).length === 0 ? (
-                <p className="text-sm text-gray-500">No other contacts available to BCC</p>
-              ) : (
-                <div className="space-y-2">
-                  {contacts
-                    .filter(c => c.id !== selectedContactId && !ccContactIds.includes(c.id))
-                    .map(contact => (
-                      <label key={contact.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-2 -mx-2">
-                        <input
-                          type="checkbox"
-                          checked={bccContactIds.includes(contact.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setBccContactIds(prev => [...prev, contact.id])
-                            } else {
-                              setBccContactIds(prev => prev.filter(id => id !== contact.id))
-                            }
-                          }}
-                          className="mr-3 w-4 h-4"
-                        />
-                        <div className="flex-1">
-                          <span className="font-medium text-gray-900">{contact.name}</span>
-                          {contact.role && (
-                            <span className="text-gray-500 text-sm ml-2">({contact.role})</span>
-                          )}
-                          {contact.emails && contact.emails.length > 0 && (
-                            <span className="text-gray-400 text-sm ml-2">{contact.emails[0]}</span>
-                          )}
-                        </div>
-                      </label>
-                    ))}
-                </div>
-              )}
-            </div>
-            {bccContactIds.length > 0 && (
-              <p className="text-sm text-gray-600 mt-2">
-                {bccContactIds.length} contact{bccContactIds.length !== 1 ? 's' : ''} will be BCC&apos;d
-              </p>
-            )}
-          </div>
+        {selectedBusinessId && contacts.length > 1 && (
+          <MultiContactSelector
+            label="BCC Contacts (optional)"
+            contacts={contacts}
+            selectedIds={bccContactIds}
+            excludeIds={selectedContactId ? [selectedContactId, ...ccContactIds] : ccContactIds}
+            onSelectionChange={setBccContactIds}
+          />
         )}
 
         {/* Entry Details Section */}
