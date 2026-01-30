@@ -65,6 +65,10 @@ export default function BusinessDetailPage({
   const [customDateFrom, setCustomDateFrom] = useState<string>('')
   const [customDateTo, setCustomDateTo] = useState<string>('')
 
+  // Load More pagination state
+  const [recentDisplayCount, setRecentDisplayCount] = useState(50)
+  const [archiveDisplayCount, setArchiveDisplayCount] = useState(50)
+
   useEffect(() => {
     async function loadParams() {
       const p = await params
@@ -111,6 +115,12 @@ export default function BusinessDetailPage({
     }
     localStorage.setItem(storageKey, JSON.stringify(prefs))
   }, [id, sortOrder, contactFilter, directionFilter, dateRange, customDateFrom, customDateTo])
+
+  // Reset display counts when filters change
+  useEffect(() => {
+    setRecentDisplayCount(50)
+    setArchiveDisplayCount(50)
+  }, [contactFilter, directionFilter, dateRange, customDateFrom, customDateTo, searchQuery])
 
   useEffect(() => {
     if (!id) return
@@ -272,6 +282,12 @@ export default function BusinessDetailPage({
       archive: archiveEntries.filter(matchesQuery),
     }
   }, [recentEntries, archiveEntries, searchQuery])
+
+  // Sliced arrays for pagination
+  const displayedRecent = filteredCorrespondence.recent.slice(0, recentDisplayCount)
+  const displayedArchive = filteredCorrespondence.archive.slice(0, archiveDisplayCount)
+  const remainingRecent = Math.max(0, filteredCorrespondence.recent.length - recentDisplayCount)
+  const remainingArchive = Math.max(0, filteredCorrespondence.archive.length - archiveDisplayCount)
 
   if (loading || !business || !id) {
     return (
@@ -1194,8 +1210,22 @@ export default function BusinessDetailPage({
                     : 'Last 12 Months'}
                 </h3>
                 <div className="space-y-6">
-                  {filteredCorrespondence.recent.map((entry) => renderEntry(entry))}
+                  {displayedRecent.map((entry) => renderEntry(entry))}
                 </div>
+                {remainingRecent > 0 && (
+                  <div className="mt-6 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setRecentDisplayCount(prev => prev + 50)}
+                      className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold"
+                    >
+                      Load 50 More ({remainingRecent} remaining)
+                    </button>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Showing {displayedRecent.length} of {filteredCorrespondence.recent.length}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1211,7 +1241,21 @@ export default function BusinessDetailPage({
                 </button>
                 {isArchiveExpanded && (
                   <div className="space-y-6 pl-4 border-l-2 border-gray-300">
-                    {filteredCorrespondence.archive.map((entry) => renderEntry(entry))}
+                    {displayedArchive.map((entry) => renderEntry(entry))}
+                    {remainingArchive > 0 && (
+                      <div className="mt-6 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setArchiveDisplayCount(prev => prev + 50)}
+                          className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold"
+                        >
+                          Load 50 More ({remainingArchive} remaining)
+                        </button>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Showing {displayedArchive.length} of {filteredCorrespondence.archive.length}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
