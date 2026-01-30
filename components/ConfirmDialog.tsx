@@ -2,7 +2,6 @@
 
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -10,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -47,7 +47,7 @@ export function ConfirmDialog({
           <AlertDialogCancel className="border-2 border-gray-800" disabled={isLoading}>
             {cancelLabel}
           </AlertDialogCancel>
-          <AlertDialogAction
+          <Button
             onClick={onConfirm}
             disabled={isLoading}
             className={
@@ -57,7 +57,7 @@ export function ConfirmDialog({
             }
           >
             {isLoading ? (loadingLabel || 'Loading...') : confirmLabel}
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
