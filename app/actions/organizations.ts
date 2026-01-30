@@ -173,7 +173,7 @@ export async function getOrganizationMembers() {
   // Join with auth.users to get email addresses
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, display_name, created_at')
+    .select('id, display_name, role, created_at')
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: true })
 

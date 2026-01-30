@@ -26,6 +26,7 @@ type Member = {
   id: string
   email: string | null
   display_name: string | null
+  role: 'admin' | 'member'
   created_at: string
 }
 
@@ -235,6 +236,10 @@ export default function OrganizationSettingsPage() {
       {/* Team Members */}
       <div className="bg-white border-2 border-gray-800 p-6 mb-6">
         <h2 className="text-xl font-bold mb-4 text-gray-900">Team Members</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          <strong>Admin:</strong> Can import data and manage settings.{' '}
+          <strong>Member:</strong> Can add and edit correspondence.
+        </p>
         {members.length === 0 ? (
           <p className="text-gray-600">No team members found.</p>
         ) : (
@@ -245,9 +250,20 @@ export default function OrganizationSettingsPage() {
                 className="border-2 border-gray-200 p-3 flex justify-between items-center"
               >
                 <div>
-                  <p className="font-semibold text-gray-900">
-                    {member.email || 'No email'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-gray-900">
+                      {member.email || 'No email'}
+                    </p>
+                    <span
+                      className={`text-xs px-2 py-0.5 font-semibold ${
+                        member.role === 'admin'
+                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                          : 'bg-gray-100 text-gray-700 border border-gray-300'
+                      }`}
+                    >
+                      {member.role === 'admin' ? 'Admin' : 'Member'}
+                    </span>
+                  </div>
                   {member.display_name && member.display_name !== member.email && (
                     <p className="text-sm text-gray-600">{member.display_name}</p>
                   )}
