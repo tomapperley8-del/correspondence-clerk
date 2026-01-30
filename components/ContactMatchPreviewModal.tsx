@@ -21,6 +21,7 @@ interface ContactMatchPreviewModalProps {
   initialMatches: ContactMatchResult[];
   defaultContactId: string;
   onConfirm: (matches: ContactMatchResult[]) => void;
+  isLoading?: boolean;
 }
 
 export function ContactMatchPreviewModal({
@@ -31,6 +32,7 @@ export function ContactMatchPreviewModal({
   initialMatches,
   defaultContactId,
   onConfirm,
+  isLoading = false,
 }: ContactMatchPreviewModalProps) {
   const [matches, setMatches] = useState<ContactMatchResult[]>(initialMatches);
 
@@ -152,14 +154,16 @@ export function ContactMatchPreviewModal({
               onClick={onClose}
               variant="outline"
               className="px-4 py-2"
+              disabled={isLoading}
             >
               Cancel
             </Button>
             <Button
               onClick={handleConfirm}
-              className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-2 font-semibold"
+              className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-2 font-semibold disabled:opacity-50"
+              disabled={isLoading}
             >
-              Save {entries.length} Email{entries.length !== 1 ? 's' : ''}
+              {isLoading ? 'Saving...' : `Save ${entries.length} Email${entries.length !== 1 ? 's' : ''}`}
             </Button>
           </div>
         </div>

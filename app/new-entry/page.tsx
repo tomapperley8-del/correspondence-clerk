@@ -1357,6 +1357,7 @@ ${emailBody || ''}`
           initialMatches={contactMatches}
           defaultContactId={selectedContactId}
           onConfirm={handleConfirmMatches}
+          isLoading={isLoading}
         />
       )}
 
@@ -1367,6 +1368,7 @@ ${emailBody || ''}`
           onClose={handleCloseDuplicateWarning}
           existingEntry={duplicateEntry}
           onSaveAnyway={handleSaveAnyway}
+          isSaving={isLoading}
         />
       )}
     </div>

@@ -10,6 +10,7 @@ interface DuplicateWarningModalProps {
   onClose: () => void
   existingEntry: Correspondence
   onSaveAnyway: () => void
+  isSaving?: boolean
 }
 
 export function DuplicateWarningModal({
@@ -17,6 +18,7 @@ export function DuplicateWarningModal({
   onClose,
   existingEntry,
   onSaveAnyway,
+  isSaving = false,
 }: DuplicateWarningModalProps) {
   const router = useRouter()
   const modalRef = useModalKeyboard(isOpen, onClose)
@@ -83,13 +85,15 @@ export function DuplicateWarningModal({
           <div className="flex gap-3">
             <Button
               onClick={handleViewExisting}
-              className="flex-1 bg-blue-600 text-white hover:bg-blue-700 px-4 py-3 font-semibold"
+              className="flex-1 bg-blue-600 text-white hover:bg-blue-700 px-4 py-3 font-semibold disabled:opacity-50"
+              disabled={isSaving}
             >
               View Existing Entry
             </Button>
             <Button
               onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-900 hover:bg-gray-300 px-4 py-3"
+              className="flex-1 bg-gray-200 text-gray-900 hover:bg-gray-300 px-4 py-3 disabled:opacity-50"
+              disabled={isSaving}
             >
               Cancel
             </Button>
@@ -97,9 +101,10 @@ export function DuplicateWarningModal({
 
           <Button
             onClick={onSaveAnyway}
-            className="w-full bg-orange-600 text-white hover:bg-orange-700 px-4 py-3 font-semibold"
+            className="w-full bg-orange-600 text-white hover:bg-orange-700 px-4 py-3 font-semibold disabled:opacity-50"
+            disabled={isSaving}
           >
-            Save Anyway (Different Contact or Update)
+            {isSaving ? 'Saving...' : 'Save Anyway (Different Contact or Update)'}
           </Button>
 
           <p className="text-xs text-gray-600 text-center">

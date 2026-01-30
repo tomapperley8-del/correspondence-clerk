@@ -54,6 +54,8 @@ export default function BusinessDetailPage({
   const [contactToDelete, setContactToDelete] = useState<{id: string, name: string} | null>(null)
   const [showDeleteEntryConfirm, setShowDeleteEntryConfirm] = useState(false)
   const [entryToDelete, setEntryToDelete] = useState<{id: string, subject?: string} | null>(null)
+  const [isDeletingContact, setIsDeletingContact] = useState(false)
+  const [isDeletingEntry, setIsDeletingEntry] = useState(false)
 
   // Feature #3: AI summary refresh trigger
   const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0)
@@ -444,7 +446,7 @@ export default function BusinessDetailPage({
   const confirmDeleteContact = async () => {
     if (!contactToDelete) return
 
-    setShowDeleteContactConfirm(false)
+    setIsDeletingContact(true)
     setActionError(null)
 
     const result = await deleteContact(contactToDelete.id)
@@ -459,6 +461,8 @@ export default function BusinessDetailPage({
       }
     }
 
+    setIsDeletingContact(false)
+    setShowDeleteContactConfirm(false)
     setContactToDelete(null)
   }
 
@@ -470,7 +474,7 @@ export default function BusinessDetailPage({
   const confirmDeleteEntry = async () => {
     if (!entryToDelete) return
 
-    setShowDeleteEntryConfirm(false)
+    setIsDeletingEntry(true)
     setActionError(null)
 
     const result = await deleteCorrespondence(entryToDelete.id)
@@ -478,13 +482,19 @@ export default function BusinessDetailPage({
     if ('error' in result) {
       setActionError(`Error deleting entry: ${result.error}`)
     } else {
-      // Reload correspondence
+      // Reload correspondence and duplicates
       if (id) {
-        const correspondenceResult = await getCorrespondenceByBusiness(id)
+        const [correspondenceResult, duplicatesResult] = await Promise.all([
+          getCorrespondenceByBusiness(id),
+          findDuplicatesInBusiness(id)
+        ])
         setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
+        setDuplicates(duplicatesResult.duplicates || [])
       }
     }
 
+    setIsDeletingEntry(false)
+    setShowDeleteEntryConfirm(false)
     setEntryToDelete(null)
   }
 
@@ -1370,7 +1380,9 @@ export default function BusinessDetailPage({
         title="Delete Contact"
         description={`Are you sure you want to delete contact "${contactToDelete?.name}"?`}
         confirmLabel="Delete"
+        loadingLabel="Deleting..."
         destructive
+        isLoading={isDeletingContact}
         onConfirm={confirmDeleteContact}
       />
 
@@ -1381,7 +1393,9 @@ export default function BusinessDetailPage({
         title="Delete Entry"
         description={`Are you sure you want to delete this entry${entryToDelete?.subject ? ` "${entryToDelete.subject}"` : ''}? This cannot be undone.`}
         confirmLabel="Delete"
+        loadingLabel="Deleting..."
         destructive
+        isLoading={isDeletingEntry}
         onConfirm={confirmDeleteEntry}
       />
     </div>
