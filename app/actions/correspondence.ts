@@ -68,7 +68,7 @@ export type Correspondence = {
 
 export async function getCorrespondenceByBusiness(
   businessId: string,
-  limit: number = 20,
+  limit: number = 1000,
   offset: number = 0
 ) {
   const supabase = await createClient()
