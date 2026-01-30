@@ -16,6 +16,7 @@ import {
   cancelInvitation,
 } from '@/app/actions/invitations'
 import { useRouter } from 'next/navigation'
+import { formatDateGB } from '@/lib/utils'
 
 type Organization = {
   id: string
@@ -268,7 +269,7 @@ export default function OrganizationSettingsPage() {
                     <p className="text-sm text-gray-600">{member.display_name}</p>
                   )}
                   <p className="text-xs text-gray-500">
-                    Joined {new Date(member.created_at).toLocaleDateString()}
+                    Joined {formatDateGB(member.created_at)}
                   </p>
                 </div>
               </div>
@@ -323,10 +324,10 @@ export default function OrganizationSettingsPage() {
                       {invitation.email}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Sent {new Date(invitation.created_at).toLocaleDateString()}
+                      Sent {formatDateGB(invitation.created_at)}
                       {' · '}
                       Expires{' '}
-                      {new Date(invitation.expires_at).toLocaleDateString()}
+                      {formatDateGB(invitation.expires_at)}
                     </p>
                   </div>
                   <div className="flex gap-2">

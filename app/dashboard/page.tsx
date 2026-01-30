@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { getBusinesses, type BusinessListItem } from '@/app/actions/businesses'
 import { AddBusinessButton } from '@/components/AddBusinessButton'
 import { Input } from '@/components/ui/input'
+import { formatDateGB } from '@/lib/utils'
 
 type FilterType = 'all' | 'club-card' | 'advertiser' | 'both' | 'prospect'
 type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
@@ -420,7 +421,7 @@ export default function DashboardPage() {
                   {business.last_contacted_at && (
                     <p className="text-sm text-gray-600 mt-3">
                       Last contacted:{' '}
-                      {new Date(business.last_contacted_at).toLocaleDateString('en-GB')}
+                      {formatDateGB(business.last_contacted_at)}
                     </p>
                   )}
 
@@ -477,7 +478,7 @@ export default function DashboardPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {business.last_contacted_at
-                          ? new Date(business.last_contacted_at).toLocaleDateString('en-GB')
+                          ? formatDateGB(business.last_contacted_at)
                           : <span className="italic text-gray-400">None</span>
                         }
                       </td>

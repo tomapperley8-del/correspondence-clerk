@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import type { ContactMatchResult } from '@/lib/contact-matching';
 import type { Contact } from '@/app/actions/contacts';
 import type { FormattedEntry } from '@/lib/ai/types';
+import { formatDateGB } from '@/lib/utils';
 
 interface ContactMatchPreviewModalProps {
   isOpen: boolean;
@@ -92,7 +93,7 @@ export function ContactMatchPreviewModal({
                       <p className="text-sm text-gray-700 mb-1">
                         <strong>Date:</strong>{' '}
                         {entry.entry_date_guess
-                          ? new Date(entry.entry_date_guess).toLocaleDateString()
+                          ? formatDateGB(entry.entry_date_guess)
                           : 'Unknown'}
                       </p>
                       <p className="text-sm text-gray-700">

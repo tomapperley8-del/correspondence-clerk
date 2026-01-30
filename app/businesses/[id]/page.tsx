@@ -22,6 +22,7 @@ import { SuccessBanner } from '@/components/SuccessBanner'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { CopyButton } from '@/components/CopyButton'
 import { retryFormatting } from '@/app/actions/ai-formatter'
+import { formatDateGB } from '@/lib/utils'
 
 export default function BusinessDetailPage({
   params,
@@ -653,7 +654,7 @@ export default function BusinessDetailPage({
 
         {/* Secondary meta line */}
         <div className="text-sm text-gray-600 mb-3">
-          {entry.entry_date && <span>{new Date(entry.entry_date).toLocaleDateString('en-GB')}</span>}
+          {entry.entry_date && <span>{formatDateGB(entry.entry_date)}</span>}
           {entry.type && <span> • {entry.type}</span>}
         </div>
 
@@ -792,7 +793,7 @@ export default function BusinessDetailPage({
             </span>
             {entry.due_at && (
               <div className={`text-xs ${isOverdue ? 'text-red-600 font-semibold' : 'text-yellow-700'}`}>
-                Due: {new Date(entry.due_at).toLocaleDateString('en-GB')}
+                Due: {formatDateGB(entry.due_at)}
                 {isOverdue && ' (Overdue)'}
               </div>
             )}
@@ -842,7 +843,7 @@ export default function BusinessDetailPage({
               <ul className="text-sm text-orange-700 mb-2 space-y-1">
                 {dup.entries.map(entry => (
                   <li key={entry.id}>
-                    {entry.subject || 'No subject'} ({entry.entry_date ? new Date(entry.entry_date).toLocaleDateString('en-GB') : 'No date'}) - {entry.contact?.name || 'Unknown contact'}
+                    {entry.subject || 'No subject'} ({entry.entry_date ? formatDateGB(entry.entry_date) : 'No date'}) - {entry.contact?.name || 'Unknown contact'}
                   </li>
                 ))}
               </ul>
@@ -880,11 +881,11 @@ export default function BusinessDetailPage({
               <div className="text-sm text-gray-700 mt-1">
                 <span className="font-semibold">Contract:</span>{' '}
                 {business.contract_start && (
-                  <span>{new Date(business.contract_start).toLocaleDateString('en-GB')}</span>
+                  <span>{formatDateGB(business.contract_start)}</span>
                 )}
                 {business.contract_start && business.contract_end && <span> - </span>}
                 {business.contract_end && (
-                  <span>{new Date(business.contract_end).toLocaleDateString('en-GB')}</span>
+                  <span>{formatDateGB(business.contract_end)}</span>
                 )}
               </div>
             )}
@@ -1313,7 +1314,7 @@ export default function BusinessDetailPage({
               <div className="mb-8">
                 <h3 className="font-bold text-gray-900 mb-4 text-lg">
                   {dateRange === 'custom'
-                    ? `Selected Range${customDateFrom ? ` (${new Date(customDateFrom).toLocaleDateString('en-GB')}` : ''}${customDateTo ? ` - ${new Date(customDateTo).toLocaleDateString('en-GB')})` : customDateFrom ? ')' : ''}`
+                    ? `Selected Range${customDateFrom ? ` (${formatDateGB(customDateFrom)}` : ''}${customDateTo ? ` - ${formatDateGB(customDateTo)})` : customDateFrom ? ')' : ''}`
                     : dateRange === '1m' ? 'Last Month'
                     : dateRange === '6m' ? 'Last 6 Months'
                     : 'Last 12 Months'}

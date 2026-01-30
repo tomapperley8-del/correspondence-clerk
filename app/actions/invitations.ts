@@ -106,7 +106,14 @@ export async function createInvitation(email: string) {
     .single()
 
   // Send invitation email
-  await sendInvitationEmail(normalizedEmail, token, org?.name || 'the organization')
+  try {
+    await sendInvitationEmail(normalizedEmail, token, org?.name || 'the organization')
+  } catch (emailError) {
+    console.error('Failed to send invitation email:', emailError)
+    // Delete the invitation since email failed
+    await supabase.from('invitations').delete().eq('id', invitation.id)
+    return { error: 'Failed to send invitation email. Please check your email configuration.' }
+  }
 
   revalidatePath('/settings/organization')
   return { data: invitation }

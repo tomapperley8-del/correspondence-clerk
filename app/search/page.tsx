@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { searchAll, type SearchResult, type SearchFilters } from '@/app/actions/search'
+import { formatDateGB } from '@/lib/utils'
 
 export default function SearchPage() {
   const [query, setQuery] = useState('')
@@ -261,7 +262,7 @@ export default function SearchPage() {
                       {result.entry_date && (
                         <span>
                           {' '}
-                          • {new Date(result.entry_date).toLocaleDateString('en-GB')}
+                          • {formatDateGB(result.entry_date)}
                         </span>
                       )}
                     </p>

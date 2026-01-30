@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { type Correspondence } from '@/app/actions/correspondence'
 import { useRouter } from 'next/navigation'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
+import { formatDateGB } from '@/lib/utils'
 
 interface DuplicateWarningModalProps {
   isOpen: boolean
@@ -31,8 +32,8 @@ export function DuplicateWarningModal({
   }
 
   const entryDate = existingEntry.entry_date
-    ? new Date(existingEntry.entry_date).toLocaleDateString('en-GB')
-    : new Date(existingEntry.created_at).toLocaleDateString('en-GB')
+    ? formatDateGB(existingEntry.entry_date)
+    : formatDateGB(existingEntry.created_at)
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
