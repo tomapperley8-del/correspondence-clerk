@@ -5,6 +5,7 @@ import { AIFormatterResponse, isThreadSplitResponse } from '@/lib/ai/types'
 import { createClient } from '@/lib/supabase/server'
 import type { ContactMatchResult } from '@/lib/contact-matching'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { checkRateLimit, rateLimitError } from '@/lib/rate-limit'
 
 /**
  * Format correspondence text using AI
@@ -14,6 +15,12 @@ export async function formatCorrespondenceText(
   rawText: string,
   shouldSplit: boolean = false
 ) {
+  // Rate limit: 20 requests per minute for AI formatting (expensive)
+  const rateLimit = await checkRateLimit({ limit: 20, windowMs: 60000, endpoint: 'ai-formatter' })
+  if (!rateLimit.allowed) {
+    return rateLimitError(rateLimit.resetIn)
+  }
+
   // Validate user is authenticated
   const supabase = await createClient()
   const {

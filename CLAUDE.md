@@ -81,6 +81,7 @@ components/
 - **businesses** - name, category, status, membership_type (club_card/advertiser/former_club_card/former_advertiser), address, email, phone, notes, contract fields, last_contacted_at
 - **contacts** - business_id, name, emails[], phones[], role, notes (unique per business+email)
 - **correspondence** - business_id, contact_id, cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, edited_at
+- **user_profiles** - id (references auth.users), organization_id, display_name, role (member/admin)
 - **RLS:** All authenticated users can read/write (v1 policy)
 
 ## Design Rules
@@ -99,6 +100,10 @@ Required in `.env.local`:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ANTHROPIC_API_KEY`
 - `NEXT_PUBLIC_APP_URL`
+
+Optional (for production email):
+- `SENDGRID_API_KEY` - SendGrid API key for sending invitation emails
+- `SENDGRID_FROM_EMAIL` - Sender email address (default: noreply@correspondenceclerk.com)
 
 ## Screenshot Workflow
 
@@ -127,6 +132,7 @@ All features complete and deployed:
 
 ## Recent Changes
 
+- **Jan 30, 2026:** Pre-launch security fixes: removed unauthenticated /api/run-migration endpoint (CRITICAL), added user roles (member/admin) with admin-only protection on /admin/* routes and import actions, implemented SendGrid email delivery for invitations, added rate limiting to AI formatter (20/min), search (30/min), and email import (60/min) endpoints.
 - **Jan 29, 2026 (PM):** Added BCC contacts, membership_type in Contract Details (replaces is_club_card/is_advertiser checkboxes), business notes in Business Details, flexible date range filter (1m/6m/12m/custom). Fixed notes deletion (nullable schema), contact deletion now checks for linked correspondence and shows helpful error. Simplified help page.
 - **Jan 29, 2026 (AM):** Bug fixes (delete contact dialog, notes cursor jump, contact notes visibility, contact selection error). Added Gmail bookmarklet support, CC contacts feature, rewrote USER_GUIDE.md.
 - **Jan 28, 2026:** Lint cleanup - fixed 52 issues (54→27 errors, 36→11 warnings). Removed unused code, replaced `any` types, fixed JSX entities.

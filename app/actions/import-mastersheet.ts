@@ -5,6 +5,8 @@ import { parse } from 'csv-parse/sync'
 import fs from 'fs/promises'
 import path from 'path'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { isAdmin } from '@/lib/admin-check'
+import { logAuditEvent, createImportMetadata } from '@/lib/audit-log'
 
 interface MastersheetRow {
   BUSINESS: string
@@ -101,6 +103,12 @@ function parseRelationshipType(type: string): {
 export async function importMastersheet(): Promise<
   { error: string } | { data: ImportReport }
 > {
+  // Require admin role for import operations
+  const adminCheck = await isAdmin()
+  if (!adminCheck) {
+    return { error: 'Unauthorized - admin role required' }
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -431,9 +439,24 @@ export async function importMastersheet(): Promise<
       }
     }
 
+    // Log successful import
+    await logAuditEvent({
+      action: 'import_mastersheet',
+      status: report.errors.length > 0 ? 'partial' : 'success',
+      metadata: createImportMetadata(report),
+    })
+
     return { data: report }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
+
+    // Log failed import
+    await logAuditEvent({
+      action: 'import_mastersheet',
+      status: 'failure',
+      metadata: { error: errorMessage, timestamp: new Date().toISOString() },
+    })
+
     return { error: `Import failed: ${errorMessage}` }
   }
 }

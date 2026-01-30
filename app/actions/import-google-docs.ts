@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { isAdmin } from '@/lib/admin-check'
+import { logAuditEvent, createImportMetadata } from '@/lib/audit-log'
 
 // MCP type definitions
 declare global {
@@ -425,6 +427,12 @@ export async function readGoogleDocsBatch(
 export async function importGoogleDocsData(
   documentsData: Array<{ documentId: string; title: string; content: string }>
 ): Promise<{ error: string } | { data: GoogleDocsImportReport }> {
+  // Require admin role for import operations
+  const adminCheck = await isAdmin()
+  if (!adminCheck) {
+    return { error: 'Unauthorized - admin role required' }
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -436,9 +444,25 @@ export async function importGoogleDocsData(
 
   try {
     const report = await processDocumentsData(documentsData)
+
+    // Log successful import
+    await logAuditEvent({
+      action: 'import_google_docs',
+      status: report.errors.length > 0 ? 'partial' : 'success',
+      metadata: createImportMetadata(report),
+    })
+
     return { data: report }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
+
+    // Log failed import
+    await logAuditEvent({
+      action: 'import_google_docs',
+      status: 'failure',
+      metadata: { error: errorMessage, timestamp: new Date().toISOString() },
+    })
+
     return { error: errorMessage }
   }
 }

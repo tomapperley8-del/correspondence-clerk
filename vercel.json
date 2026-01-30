@@ -3,6 +3,10 @@
     {
       "path": "/api/cleanup-temp-emails",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cleanup-rate-limits",
+      "schedule": "0 * * * *"
     }
   ]
 }

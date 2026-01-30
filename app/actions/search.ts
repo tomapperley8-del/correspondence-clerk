@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { checkRateLimit, rateLimitError } from '@/lib/rate-limit'
 
 const searchQuerySchema = z.string().min(2, 'Search query must be at least 2 characters')
 
@@ -49,6 +50,12 @@ interface CorrespondenceSearchResult {
  * Supports filtering by date range, direction, type, and sorting
  */
 export async function searchAll(query: string, filters?: SearchFilters) {
+  // Rate limit: 30 requests per minute for search
+  const rateLimit = await checkRateLimit({ limit: 30, windowMs: 60000, endpoint: 'search' })
+  if (!rateLimit.allowed) {
+    return rateLimitError(rateLimit.resetIn)
+  }
+
   const supabase = await createClient()
   const {
     data: { user },

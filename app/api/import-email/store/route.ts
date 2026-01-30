@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 // Allowed origins for CORS (Outlook and Gmail domains)
 const ALLOWED_ORIGINS = [
@@ -28,6 +29,17 @@ function getCorsHeaders(origin: string | null) {
 export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin')
   const corsHeaders = getCorsHeaders(origin)
+
+  // Rate limit: 60 requests per minute for email imports
+  const rateLimit = await checkRateLimit({ limit: 60, windowMs: 60000, endpoint: 'email-import' })
+  if (!rateLimit.allowed) {
+    const response = rateLimitResponse(rateLimit.resetIn)
+    // Add CORS headers to rate limit response
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value)
+    })
+    return response
+  }
 
   try {
     const supabase = await createClient()
