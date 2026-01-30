@@ -88,25 +88,7 @@ export default function DashboardPage() {
     localStorage.setItem('dashboard_prefs', JSON.stringify(prefs))
   }, [filterType, selectedCategory, sortBy, viewMode])
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <p className="text-gray-600">Loading...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="border-2 border-red-600 bg-red-50 px-4 py-3">
-          <p className="text-red-800">Error loading businesses: {error}</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Get unique categories (memoized)
+  // Get unique categories (memoized) - must be before early returns to respect hooks rules
   const categories = useMemo(() =>
     Array.from(
       new Set(businesses.map((b) => b.category).filter((c): c is string => Boolean(c)))
@@ -115,6 +97,7 @@ export default function DashboardPage() {
   )
 
   // Filter and sort businesses (memoized to prevent recalculation on unrelated state changes)
+  // Must be before early returns to respect hooks rules
   const filtered = useMemo(() => {
     // Filter businesses
     let result = businesses.filter((business) => {
@@ -163,6 +146,24 @@ export default function DashboardPage() {
       }
     })
   }, [businesses, searchQuery, filterType, selectedCategory, sortBy])
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="border-2 border-red-600 bg-red-50 px-4 py-3">
+          <p className="text-red-800">Error loading businesses: {error}</p>
+        </div>
+      </div>
+    )
+  }
 
   // Pagination calculations
   const totalPages = Math.ceil(filtered.length / itemsPerPage)
