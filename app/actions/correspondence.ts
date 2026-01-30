@@ -158,13 +158,20 @@ export async function getCorrespondenceByBusiness(
     }
   }
 
-  // Supabase returns contact as array for foreign key joins, normalize to single object
-  // and cast to Correspondence[] for proper typing
+  // Supabase returns contact as object for foreign key joins, normalize for consistent typing
   const normalizedData = (data || []).map((entry) => {
-    const contactArray = entry.contact as unknown as Array<{ name: string; role: string | null }>
+    // Handle contact - could be object (normal) or array (edge case) or null
+    let contact: { name: string; role: string | null }
+    if (Array.isArray(entry.contact)) {
+      contact = entry.contact[0] || { name: 'Unknown', role: null }
+    } else if (entry.contact && typeof entry.contact === 'object') {
+      contact = entry.contact as { name: string; role: string | null }
+    } else {
+      contact = { name: 'Unknown', role: null }
+    }
     return {
       ...entry,
-      contact: contactArray?.[0] || { name: 'Unknown', role: null },
+      contact,
     }
   }) as Correspondence[]
 
