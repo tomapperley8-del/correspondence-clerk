@@ -69,7 +69,8 @@ export default function BusinessDetailPage({
       contact: { name: string } | null
     }>
   }>>([])
-  const [dismissingDuplicate, setDismissingDuplicate] = useState(false)
+  const [dismissingDuplicate, setDismissingDuplicate] = useState<string | null>(null)
+  const [deletingDuplicate, setDeletingDuplicate] = useState<string | null>(null)
 
   // Feature #4: Correspondence view controls state
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest')
@@ -488,8 +489,9 @@ export default function BusinessDetailPage({
   }
 
   // Duplicate detection handlers
-  const handleDeleteDuplicate = async (entryId: string) => {
+  const handleDeleteDuplicate = async (entryId: string, hash: string) => {
     if (!id) return
+    setDeletingDuplicate(hash)
     setActionError(null)
 
     const result = await deleteCorrespondence(entryId)
@@ -505,11 +507,13 @@ export default function BusinessDetailPage({
       setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
       setDuplicates(duplicatesResult.duplicates || [])
     }
+
+    setDeletingDuplicate(null)
   }
 
-  const handleDismissDuplicate = async (id1: string, id2: string) => {
+  const handleDismissDuplicate = async (id1: string, id2: string, hash: string) => {
     if (!id) return
-    setDismissingDuplicate(true)
+    setDismissingDuplicate(hash)
     setActionError(null)
 
     const result = await dismissDuplicatePair(id, id1, id2)
@@ -522,7 +526,7 @@ export default function BusinessDetailPage({
       setDuplicates(duplicatesResult.duplicates || [])
     }
 
-    setDismissingDuplicate(false)
+    setDismissingDuplicate(null)
   }
 
   // Feature #3: Handle contract details update with AI summary refresh
@@ -834,19 +838,19 @@ export default function BusinessDetailPage({
               </ul>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleDeleteDuplicate(dup.entries[dup.entries.length - 1].id)}
-                  disabled={dismissingDuplicate}
+                  onClick={() => handleDeleteDuplicate(dup.entries[dup.entries.length - 1].id, dup.hash)}
+                  disabled={deletingDuplicate === dup.hash || dismissingDuplicate === dup.hash}
                   className="px-3 py-1 text-xs bg-red-100 text-red-900 hover:bg-red-200 disabled:opacity-50"
                 >
-                  Delete Newer Entry
+                  {deletingDuplicate === dup.hash ? 'Deleting...' : 'Delete Newer Entry'}
                 </button>
                 {dup.entries.length === 2 && (
                   <button
-                    onClick={() => handleDismissDuplicate(dup.entries[0].id, dup.entries[1].id)}
-                    disabled={dismissingDuplicate}
+                    onClick={() => handleDismissDuplicate(dup.entries[0].id, dup.entries[1].id, dup.hash)}
+                    disabled={deletingDuplicate === dup.hash || dismissingDuplicate === dup.hash}
                     className="px-3 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
                   >
-                    Not a Duplicate
+                    {dismissingDuplicate === dup.hash ? 'Dismissing...' : 'Not a Duplicate'}
                   </button>
                 )}
               </div>
