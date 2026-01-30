@@ -19,7 +19,6 @@ function SignupPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [invitedEmail, setInvitedEmail] = useState<string | null>(null)
   const [organizationName, setOrganizationName] = useState<string | null>(null)
   const supabase = createClient()
 
@@ -31,8 +30,7 @@ function SignupPageContent() {
         if (result.error) {
           setError(result.error)
         } else if (result.data) {
-          setInvitedEmail(result.data.email)
-          setEmail(result.data.email)
+          // For shareable links, don't lock the email - just show the org name
           setOrganizationName(result.data.organizations?.name || null)
         }
       }
@@ -43,14 +41,6 @@ function SignupPageContent() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-
-    // If invitation token exists, validate email matches
-    if (invitedEmail && email.toLowerCase() !== invitedEmail.toLowerCase()) {
-      setError(
-        `You must sign up with the invited email address: ${invitedEmail}`
-      )
-      return
-    }
 
     // Client-side validation
     if (password !== confirmPassword) {
@@ -148,15 +138,10 @@ function SignupPageContent() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading || !!invitedEmail}
+                disabled={isLoading}
                 className="w-full"
                 placeholder="you@example.com"
               />
-              {invitedEmail && (
-                <p className="text-gray-500 text-xs mt-1">
-                  Using invited email address
-                </p>
-              )}
             </div>
 
             <div>

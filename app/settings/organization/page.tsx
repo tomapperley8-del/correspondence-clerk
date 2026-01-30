@@ -37,6 +37,8 @@ type Invitation = {
   status: string
   created_at: string
   expires_at: string
+  token: string
+  accepted_email?: string | null
 }
 
 export default function OrganizationSettingsPage() {
@@ -45,10 +47,11 @@ export default function OrganizationSettingsPage() {
   const [organizationName, setOrganizationName] = useState('')
   const [members, setMembers] = useState<Member[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
-  const [inviteEmail, setInviteEmail] = useState('')
   const [isLoadingOrg, setIsLoadingOrg] = useState(true)
   const [isSavingName, setIsSavingName] = useState(false)
-  const [isSendingInvite, setIsSendingInvite] = useState(false)
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false)
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -110,24 +113,20 @@ export default function OrganizationSettingsPage() {
     setIsSavingName(false)
   }
 
-  async function handleSendInvite(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleGenerateLink() {
     setError(null)
     setSuccess(null)
+    setGeneratedLink(null)
+    setLinkCopied(false)
 
-    if (!inviteEmail.trim() || !inviteEmail.includes('@')) {
-      setError('Please enter a valid email address')
-      return
-    }
-
-    setIsSendingInvite(true)
-    const result = await createInvitation(inviteEmail)
+    setIsGeneratingLink(true)
+    const result = await createInvitation()
 
     if (result.error) {
       setError(result.error)
-    } else {
-      setSuccess(`Invitation sent to ${inviteEmail}`)
-      setInviteEmail('')
+    } else if (result.inviteUrl) {
+      setGeneratedLink(result.inviteUrl)
+      setSuccess('Invite link generated. Copy and share it with your team member.')
       // Reload invitations
       const invitationsResult = await getInvitations()
       if (invitationsResult.data) {
@@ -137,7 +136,22 @@ export default function OrganizationSettingsPage() {
       }
     }
 
-    setIsSendingInvite(false)
+    setIsGeneratingLink(false)
+  }
+
+  async function handleCopyLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      setError('Failed to copy link to clipboard')
+    }
+  }
+
+  function getInviteUrl(invitation: Invitation): string {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    return `${appUrl}/invite/accept?token=${invitation.token}`
   }
 
   async function handleCancelInvite(invitationId: string) {
@@ -283,54 +297,63 @@ export default function OrganizationSettingsPage() {
         <h2 className="text-xl font-bold mb-4 text-gray-900">
           Invite Team Members
         </h2>
-        <form onSubmit={handleSendInvite} className="space-y-4">
-          <div>
-            <Label htmlFor="inviteEmail" className="block mb-2 font-semibold">
-              Email Address
-            </Label>
+        <p className="text-sm text-gray-600 mb-4">
+          Generate a shareable invite link and send it to your team member via email, Slack, or any other channel.
+        </p>
+
+        <Button
+          onClick={handleGenerateLink}
+          disabled={isGeneratingLink}
+          className="bg-blue-600 text-white hover:bg-blue-700"
+        >
+          {isGeneratingLink ? 'Generating...' : 'Generate Invite Link'}
+        </Button>
+
+        {/* Generated Link Display */}
+        {generatedLink && (
+          <div className="mt-4 border-2 border-green-600 bg-green-50 p-4">
+            <p className="text-sm font-semibold text-gray-900 mb-2">
+              Invite Link (expires in 7 days):
+            </p>
             <div className="flex gap-2">
               <Input
-                id="inviteEmail"
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                disabled={isSendingInvite}
-                className="flex-1"
-                placeholder="colleague@example.com"
+                type="text"
+                value={generatedLink}
+                readOnly
+                className="flex-1 text-sm bg-white"
               />
               <Button
-                type="submit"
-                disabled={isSendingInvite}
-                className="bg-blue-600 text-white hover:bg-blue-700"
+                onClick={() => handleCopyLink(generatedLink)}
+                variant="outline"
+                className="border-2 border-gray-800"
               >
-                {isSendingInvite ? 'Sending...' : 'Send Invite'}
+                {linkCopied ? 'Copied' : 'Copy'}
               </Button>
             </div>
+            <p className="text-xs text-gray-600 mt-2">
+              Share this link with your team member. They can sign up with any email address.
+            </p>
           </div>
-        </form>
+        )}
 
         {/* Pending Invitations */}
         {invitations.length > 0 && (
           <div className="mt-6">
-            <h3 className="font-bold mb-3 text-gray-900">Pending Invitations</h3>
+            <h3 className="font-bold mb-3 text-gray-900">Pending Invite Links</h3>
             <div className="space-y-2">
               {invitations.map((invitation) => (
                 <div
                   key={invitation.id}
-                  className="border-2 border-gray-200 p-3 flex justify-between items-center"
+                  className="border-2 border-gray-200 p-3"
                 >
-                  <div>
-                    <p className="font-semibold text-gray-900">
-                      {invitation.email}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Sent {formatDateGB(invitation.created_at)}
-                      {' · '}
-                      Expires{' '}
-                      {formatDateGB(invitation.expires_at)}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        Created {formatDateGB(invitation.created_at)}
+                        {' · '}
+                        Expires {formatDateGB(invitation.expires_at)}
+                      </p>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -338,6 +361,22 @@ export default function OrganizationSettingsPage() {
                       className="text-sm"
                     >
                       Cancel
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={getInviteUrl(invitation)}
+                      readOnly
+                      className="flex-1 text-xs bg-gray-50"
+                    />
+                    <Button
+                      onClick={() => handleCopyLink(getInviteUrl(invitation))}
+                      variant="outline"
+                      size="sm"
+                      className="text-sm"
+                    >
+                      Copy
                     </Button>
                   </div>
                 </div>

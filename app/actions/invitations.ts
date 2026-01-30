@@ -3,7 +3,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
-import { sendInvitationEmail } from '@/lib/email'
 import crypto from 'crypto'
 
 export type Invitation = {
@@ -18,6 +17,7 @@ export type Invitation = {
   updated_at: string
   accepted_at: string | null
   accepted_by: string | null
+  accepted_email: string | null
 }
 
 /**
@@ -29,14 +29,9 @@ function generateInvitationToken(): string {
 
 /**
  * Create a new invitation for the current user's organization
+ * Returns the shareable invite URL (no email sent)
  */
-export async function createInvitation(email: string) {
-  if (!email || !email.includes('@')) {
-    return { error: 'Valid email address is required' }
-  }
-
-  const normalizedEmail = email.toLowerCase().trim()
-
+export async function createInvitation() {
   const supabase = await createClient()
   const {
     data: { user },
@@ -52,40 +47,20 @@ export async function createInvitation(email: string) {
     return { error: 'No organization found' }
   }
 
-  // Check if user with this email already exists
-  const { data: existingUser } = await supabase.auth.admin.listUsers()
-  const userExists = existingUser.users.some(
-    (u) => u.email?.toLowerCase() === normalizedEmail
-  )
-
-  if (userExists) {
-    return { error: 'A user with this email already exists' }
-  }
-
-  // Check if there's already a pending invitation for this email to this organization
-  const { data: existingInvitation } = await supabase
-    .from('invitations')
-    .select('id')
-    .eq('organization_id', organizationId)
-    .eq('email', normalizedEmail)
-    .eq('status', 'pending')
-    .single()
-
-  if (existingInvitation) {
-    return { error: 'An invitation for this email is already pending' }
-  }
-
   // Generate token and set expiration (7 days from now)
   const token = generateInvitationToken()
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + 7)
+
+  // Use placeholder email for shareable links
+  const placeholderEmail = `pending-${token.slice(0, 8)}@invite.local`
 
   // Create invitation
   const { data: invitation, error: invitationError } = await supabase
     .from('invitations')
     .insert({
       organization_id: organizationId,
-      email: normalizedEmail,
+      email: placeholderEmail,
       invited_by: user.id,
       token,
       expires_at: expiresAt.toISOString(),
@@ -98,25 +73,12 @@ export async function createInvitation(email: string) {
     return { error: invitationError.message }
   }
 
-  // Get organization name for the email
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('name')
-    .eq('id', organizationId)
-    .single()
-
-  // Send invitation email
-  try {
-    await sendInvitationEmail(normalizedEmail, token, org?.name || 'the organization')
-  } catch (emailError) {
-    console.error('Failed to send invitation email:', emailError)
-    // Delete the invitation since email failed
-    await supabase.from('invitations').delete().eq('id', invitation.id)
-    return { error: 'Failed to send invitation email. Please check your email configuration.' }
-  }
+  // Build the invite URL
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const inviteUrl = `${appUrl}/invite/accept?token=${token}`
 
   revalidatePath('/settings/organization')
-  return { data: invitation }
+  return { data: invitation, inviteUrl }
 }
 
 /**
@@ -218,6 +180,7 @@ export async function validateInvitationToken(token: string) {
 /**
  * Accept an invitation and create user profile
  * Called after user signs up with the invitation token
+ * No email matching required - shareable links allow any email
  */
 export async function acceptInvitation(token: string, userId: string) {
   const supabase = await createClient()
@@ -241,14 +204,9 @@ export async function acceptInvitation(token: string, userId: string) {
     return { error: 'User already has an organization' }
   }
 
-  // Get user email to verify it matches invitation
+  // Get user email for the profile
   const { data: userData } = await supabase.auth.admin.getUserById(userId)
-  if (userData.user?.email?.toLowerCase() !== invitation.email.toLowerCase()) {
-    return {
-      error:
-        'Email address does not match the invitation. Please sign up with the invited email address.',
-    }
-  }
+  const userEmail = userData.user?.email || ''
 
   // Create user profile
   const { data: profile, error: profileError } = await supabase
@@ -256,7 +214,7 @@ export async function acceptInvitation(token: string, userId: string) {
     .insert({
       id: userId,
       organization_id: invitation.organization_id,
-      display_name: invitation.email,
+      display_name: userEmail,
     })
     .select()
     .single()
@@ -265,13 +223,14 @@ export async function acceptInvitation(token: string, userId: string) {
     return { error: profileError.message }
   }
 
-  // Mark invitation as accepted
+  // Mark invitation as accepted with the actual email used
   const { error: updateError } = await supabase
     .from('invitations')
     .update({
       status: 'accepted',
       accepted_at: new Date().toISOString(),
       accepted_by: userId,
+      accepted_email: userEmail,
     })
     .eq('id', invitation.id)
 

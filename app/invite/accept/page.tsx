@@ -8,7 +8,6 @@ import { getInvitationByToken } from '@/app/actions/invitations'
 
 type InvitationData = {
   id: string
-  email: string
   status: string
   expires_at: string
   organizations: {
@@ -122,13 +121,10 @@ function AcceptInvitePageContent() {
 
           <div className="border-2 border-gray-200 bg-gray-50 p-4 mb-6">
             <p className="text-sm text-gray-700 mb-2">
-              <strong>Email:</strong> {invitation.email}
-            </p>
-            <p className="text-sm text-gray-700 mb-2">
               <strong>Organization:</strong> {invitation.organizations.name}
             </p>
             <p className="text-sm text-gray-500">
-              Expires in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? 's' : ''}
+              This invite expires in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? 's' : ''}
             </p>
           </div>
 
@@ -150,8 +146,7 @@ function AcceptInvitePageContent() {
           </div>
 
           <p className="text-xs text-gray-500 mt-6">
-            Note: You must sign up or log in with the email address{' '}
-            <strong>{invitation.email}</strong> to accept this invitation.
+            You can sign up with any email address to join the organization.
           </p>
         </div>
       </div>
