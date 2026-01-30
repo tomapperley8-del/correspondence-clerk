@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
-import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, type Correspondence } from '@/app/actions/correspondence'
+import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, findDuplicatesInBusiness, type Correspondence } from '@/app/actions/correspondence'
+import { dismissDuplicatePair } from '@/app/actions/duplicate-dismissals'
 import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
 import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
@@ -56,6 +57,19 @@ export default function BusinessDetailPage({
 
   // Feature #3: AI summary refresh trigger
   const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0)
+
+  // Duplicate detection state
+  const [duplicates, setDuplicates] = useState<Array<{
+    hash: string
+    entries: Array<{
+      id: string
+      content_hash: string | null
+      subject: string | null
+      entry_date: string | null
+      contact: { name: string } | null
+    }>
+  }>>([])
+  const [dismissingDuplicate, setDismissingDuplicate] = useState(false)
 
   // Feature #4: Correspondence view controls state
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest')
@@ -129,10 +143,11 @@ export default function BusinessDetailPage({
       if (!id) return // Type guard for nested function
 
       // Fetch all data in parallel for faster page load
-      const [businessResult, contactsResult, correspondenceResult] = await Promise.all([
+      const [businessResult, contactsResult, correspondenceResult, duplicatesResult] = await Promise.all([
         getBusinessById(id),
         getContactsByBusiness(id),
         getCorrespondenceByBusiness(id),
+        findDuplicatesInBusiness(id),
       ])
 
       if ('error' in businessResult || !businessResult.data) {
@@ -144,6 +159,7 @@ export default function BusinessDetailPage({
       setContacts('error' in contactsResult ? [] : contactsResult.data || [])
       const correspondenceData = 'error' in correspondenceResult ? [] : correspondenceResult.data || []
       setCorrespondence(correspondenceData)
+      setDuplicates(duplicatesResult.duplicates || [])
 
       // Fetch display names for all users who created correspondence
       const userIds = [...new Set(correspondenceData.map((c) => c.user_id))]
@@ -471,6 +487,44 @@ export default function BusinessDetailPage({
     setEntryToDelete(null)
   }
 
+  // Duplicate detection handlers
+  const handleDeleteDuplicate = async (entryId: string) => {
+    if (!id) return
+    setActionError(null)
+
+    const result = await deleteCorrespondence(entryId)
+
+    if ('error' in result) {
+      setActionError(`Error deleting entry: ${result.error}`)
+    } else {
+      // Refresh both correspondence and duplicates
+      const [correspondenceResult, duplicatesResult] = await Promise.all([
+        getCorrespondenceByBusiness(id),
+        findDuplicatesInBusiness(id)
+      ])
+      setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
+      setDuplicates(duplicatesResult.duplicates || [])
+    }
+  }
+
+  const handleDismissDuplicate = async (id1: string, id2: string) => {
+    if (!id) return
+    setDismissingDuplicate(true)
+    setActionError(null)
+
+    const result = await dismissDuplicatePair(id, id1, id2)
+
+    if ('error' in result) {
+      setActionError(`Error dismissing duplicate: ${result.error}`)
+    } else {
+      // Refresh duplicates list
+      const duplicatesResult = await findDuplicatesInBusiness(id)
+      setDuplicates(duplicatesResult.duplicates || [])
+    }
+
+    setDismissingDuplicate(false)
+  }
+
   // Feature #3: Handle contract details update with AI summary refresh
   const handleContractUpdate = async () => {
     if (!id) return
@@ -757,6 +811,47 @@ export default function BusinessDetailPage({
               Dismiss
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Duplicate Warning Banner */}
+      {duplicates.length > 0 && (
+        <div className="bg-orange-50 border-2 border-orange-600 p-4 mb-6">
+          <h3 className="font-semibold text-orange-900 mb-2">
+            {duplicates.length} Potential Duplicate{duplicates.length !== 1 ? 's' : ''} Found
+          </h3>
+          {duplicates.map((dup) => (
+            <div key={dup.hash} className="border-t border-orange-300 pt-3 mt-3 first:border-t-0 first:pt-0 first:mt-0">
+              <p className="text-sm text-orange-800 mb-2">
+                <strong>{dup.entries.length} entries</strong> with identical content:
+              </p>
+              <ul className="text-sm text-orange-700 mb-2 space-y-1">
+                {dup.entries.map(entry => (
+                  <li key={entry.id}>
+                    {entry.subject || 'No subject'} ({entry.entry_date ? new Date(entry.entry_date).toLocaleDateString('en-GB') : 'No date'}) - {entry.contact?.name || 'Unknown contact'}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleDeleteDuplicate(dup.entries[dup.entries.length - 1].id)}
+                  disabled={dismissingDuplicate}
+                  className="px-3 py-1 text-xs bg-red-100 text-red-900 hover:bg-red-200 disabled:opacity-50"
+                >
+                  Delete Newer Entry
+                </button>
+                {dup.entries.length === 2 && (
+                  <button
+                    onClick={() => handleDismissDuplicate(dup.entries[0].id, dup.entries[1].id)}
+                    disabled={dismissingDuplicate}
+                    className="px-3 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    Not a Duplicate
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

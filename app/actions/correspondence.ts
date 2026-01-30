@@ -491,3 +491,91 @@ export async function checkForDuplicates(
 
   return { isDuplicate: false }
 }
+
+/**
+ * Find duplicate correspondence entries within a business
+ * Uses content_hash (SHA256) to identify entries with identical text
+ * Excludes pairs that have been dismissed by users
+ */
+export async function findDuplicatesInBusiness(businessId: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { duplicates: [] }
+  }
+
+  // Get all correspondence with their hashes
+  const { data: entries } = await supabase
+    .from('correspondence')
+    .select('id, content_hash, subject, entry_date, contact:contacts(name)')
+    .eq('business_id', businessId)
+    .not('content_hash', 'is', null)
+    .order('entry_date', { ascending: false })
+
+  if (!entries) return { duplicates: [] }
+
+  // Get dismissed pairs
+  const { data: dismissals } = await supabase
+    .from('duplicate_dismissals')
+    .select('entry_id_1, entry_id_2')
+    .eq('business_id', businessId)
+
+  const dismissedPairs = new Set(
+    (dismissals || []).map(d => [d.entry_id_1, d.entry_id_2].sort().join('|'))
+  )
+
+  // Group by content_hash to find duplicates
+  const hashGroups = new Map<string, typeof entries>()
+  for (const entry of entries) {
+    if (!entry.content_hash) continue
+    const existing = hashGroups.get(entry.content_hash) || []
+    existing.push(entry)
+    hashGroups.set(entry.content_hash, existing)
+  }
+
+  // Define the entry type for duplicate groups
+  type DuplicateEntry = {
+    id: string
+    content_hash: string | null
+    subject: string | null
+    entry_date: string | null
+    contact: { name: string } | null
+  }
+
+  // Filter to groups with 2+ entries, excluding dismissed pairs
+  const duplicates: Array<{
+    hash: string
+    entries: DuplicateEntry[]
+  }> = []
+
+  for (const [hash, group] of hashGroups) {
+    if (group.length < 2) continue
+
+    // For groups with exactly 2 entries, check if this pair is dismissed
+    if (group.length === 2) {
+      const pairKey = [group[0].id, group[1].id].sort().join('|')
+      if (dismissedPairs.has(pairKey)) continue
+    }
+
+    // Map entries to normalize the contact field (Supabase returns it as array)
+    const normalizedEntries: DuplicateEntry[] = group.map(entry => ({
+      id: entry.id,
+      content_hash: entry.content_hash,
+      subject: entry.subject,
+      entry_date: entry.entry_date,
+      contact: Array.isArray(entry.contact) ? entry.contact[0] || null : entry.contact
+    }))
+
+    // For groups with more than 2 entries, we show them all
+    // (user would need to dismiss multiple pairs to hide them all)
+    duplicates.push({
+      hash,
+      entries: normalizedEntries
+    })
+  }
+
+  return { duplicates }
+}
