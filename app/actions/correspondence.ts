@@ -80,11 +80,15 @@ export async function getCorrespondenceByBusiness(
     return { error: 'Unauthorized' }
   }
 
+  // Select only columns needed for list view (excludes large text fields for performance)
   const { data, error, count } = await supabase
     .from('correspondence')
     .select(
       `
-      *,
+      id, business_id, contact_id, cc_contact_ids, bcc_contact_ids, user_id,
+      raw_text_original, formatted_text_original, formatted_text_current,
+      entry_date, subject, type, direction, formatting_status, action_needed,
+      due_at, content_hash, ai_metadata, organization_id, created_at, updated_at, edited_at, edited_by,
       contact:contacts(name, role)
     `,
       { count: 'exact' }
@@ -128,26 +132,43 @@ export async function getCorrespondenceByBusiness(
       )
 
       // Add cc_contacts and bcc_contacts to each entry
+      // Using type assertion for dynamic property assignment
+      type ContactInfo = { id: string; name: string; role: string | null }
+      type EntryWithExtras = typeof data[0] & {
+        cc_contacts?: ContactInfo[]
+        bcc_contacts?: ContactInfo[]
+      }
       data.forEach((entry) => {
+        const entryWithExtras = entry as EntryWithExtras
         if (entry.cc_contact_ids && Array.isArray(entry.cc_contact_ids)) {
-          entry.cc_contacts = entry.cc_contact_ids
+          entryWithExtras.cc_contacts = entry.cc_contact_ids
             .map((id: string) => contactMap.get(id))
-            .filter(Boolean)
+            .filter((c): c is ContactInfo => c !== undefined)
         } else {
-          entry.cc_contacts = []
+          entryWithExtras.cc_contacts = []
         }
         if (entry.bcc_contact_ids && Array.isArray(entry.bcc_contact_ids)) {
-          entry.bcc_contacts = entry.bcc_contact_ids
+          entryWithExtras.bcc_contacts = entry.bcc_contact_ids
             .map((id: string) => contactMap.get(id))
-            .filter(Boolean)
+            .filter((c): c is ContactInfo => c !== undefined)
         } else {
-          entry.bcc_contacts = []
+          entryWithExtras.bcc_contacts = []
         }
       })
     }
   }
 
-  return { data, count }
+  // Supabase returns contact as array for foreign key joins, normalize to single object
+  // and cast to Correspondence[] for proper typing
+  const normalizedData = (data || []).map((entry) => {
+    const contactArray = entry.contact as unknown as Array<{ name: string; role: string | null }>
+    return {
+      ...entry,
+      contact: contactArray?.[0] || { name: 'Unknown', role: null },
+    }
+  }) as Correspondence[]
+
+  return { data: normalizedData, count }
 }
 
 export async function createCorrespondence(formData: {
@@ -507,13 +528,15 @@ export async function findDuplicatesInBusiness(businessId: string) {
     return { duplicates: [] }
   }
 
-  // Get all correspondence with their hashes
+  // Get recent correspondence with their hashes (limited to 500 for performance)
+  // Duplicates are typically recent, so limiting to last 500 entries is acceptable
   const { data: entries } = await supabase
     .from('correspondence')
     .select('id, content_hash, subject, entry_date, contact:contacts(name)')
     .eq('business_id', businessId)
     .not('content_hash', 'is', null)
     .order('entry_date', { ascending: false })
+    .limit(500)
 
   if (!entries) return { duplicates: [] }
 

@@ -176,23 +176,17 @@ ${emailData.body}`
     let matchedBusinessId: string | null = null
     let matchedContactId: string | null = null
 
-    // Search for contact by email
+    // Search for contact by normalized email (query-side filter for performance)
     const fromEmail = emailData.from.email.toLowerCase()
     const { data: matchingContacts } = await supabase
       .from('contacts')
-      .select('id, business_id, email, normalized_email')
-      .limit(100)
+      .select('id, business_id')
+      .eq('normalized_email', fromEmail)
+      .limit(1)
 
-    if (matchingContacts) {
-      for (const contact of matchingContacts) {
-        const contactEmail = (contact.email || contact.normalized_email || '').toLowerCase()
-
-        if (contactEmail === fromEmail) {
-          matchedBusinessId = contact.business_id
-          matchedContactId = contact.id
-          break
-        }
-      }
+    if (matchingContacts && matchingContacts.length > 0) {
+      matchedBusinessId = matchingContacts[0].business_id
+      matchedContactId = matchingContacts[0].id
     }
 
     if (matchedBusinessId) {

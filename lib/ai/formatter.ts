@@ -395,7 +395,7 @@ ${rawText}`;
 
     const response = await client.beta.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 16384,
+      max_tokens: 8192,
       temperature: 0,
       betas: ['structured-outputs-2025-11-13'],
       system: SYSTEM_PROMPT,

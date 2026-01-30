@@ -91,6 +91,12 @@ function NewEntryPageContent() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionWarning, setActionWarning] = useState<string | null>(null)
 
+  // Debounce ref for thread detection
+  const threadDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounce ref for contact extraction
+  const contactExtractionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   // AI Preview state (Phase 4)
   const [showPreview, setShowPreview] = useState(false)
   const [previewData, setPreviewData] = useState<AIFormatterResponse | null>(null)
@@ -468,18 +474,32 @@ ${emailBody || ''}`
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [isDirty])
 
-  // Extract contacts when raw text changes
+  // Extract contacts when raw text changes (debounced to avoid lag)
   useEffect(() => {
     if (rawText.trim().length < 100) {
       setExtractedContacts([])
       return
     }
 
-    const result = extractContactsFromText(rawText)
-    setExtractedContacts(result.contacts)
+    // Clear existing timeout
+    if (contactExtractionTimeoutRef.current) {
+      clearTimeout(contactExtractionTimeoutRef.current)
+    }
+
+    // Debounce contact extraction by 500ms to avoid lag when typing
+    contactExtractionTimeoutRef.current = setTimeout(() => {
+      const result = extractContactsFromText(rawText)
+      setExtractedContacts(result.contacts)
+    }, 500)
+
+    return () => {
+      if (contactExtractionTimeoutRef.current) {
+        clearTimeout(contactExtractionTimeoutRef.current)
+      }
+    }
   }, [rawText])
 
-  // Detect email threads when raw text changes
+  // Detect email threads when raw text changes (debounced to avoid lag)
   useEffect(() => {
     if (rawText.trim().length < 50) {
       setThreadDetection(null)
@@ -487,12 +507,26 @@ ${emailBody || ''}`
       return
     }
 
-    const detection = detectEmailThread(rawText)
-    setThreadDetection(detection)
+    // Clear existing timeout
+    if (threadDetectionTimeoutRef.current) {
+      clearTimeout(threadDetectionTimeoutRef.current)
+    }
 
-    // Auto-default split toggle based on confidence
-    const autoSplit = shouldDefaultToSplit(rawText)
-    setShouldSplit(autoSplit)
+    // Debounce thread detection by 300ms to avoid lag when typing
+    threadDetectionTimeoutRef.current = setTimeout(() => {
+      const detection = detectEmailThread(rawText)
+      setThreadDetection(detection)
+
+      // Auto-default split toggle based on confidence
+      const autoSplit = shouldDefaultToSplit(rawText)
+      setShouldSplit(autoSplit)
+    }, 300)
+
+    return () => {
+      if (threadDetectionTimeoutRef.current) {
+        clearTimeout(threadDetectionTimeoutRef.current)
+      }
+    }
   }, [rawText])
 
   const handleBusinessSelect = async (businessId: string) => {

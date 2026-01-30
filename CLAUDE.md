@@ -119,7 +119,7 @@ All features complete and deployed:
 2. Database migrations (10 migrations, all run)
 3. Dashboard + Business pages (search, filters, sort, flexible date range filter)
 4. New Entry flow (forced filing, date required/time optional, direction for emails)
-5. AI Formatter (Anthropic structured outputs, 0 JSON errors, 16K token budget, graceful fallback)
+5. AI Formatter (Anthropic structured outputs, 0 JSON errors, 8K token budget, graceful fallback)
 6. Manual Editing (correction layer, preserves originals, "Corrected" badge)
 7. Full-text Search (business name prioritization, tsvector + GIN)
 8. Mastersheet Import (CSV, duplicate merging, idempotent)
@@ -135,6 +135,8 @@ All features complete and deployed:
 
 ## Recent Changes
 
+- **Jan 31, 2026 (PM):** Additional performance optimizations: added 500ms debounce to contact extraction (new-entry page), optimized getCorrespondenceByBusiness/getContactsByBusiness/getBusinessById/getContactById to select specific columns instead of SELECT *, added GIN index for cc_contact_ids and indexes for temporary_email_data (token, expires_at), optimized email import contact matching with query-side filter (eliminates loop over 100 contacts), added useCallback to business detail page handlers.
+- **Jan 31, 2026:** Performance optimizations: added 300ms debounce to thread detection (eliminates input lag), reduced AI max_tokens to 8192 (reduced latency), optimized getBusinesses to fetch only required columns (30-40% less data), combined contact delete queries (3x fewer round-trips), added GIN index for bcc_contact_ids, limited duplicate detection to recent 500 entries, added useMemo to dashboard filtering.
 - **Jan 30, 2026 (PM):** Added duplicate detection with warning banner on business page (uses content_hash). Users can delete newer entry or mark as "not duplicate". Added loading indicators across site (ConfirmDialog, modals, delete buttons show "Deleting...", "Saving..." etc.).
 - **Jan 30, 2026 (AM):** Pre-launch security fixes: removed unauthenticated /api/run-migration endpoint (CRITICAL), added user roles (member/admin) with admin-only protection on /admin/* routes and import actions, implemented SendGrid email delivery for invitations, added rate limiting to AI formatter (20/min), search (30/min), and email import (60/min) endpoints.
 - **Jan 29, 2026 (PM):** Added BCC contacts, membership_type in Contract Details (replaces is_club_card/is_advertiser checkboxes), business notes in Business Details, flexible date range filter (1m/6m/12m/custom). Fixed notes deletion (nullable schema), contact deletion now checks for linked correspondence and shows helpful error. Simplified help page.

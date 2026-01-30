@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -556,8 +556,8 @@ export default function BusinessDetailPage({
     setSummaryRefreshTrigger((prev) => prev + 1)
   }
 
-  // Helper to extract sender/recipient name from AI metadata
-  const getExtractedName = (entry: Correspondence): string | null => {
+  // Helper to extract sender/recipient name from AI metadata (memoized)
+  const getExtractedName = useCallback((entry: Correspondence): string | null => {
     if (!entry.ai_metadata) return null
     try {
       const metadata = entry.ai_metadata as any
@@ -573,9 +573,10 @@ export default function BusinessDetailPage({
       // Silently fail and fall back to contact name
     }
     return null
-  }
+  }, [])
 
-  const renderEntry = (entry: Correspondence) => {
+  // Memoized renderEntry to prevent recreation on every render
+  const renderEntry = useCallback((entry: Correspondence) => {
     const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
     const isUnformatted = entry.formatting_status !== 'formatted'
     const isEdited = entry.edited_at !== null
@@ -800,7 +801,10 @@ export default function BusinessDetailPage({
         )}
       </div>
     )
-  }
+  }, [
+    editingEntryId, editedText, editedDate, editedDirection, editedContactId,
+    savingEdit, formattingInProgress, displayNames, contacts, getExtractedName
+  ])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

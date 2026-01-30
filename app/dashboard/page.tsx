@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { getBusinesses, type Business } from '@/app/actions/businesses'
+import { getBusinesses, type BusinessListItem } from '@/app/actions/businesses'
 import { AddBusinessButton } from '@/components/AddBusinessButton'
 import { Input } from '@/components/ui/input'
 
@@ -10,7 +10,7 @@ type FilterType = 'all' | 'club-card' | 'advertiser' | 'both' | 'prospect'
 type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
 
 export default function DashboardPage() {
-  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [businesses, setBusinesses] = useState<BusinessListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -106,61 +106,63 @@ export default function DashboardPage() {
     )
   }
 
-  // Get unique categories
-  const categories = Array.from(
-    new Set(businesses.map((b) => b.category).filter((c): c is string => Boolean(c)))
-  ).sort()
+  // Get unique categories (memoized)
+  const categories = useMemo(() =>
+    Array.from(
+      new Set(businesses.map((b) => b.category).filter((c): c is string => Boolean(c)))
+    ).sort(),
+    [businesses]
+  )
 
-  // Filter businesses
-  let filtered = businesses.filter((business) => {
-    // Search filter
-    if (searchQuery && !business.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false
-    }
+  // Filter and sort businesses (memoized to prevent recalculation on unrelated state changes)
+  const filtered = useMemo(() => {
+    // Filter businesses
+    let result = businesses.filter((business) => {
+      // Search filter
+      if (searchQuery && !business.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false
+      }
 
-    // Type filter
-    if (filterType === 'club-card' && !business.is_club_card) return false
-    if (filterType === 'advertiser' && !business.is_advertiser) return false
-    if (filterType === 'both' && !(business.is_club_card && business.is_advertiser)) return false
-    if (filterType === 'prospect' && (business.is_club_card || business.is_advertiser)) return false
+      // Type filter
+      if (filterType === 'club-card' && !business.is_club_card) return false
+      if (filterType === 'advertiser' && !business.is_advertiser) return false
+      if (filterType === 'both' && !(business.is_club_card && business.is_advertiser)) return false
+      if (filterType === 'prospect' && (business.is_club_card || business.is_advertiser)) return false
 
-    // Category filter
-    if (selectedCategory !== 'all' && business.category !== selectedCategory) return false
+      // Category filter
+      if (selectedCategory !== 'all' && business.category !== selectedCategory) return false
 
-    // Action needed filter
-    // Note: We don't have action_needed on businesses yet, would need to join with correspondence
-    // Skipping for now
+      return true
+    })
 
-    return true
-  })
+    // Sort businesses
+    return [...result].sort((a, b) => {
+      switch (sortBy) {
+        case 'recent':
+          // Most recently contacted first
+          if (!a.last_contacted_at && !b.last_contacted_at) return 0
+          if (!a.last_contacted_at) return 1
+          if (!b.last_contacted_at) return -1
+          return new Date(b.last_contacted_at).getTime() - new Date(a.last_contacted_at).getTime()
 
-  // Sort businesses
-  filtered = [...filtered].sort((a, b) => {
-    switch (sortBy) {
-      case 'recent':
-        // Most recently contacted first
-        if (!a.last_contacted_at && !b.last_contacted_at) return 0
-        if (!a.last_contacted_at) return 1
-        if (!b.last_contacted_at) return -1
-        return new Date(b.last_contacted_at).getTime() - new Date(a.last_contacted_at).getTime()
+        case 'oldest':
+          // Least recently contacted first
+          if (!a.last_contacted_at && !b.last_contacted_at) return 0
+          if (!a.last_contacted_at) return 1
+          if (!b.last_contacted_at) return -1
+          return new Date(a.last_contacted_at).getTime() - new Date(b.last_contacted_at).getTime()
 
-      case 'oldest':
-        // Least recently contacted first
-        if (!a.last_contacted_at && !b.last_contacted_at) return 0
-        if (!a.last_contacted_at) return 1
-        if (!b.last_contacted_at) return -1
-        return new Date(a.last_contacted_at).getTime() - new Date(b.last_contacted_at).getTime()
+        case 'name-asc':
+          return a.name.localeCompare(b.name)
 
-      case 'name-asc':
-        return a.name.localeCompare(b.name)
+        case 'name-desc':
+          return b.name.localeCompare(a.name)
 
-      case 'name-desc':
-        return b.name.localeCompare(a.name)
-
-      default:
-        return 0
-    }
-  })
+        default:
+          return 0
+      }
+    })
+  }, [businesses, searchQuery, filterType, selectedCategory, sortBy])
 
   // Pagination calculations
   const totalPages = Math.ceil(filtered.length / itemsPerPage)

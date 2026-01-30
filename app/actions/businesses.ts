@@ -54,7 +54,13 @@ export type Business = {
   updated_at: string
 }
 
-export async function getBusinesses() {
+// Subset of Business for dashboard list view (optimized query)
+export type BusinessListItem = Pick<
+  Business,
+  'id' | 'name' | 'normalized_name' | 'category' | 'status' | 'is_club_card' | 'is_advertiser' | 'membership_type' | 'last_contacted_at'
+>
+
+export async function getBusinesses(): Promise<{ data?: BusinessListItem[]; error?: string }> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -66,14 +72,14 @@ export async function getBusinesses() {
 
   const { data, error } = await supabase
     .from('businesses')
-    .select('*')
+    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, last_contacted_at')
     .order('name', { ascending: true })
 
   if (error) {
     return { error: error.message }
   }
 
-  return { data }
+  return { data: data as BusinessListItem[] }
 }
 
 export async function getBusinessById(id: string) {
@@ -86,9 +92,10 @@ export async function getBusinessById(id: string) {
     return { error: 'Unauthorized' }
   }
 
+  // Select specific columns needed for detail page (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('businesses')
-    .select('*')
+    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, address, email, phone, notes, last_contacted_at, mastersheet_source_ids, organization_id, created_at, updated_at')
     .eq('id', id)
     .single()
 

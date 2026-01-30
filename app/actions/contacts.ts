@@ -54,9 +54,10 @@ export async function getContactsByBusiness(businessId: string) {
     return { error: 'Unauthorized' }
   }
 
+  // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
-    .select('*')
+    .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, organization_id, created_at, updated_at')
     .eq('business_id', businessId)
     .order('name', { ascending: true })
 
@@ -84,9 +85,10 @@ export async function getContactById(id: string) {
     return { error: 'Unauthorized' }
   }
 
+  // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
-    .select('*')
+    .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, organization_id, created_at, updated_at')
     .eq('id', id)
     .single()
 
@@ -298,38 +300,21 @@ export async function deleteContact(id: string) {
     return { error: 'Contact not found' }
   }
 
-  // Check if contact has any correspondence entries
-  const { count: correspondenceCount } = await supabase
+  // Check if contact is referenced in any correspondence (as primary, CC, or BCC)
+  // Combined into single query for performance (3x fewer round-trips)
+  const { count: usageCount, error: usageError } = await supabase
     .from('correspondence')
     .select('*', { count: 'exact', head: true })
-    .eq('contact_id', id)
+    .eq('business_id', contact.business_id)
+    .or(`contact_id.eq.${id},cc_contact_ids.cs.{${id}},bcc_contact_ids.cs.{${id}}`)
 
-  if (correspondenceCount && correspondenceCount > 0) {
-    return {
-      error: `Cannot delete "${contact.name}" because they have ${correspondenceCount} correspondence ${correspondenceCount === 1 ? 'entry' : 'entries'}. Please reassign or delete those entries first.`
-    }
+  if (usageError) {
+    return { error: usageError.message }
   }
 
-  // Also check if contact is used as CC or BCC in any correspondence
-  const { count: ccCount } = await supabase
-    .from('correspondence')
-    .select('*', { count: 'exact', head: true })
-    .contains('cc_contact_ids', [id])
-
-  if (ccCount && ccCount > 0) {
+  if (usageCount && usageCount > 0) {
     return {
-      error: `Cannot delete "${contact.name}" because they are CC'd on ${ccCount} correspondence ${ccCount === 1 ? 'entry' : 'entries'}. Please remove them from CC first.`
-    }
-  }
-
-  const { count: bccCount } = await supabase
-    .from('correspondence')
-    .select('*', { count: 'exact', head: true })
-    .contains('bcc_contact_ids', [id])
-
-  if (bccCount && bccCount > 0) {
-    return {
-      error: `Cannot delete "${contact.name}" because they are BCC'd on ${bccCount} correspondence ${bccCount === 1 ? 'entry' : 'entries'}. Please remove them from BCC first.`
+      error: `Cannot delete "${contact.name}" because they are referenced in ${usageCount} correspondence ${usageCount === 1 ? 'entry' : 'entries'}. Please reassign or delete those entries first.`
     }
   }
 
