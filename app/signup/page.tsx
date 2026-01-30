@@ -2,15 +2,16 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
-import { validateInvitationToken } from '@/app/actions/invitations'
+import { validateInvitationToken, acceptInvitation } from '@/app/actions/invitations'
 
 function SignupPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const invitationToken = searchParams.get('invitation_token')
 
   const [email, setEmail] = useState('')
@@ -55,12 +56,12 @@ function SignupPageContent() {
 
     setIsLoading(true)
 
-    // Add invitation token to redirect URL if present
+    // Add invitation token to redirect URL if present (for email verification flow)
     const redirectUrl = invitationToken
       ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?invitation_token=${invitationToken}`
       : `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error: signupError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -68,13 +69,31 @@ function SignupPageContent() {
       },
     })
 
-    if (error) {
-      setError(error.message)
+    if (signupError) {
+      setError(signupError.message)
       setIsLoading(false)
-    } else {
-      setSuccess(true)
-      setIsLoading(false)
+      return
     }
+
+    // Check if user is immediately signed in (email verification disabled)
+    if (data.session && data.user) {
+      // User is signed in - accept invitation if present
+      if (invitationToken) {
+        const result = await acceptInvitation(invitationToken, data.user.id)
+        if (result.error) {
+          setError(result.error)
+          setIsLoading(false)
+          return
+        }
+      }
+      // Redirect to dashboard or onboarding
+      router.push(invitationToken ? '/dashboard' : '/onboarding/create-organization')
+      return
+    }
+
+    // Email verification required - show success message
+    setSuccess(true)
+    setIsLoading(false)
   }
 
   if (success) {
