@@ -1,6 +1,28 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+// Allowed origins for CORS (Outlook and Gmail only)
+const ALLOWED_ORIGINS = [
+  'https://outlook.office.com',
+  'https://outlook.office365.com',
+  'https://outlook.live.com',
+  'https://mail.google.com',
+]
+
+// Organization domain for sent email detection (fallback if env not set)
+const ORG_DOMAIN = process.env.ORGANIZATION_EMAIL_DOMAIN || 'chiswickcalendar.co.uk'
+
+function getCorsHeaders(request: NextRequest): Record<string, string> {
+  const origin = request.headers.get('origin')
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
+
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  }
+}
+
 interface OutlookEmailData {
   subject: string
   body: string
@@ -26,6 +48,7 @@ interface OutlookEmailData {
  * 2. Returns pre-fill URL for new-entry page
  */
 export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request)
   const supabase = await createClient()
   const {
     data: { user },
@@ -36,11 +59,7 @@ export async function POST(request: NextRequest) {
       { error: 'Unauthorized' },
       {
         status: 401,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        }
+        headers: corsHeaders,
       }
     )
   }
@@ -105,7 +124,7 @@ ${emailData.body}`
       const userEmail = user.email?.toLowerCase() || ''
       const fromEmail = emailData.from.email.toLowerCase()
       const direction: 'sent' | 'received' =
-        fromEmail === userEmail || fromEmail.includes('chiswickcalendar.co.uk')
+        fromEmail === userEmail || fromEmail.includes(ORG_DOMAIN)
           ? 'sent'
           : 'received'
 
@@ -154,11 +173,7 @@ ${emailData.body}`
         entryId: entry.id,
         url: `/businesses/${emailData.business_id}?saved=${entry.id}`,
       }, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        }
+        headers: corsHeaders,
       })
     }
 
@@ -206,11 +221,7 @@ ${emailData.body}`
         contact_id: matchedContactId,
       },
     }, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      }
+      headers: corsHeaders,
     })
   } catch (error) {
     console.error('Email import error:', error)
@@ -221,24 +232,16 @@ ${emailData.body}`
       },
       {
         status: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        }
+        headers: corsHeaders,
       }
     )
   }
 }
 
 // Handle OPTIONS request for CORS preflight
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
+    headers: getCorsHeaders(request),
   })
 }
