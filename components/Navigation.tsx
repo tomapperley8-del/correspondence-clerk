@@ -93,7 +93,7 @@ export function Navigation() {
 
   if (isLoading) {
     return (
-      <nav className="bg-black border-b-2 border-black">
+      <nav className="bg-[#1E293B] border-b-2 border-[#1E293B]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -110,7 +110,7 @@ export function Navigation() {
   }
 
   return (
-    <nav aria-label="Main navigation" className="bg-black border-b-2 border-black">
+    <nav aria-label="Main navigation" className="bg-[#1E293B] border-b-2 border-[#1E293B]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">
@@ -126,8 +126,8 @@ export function Navigation() {
                 href="/dashboard"
                 className={`px-3 py-2 text-sm font-medium transition-colors ${
                   pathname === '/dashboard'
-                    ? 'text-white bg-[#98bf64]'
-                    : 'text-white hover:text-[#98bf64]'
+                    ? 'text-white bg-[#7C9A5E]'
+                    : 'text-white hover:text-[#7C9A5E]'
                 }`}
               >
                 Dashboard
@@ -138,8 +138,8 @@ export function Navigation() {
                 href="/new-entry"
                 className={`px-3 py-2 text-sm font-medium transition-colors ${
                   pathname === '/new-entry'
-                    ? 'text-white bg-[#98bf64]'
-                    : 'text-white hover:text-[#98bf64]'
+                    ? 'text-white bg-[#7C9A5E]'
+                    : 'text-white hover:text-[#7C9A5E]'
                 }`}
               >
                 New Entry
@@ -150,8 +150,8 @@ export function Navigation() {
                 href="/search"
                 className={`px-3 py-2 text-sm font-medium transition-colors ${
                   pathname === '/search'
-                    ? 'text-white bg-[#98bf64]'
-                    : 'text-white hover:text-[#98bf64]'
+                    ? 'text-white bg-[#7C9A5E]'
+                    : 'text-white hover:text-[#7C9A5E]'
                 }`}
               >
                 Search
@@ -162,8 +162,8 @@ export function Navigation() {
                 href="/help"
                 className={`px-3 py-2 text-sm font-medium transition-colors ${
                   pathname === '/help'
-                    ? 'text-white bg-[#98bf64]'
-                    : 'text-white hover:text-[#98bf64]'
+                    ? 'text-white bg-[#7C9A5E]'
+                    : 'text-white hover:text-[#7C9A5E]'
                 }`}
               >
                 Help
@@ -184,8 +184,8 @@ export function Navigation() {
               href="/settings"
               className={`px-3 py-2 text-sm font-medium transition-colors ${
                 pathname?.startsWith('/settings')
-                  ? 'text-white bg-[#98bf64]'
-                  : 'text-white hover:text-[#98bf64]'
+                  ? 'text-white bg-[#7C9A5E]'
+                  : 'text-white hover:text-[#7C9A5E]'
               }`}
             >
               Settings
@@ -193,7 +193,7 @@ export function Navigation() {
             <Button
               onClick={handleLogout}
               variant="ghost"
-              className="text-white hover:text-[#98bf64]"
+              className="text-white hover:text-[#7C9A5E]"
             >
               Logout
             </Button>
