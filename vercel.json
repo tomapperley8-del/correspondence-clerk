@@ -7,6 +7,38 @@
     {
       "path": "/api/cleanup-rate-limits",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/marketing/cron/prospect-finder",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/marketing/cron/send-cold-emails",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/marketing/cron/generate-content",
+      "schedule": "0 0 * * 0"
+    },
+    {
+      "path": "/api/marketing/cron/post-linkedin",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/marketing/cron/post-twitter",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/marketing/cron/request-reviews",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/marketing/cron/run-sequences",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/marketing/cron/generate-blog",
+      "schedule": "0 3 * * 0"
     }
   ]
 }
