@@ -12,15 +12,15 @@
   --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
   --font-mono: "Courier New", monospace;
 
-  /* Very subtle rounded corners - barely perceptible softness for trustworthiness */
+  /* Consistent rounded corners - matches button styling for cohesive look */
   --radius-none: 0;
-  --radius-sm: 2px;
-  --radius-DEFAULT: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
-  --radius-xl: 4px;
-  --radius-2xl: 4px;
-  --radius-3xl: 4px;
+  --radius-sm: 4px;
+  --radius-DEFAULT: 6px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --radius-2xl: 10px;
+  --radius-3xl: 12px;
   --radius-full: 9999px;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);

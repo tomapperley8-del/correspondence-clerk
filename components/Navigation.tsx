@@ -121,49 +121,49 @@ export function Navigation() {
               Correspondence Clerk
             </Link>
 
-            <div className="flex space-x-1">
+            <div className="flex h-16">
               <Link
                 href="/dashboard"
-                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors ${
                   pathname === '/dashboard'
                     ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:text-[#7C9A5E]'
+                    : 'text-white hover:bg-[#7C9A5E]/20'
                 }`}
               >
                 Dashboard
               </Link>
-              <span className="text-white self-center">|</span>
+              <span className="text-white/30 self-center">|</span>
 
               <Link
                 href="/new-entry"
-                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors ${
                   pathname === '/new-entry'
                     ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:text-[#7C9A5E]'
+                    : 'text-white hover:bg-[#7C9A5E]/20'
                 }`}
               >
                 New Entry
               </Link>
-              <span className="text-white self-center">|</span>
+              <span className="text-white/30 self-center">|</span>
 
               <Link
                 href="/search"
-                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors ${
                   pathname === '/search'
                     ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:text-[#7C9A5E]'
+                    : 'text-white hover:bg-[#7C9A5E]/20'
                 }`}
               >
                 Search
               </Link>
-              <span className="text-white self-center">|</span>
+              <span className="text-white/30 self-center">|</span>
 
               <Link
                 href="/help"
-                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors ${
                   pathname === '/help'
                     ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:text-[#7C9A5E]'
+                    : 'text-white hover:bg-[#7C9A5E]/20'
                 }`}
               >
                 Help
@@ -182,10 +182,10 @@ export function Navigation() {
             </div>
             <Link
               href="/settings"
-              className={`px-3 py-2 text-sm font-medium transition-colors ${
+              className={`px-4 h-16 flex items-center text-sm font-medium transition-colors ${
                 pathname?.startsWith('/settings')
                   ? 'text-white bg-[#7C9A5E]'
-                  : 'text-white hover:text-[#7C9A5E]'
+                  : 'text-white hover:bg-[#7C9A5E]/20'
               }`}
             >
               Settings
