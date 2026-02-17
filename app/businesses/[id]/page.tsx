@@ -284,6 +284,8 @@ export default function BusinessDetailPage({
   }, [correspondence, contactFilter, directionFilter, sortOrder, dateRange, customDateFrom, customDateTo])
 
   // Filter correspondence based on search query
+  // Only searches the displayed text (not raw_text_original when formatted text exists,
+  // since thread-split entries all share the same raw_text_original)
   const filteredCorrespondence = useMemo(() => {
     if (!searchQuery.trim()) {
       return { recent: recentEntries, archive: archiveEntries }
@@ -291,12 +293,14 @@ export default function BusinessDetailPage({
 
     const query = searchQuery.toLowerCase()
     const matchesQuery = (entry: Correspondence) => {
+      // Search the text that's actually displayed for this entry
+      const displayedText = entry.formatted_text_current
+        || entry.formatted_text_original
+        || entry.raw_text_original
       return (
         entry.subject?.toLowerCase().includes(query) ||
         entry.contact.name.toLowerCase().includes(query) ||
-        entry.formatted_text_current?.toLowerCase().includes(query) ||
-        entry.formatted_text_original?.toLowerCase().includes(query) ||
-        entry.raw_text_original.toLowerCase().includes(query)
+        displayedText.toLowerCase().includes(query)
       )
     }
 
@@ -665,6 +669,20 @@ export default function BusinessDetailPage({
     return null
   }
 
+  // Highlight matching text when searching
+  const highlightMatch = (text: string): React.ReactNode => {
+    if (!searchQuery.trim()) return text
+    const query = searchQuery.trim()
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const parts = text.split(regex)
+    if (parts.length === 1) return text
+    return parts.map((part, i) =>
+      regex.test(part)
+        ? <mark key={i} className="bg-yellow-200 text-yellow-900">{part}</mark>
+        : part
+    )
+  }
+
   const renderEntry = (entry: Correspondence) => {
     const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
     const isUnformatted = entry.formatting_status !== 'formatted'
@@ -697,7 +715,7 @@ export default function BusinessDetailPage({
         <div className="flex items-center gap-2 mb-2">
           {entry.subject && (
             <h3 className="font-semibold text-gray-900">
-              {entry.subject}
+              {highlightMatch(entry.subject)}
             </h3>
           )}
           {isEdited && (
@@ -828,9 +846,11 @@ export default function BusinessDetailPage({
         ) : (
           <>
             <div className="text-sm text-gray-800 whitespace-pre-wrap mb-3">
-              {entry.formatted_text_current ||
+              {highlightMatch(
+                entry.formatted_text_current ||
                 entry.formatted_text_original ||
-                entry.raw_text_original}
+                entry.raw_text_original
+              )}
             </div>
 
             {/* Display who created this entry */}
