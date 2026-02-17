@@ -48,6 +48,7 @@ export default function BusinessDetailPage({
   const [editedContactId, setEditedContactId] = useState<string>('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [contextEntryIds, setContextEntryIds] = useState<Set<string>>(new Set())
 
   // Error and confirmation state
   const [actionError, setActionError] = useState<string | null>(null)
@@ -137,10 +138,11 @@ export default function BusinessDetailPage({
     localStorage.setItem(storageKey, JSON.stringify(prefs))
   }, [id, sortOrder, contactFilter, directionFilter, dateRange, customDateFrom, customDateTo])
 
-  // Reset display counts when filters change
+  // Reset display counts and context entries when filters change
   useEffect(() => {
     setRecentDisplayCount(50)
     setArchiveDisplayCount(50)
+    setContextEntryIds(new Set())
   }, [contactFilter, directionFilter, dateRange, customDateFrom, customDateTo, searchQuery])
 
   useEffect(() => {
@@ -232,8 +234,11 @@ export default function BusinessDetailPage({
     // For custom range, also use the "to" date if set
     const endDate = dateRange === 'custom' && customDateTo ? new Date(customDateTo) : null
 
-    // Apply contact and direction filters
+    // Apply contact and direction filters (context entries bypass these)
     const filtered = correspondence.filter((e) => {
+      // Context entries bypass contact/direction filters
+      if (contextEntryIds.has(e.id)) return true
+
       // Contact filter
       if (contactFilter !== 'all' && e.contact_id !== contactFilter) {
         return false
@@ -281,14 +286,52 @@ export default function BusinessDetailPage({
       .sort(sortFn)
 
     return { recentEntries: recent, archiveEntries: archive }
-  }, [correspondence, contactFilter, directionFilter, sortOrder, dateRange, customDateFrom, customDateTo])
+  }, [correspondence, contactFilter, directionFilter, sortOrder, dateRange, customDateFrom, customDateTo, contextEntryIds])
+
+  // Chronological index: all entries sorted oldest-first for neighbour lookup
+  const { chronoIndex } = useMemo(() => {
+    const sorted = [...correspondence].sort((a, b) => {
+      const dateA = new Date(a.entry_date || a.created_at).getTime()
+      const dateB = new Date(b.entry_date || b.created_at).getTime()
+      return dateA - dateB
+    })
+    const indexMap = new Map<string, number>()
+    sorted.forEach((entry, i) => indexMap.set(entry.id, i))
+    return { chronoIndex: { sorted, indexMap } }
+  }, [correspondence])
+
+  const getPreviousEntryId = (id: string): string | null => {
+    const idx = chronoIndex.indexMap.get(id)
+    if (idx === undefined || idx === 0) return null
+    return chronoIndex.sorted[idx - 1].id
+  }
+
+  const getNextEntryId = (id: string): string | null => {
+    const idx = chronoIndex.indexMap.get(id)
+    if (idx === undefined || idx >= chronoIndex.sorted.length - 1) return null
+    return chronoIndex.sorted[idx + 1].id
+  }
+
+  const handleShowPrevious = (id: string) => {
+    const prevId = getPreviousEntryId(id)
+    if (prevId) {
+      setContextEntryIds(prev => new Set([...prev, prevId]))
+    }
+  }
+
+  const handleShowNext = (id: string) => {
+    const nextId = getNextEntryId(id)
+    if (nextId) {
+      setContextEntryIds(prev => new Set([...prev, nextId]))
+    }
+  }
 
   // Filter correspondence based on search query
   // Only searches the displayed text (not raw_text_original when formatted text exists,
   // since thread-split entries all share the same raw_text_original)
   const filteredCorrespondence = useMemo(() => {
     if (!searchQuery.trim()) {
-      return { recent: recentEntries, archive: archiveEntries }
+      return { recent: recentEntries, archive: archiveEntries, matchedIds: new Set<string>() }
     }
 
     const query = searchQuery.toLowerCase()
@@ -304,11 +347,28 @@ export default function BusinessDetailPage({
       )
     }
 
+    // Build the set of actual search matches (not context entries)
+    const matchedIds = new Set<string>()
+    ;[...recentEntries, ...archiveEntries].forEach(entry => {
+      if (matchesQuery(entry)) matchedIds.add(entry.id)
+    })
+
     return {
-      recent: recentEntries.filter(matchesQuery),
-      archive: archiveEntries.filter(matchesQuery),
+      recent: recentEntries.filter(e => matchesQuery(e) || contextEntryIds.has(e.id)),
+      archive: archiveEntries.filter(e => matchesQuery(e) || contextEntryIds.has(e.id)),
+      matchedIds,
     }
-  }, [recentEntries, archiveEntries, searchQuery])
+  }, [recentEntries, archiveEntries, searchQuery, contextEntryIds])
+
+  // Auto-expand archive when a context entry lands there during search
+  useEffect(() => {
+    if (searchQuery.trim() && contextEntryIds.size > 0) {
+      const hasContextInArchive = filteredCorrespondence.archive.some(e => contextEntryIds.has(e.id))
+      if (hasContextInArchive) {
+        setIsArchiveExpanded(true)
+      }
+    }
+  }, [searchQuery, contextEntryIds, filteredCorrespondence.archive])
 
   // Sliced arrays for pagination
   const displayedRecent = filteredCorrespondence.recent.slice(0, recentDisplayCount)
@@ -683,15 +743,30 @@ export default function BusinessDetailPage({
     )
   }
 
-  const renderEntry = (entry: Correspondence) => {
+  const renderEntry = (entry: Correspondence, options?: { isContext: boolean }) => {
+    const isContext = options?.isContext ?? false
     const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
     const isUnformatted = entry.formatting_status !== 'formatted'
     const isEdited = entry.edited_at !== null
     const isEditing = editingEntryId === entry.id
     const extractedName = getExtractedName(entry)
+    const isSearchActive = searchQuery.trim() !== ''
+
+    // Context button visibility
+    const prevId = getPreviousEntryId(entry.id)
+    const nextId = getNextEntryId(entry.id)
+    const allVisibleIds = new Set([
+      ...filteredCorrespondence.recent.map(e => e.id),
+      ...filteredCorrespondence.archive.map(e => e.id),
+    ])
+    const showPrevButton = isSearchActive && prevId && !allVisibleIds.has(prevId)
+    const showNextButton = isSearchActive && nextId && !allVisibleIds.has(nextId)
 
     return (
-      <div id={`entry-${entry.id}`} key={entry.id} className="border-t border-gray-300 pt-6 first:border-t-0 first:pt-0">
+      <div id={`entry-${entry.id}`} key={entry.id} className={`border-t border-gray-300 pt-6 first:border-t-0 first:pt-0 ${isContext ? 'border-l-2 border-l-amber-300 bg-amber-50/30 pl-4' : ''}`}>
+        {isContext && (
+          <p className="text-xs text-amber-700 font-medium mb-2">Surrounding context</p>
+        )}
         {/* Unformatted indicator */}
         {isUnformatted && (
           <div className="bg-orange-50 border-2 border-orange-600 p-3 mb-3">
@@ -891,6 +966,29 @@ export default function BusinessDetailPage({
                 </Button>
               )}
             </div>
+            {/* Search context expansion buttons */}
+            {(showPrevButton || showNextButton) && (
+              <div className="flex gap-2 mt-2">
+                {showPrevButton && (
+                  <button
+                    type="button"
+                    onClick={() => handleShowPrevious(entry.id)}
+                    className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-100 px-2 py-1"
+                  >
+                    Show Previous
+                  </button>
+                )}
+                {showNextButton && (
+                  <button
+                    type="button"
+                    onClick={() => handleShowNext(entry.id)}
+                    className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-100 px-2 py-1"
+                  >
+                    Show Next
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -1145,7 +1243,7 @@ export default function BusinessDetailPage({
         />
         {searchQuery && (
           <p className="text-sm text-gray-600 mt-2">
-            Showing {filteredCorrespondence.recent.length + filteredCorrespondence.archive.length} matching entries
+            Showing {filteredCorrespondence.matchedIds.size} matching entries
             <button
               onClick={() => setSearchQuery('')}
               className="ml-2 text-blue-600 hover:underline"
@@ -1478,7 +1576,9 @@ export default function BusinessDetailPage({
                     : 'Last 12 Months'}
                 </h3>
                 <div className="space-y-6">
-                  {displayedRecent.map((entry) => renderEntry(entry))}
+                  {displayedRecent.map((entry) => renderEntry(entry, {
+                    isContext: searchQuery.trim() !== '' && !filteredCorrespondence.matchedIds.has(entry.id)
+                  }))}
                 </div>
                 {remainingRecent > 0 && (
                   <div className="mt-6 text-center">
@@ -1509,7 +1609,9 @@ export default function BusinessDetailPage({
                 </button>
                 {isArchiveExpanded && (
                   <div className="space-y-6 pl-4 border-l-2 border-gray-300">
-                    {displayedArchive.map((entry) => renderEntry(entry))}
+                    {displayedArchive.map((entry) => renderEntry(entry, {
+                      isContext: searchQuery.trim() !== '' && !filteredCorrespondence.matchedIds.has(entry.id)
+                    }))}
                     {remainingArchive > 0 && (
                       <div className="mt-6 text-center">
                         <button
