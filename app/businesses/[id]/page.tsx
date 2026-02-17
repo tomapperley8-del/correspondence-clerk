@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
-import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, findDuplicatesInBusiness, type Correspondence } from '@/app/actions/correspondence'
-import { dismissDuplicatePair } from '@/app/actions/duplicate-dismissals'
+import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, findDuplicatesInBusiness, type Correspondence } from '@/app/actions/correspondence'
+import { dismissDuplicatePair, dismissMultipleDuplicatePairs } from '@/app/actions/duplicate-dismissals'
 import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
 import { AddContactButton } from '@/components/AddContactButton'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
@@ -74,6 +74,9 @@ export default function BusinessDetailPage({
   }>>([])
   const [dismissingDuplicate, setDismissingDuplicate] = useState<string | null>(null)
   const [deletingDuplicate, setDeletingDuplicate] = useState<string | null>(null)
+  const [selectedDuplicateHashes, setSelectedDuplicateHashes] = useState<Set<string>>(new Set())
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [isBulkDismissing, setIsBulkDismissing] = useState(false)
 
   // Feature #4: Correspondence view controls state
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest')
@@ -540,6 +543,92 @@ export default function BusinessDetailPage({
     setDismissingDuplicate(null)
   }
 
+  // Bulk duplicate action handlers
+  const isBulkOperationRunning = isBulkDeleting || isBulkDismissing
+  const selectedCount = selectedDuplicateHashes.size
+
+  const toggleDuplicateHash = (hash: string) => {
+    setSelectedDuplicateHashes(prev => {
+      const next = new Set(prev)
+      if (next.has(hash)) {
+        next.delete(hash)
+      } else {
+        next.add(hash)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAllDuplicates = () => {
+    if (selectedDuplicateHashes.size === duplicates.length) {
+      setSelectedDuplicateHashes(new Set())
+    } else {
+      setSelectedDuplicateHashes(new Set(duplicates.map(d => d.hash)))
+    }
+  }
+
+  const handleBulkDeleteDuplicates = async () => {
+    if (!id || selectedCount === 0) return
+    setIsBulkDeleting(true)
+    setActionError(null)
+
+    // Collect the newer entry ID from each selected group
+    const idsToDelete = duplicates
+      .filter(d => selectedDuplicateHashes.has(d.hash))
+      .map(d => d.entries[d.entries.length - 1].id)
+
+    const result = await deleteMultipleCorrespondence(idsToDelete)
+
+    if ('error' in result) {
+      setActionError(`Error deleting entries: ${result.error}`)
+    } else {
+      // Refresh data and clear selection
+      const [correspondenceResult, duplicatesResult] = await Promise.all([
+        getCorrespondenceByBusiness(id),
+        findDuplicatesInBusiness(id),
+      ])
+      setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
+      setDuplicates(duplicatesResult.duplicates || [])
+      setSelectedDuplicateHashes(new Set())
+    }
+
+    setIsBulkDeleting(false)
+  }
+
+  const handleBulkDismissDuplicates = async () => {
+    if (!id || selectedCount === 0) return
+    setIsBulkDismissing(true)
+    setActionError(null)
+
+    // Only dismiss groups with exactly 2 entries
+    const pairs = duplicates
+      .filter(d => selectedDuplicateHashes.has(d.hash) && d.entries.length === 2)
+      .map(d => ({ entryId1: d.entries[0].id, entryId2: d.entries[1].id }))
+
+    if (pairs.length === 0) {
+      setActionError('No valid pairs to dismiss (only groups with exactly 2 entries can be dismissed)')
+      setIsBulkDismissing(false)
+      return
+    }
+
+    const result = await dismissMultipleDuplicatePairs(id, pairs)
+
+    if ('error' in result) {
+      setActionError(`Error dismissing duplicates: ${result.error}`)
+    } else {
+      const duplicatesResult = await findDuplicatesInBusiness(id)
+      setDuplicates(duplicatesResult.duplicates || [])
+      setSelectedDuplicateHashes(new Set())
+    }
+
+    setIsBulkDismissing(false)
+  }
+
+  // Count how many selected groups have exactly 2 entries (dismissable)
+  const dismissableSelectedCount = duplicates
+    .filter(d => selectedDuplicateHashes.has(d.hash) && d.entries.length === 2)
+    .length
+
   // Feature #3: Handle contract details update with AI summary refresh
   const handleContractUpdate = async () => {
     if (!id) return
@@ -832,38 +921,87 @@ export default function BusinessDetailPage({
       {/* Duplicate Warning Banner */}
       {duplicates.length > 0 && (
         <div className="bg-orange-50 border-2 border-orange-600 p-4 mb-6">
-          <h3 className="font-semibold text-orange-900 mb-2">
-            {duplicates.length} Potential Duplicate{duplicates.length !== 1 ? 's' : ''} Found
-          </h3>
-          {duplicates.map((dup) => (
-            <div key={dup.hash} className="border-t border-orange-300 pt-3 mt-3 first:border-t-0 first:pt-0 first:mt-0">
-              <p className="text-sm text-orange-800 mb-2">
-                <strong>{dup.entries.length} entries</strong> with identical content:
-              </p>
-              <ul className="text-sm text-orange-700 mb-2 space-y-1">
-                {dup.entries.map(entry => (
-                  <li key={entry.id}>
-                    {entry.subject || 'No subject'} ({entry.entry_date ? formatDateGB(entry.entry_date) : 'No date'}) - {entry.contact?.name || 'Unknown contact'}
-                  </li>
-                ))}
-              </ul>
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedDuplicateHashes.size === duplicates.length && duplicates.length > 0}
+                  onChange={toggleSelectAllDuplicates}
+                  disabled={isBulkOperationRunning}
+                  className="mr-2 w-4 h-4"
+                />
+                <span className="font-semibold text-orange-900">
+                  {duplicates.length} Potential Duplicate{duplicates.length !== 1 ? 's' : ''} Found
+                </span>
+              </label>
+              {selectedCount > 0 && (
+                <span className="text-xs text-orange-700">
+                  ({selectedCount} selected)
+                </span>
+              )}
+            </div>
+            {selectedCount > 0 && (
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleDeleteDuplicate(dup.entries[dup.entries.length - 1].id, dup.hash)}
-                  disabled={deletingDuplicate === dup.hash || dismissingDuplicate === dup.hash}
-                  className="px-3 py-1 text-xs bg-red-100 text-red-900 hover:bg-red-200 disabled:opacity-50"
+                  onClick={handleBulkDeleteDuplicates}
+                  disabled={isBulkOperationRunning}
+                  className="px-3 py-1 text-xs bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 font-semibold"
                 >
-                  {deletingDuplicate === dup.hash ? 'Deleting...' : 'Delete Newer Entry'}
+                  {isBulkDeleting ? 'Deleting...' : `Delete ${selectedCount} Newer Entr${selectedCount === 1 ? 'y' : 'ies'}`}
                 </button>
-                {dup.entries.length === 2 && (
+                {dismissableSelectedCount > 0 && (
                   <button
-                    onClick={() => handleDismissDuplicate(dup.entries[0].id, dup.entries[1].id, dup.hash)}
-                    disabled={deletingDuplicate === dup.hash || dismissingDuplicate === dup.hash}
-                    className="px-3 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                    onClick={handleBulkDismissDuplicates}
+                    disabled={isBulkOperationRunning}
+                    className="px-3 py-1 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
                   >
-                    {dismissingDuplicate === dup.hash ? 'Dismissing...' : 'Not a Duplicate'}
+                    {isBulkDismissing ? 'Dismissing...' : `Dismiss ${dismissableSelectedCount} as Not Duplicate${dismissableSelectedCount === 1 ? '' : 's'}`}
                   </button>
                 )}
+              </div>
+            )}
+          </div>
+          {duplicates.map((dup) => (
+            <div key={dup.hash} className="border-t border-orange-300 pt-3 mt-3 first:border-t-0 first:pt-0 first:mt-0">
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectedDuplicateHashes.has(dup.hash)}
+                  onChange={() => toggleDuplicateHash(dup.hash)}
+                  disabled={isBulkOperationRunning}
+                  className="mt-1 w-4 h-4 shrink-0"
+                />
+                <div className="flex-1">
+                  <p className="text-sm text-orange-800 mb-2">
+                    <strong>{dup.entries.length} entries</strong> with identical content:
+                  </p>
+                  <ul className="text-sm text-orange-700 mb-2 space-y-1">
+                    {dup.entries.map(entry => (
+                      <li key={entry.id}>
+                        {entry.subject || 'No subject'} ({entry.entry_date ? formatDateGB(entry.entry_date) : 'No date'}) - {entry.contact?.name || 'Unknown contact'}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleDeleteDuplicate(dup.entries[dup.entries.length - 1].id, dup.hash)}
+                      disabled={deletingDuplicate === dup.hash || dismissingDuplicate === dup.hash || isBulkOperationRunning}
+                      className="px-3 py-1 text-xs bg-red-100 text-red-900 hover:bg-red-200 disabled:opacity-50"
+                    >
+                      {deletingDuplicate === dup.hash ? 'Deleting...' : 'Delete Newer Entry'}
+                    </button>
+                    {dup.entries.length === 2 && (
+                      <button
+                        onClick={() => handleDismissDuplicate(dup.entries[0].id, dup.entries[1].id, dup.hash)}
+                        disabled={deletingDuplicate === dup.hash || dismissingDuplicate === dup.hash || isBulkOperationRunning}
+                        className="px-3 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                      >
+                        {dismissingDuplicate === dup.hash ? 'Dismissing...' : 'Not a Duplicate'}
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ))}

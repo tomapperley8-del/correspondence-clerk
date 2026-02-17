@@ -777,7 +777,7 @@ ${emailBody || ''}`
     setPreviewText('')
   }
 
-  const handleConfirmMatches = async (confirmedMatches: ContactMatchResult[]) => {
+  const handleConfirmMatches = async (confirmedMatches: ContactMatchResult[], selectedIndices: number[]) => {
     if (!pendingAiResponse || !selectedBusinessId) return
 
     setIsLoading(true)
@@ -787,6 +787,18 @@ ${emailBody || ''}`
     const entry_date = entryTime
       ? `${entryDateOnly}T${entryTime}:00`
       : `${entryDateOnly}T12:00:00`
+
+    // Filter AI response and matches to only the selected entries
+    let filteredAiResponse = pendingAiResponse
+    let filteredMatches = confirmedMatches
+
+    if (isThreadSplitResponse(pendingAiResponse) && selectedIndices.length < pendingAiResponse.entries.length) {
+      filteredAiResponse = {
+        ...pendingAiResponse,
+        entries: selectedIndices.map(i => pendingAiResponse.entries[i]),
+      }
+      filteredMatches = selectedIndices.map(i => confirmedMatches[i])
+    }
 
     // Save correspondence with matched contacts
     const result = await createFormattedCorrespondence(
@@ -803,8 +815,8 @@ ${emailBody || ''}`
         due_at: dueAt || undefined,
         email_source: emailSourceMetadata || undefined,
       },
-      pendingAiResponse,
-      confirmedMatches // Pass the confirmed contact matches
+      filteredAiResponse,
+      filteredMatches // Pass the filtered contact matches
     )
 
     if ('error' in result) {

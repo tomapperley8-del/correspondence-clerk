@@ -21,7 +21,7 @@ interface ContactMatchPreviewModalProps {
   contacts: Contact[];
   initialMatches: ContactMatchResult[];
   defaultContactId: string;
-  onConfirm: (matches: ContactMatchResult[]) => void;
+  onConfirm: (matches: ContactMatchResult[], selectedIndices: number[]) => void;
   isLoading?: boolean;
 }
 
@@ -36,10 +36,18 @@ export function ContactMatchPreviewModal({
   isLoading = false,
 }: ContactMatchPreviewModalProps) {
   const [matches, setMatches] = useState<ContactMatchResult[]>(initialMatches);
+  const [selectedEntries, setSelectedEntries] = useState<Set<number>>(
+    () => new Set(entries.map((_, i) => i))
+  );
 
   useEffect(() => {
     setMatches(initialMatches);
   }, [initialMatches]);
+
+  // Reset selection when entries change
+  useEffect(() => {
+    setSelectedEntries(new Set(entries.map((_, i) => i)));
+  }, [entries]);
 
   const handleContactChange = (index: number, contactId: string) => {
     const newMatches = [...matches];
@@ -53,8 +61,31 @@ export function ContactMatchPreviewModal({
     setMatches(newMatches);
   };
 
+  const toggleEntry = (index: number) => {
+    setSelectedEntries(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedEntries.size === entries.length) {
+      setSelectedEntries(new Set());
+    } else {
+      setSelectedEntries(new Set(entries.map((_, i) => i)));
+    }
+  };
+
+  const selectedCount = selectedEntries.size;
+
   const handleConfirm = () => {
-    onConfirm(matches);
+    const selectedIndices = Array.from(selectedEntries).sort((a, b) => a - b);
+    onConfirm(matches, selectedIndices);
   };
 
   return (
@@ -68,21 +99,47 @@ export function ContactMatchPreviewModal({
           <div className="bg-blue-50 border-2 border-blue-300 p-4">
             <p className="text-sm text-blue-900">
               <strong>Multiple contacts detected!</strong> We&apos;ve automatically matched each email to the person it&apos;s from or to.
-              Review and adjust if needed before saving.
+              Review and adjust if needed before saving. Untick any emails you don&apos;t want to import.
             </p>
+          </div>
+
+          {/* Select All / Count */}
+          <div className="flex items-center justify-between">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedCount === entries.length && entries.length > 0}
+                onChange={toggleSelectAll}
+                className="mr-2 w-4 h-4"
+              />
+              <span className="text-sm font-semibold text-gray-700">
+                Select All
+              </span>
+            </label>
+            <span className="text-sm text-gray-600">
+              {selectedCount} of {entries.length} selected
+            </span>
           </div>
 
           <div className="space-y-4">
             {entries.map((entry, index) => {
               const match = matches[index];
               const defaultContact = contacts.find(c => c.id === defaultContactId);
+              const isSelected = selectedEntries.has(index);
 
               return (
                 <div
                   key={index}
-                  className="border-2 border-gray-200 p-4 bg-gray-50"
+                  className={`border-2 p-4 ${isSelected ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-gray-50 opacity-50'}`}
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleEntry(index)}
+                      className="mt-1 w-4 h-4 shrink-0"
+                    />
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-semibold text-gray-900 mb-1">
                         Email #{index + 1}
@@ -145,6 +202,7 @@ export function ContactMatchPreviewModal({
                       {entry.formatted_text}
                     </p>
                   </div>
+                  </div>
                 </div>
               );
             })}
@@ -162,9 +220,9 @@ export function ContactMatchPreviewModal({
             <Button
               onClick={handleConfirm}
               className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-2 font-semibold disabled:opacity-50"
-              disabled={isLoading}
+              disabled={isLoading || selectedCount === 0}
             >
-              {isLoading ? 'Saving...' : `Save ${entries.length} Email${entries.length !== 1 ? 's' : ''}`}
+              {isLoading ? 'Saving...' : `Save ${selectedCount} Email${selectedCount !== 1 ? 's' : ''}`}
             </Button>
           </div>
         </div>

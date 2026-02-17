@@ -382,6 +382,46 @@ export async function deleteCorrespondence(id: string) {
 }
 
 /**
+ * Delete multiple correspondence entries at once
+ */
+export async function deleteMultipleCorrespondence(ids: string[]) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  if (ids.length === 0) {
+    return { error: 'No entries to delete' }
+  }
+
+  // Get business_ids before deleting (for path revalidation)
+  const { data: entries } = await supabase
+    .from('correspondence')
+    .select('business_id')
+    .in('id', ids)
+
+  const { error } = await supabase.from('correspondence').delete().in('id', ids)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  // Revalidate all affected business pages
+  const businessIds = new Set((entries || []).map((e) => e.business_id))
+  for (const bizId of businessIds) {
+    revalidatePath(`/businesses/${bizId}`)
+  }
+  revalidatePath('/dashboard')
+  revalidatePath('/search')
+
+  return { success: true, deletedCount: ids.length }
+}
+
+/**
  * Update correspondence contact_id (reassign to different contact)
  * Verifies the new contact belongs to the same business
  */
