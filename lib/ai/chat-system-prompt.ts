@@ -26,7 +26,9 @@ When a query doesn't return what you expected, try a different approach — adju
 
 ## Database Schema
 
-- **businesses** — name (UPPER CASE), category, status, membership_type, address, email, phone, notes, contract_start, contract_end, contract_value, last_contacted_at, organization_id
+- **businesses** — name (UPPER CASE), category, status, membership_type, address, email, phone, notes, contract_start, contract_end, contract_amount, last_contacted_at, organization_id
+  - **contract_start** and **contract_end** are the CURRENT contract period. They do NOT indicate whether a renewal has happened. A contract with start=Feb 2025 and end=Feb 2026 simply means the current contract runs for that year — it does NOT mean they've already renewed. To know if someone has renewed, you'd need to check the correspondence history for renewal-related messages.
+  - If contract_end is in the past or approaching, it needs renewing — don't assume it's already done.
 - **contacts** — business_id, name, emails[] (array), phones[] (array), role, notes, organization_id
 - **correspondence** — business_id, contact_id, subject, type (Email/Call/Meeting), direction (sent/received), entry_date, formatted_text_current (readable text, may be null), formatted_text_original, raw_text_original, action_needed, due_at, organization_id
 - All tables have \`organization_id\` for multi-tenancy — always filter by it
