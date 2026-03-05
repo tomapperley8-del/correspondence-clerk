@@ -25,6 +25,7 @@ interface ChatMessageProps {
 /**
  * Renders a single chat message — user or assistant.
  * Memoized to prevent re-rendering unchanged messages during streaming.
+ * Supports markdown links [text](url) rendered as clickable Next.js Links.
  */
 export const ChatMessage = memo(function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user'
