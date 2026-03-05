@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
 export type ChatMessageRole = 'user' | 'assistant'
@@ -188,12 +189,12 @@ function MarkdownLite({ text }: { text: string }) {
 }
 
 /**
- * Handles **bold** and `code` within a line
+ * Handles **bold**, `code`, and [links](url) within a line
  */
 function renderInline(text: string): React.ReactNode {
   const parts: React.ReactNode[] = []
-  // Split on **bold** and `code` patterns
-  const regex = /(\*\*(.+?)\*\*|`(.+?)`)/g
+  // Match **bold**, `code`, and [text](url) markdown links
+  const regex = /(\*\*(.+?)\*\*|`(.+?)`|\[([^\]]+)\]\(([^)]+)\))/g
   let lastIndex = 0
   let match
 
@@ -217,6 +218,33 @@ function renderInline(text: string): React.ReactNode {
           {match[3]}
         </code>
       )
+    } else if (match[4] && match[5]) {
+      // Link [text](url) — use Next.js Link for internal paths
+      const linkText = match[4]
+      const href = match[5]
+      if (href.startsWith('/')) {
+        parts.push(
+          <Link
+            key={match.index}
+            href={href}
+            className="font-semibold text-[#2C4A6E] underline decoration-[#2C4A6E]/30 hover:decoration-[#2C4A6E] transition-colors"
+          >
+            {linkText}
+          </Link>
+        )
+      } else {
+        parts.push(
+          <a
+            key={match.index}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#2C4A6E] underline"
+          >
+            {linkText}
+          </a>
+        )
+      }
     }
 
     lastIndex = match.index + match[0].length
