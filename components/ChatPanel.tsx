@@ -7,7 +7,7 @@ import { ChatMessage, type ChatMessageData, type ToolCallInfo } from '@/componen
 
 /**
  * Slide-out chat panel for the AI Outreach Assistant.
- * Handles SSE streaming, tool call indicators, and message state.
+ * Smooth streaming and animations to match Claude.ai feel.
  */
 export function ChatPanel() {
   const { isOpen, close } = useChat()
@@ -17,33 +17,40 @@ export function ChatPanel() {
   const [pendingToolCalls, setPendingToolCalls] = useState<ToolCallInfo[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const scrollRafRef = useRef<number | null>(null)
 
-  // Smooth auto-scroll using requestAnimationFrame (batched, no jitter)
+  // Smooth scroll that sticks to bottom during streaming
+  const isNearBottom = useRef(true)
+  const rafId = useRef<number>(0)
+
+  const checkNearBottom = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    isNearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }, [])
+
   const scrollToBottom = useCallback(() => {
-    if (scrollRafRef.current) return // already scheduled
-    scrollRafRef.current = requestAnimationFrame(() => {
-      scrollRafRef.current = null
-      if (scrollRef.current) {
-        scrollRef.current.scrollTo({
-          top: scrollRef.current.scrollHeight,
-          behavior: 'smooth',
-        })
+    cancelAnimationFrame(rafId.current)
+    rafId.current = requestAnimationFrame(() => {
+      const el = scrollRef.current
+      if (el && isNearBottom.current) {
+        el.scrollTop = el.scrollHeight
       }
     })
   }, [])
 
-  // Scroll when messages change (not on every delta — handled via ref)
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages.length, pendingToolCalls.length, scrollToBottom])
-
   // Focus input when panel opens
   useEffect(() => {
     if (isOpen && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100)
+      setTimeout(() => inputRef.current?.focus(), 200)
     }
   }, [isOpen])
+
+  // Mutable ref for streaming state — avoids stale closures and re-renders
+  const streamState = useRef({
+    text: '',
+    toolCalls: [] as ToolCallInfo[],
+    assistantId: '',
+  })
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
@@ -68,13 +75,40 @@ export function ChatPanel() {
 
     // Create placeholder assistant message
     const assistantId = crypto.randomUUID()
-    const assistantMessage: ChatMessageData = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      toolCalls: [],
+    streamState.current = { text: '', toolCalls: [], assistantId }
+
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantId, role: 'assistant', content: '', toolCalls: [] },
+    ])
+
+    // rAF-driven render loop — updates DOM at screen refresh rate
+    let rendering = true
+    let lastRenderedText = ''
+    let lastRenderedToolCount = 0
+
+    const renderLoop = () => {
+      if (!rendering) return
+      const { text: currentText, toolCalls: currentTools } = streamState.current
+
+      // Only update if something changed
+      if (currentText !== lastRenderedText || currentTools.length !== lastRenderedToolCount) {
+        lastRenderedText = currentText
+        lastRenderedToolCount = currentTools.length
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: currentText, toolCalls: [...currentTools] }
+              : m
+          )
+        )
+        scrollToBottom()
+      }
+
+      requestAnimationFrame(renderLoop)
     }
-    setMessages((prev) => [...prev, assistantMessage])
+    requestAnimationFrame(renderLoop)
 
     try {
       const response = await fetch('/api/chat', {
@@ -93,33 +127,6 @@ export function ChatPanel() {
 
       const decoder = new TextDecoder()
       let buffer = ''
-      let accumulatedText = ''
-      const accumulatedToolCalls: ToolCallInfo[] = []
-
-      // Batch text delta updates — flush at most every 50ms
-      let flushTimer: ReturnType<typeof setTimeout> | null = null
-      let needsFlush = false
-
-      const flushText = () => {
-        flushTimer = null
-        if (!needsFlush) return
-        needsFlush = false
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? { ...m, content: accumulatedText, toolCalls: [...accumulatedToolCalls] }
-              : m
-          )
-        )
-        scrollToBottom()
-      }
-
-      const scheduleFlush = () => {
-        needsFlush = true
-        if (!flushTimer) {
-          flushTimer = setTimeout(flushText, 50)
-        }
-      }
 
       while (true) {
         const { done, value } = await reader.read()
@@ -129,7 +136,7 @@ export function ChatPanel() {
 
         // Parse SSE events from buffer
         const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Keep incomplete line in buffer
+        buffer = lines.pop() || ''
 
         let eventType = ''
         for (const line of lines) {
@@ -141,32 +148,30 @@ export function ChatPanel() {
 
               switch (eventType) {
                 case 'text_delta':
-                  accumulatedText += data.text
-                  scheduleFlush()
+                  streamState.current.text += data.text
                   break
 
                 case 'tool_call':
-                  accumulatedToolCalls.push({ name: data.name })
-                  setPendingToolCalls([...accumulatedToolCalls])
+                  streamState.current.toolCalls.push({ name: data.name })
+                  setPendingToolCalls([...streamState.current.toolCalls])
                   break
 
                 case 'tool_result': {
-                  const idx = accumulatedToolCalls.findIndex(
+                  const idx = streamState.current.toolCalls.findIndex(
                     (tc) => tc.name === data.name && !tc.summary
                   )
                   if (idx >= 0) {
-                    accumulatedToolCalls[idx] = {
-                      ...accumulatedToolCalls[idx],
+                    streamState.current.toolCalls[idx] = {
+                      ...streamState.current.toolCalls[idx],
                       summary: data.summary,
                     }
                   }
-                  setPendingToolCalls([...accumulatedToolCalls])
+                  setPendingToolCalls([...streamState.current.toolCalls])
                   break
                 }
 
                 case 'error':
-                  accumulatedText += `\n\nError: ${data.message}`
-                  scheduleFlush()
+                  streamState.current.text += `\n\nError: ${data.message}`
                   break
 
                 case 'done':
@@ -180,25 +185,29 @@ export function ChatPanel() {
         }
       }
 
-      // Final flush
-      if (flushTimer) clearTimeout(flushTimer)
+      // Stop render loop and do final update
+      rendering = false
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, content: accumulatedText, toolCalls: accumulatedToolCalls }
+            ? {
+                ...m,
+                content: streamState.current.text,
+                toolCalls: streamState.current.toolCalls,
+              }
             : m
         )
       )
     } catch (err) {
+      rendering = false
       const errorMessage = err instanceof Error ? err.message : 'Something went wrong'
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: `Error: ${errorMessage}` }
-            : m
+          m.id === assistantId ? { ...m, content: `Error: ${errorMessage}` } : m
         )
       )
     } finally {
+      rendering = false
       setIsStreaming(false)
       setPendingToolCalls([])
     }
@@ -225,19 +234,24 @@ export function ChatPanel() {
     return () => document.removeEventListener('keydown', handler)
   }, [isOpen, close])
 
-  if (!isOpen) return null
-
+  // Always render for CSS transitions — use opacity + transform to animate
   return (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/20 z-40"
+        className={`fixed inset-0 bg-black/20 z-40 transition-opacity duration-200 ${
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
         onClick={close}
         aria-hidden="true"
       />
 
       {/* Panel */}
-      <div className="fixed top-16 right-0 bottom-0 w-full max-w-[480px] bg-white z-50 shadow-xl flex flex-col border-l border-gray-200 transition-transform duration-200 ease-out">
+      <div
+        className={`fixed top-16 right-0 bottom-0 w-full max-w-[480px] bg-white z-50 shadow-xl flex flex-col border-l border-gray-200 transition-transform duration-200 ease-out ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-[#FAFAF8]">
           <h2 className="font-[Lora,serif] text-lg font-semibold text-[#1E293B]">
@@ -266,11 +280,18 @@ export function ChatPanel() {
         </div>
 
         {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scroll-smooth">
+        <div
+          ref={scrollRef}
+          onScroll={checkNearBottom}
+          className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
+        >
           {messages.length === 0 && (
             <div className="text-center text-sm text-gray-400 mt-8">
               <p className="mb-2 font-medium text-gray-500">Outreach Assistant</p>
-              <p>Ask me about your businesses, correspondence, or say &ldquo;do it&rdquo; to run the full outreach workflow.</p>
+              <p>
+                Ask me about your businesses, correspondence, or say &ldquo;do
+                it&rdquo; to run the full outreach workflow.
+              </p>
             </div>
           )}
 
@@ -284,7 +305,10 @@ export function ChatPanel() {
               {pendingToolCalls
                 .filter((tc) => !tc.summary)
                 .map((tc, i) => (
-                  <div key={i} className="text-xs text-gray-400 italic px-1 animate-pulse">
+                  <div
+                    key={i}
+                    className="text-xs text-gray-400 italic px-1 animate-pulse"
+                  >
                     {formatToolName(tc.name)}...
                   </div>
                 ))}
@@ -292,12 +316,14 @@ export function ChatPanel() {
           )}
 
           {/* Streaming indicator */}
-          {isStreaming && pendingToolCalls.every((tc) => tc.summary) && (
-            <div className="flex items-center gap-1.5 text-xs text-gray-400">
-              <span className="inline-block w-1.5 h-1.5 bg-[#7C9A5E] rounded-full animate-pulse" />
-              Thinking...
-            </div>
-          )}
+          {isStreaming &&
+            pendingToolCalls.every((tc) => tc.summary) &&
+            !streamState.current.text && (
+              <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                <span className="inline-block w-1.5 h-1.5 bg-[#7C9A5E] rounded-full animate-pulse" />
+                Thinking...
+              </div>
+            )}
         </div>
 
         {/* Input */}
@@ -321,9 +347,7 @@ export function ChatPanel() {
               Send
             </Button>
           </div>
-          <p className="text-[10px] text-gray-400 mt-1">
-            Shift+Enter for new line
-          </p>
+          <p className="text-[10px] text-gray-400 mt-1">Shift+Enter for new line</p>
         </div>
       </div>
     </>
