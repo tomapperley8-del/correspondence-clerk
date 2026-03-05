@@ -66,12 +66,25 @@ export async function POST(request: NextRequest) {
 
         while (continueLoop) {
           // Stream from Anthropic
+          // Cache system prompt and tools — they're identical every call
+          const tools = CHAT_TOOL_DEFINITIONS.map((tool, i, arr) =>
+            i === arr.length - 1
+              ? { ...tool, cache_control: { type: 'ephemeral' as const } }
+              : tool
+          )
+
           const response = await anthropic.messages.create({
             model: 'claude-sonnet-4-5-20250929',
             max_tokens: 16384,
-            system: CHAT_SYSTEM_PROMPT,
+            system: [
+              {
+                type: 'text',
+                text: CHAT_SYSTEM_PROMPT,
+                cache_control: { type: 'ephemeral' },
+              },
+            ],
             messages: currentMessages,
-            tools: CHAT_TOOL_DEFINITIONS as Anthropic.Tool[],
+            tools: tools as Anthropic.Tool[],
             stream: true,
           })
 
