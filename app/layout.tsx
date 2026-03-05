@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Navigation } from '@/components/Navigation'
+import { ChatProvider } from '@/components/ChatContext'
+import { ChatPanel } from '@/components/ChatPanel'
 
 export const metadata: Metadata = {
   title: 'Correspondence Clerk',
@@ -21,14 +23,17 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:font-semibold"
-        >
-          Skip to main content
-        </a>
-        <Navigation />
-        <main id="main-content">{children}</main>
+        <ChatProvider>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:font-semibold"
+          >
+            Skip to main content
+          </a>
+          <Navigation />
+          <ChatPanel />
+          <main id="main-content">{children}</main>
+        </ChatProvider>
       </body>
     </html>
   )

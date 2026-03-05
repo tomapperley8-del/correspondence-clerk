@@ -8,6 +8,23 @@ import { Button } from '@/components/ui/button'
 import type { User } from '@supabase/supabase-js'
 import { getCurrentOrganization } from '@/app/actions/organizations'
 import { getUserProfile } from '@/app/actions/user-profile'
+import { useChat } from '@/components/ChatContext'
+
+function OutreachButton() {
+  const { isOpen, toggle } = useChat()
+  return (
+    <button
+      onClick={toggle}
+      className={`px-4 h-16 flex items-center text-sm font-medium transition-colors ${
+        isOpen
+          ? 'text-white bg-[#7C9A5E]'
+          : 'text-white hover:bg-[#7C9A5E]/20'
+      }`}
+    >
+      Outreach
+    </button>
+  )
+}
 
 type Organization = {
   id: string
@@ -168,6 +185,8 @@ export function Navigation() {
               >
                 Help
               </Link>
+              <span className="text-white/30 self-center">|</span>
+              <OutreachButton />
             </div>
           </div>
 
