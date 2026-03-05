@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
@@ -24,9 +24,9 @@ interface ChatMessageProps {
 
 /**
  * Renders a single chat message — user or assistant.
- * Detects email draft blocks and renders them with a Copy button.
+ * Memoized to prevent re-rendering unchanged messages during streaming.
  */
-export function ChatMessage({ message }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user'
 
   return (
@@ -54,7 +54,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       </div>
     </div>
   )
-}
+})
 
 /**
  * Parses message content, pulling out email draft blocks
@@ -133,7 +133,9 @@ function EmailDraftCard({ content }: { content: string }) {
 function MarkdownLite({ text }: { text: string }) {
   if (!text.trim()) return null
 
-  const lines = text.split('\n')
+  // Rejoin markdown links that got split across lines: [text]\n(url) → [text](url)
+  const rejoined = text.replace(/\]\s*\n\s*\(/g, '](')
+  const lines = rejoined.split('\n')
   const elements: React.ReactNode[] = []
 
   for (let i = 0; i < lines.length; i++) {
