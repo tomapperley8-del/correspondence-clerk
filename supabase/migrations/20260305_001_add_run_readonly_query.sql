@@ -12,16 +12,18 @@ SET statement_timeout = '10s'
 AS $$
 DECLARE
   result JSONB;
+  clean_query TEXT;
 BEGIN
+  -- Strip whitespace and trailing semicolons
+  clean_query := regexp_replace(TRIM(query_text), ';+\s*$', '');
+
   -- Validate: only SELECT or WITH allowed
-  IF NOT (
-    TRIM(query_text) ~* '^\s*(SELECT|WITH)\b'
-  ) THEN
+  IF NOT (clean_query ~* '^(SELECT|WITH)\b') THEN
     RAISE EXCEPTION 'Only SELECT queries are allowed';
   END IF;
 
   -- Reject dangerous keywords
-  IF query_text ~* '\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|EXEC|EXECUTE)\b' THEN
+  IF clean_query ~* '\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE)\b' THEN
     RAISE EXCEPTION 'Query contains forbidden keywords';
   END IF;
 
@@ -31,7 +33,7 @@ BEGIN
   -- Wrap the query with a row limit and execute with org_id as $1
   EXECUTE format(
     'SELECT COALESCE(jsonb_agg(row_to_json(t)), ''[]''::jsonb) FROM (SELECT * FROM (%s) sub LIMIT %s) t',
-    query_text,
+    clean_query,
     row_limit
   )
   INTO result

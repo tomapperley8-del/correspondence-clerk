@@ -284,7 +284,7 @@ async function getExpiringContracts(
     .from('businesses')
     .select(`
       id, name, category, status, membership_type,
-      contract_start, contract_end, contract_value,
+      contract_start, contract_end, contract_amount,
       contacts(id, name, emails, role)
     `)
     .eq('organization_id', orgId)
@@ -306,7 +306,7 @@ async function getExpiringContracts(
       membership_type: b.membership_type,
       contract_start: b.contract_start,
       contract_end: b.contract_end,
-      contract_value: b.contract_value,
+      contract_amount: b.contract_amount,
       primary_contact: b.contacts?.[0] || null,
     })),
   }
@@ -476,7 +476,7 @@ async function searchBusinesses(
     .select(`
       id, name, category, status, membership_type,
       email, phone, address, notes,
-      contract_start, contract_end, contract_value,
+      contract_start, contract_end, contract_amount,
       contacts(id, name, emails, phones, role)
     `)
     .eq('organization_id', orgId)
@@ -525,7 +525,7 @@ async function getBusinessSummary(
     .select(`
       id, name, category, status, membership_type,
       email, phone, address, notes,
-      contract_start, contract_end, contract_value,
+      contract_start, contract_end, contract_amount,
       last_contacted_at,
       contacts(id, name, emails, phones, role, notes)
     `)
@@ -565,41 +565,30 @@ async function getBusinessSummary(
 
 // ---------- run_query — general-purpose read-only SQL ----------
 
-const FORBIDDEN_PATTERNS = [
-  /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|EXEC|EXECUTE)\b/i,
-  /\bINTO\b\s+\w/i, // SELECT INTO
-  /;\s*\w/i, // Multiple statements
-]
+const FORBIDDEN_KEYWORDS = /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE)\b/i
 
 async function runQuery(orgId: string, sql: string): Promise<ToolResult> {
-  // Validate: must be a SELECT
-  const trimmed = sql.trim().replace(/;+\s*$/, '') // strip trailing semicolons
-  if (!/^\s*SELECT\b/i.test(trimmed) && !/^\s*WITH\b/i.test(trimmed)) {
+  // Strip trailing semicolons and trim
+  const trimmed = sql.trim().replace(/;+\s*$/, '')
+
+  // Must start with SELECT or WITH
+  if (!/^(SELECT|WITH)\b/i.test(trimmed)) {
     return { success: false, error: 'Only SELECT queries (or WITH ... SELECT) are allowed.' }
   }
 
-  for (const pattern of FORBIDDEN_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return { success: false, error: `Query rejected: contains forbidden keyword. Only SELECT queries are allowed.` }
-    }
+  // Reject write operations
+  if (FORBIDDEN_KEYWORDS.test(trimmed)) {
+    return { success: false, error: 'Query rejected: contains forbidden keyword. Only SELECT queries are allowed.' }
+  }
+
+  // Reject multiple statements
+  if (/;\s*\S/.test(trimmed)) {
+    return { success: false, error: 'Only single statements are allowed.' }
   }
 
   const supabase = await createClient()
 
-  // Execute via Supabase's rpc or raw SQL. We'll use the Postgres function approach.
-  // Since Supabase JS doesn't support raw SQL directly, we use the REST PostgREST
-  // workaround: call a server-side function, or use the service role.
-  // Simplest: use supabase.rpc with a helper function, but since we may not have one,
-  // let's use the Supabase management API or a simple RPC.
-  // Best approach: use the Supabase client's .from() won't work for raw SQL.
-  // We'll create an edge function approach or use the postgres connection directly.
-  // Actually, the cleanest way is to use supabase's .rpc() if we have a function,
-  // or the REST API directly.
-
-  // Use the Supabase REST API with a raw query via PostgREST's /rpc endpoint
-  // We need a database function for this. Let's call it safely.
   try {
-    // Inject org_id parameter - the SQL should use $1 for org_id
     const { data, error } = await supabase.rpc('run_readonly_query' as never, {
       query_text: trimmed,
       org_id: orgId,
