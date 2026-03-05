@@ -195,79 +195,63 @@ async function getUnrepliedInbounds(
 ): Promise<ToolResult> {
   const supabase = await createClient()
 
-  // Get the latest correspondence entry per business, then filter to those where direction=received
-  const { data, error } = await supabase.rpc('get_unreplied_inbounds' as never, {
-    org_id: orgId,
-    result_limit: Math.min(limit, 50),
-  })
+  // Fetch recent correspondence (BOTH directions) to find businesses
+  // where the most recent entry is received with no newer sent
+  const { data, error } = await supabase
+    .from('correspondence')
+    .select(`
+      id, subject, entry_date, direction, type,
+      formatted_text_current, formatted_text_original,
+      business_id,
+      businesses!inner(id, name),
+      contacts!inner(id, name, emails, role)
+    `)
+    .eq('organization_id', orgId)
+    .not('direction', 'is', null)
+    .order('entry_date', { ascending: false })
+    .limit(500)
 
   if (error) {
-    // Fallback: use raw SQL approach via the general query
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from('correspondence')
-      .select(`
-        id, subject, entry_date, direction, type,
-        formatted_text_current, formatted_text_original,
-        business_id,
-        businesses!inner(id, name),
-        contacts!inner(id, name, emails, role)
-      `)
-      .eq('organization_id', orgId)
-      .eq('direction', 'received')
-      .order('entry_date', { ascending: false })
-      .limit(200)
-
-    if (fallbackError) {
-      return { success: false, error: fallbackError.message }
-    }
-
-    // Group by business and find those where the latest entry is received (no newer sent)
-    const businessLatest = new Map<string, typeof fallbackData[0]>()
-    const businessHasReply = new Set<string>()
-
-    // Sort all entries to process
-    const sorted = (fallbackData || []).sort(
-      (a, b) => new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime()
-    )
-
-    for (const entry of sorted) {
-      const bizId = entry.business_id
-      if (!businessLatest.has(bizId)) {
-        businessLatest.set(bizId, entry)
-      }
-      if (entry.direction === 'sent') {
-        businessHasReply.add(bizId)
-      }
-    }
-
-    // Filter: latest is received AND no sent entry exists that's newer
-    const unreplied = []
-    for (const [bizId, latestEntry] of businessLatest) {
-      if (latestEntry.direction === 'received' && !businessHasReply.has(bizId)) {
-        const biz = latestEntry.businesses as unknown as Record<string, string> | null
-        const contact = latestEntry.contacts as unknown as Record<string, unknown> | null
-        unreplied.push({
-          business_id: bizId,
-          business_name: biz?.name,
-          contact_name: contact?.name as string | undefined,
-          contact_email: (contact?.emails as string[] | undefined)?.[0],
-          contact_role: contact?.role as string | undefined,
-          subject: latestEntry.subject,
-          entry_date: latestEntry.entry_date,
-          text_preview: (
-            latestEntry.formatted_text_current ||
-            latestEntry.formatted_text_original ||
-            ''
-          ).substring(0, 300),
-        })
-        if (unreplied.length >= limit) break
-      }
-    }
-
-    return { success: true, data: unreplied }
+    return { success: false, error: error.message }
   }
 
-  return { success: true, data }
+  // Sort newest first
+  const sorted = (data || []).sort(
+    (a, b) => new Date(b.entry_date || 0).getTime() - new Date(a.entry_date || 0).getTime()
+  )
+
+  // For each business, find the most recent entry — if it's received, it's unreplied
+  const businessLatest = new Map<string, (typeof sorted)[0]>()
+  for (const entry of sorted) {
+    if (!businessLatest.has(entry.business_id)) {
+      businessLatest.set(entry.business_id, entry)
+    }
+  }
+
+  const unreplied = []
+  for (const [bizId, latestEntry] of businessLatest) {
+    if (latestEntry.direction === 'received') {
+      const biz = latestEntry.businesses as unknown as Record<string, string> | null
+      const contact = latestEntry.contacts as unknown as Record<string, unknown> | null
+      unreplied.push({
+        business_id: bizId,
+        business_name: biz?.name,
+        contact_name: contact?.name as string | undefined,
+        contact_email: (contact?.emails as string[] | undefined)?.[0],
+        contact_role: contact?.role as string | undefined,
+        subject: latestEntry.subject,
+        entry_date: latestEntry.entry_date,
+        text_preview: (
+          latestEntry.formatted_text_current ||
+          latestEntry.formatted_text_original ||
+          ''
+        ).substring(0, 300),
+      })
+      if (unreplied.length >= limit) break
+    }
+  }
+
+  return { success: true, data: unreplied }
 }
 
 async function getExpiringContracts(
