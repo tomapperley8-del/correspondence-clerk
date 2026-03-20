@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
 import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, type Correspondence } from '@/app/actions/correspondence'
+import { getThreadsByBusiness, createThread, renameThread, deleteThread, assignCorrespondenceToThread, type ConversationThread } from '@/app/actions/threads'
 import { dismissDuplicatePair, dismissMultipleDuplicatePairs } from '@/app/actions/duplicate-dismissals'
 import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
 import { AddContactButton } from '@/components/AddContactButton'
@@ -63,6 +64,16 @@ export default function BusinessDetailPage({
 
   // Feature #3: AI summary refresh trigger
   const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0)
+
+  // Thread state
+  const [threads, setThreads] = useState<ConversationThread[]>([])
+  const [viewMode, setViewMode] = useState<'all' | 'threads'>('all')
+  const [assigningThreadEntryId, setAssigningThreadEntryId] = useState<string | null>(null)
+  const [newThreadName, setNewThreadName] = useState('')
+  const [creatingThreadFor, setCreatingThreadFor] = useState<string | null>(null)
+  const [collapsedThreads, setCollapsedThreads] = useState<Set<string>>(new Set())
+  const [renamingThreadId, setRenamingThreadId] = useState<string | null>(null)
+  const [renameThreadName, setRenameThreadName] = useState('')
 
   // Duplicate detection state
   const [duplicates, setDuplicates] = useState<Array<{
@@ -154,11 +165,12 @@ export default function BusinessDetailPage({
       if (!id) return // Type guard for nested function
 
       // Fetch all data in parallel for faster page load
-      const [businessResult, contactsResult, correspondenceResult, duplicatesResult] = await Promise.all([
+      const [businessResult, contactsResult, correspondenceResult, duplicatesResult, threadsResult] = await Promise.all([
         getBusinessById(id),
         getContactsByBusiness(id),
         getCorrespondenceByBusiness(id),
         findDuplicatesInBusiness(id),
+        getThreadsByBusiness(id),
       ])
 
       if ('error' in businessResult || !businessResult.data) {
@@ -171,6 +183,7 @@ export default function BusinessDetailPage({
       const correspondenceData = 'error' in correspondenceResult ? [] : correspondenceResult.data || []
       setCorrespondence(correspondenceData)
       setDuplicates(duplicatesResult.duplicates || [])
+      setThreads('error' in threadsResult ? [] : threadsResult.data || [])
 
       // Fetch display names for all users who created correspondence
       const userIds = [...new Set(correspondenceData.map((c) => c.user_id))]
@@ -1030,6 +1043,21 @@ export default function BusinessDetailPage({
                 {entry.is_pinned ? 'Unpin' : 'Pin'}
               </Button>
               <Button
+                onClick={() => {
+                  if (assigningThreadEntryId === entry.id) {
+                    setAssigningThreadEntryId(null)
+                    setCreatingThreadFor(null)
+                  } else {
+                    setAssigningThreadEntryId(entry.id)
+                    setCreatingThreadFor(null)
+                    setNewThreadName('')
+                  }
+                }}
+                className={`px-3 py-1 text-xs ${entry.thread_id ? 'bg-indigo-100 text-indigo-900 hover:bg-indigo-200' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}
+              >
+                {entry.thread_id ? `Thread: ${threads.find(t => t.id === entry.thread_id)?.name || '…'}` : 'Thread'}
+              </Button>
+              <Button
                 onClick={() => handleDeleteEntry(entry.id, entry.subject || '')}
                 className="bg-red-100 text-red-900 hover:bg-red-200 px-3 py-1 text-xs"
               >
@@ -1052,6 +1080,71 @@ export default function BusinessDetailPage({
                 </Button>
               )}
             </div>
+            {/* Thread assignment panel */}
+            {assigningThreadEntryId === entry.id && (
+              <div className="mt-2 p-3 border-2 border-indigo-300 bg-indigo-50">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Assign to thread:</p>
+                <div className="flex flex-wrap gap-2">
+                  {threads.map((thread) => (
+                    <button
+                      key={thread.id}
+                      type="button"
+                      onClick={async () => {
+                        const newId = entry.thread_id === thread.id ? null : thread.id
+                        await assignCorrespondenceToThread(entry.id, newId, id!)
+                        const result = await getCorrespondenceByBusiness(id!)
+                        setCorrespondence('error' in result ? [] : result.data || [])
+                        setAssigningThreadEntryId(null)
+                      }}
+                      className={`px-3 py-1 text-xs border-2 font-semibold ${entry.thread_id === thread.id ? 'border-indigo-600 bg-indigo-200 text-indigo-900' : 'border-gray-300 bg-white text-gray-700 hover:border-indigo-400'}`}
+                    >
+                      {entry.thread_id === thread.id ? `✓ ${thread.name}` : thread.name}
+                    </button>
+                  ))}
+                  {creatingThreadFor === entry.id ? (
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        value={newThreadName}
+                        onChange={(e) => setNewThreadName(e.target.value)}
+                        placeholder="Thread name…"
+                        className="px-2 py-1 text-xs border-2 border-gray-300 focus:border-indigo-600 focus:outline-none"
+                        autoFocus
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter' && newThreadName.trim() && id) {
+                            const result = await createThread(id, newThreadName.trim())
+                            if ('data' in result && result.data) {
+                              await assignCorrespondenceToThread(entry.id, result.data.id, id)
+                              const [threadsRes, corrRes] = await Promise.all([
+                                getThreadsByBusiness(id),
+                                getCorrespondenceByBusiness(id),
+                              ])
+                              setThreads('error' in threadsRes ? [] : threadsRes.data || [])
+                              setCorrespondence('error' in corrRes ? [] : corrRes.data || [])
+                            }
+                            setAssigningThreadEntryId(null)
+                            setCreatingThreadFor(null)
+                            setNewThreadName('')
+                          } else if (e.key === 'Escape') {
+                            setCreatingThreadFor(null)
+                          }
+                        }}
+                      />
+                      <span className="text-xs text-gray-500">Enter to save</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setCreatingThreadFor(entry.id)}
+                      className="px-3 py-1 text-xs border-2 border-dashed border-gray-300 text-gray-500 hover:border-indigo-400 hover:text-indigo-700"
+                    >
+                      + New thread
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Search context expansion buttons */}
             {(showPrevButton || showNextButton) && (
               <div className="flex gap-2 mt-2">
@@ -1644,11 +1737,137 @@ export default function BusinessDetailPage({
           </div>
         )}
 
+        {/* View mode toggle */}
+        {correspondence && correspondence.length > 0 && threads.length > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex border-2 border-gray-300 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setViewMode('all')}
+                className={`px-4 py-1.5 text-sm font-semibold ${viewMode === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('threads')}
+                className={`px-4 py-1.5 text-sm font-semibold border-l-2 border-gray-300 ${viewMode === 'threads' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              >
+                Threads ({threads.length})
+              </button>
+            </div>
+          </div>
+        )}
+
         {correspondence && correspondence.length === 0 ? (
           <p className="text-gray-600 text-sm">
             No correspondence yet. Add your first entry to start building the
             letter file.
           </p>
+        ) : viewMode === 'threads' ? (
+          /* Threads view */
+          <div>
+            {threads.map((thread) => {
+              const threadEntries = correspondence
+                .filter((e) => e.thread_id === thread.id)
+                .sort((a, b) => {
+                  const da = new Date(a.entry_date || a.created_at).getTime()
+                  const db = new Date(b.entry_date || b.created_at).getTime()
+                  return da - db
+                })
+              const isCollapsed = collapsedThreads.has(thread.id)
+              return (
+                <div key={thread.id} className="mb-6 border-2 border-indigo-200">
+                  <div className="flex items-center justify-between bg-indigo-50 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = new Set(collapsedThreads)
+                          if (next.has(thread.id)) next.delete(thread.id)
+                          else next.add(thread.id)
+                          setCollapsedThreads(next)
+                        }}
+                        className="text-indigo-700 font-bold text-sm"
+                      >
+                        {isCollapsed ? '▸' : '▾'}
+                      </button>
+                      {renamingThreadId === thread.id ? (
+                        <input
+                          type="text"
+                          value={renameThreadName}
+                          onChange={(e) => setRenameThreadName(e.target.value)}
+                          className="text-sm font-bold border-2 border-indigo-400 px-2 py-0.5 focus:outline-none"
+                          autoFocus
+                          onKeyDown={async (e) => {
+                            if (e.key === 'Enter' && renameThreadName.trim() && id) {
+                              await renameThread(thread.id, id, renameThreadName.trim())
+                              const result = await getThreadsByBusiness(id)
+                              setThreads('error' in result ? [] : result.data || [])
+                              setRenamingThreadId(null)
+                            } else if (e.key === 'Escape') {
+                              setRenamingThreadId(null)
+                            }
+                          }}
+                          onBlur={() => setRenamingThreadId(null)}
+                        />
+                      ) : (
+                        <span className="font-bold text-gray-900 text-sm">{thread.name}</span>
+                      )}
+                      <span className="text-xs text-gray-500">{threadEntries.length} {threadEntries.length === 1 ? 'entry' : 'entries'}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setRenamingThreadId(thread.id); setRenameThreadName(thread.name) }}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!id) return
+                          await deleteThread(thread.id, id)
+                          const [threadsRes, corrRes] = await Promise.all([
+                            getThreadsByBusiness(id),
+                            getCorrespondenceByBusiness(id),
+                          ])
+                          setThreads('error' in threadsRes ? [] : threadsRes.data || [])
+                          setCorrespondence('error' in corrRes ? [] : corrRes.data || [])
+                        }}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        Delete thread
+                      </button>
+                    </div>
+                  </div>
+                  {!isCollapsed && (
+                    <div className="p-4 space-y-6">
+                      {threadEntries.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No entries assigned to this thread yet.</p>
+                      ) : (
+                        threadEntries.map((entry) => renderEntry(entry, { isContext: false }))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {/* Unthreaded entries */}
+            {(() => {
+              const unthreaded = correspondence.filter((e) => !e.thread_id)
+              if (unthreaded.length === 0) return null
+              return (
+                <div className="mb-6">
+                  <h3 className="font-bold text-gray-700 text-sm mb-3 text-gray-500">Unassigned ({unthreaded.length})</h3>
+                  <div className="space-y-6">
+                    {unthreaded.map((entry) => renderEntry(entry, { isContext: false }))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
         ) : (
           <>
             {/* Recent Section */}

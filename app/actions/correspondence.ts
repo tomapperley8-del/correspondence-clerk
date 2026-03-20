@@ -55,6 +55,7 @@ export type Correspondence = {
   is_pinned: boolean
   thread_participants: string | null
   internal_sender: string | null
+  thread_id: string | null
   contact: {
     name: string
     role: string | null
@@ -95,7 +96,7 @@ export async function getCorrespondenceByBusiness(
       raw_text_original, formatted_text_original, formatted_text_current,
       entry_date, subject, type, direction, formatting_status, action_needed,
       due_at, content_hash, ai_metadata, organization_id, created_at, updated_at, edited_at, edited_by,
-      is_pinned, thread_participants, internal_sender,
+      is_pinned, thread_participants, internal_sender, thread_id,
       contact:contacts(name, role, is_active)
     `,
       { count: 'exact' }
@@ -184,6 +185,7 @@ export async function getCorrespondenceByBusiness(
       is_pinned: entry.is_pinned ?? false,
       thread_participants: (entry as Record<string, unknown>).thread_participants as string | null ?? null,
       internal_sender: (entry as Record<string, unknown>).internal_sender as string | null ?? null,
+      thread_id: (entry as Record<string, unknown>).thread_id as string | null ?? null,
     }
   }) as Correspondence[]
 
