@@ -227,7 +227,7 @@ export default function BusinessDetailPage({
 
   // Feature #4: Split correspondence into recent and archive with filters applied
   // Memoize to prevent recalculation on every render
-  const { recentEntries, archiveEntries } = useMemo(() => {
+  const { recentEntries, archiveEntries, pinnedEntries } = useMemo(() => {
     // Calculate cutoff date based on selected range
     let cutoffDate: Date
     if (dateRange === 'custom' && customDateFrom) {
@@ -275,10 +275,8 @@ export default function BusinessDetailPage({
       return true
     })
 
-    // Sort: pinned entries first, then by user preference
+    // Sort by user preference (no pinned-first — pinned entries appear in a separate section AND in place)
     const sortFn = (a: typeof correspondence[0], b: typeof correspondence[0]) => {
-      if (a.is_pinned && !b.is_pinned) return -1
-      if (!a.is_pinned && b.is_pinned) return 1
       const dateA = new Date(a.entry_date || a.created_at).getTime()
       const dateB = new Date(b.entry_date || b.created_at).getTime()
       return sortOrder === 'oldest' ? dateA - dateB : dateB - dateA
@@ -304,7 +302,12 @@ export default function BusinessDetailPage({
       })
       .sort(sortFn)
 
-    return { recentEntries: recent, archiveEntries: archive }
+    // Pinned entries from ALL filtered correspondence (regardless of date range), sorted newest first
+    const pinned = filtered
+      .filter((e) => e.is_pinned)
+      .sort((a, b) => new Date(b.entry_date || b.created_at).getTime() - new Date(a.entry_date || a.created_at).getTime())
+
+    return { recentEntries: recent, archiveEntries: archive, pinnedEntries: pinned }
   }, [correspondence, contactFilter, directionFilter, sortOrder, dateRange, customDateFrom, customDateTo, contextEntryIds])
 
   // Chronological index: all entries sorted oldest-first for neighbour lookup
@@ -350,7 +353,7 @@ export default function BusinessDetailPage({
   // since thread-split entries all share the same raw_text_original)
   const filteredCorrespondence = useMemo(() => {
     if (!searchQuery.trim()) {
-      return { recent: recentEntries, archive: archiveEntries, matchedIds: new Set<string>() }
+      return { recent: recentEntries, archive: archiveEntries, pinned: pinnedEntries, matchedIds: new Set<string>() }
     }
 
     const query = searchQuery.toLowerCase()
@@ -375,9 +378,10 @@ export default function BusinessDetailPage({
     return {
       recent: recentEntries.filter(e => matchesQuery(e) || contextEntryIds.has(e.id)),
       archive: archiveEntries.filter(e => matchesQuery(e) || contextEntryIds.has(e.id)),
+      pinned: pinnedEntries.filter(e => matchesQuery(e)),
       matchedIds,
     }
-  }, [recentEntries, archiveEntries, searchQuery, contextEntryIds])
+  }, [recentEntries, archiveEntries, pinnedEntries, searchQuery, contextEntryIds])
 
   // Auto-expand archive when a context entry lands there during search
   useEffect(() => {
@@ -1912,6 +1916,20 @@ export default function BusinessDetailPage({
           </div>
         ) : (
           <>
+            {/* Pinned Section */}
+            {filteredCorrespondence.pinned.length > 0 && (
+              <div className="mb-8 pb-8 border-b-2 border-yellow-200">
+                <h3 className="font-bold text-gray-900 mb-4 text-lg flex items-center gap-2">
+                  <span className="text-yellow-600">📌</span> Pinned
+                </h3>
+                <div className="space-y-6">
+                  {filteredCorrespondence.pinned.map((entry) => renderEntry(entry, {
+                    isContext: false
+                  }))}
+                </div>
+              </div>
+            )}
+
             {/* Recent Section */}
             {filteredCorrespondence.recent.length > 0 && (
               <div className="mb-8">
