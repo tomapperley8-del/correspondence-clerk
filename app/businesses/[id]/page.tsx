@@ -49,6 +49,8 @@ export default function BusinessDetailPage({
   const [editedContactId, setEditedContactId] = useState<string>('')
   const [editedSubject, setEditedSubject] = useState<string>('')
   const [editedInternalSender, setEditedInternalSender] = useState<string>('')
+  const [editedActionNeeded, setEditedActionNeeded] = useState<string>('none')
+  const [editedDueAt, setEditedDueAt] = useState<string>('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [contextEntryIds, setContextEntryIds] = useState<Set<string>>(new Set())
@@ -432,6 +434,8 @@ export default function BusinessDetailPage({
     setEditedContactId(entry.contact_id || '')
     setEditedSubject(entry.subject || '')
     setEditedInternalSender(entry.internal_sender || '')
+    setEditedActionNeeded(entry.action_needed || 'none')
+    setEditedDueAt(entry.due_at ? new Date(entry.due_at).toISOString().split('T')[0] : '')
     // Set date in YYYY-MM-DD format for the input field
     if (entry.entry_date) {
       const date = new Date(entry.entry_date)
@@ -450,6 +454,8 @@ export default function BusinessDetailPage({
     setEditedContactId('')
     setEditedSubject('')
     setEditedInternalSender('')
+    setEditedActionNeeded('none')
+    setEditedDueAt('')
     setActionError(null)
   }
 
@@ -472,7 +478,7 @@ export default function BusinessDetailPage({
       const contactChanged = originalEntry && originalEntry.contact_id !== editedContactId
 
       // Update formatted text, date, subject, and internal_sender
-      const textResult = await updateFormattedText(entryId, editedText, dateToSave, editedSubject || null, editedInternalSender || null)
+      const textResult = await updateFormattedText(entryId, editedText, dateToSave, editedSubject || null, editedInternalSender || null, editedActionNeeded || 'none', editedDueAt || null)
 
       if ('error' in textResult) {
         setActionError(`Error saving: ${textResult.error}`)
@@ -521,6 +527,8 @@ export default function BusinessDetailPage({
       setEditedContactId('')
       setEditedSubject('')
       setEditedInternalSender('')
+      setEditedActionNeeded('none')
+      setEditedDueAt('')
     } catch (err) {
       setActionError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
@@ -980,6 +988,40 @@ export default function BusinessDetailPage({
                 className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
               />
             </div>
+
+            {/* Action Needed */}
+            <div className="mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-1">
+                Action needed:
+              </label>
+              <select
+                value={editedActionNeeded}
+                onChange={(e) => setEditedActionNeeded(e.target.value)}
+                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+              >
+                <option value="none">None</option>
+                <option value="follow_up">Follow-up</option>
+                <option value="waiting_on_them">Waiting on them</option>
+                <option value="invoice">Invoice</option>
+                <option value="renewal">Renewal</option>
+                <option value="prospect">Prospect</option>
+              </select>
+            </div>
+
+            {/* Due Date (only shown when action is set) */}
+            {editedActionNeeded !== 'none' && (
+              <div className="mb-3">
+                <label className="block text-sm font-semibold text-gray-900 mb-1">
+                  Due date (optional):
+                </label>
+                <input
+                  type="date"
+                  value={editedDueAt}
+                  onChange={(e) => setEditedDueAt(e.target.value)}
+                  className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+            )}
 
             {/* Text Textarea */}
             <textarea

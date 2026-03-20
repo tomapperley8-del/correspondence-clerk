@@ -281,7 +281,9 @@ export async function updateFormattedText(
   formattedTextCurrent: string,
   entryDate?: string | null,
   subject?: string | null,
-  internalSender?: string | null
+  internalSender?: string | null,
+  actionNeeded?: string | null,
+  dueAt?: string | null
 ) {
   const supabase = await createClient()
   const {
@@ -311,6 +313,14 @@ export async function updateFormattedText(
   // Only update internal_sender if explicitly provided
   if (internalSender !== undefined) {
     updateData.internal_sender = internalSender
+  }
+
+  if (actionNeeded !== undefined) {
+    updateData.action_needed = actionNeeded || 'none'
+  }
+
+  if (dueAt !== undefined) {
+    updateData.due_at = dueAt || null
   }
 
   const { data, error } = await supabase
