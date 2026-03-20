@@ -7,9 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "update-docs": "tsx scripts/update-docs.ts",
     "export-user-guide": "tsx scripts/export-user-guide-to-gdoc.ts",
-    "screenshot": "powershell -ExecutionPolicy Bypass -File scripts/paste-screenshot.ps1"
+    "screenshot": "powershell -ExecutionPolicy Bypass -File scripts/paste-screenshot.ps1",
+    "dev:setup": "tsx scripts/setup-dev-db.ts",
+    "db:migrate": "tsx scripts/run-migrations.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -32,20 +37,27 @@
     "next": "16.1.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "stripe": "^14.0.0",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@azure/msal-node": "^3.8.8",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.2",
+    "jsdom": "^28.0.0",
     "supabase": "^2.72.7",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "tw-animate-css": "^1.4.0",
-    "typescript": "^5"
+    "typescript": "5.9.3",
+    "vitest": "^4.0.18"
   }
 }

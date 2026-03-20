@@ -346,7 +346,7 @@ RULES:
    - Store in extracted_names field
    - Use null if cannot extract
 4. Determine direction:
-   - "sent" if sender is "me", "I", "Bridget", or @chiswickcalendar.co.uk
+   - "sent" if sender is "me", "I", "Bridget", "Tom", "James", "Dawn", or @chiswickcalendar.co.uk
    - "received" for all other senders
    - null if cannot determine
 5. CRITICAL: Strip headers from formatted_text

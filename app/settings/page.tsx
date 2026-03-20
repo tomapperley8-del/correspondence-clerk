@@ -108,6 +108,12 @@ export default function SettingsPage() {
         >
           Organization
         </Link>
+        <Link
+          href="/settings/billing"
+          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-blue-600"
+        >
+          Billing
+        </Link>
       </div>
 
       {error && (

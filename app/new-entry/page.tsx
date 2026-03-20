@@ -26,6 +26,7 @@ import { MultiContactSelector } from '@/components/MultiContactSelector'
 import { matchEntriesToContacts, type ContactMatchResult } from '@/lib/contact-matching'
 import { isThreadSplitResponse } from '@/lib/ai/types'
 import { checkForDuplicates, type Correspondence } from '@/app/actions/correspondence'
+import { isInternalSender, detectInternalSender, INTERNAL_SENDER_NAMES } from '@/lib/internal-senders'
 
 function NewEntryPageContent() {
   const router = useRouter()
@@ -42,8 +43,10 @@ function NewEntryPageContent() {
   const [subject, setSubject] = useState('')
   const [entryDateOnly, setEntryDateOnly] = useState(() => new Date().toISOString().slice(0, 10))
   const [entryTime, setEntryTime] = useState('')
-  const [entryType, setEntryType] = useState<'Email' | 'Call' | 'Meeting' | ''>('')
+  const [entryType, setEntryType] = useState<'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note' | ''>('')
   const [direction, setDirection] = useState<'received' | 'sent' | ''>('')
+  const [internalSender, setInternalSender] = useState('')
+  const [threadParticipants, setThreadParticipants] = useState('')
   const [actionNeeded, setActionNeeded] = useState<'none' | 'prospect' | 'follow_up' | 'waiting_on_them' | 'invoice' | 'renewal'>('none')
   const [dueAt, setDueAt] = useState('')
   const [errors, setErrors] = useState<{
@@ -101,6 +104,22 @@ function NewEntryPageContent() {
   const [showPreview, setShowPreview] = useState(false)
   const [previewData, setPreviewData] = useState<AIFormatterResponse | null>(null)
   const [previewText, setPreviewText] = useState<string>('')
+
+  // Email selection state (multi-email thread import)
+  type ImportedEmail = {
+    emailSubject: string
+    emailBody: string
+    emailFrom: string
+    emailFromEmail: string
+    emailFromName: string
+    emailDate: string
+    emailTo: string
+    emailRawContent: string
+    emailSourceMetadata?: string
+  }
+  const [pendingEmails, setPendingEmails] = useState<ImportedEmail[]>([])
+  const [selectedEmailIndices, setSelectedEmailIndices] = useState<Set<number>>(new Set())
+  const [showEmailSelection, setShowEmailSelection] = useState(false)
 
   // Business email suggestion state (Feature #1)
   const [suggestedBusinessEmail, setSuggestedBusinessEmail] = useState<string | null>(null)
@@ -169,14 +188,12 @@ ${emailData.emailBody || ''}`
 
         setEntryType('Email')
 
-        // Auto-detect direction
+        // Auto-detect direction using internal senders list
         if (emailData.emailFrom) {
-          const fromLower = emailData.emailFrom.toLowerCase()
-          if (
-            fromLower.includes('chiswickcalendar.co.uk') ||
-            fromLower.includes('bridget')
-          ) {
+          if (isInternalSender(emailData.emailFrom)) {
             setDirection('sent')
+            const detected = detectInternalSender(emailData.emailFrom)
+            if (detected) setInternalSender(detected)
           } else {
             setDirection('received')
           }
@@ -229,6 +246,73 @@ ${emailData.emailBody || ''}`
     }
   }
 
+  // Shared helper: apply a single email's data to the form fields
+  const applyEmailToForm = async (emailData: ImportedEmail) => {
+    if (emailData.emailRawContent) {
+      setRawText(emailData.emailRawContent)
+    } else if (emailData.emailFrom || emailData.emailSubject || emailData.emailBody) {
+      const formattedEmail = `From: ${emailData.emailFrom || ''}
+${emailData.emailTo ? `To: ${emailData.emailTo}\n` : ''}${emailData.emailDate ? `Date: ${emailData.emailDate}\n` : ''}${emailData.emailSubject ? `Subject: ${emailData.emailSubject}\n` : ''}
+
+${emailData.emailBody || ''}`
+      setRawText(formattedEmail)
+    }
+
+    if (emailData.emailSubject) setSubject(emailData.emailSubject)
+
+    if (emailData.emailDate) {
+      try {
+        const date = new Date(emailData.emailDate)
+        setEntryDateOnly(date.toISOString().slice(0, 10))
+        const hours = date.getHours()
+        const minutes = date.getMinutes()
+        setEntryTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`)
+      } catch (e) {
+        // Invalid date, use today
+      }
+    }
+
+    if (emailData.emailSourceMetadata) {
+      try {
+        const metadata = typeof emailData.emailSourceMetadata === 'string'
+          ? JSON.parse(emailData.emailSourceMetadata)
+          : emailData.emailSourceMetadata
+        setEmailSourceMetadata(metadata)
+      } catch (e) {
+        console.warn('Failed to parse email source metadata:', e)
+      }
+    }
+
+    setEntryType('Email')
+
+    if (emailData.emailFrom) {
+      if (isInternalSender(emailData.emailFrom)) {
+        setDirection('sent')
+        const detected = detectInternalSender(emailData.emailFrom)
+        if (detected) setInternalSender(detected)
+      } else {
+        setDirection('received')
+      }
+    }
+
+    if (emailData.emailFromEmail) {
+      setSenderEmailData({ email: emailData.emailFromEmail, name: emailData.emailFrom || emailData.emailFromEmail })
+      try {
+        const response = await fetch(`/api/contacts?email=${encodeURIComponent(emailData.emailFromEmail)}`)
+        if (response.ok) {
+          const matchedContacts = await response.json()
+          if (matchedContacts.length > 0) {
+            const contact = matchedContacts[0]
+            setAutoMatchedContactId(contact.id)
+            setSelectedBusinessId(contact.business_id)
+          }
+        }
+      } catch (error) {
+        console.error('Error matching contact:', error)
+      }
+    }
+  }
+
   // Check for email import query parameters and pre-fill form
   useEffect(() => {
     // NEW: Check for awaitingEmail flag (postMessage-based from bookmarklet)
@@ -244,67 +328,25 @@ ${emailData.emailBody || ''}`
           return
         }
 
+        // New multi-email format from v2 bookmarklet
+        if (event.data && event.data.type === 'EMAIL_IMPORT' && Array.isArray(event.data.emails)) {
+          const emails: ImportedEmail[] = event.data.emails
+          if (emails.length === 0) return
+          if (emails.length === 1) {
+            // Single email — skip selection, apply directly
+            await applyEmailToForm(emails[0])
+          } else {
+            // Multiple emails — show selection UI
+            setPendingEmails(emails)
+            setSelectedEmailIndices(new Set(emails.map((_, i) => i)))
+            setShowEmailSelection(true)
+          }
+          return
+        }
+
+        // Legacy single-email format (backwards compat)
         if (event.data && (event.data.type === 'OUTLOOK_EMAIL_DATA' || event.data.type === 'EMAIL_DATA')) {
-          const emailData = event.data.data
-
-          // Pre-fill form with received data
-          if (emailData.emailRawContent) {
-            setRawText(emailData.emailRawContent)
-          } else if (emailData.emailFrom || emailData.emailSubject || emailData.emailBody) {
-            const formattedEmail = `From: ${emailData.emailFrom || ''}
-${emailData.emailTo ? `To: ${emailData.emailTo}\n` : ''}${emailData.emailDate ? `Date: ${emailData.emailDate}\n` : ''}${emailData.emailSubject ? `Subject: ${emailData.emailSubject}\n` : ''}
-
-${emailData.emailBody || ''}`
-            setRawText(formattedEmail)
-          }
-
-          if (emailData.emailSubject) {
-            setSubject(emailData.emailSubject)
-          }
-
-          if (emailData.emailDate) {
-            try {
-              const date = new Date(emailData.emailDate)
-              setEntryDateOnly(date.toISOString().slice(0, 10))
-              const hours = date.getHours()
-              const minutes = date.getMinutes()
-              setEntryTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`)
-            } catch (e) {
-              // Invalid date, use today
-            }
-          }
-
-          setEntryType('Email')
-
-          // Auto-detect direction
-          if (emailData.emailFrom) {
-            const fromLower = emailData.emailFrom.toLowerCase()
-            if (
-              fromLower.includes('chiswickcalendar.co.uk') ||
-              fromLower.includes('bridget')
-            ) {
-              setDirection('sent')
-            } else {
-              setDirection('received')
-            }
-          }
-
-          // Auto-match contact if email provided
-          if (emailData.emailFromEmail) {
-            try {
-              const response = await fetch(`/api/contacts?email=${encodeURIComponent(emailData.emailFromEmail)}`)
-              if (response.ok) {
-                const matchedContacts = await response.json()
-                if (matchedContacts.length > 0) {
-                  const contact = matchedContacts[0]
-                  setAutoMatchedContactId(contact.id)
-                  setSelectedBusinessId(contact.business_id)
-                }
-              }
-            } catch (error) {
-              console.error('Error matching contact:', error)
-            }
-          }
+          await applyEmailToForm(event.data.data)
         }
       }
 
@@ -651,7 +693,8 @@ ${emailBody || ''}`
       newErrors.business = 'Business is required'
     }
 
-    if (!selectedContactId) {
+    // Contact is not required for Note type
+    if (!selectedContactId && entryType !== 'Note') {
       newErrors.contact = 'Contact is required'
     }
 
@@ -659,8 +702,8 @@ ${emailBody || ''}`
       newErrors.entryDate = 'Entry date is required'
     }
 
-    // Direction is only required for Email type
-    if (entryType === 'Email' && !direction) {
+    // Direction is only required for Email / Email Thread type
+    if ((entryType === 'Email' || entryType === 'Email Thread') && !direction) {
       newErrors.direction = 'Direction is required for emails'
     }
 
@@ -747,7 +790,7 @@ ${emailBody || ''}`
     const result = await createFormattedCorrespondence(
       {
         business_id: selectedBusinessId,
-        contact_id: selectedContactId,
+        contact_id: selectedContactId || undefined,
         cc_contact_ids: ccContactIds.length > 0 ? ccContactIds : undefined,
         bcc_contact_ids: bccContactIds.length > 0 ? bccContactIds : undefined,
         raw_text_original: rawText,
@@ -757,6 +800,8 @@ ${emailBody || ''}`
         action_needed: actionNeeded,
         due_at: dueAt || undefined,
         email_source: emailSourceMetadata || undefined,
+        thread_participants: threadParticipants || undefined,
+        internal_sender: internalSender || undefined,
       },
       previewData
     )
@@ -804,7 +849,7 @@ ${emailBody || ''}`
     const result = await createFormattedCorrespondence(
       {
         business_id: selectedBusinessId,
-        contact_id: selectedContactId!, // Fallback contact (not used if matches provided)
+        contact_id: selectedContactId || undefined, // Fallback contact (not used if matches provided)
         cc_contact_ids: ccContactIds.length > 0 ? ccContactIds : undefined,
         bcc_contact_ids: bccContactIds.length > 0 ? bccContactIds : undefined,
         raw_text_original: rawText,
@@ -814,6 +859,8 @@ ${emailBody || ''}`
         action_needed: actionNeeded,
         due_at: dueAt || undefined,
         email_source: emailSourceMetadata || undefined,
+        thread_participants: threadParticipants || undefined,
+        internal_sender: internalSender || undefined,
       },
       filteredAiResponse,
       filteredMatches // Pass the filtered contact matches
@@ -850,7 +897,7 @@ ${emailBody || ''}`
 
     const result = await createUnformattedCorrespondence({
       business_id: selectedBusinessId!,
-      contact_id: selectedContactId!,
+      contact_id: selectedContactId || undefined,
       cc_contact_ids: ccContactIds.length > 0 ? ccContactIds : undefined,
       bcc_contact_ids: bccContactIds.length > 0 ? bccContactIds : undefined,
       raw_text_original: rawText,
@@ -860,6 +907,8 @@ ${emailBody || ''}`
       direction: direction || undefined,
       action_needed: actionNeeded,
       due_at: dueAt || undefined,
+      thread_participants: threadParticipants || undefined,
+      internal_sender: internalSender || undefined,
     })
 
     if ('error' in result) {
@@ -893,6 +942,84 @@ ${emailBody || ''}`
     searchParams.get('emailBody') ||
     searchParams.get('emailRawContent')
   )
+
+  // Email selection UI (multi-email thread import)
+  if (showEmailSelection && pendingEmails.length > 1) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'Lora, serif' }}>
+          Select Emails to Import
+        </h1>
+        <p className="text-gray-600 text-sm mb-6">
+          {pendingEmails.length} emails found in this thread. Choose which to import.
+        </p>
+
+        <div className="space-y-3 mb-6">
+          {pendingEmails.map((email, i) => {
+            const checked = selectedEmailIndices.has(i)
+            const date = email.emailDate ? new Date(email.emailDate).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
+            return (
+              <label
+                key={i}
+                className={`flex items-start gap-3 p-4 border-2 cursor-pointer ${checked ? 'border-blue-600 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    const next = new Set(selectedEmailIndices)
+                    if (next.has(i)) next.delete(i)
+                    else next.add(i)
+                    setSelectedEmailIndices(next)
+                  }}
+                  className="mt-1 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-gray-900 text-sm">
+                    {email.emailFrom || 'Unknown sender'}
+                  </div>
+                  {email.emailSubject && (
+                    <div className="text-sm text-gray-700 mt-0.5">{email.emailSubject}</div>
+                  )}
+                  <div className="text-xs text-gray-500 mt-0.5">{date}</div>
+                  {email.emailBody && (
+                    <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                      {email.emailBody.substring(0, 150)}{email.emailBody.length > 150 ? '…' : ''}
+                    </div>
+                  )}
+                </div>
+              </label>
+            )
+          })}
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            onClick={async () => {
+              const selected = pendingEmails.filter((_, i) => selectedEmailIndices.has(i))
+              if (selected.length === 0) return
+              setShowEmailSelection(false)
+              // Apply the first selected email to the form; user can save and repeat for others
+              await applyEmailToForm(selected[0])
+              if (selected.length > 1) {
+                setActionWarning(`Importing 1 of ${selected.length} selected emails. After saving, use the bookmarklet selection again for the remaining ${selected.length - 1}.`)
+              }
+            }}
+            disabled={selectedEmailIndices.size === 0}
+            className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-2 font-semibold"
+          >
+            Import Selected ({selectedEmailIndices.size})
+          </Button>
+          <Button
+            onClick={() => setShowEmailSelection(false)}
+            className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-6 py-2"
+          >
+            Cancel
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -994,16 +1121,18 @@ ${emailBody || ''}`
           </div>
         )}
 
-        {/* Contact Selector */}
-        <ContactSelector
-          contacts={contacts}
-          selectedContactId={selectedContactId}
-          onSelect={handleContactSelect}
-          onAddNew={handleAddNewContact}
-          error={errors.contact}
-          disabled={!selectedBusinessId}
-          onContactUpdated={handleContactUpdated}
-        />
+        {/* Contact Selector - hidden for Note type */}
+        {entryType !== 'Note' && (
+          <ContactSelector
+            contacts={contacts}
+            selectedContactId={selectedContactId}
+            onSelect={handleContactSelect}
+            onAddNew={handleAddNewContact}
+            error={errors.contact}
+            disabled={!selectedBusinessId}
+            onContactUpdated={handleContactUpdated}
+          />
+        )}
 
         {/* CC Contacts Selector */}
         {selectedBusinessId && contacts.length > 1 && (
@@ -1068,8 +1197,8 @@ ${emailBody || ''}`
               <p className="text-gray-500 text-xs mt-1">Leave blank if time is unknown</p>
             </div>
 
-            {/* Direction - only show for emails */}
-            {entryType === 'Email' && (
+            {/* Direction - only show for emails and email threads */}
+            {(entryType === 'Email' || entryType === 'Email Thread') && (
               <div>
                 <Label className="block mb-2 font-semibold">
                   Direction <span className="text-red-600">*</span>
@@ -1125,8 +1254,48 @@ ${emailBody || ''}`
                 <option value="Email">Email</option>
                 <option value="Call">Call</option>
                 <option value="Meeting">Meeting</option>
+                <option value="Email Thread">Email Thread</option>
+                <option value="Note">Note</option>
               </select>
             </div>
+
+            {/* Thread Participants - only shown for Email Thread type */}
+            {entryType === 'Email Thread' && (
+              <div>
+                <Label htmlFor="threadParticipants" className="block mb-2 font-semibold">
+                  Thread between (optional)
+                </Label>
+                <Input
+                  id="threadParticipants"
+                  type="text"
+                  value={threadParticipants}
+                  onChange={(e) => setThreadParticipants(e.target.value)}
+                  placeholder="e.g. Tom and Josh Harrington"
+                  className="w-full"
+                />
+              </div>
+            )}
+
+            {/* Internal Sender - shown when direction is set */}
+            {(entryType === 'Email' || entryType === 'Email Thread') && direction && (
+              <div>
+                <Label htmlFor="internalSender" className="block mb-2 font-semibold">
+                  {direction === 'sent' ? 'Sent from' : 'Received by'} (optional)
+                </Label>
+                <select
+                  id="internalSender"
+                  value={internalSender}
+                  onChange={(e) => setInternalSender(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 focus:outline-none focus:border-blue-600"
+                >
+                  <option value="">Not specified</option>
+                  {INTERNAL_SENDER_NAMES.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                  <option value="info@">info@ (shared)</option>
+                </select>
+              </div>
+            )}
           </div>
         </div>
 

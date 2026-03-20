@@ -176,6 +176,30 @@ export function Navigation() {
               <span className="text-white/30 self-center">|</span>
 
               <Link
+                href="/reminders"
+                className={`px-4 flex items-center text-sm font-medium transition-colors ${
+                  pathname === '/reminders'
+                    ? 'text-white bg-[#7C9A5E]'
+                    : 'text-white hover:bg-[#7C9A5E]/20'
+                }`}
+              >
+                Reminders
+              </Link>
+              <span className="text-white/30 self-center">|</span>
+
+              <Link
+                href="/actions-page"
+                className={`px-4 flex items-center text-sm font-medium transition-colors ${
+                  pathname === '/actions-page'
+                    ? 'text-white bg-[#7C9A5E]'
+                    : 'text-white hover:bg-[#7C9A5E]/20'
+                }`}
+              >
+                Actions
+              </Link>
+              <span className="text-white/30 self-center">|</span>
+
+              <Link
                 href="/help"
                 className={`px-4 flex items-center text-sm font-medium transition-colors ${
                   pathname === '/help'

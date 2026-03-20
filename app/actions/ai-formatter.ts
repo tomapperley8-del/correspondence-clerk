@@ -54,12 +54,12 @@ export async function formatCorrespondenceText(
 export async function createFormattedCorrespondence(
   formData: {
     business_id: string
-    contact_id: string
+    contact_id?: string
     cc_contact_ids?: string[]
     bcc_contact_ids?: string[]
     raw_text_original: string
     entry_date?: string
-    type?: 'Email' | 'Call' | 'Meeting'
+    type?: 'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note'
     direction?: 'received' | 'sent'
     action_needed?:
       | 'none'
@@ -70,6 +70,8 @@ export async function createFormattedCorrespondence(
       | 'renewal'
     due_at?: string
     email_source?: Record<string, unknown>
+    thread_participants?: string
+    internal_sender?: string
   },
   aiResponse: AIFormatterResponse,
   contactMatches?: ContactMatchResult[]
@@ -97,7 +99,7 @@ export async function createFormattedCorrespondence(
         // Use matched contact if available, otherwise use default contact
         const contactId = contactMatches && contactMatches[index]?.contactId
           ? contactMatches[index].contactId
-          : formData.contact_id
+          : (formData.contact_id || null)
 
         // Hash the formatted text of THIS specific email, not the full raw thread
         const { data: entryHash } = await supabase.rpc('compute_content_hash', {
@@ -172,7 +174,7 @@ export async function createFormattedCorrespondence(
       .from('correspondence')
       .insert({
         business_id: formData.business_id,
-        contact_id: formData.contact_id,
+        contact_id: formData.contact_id || null,
         cc_contact_ids: formData.cc_contact_ids || [],
         bcc_contact_ids: formData.bcc_contact_ids || [],
         user_id: user.id,
@@ -182,13 +184,15 @@ export async function createFormattedCorrespondence(
         entry_date:
           aiResponse.entry_date_guess || formData.entry_date || new Date().toISOString(),
         subject: aiResponse.subject_guess,
-        type: aiResponse.entry_type_guess,
+        type: formData.type || aiResponse.entry_type_guess,
         direction: aiResponse.direction_guess || formData.direction || null,
         action_needed: formData.action_needed || 'none',
         due_at: formData.due_at || null,
         formatting_status: 'formatted',
         content_hash: contentHash || null,
         organization_id: organizationId,
+        thread_participants: formData.thread_participants || null,
+        internal_sender: formData.internal_sender || null,
         ai_metadata: {
           warnings: aiResponse.warnings,
           split_from_thread: false,
@@ -221,13 +225,13 @@ export async function createFormattedCorrespondence(
  */
 export async function createUnformattedCorrespondence(formData: {
   business_id: string
-  contact_id: string
+  contact_id?: string
   cc_contact_ids?: string[]
   bcc_contact_ids?: string[]
   raw_text_original: string
   entry_date?: string
   subject?: string
-  type?: 'Email' | 'Call' | 'Meeting'
+  type?: 'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note'
   direction?: 'received' | 'sent'
   action_needed?:
     | 'none'
@@ -237,6 +241,8 @@ export async function createUnformattedCorrespondence(formData: {
     | 'invoice'
     | 'renewal'
   due_at?: string
+  thread_participants?: string
+  internal_sender?: string
 }) {
   const supabase = await createClient()
   const {
@@ -262,7 +268,7 @@ export async function createUnformattedCorrespondence(formData: {
     .from('correspondence')
     .insert({
       business_id: formData.business_id,
-      contact_id: formData.contact_id,
+      contact_id: formData.contact_id || null,
       cc_contact_ids: formData.cc_contact_ids || [],
       bcc_contact_ids: formData.bcc_contact_ids || [],
       user_id: user.id,
@@ -279,6 +285,8 @@ export async function createUnformattedCorrespondence(formData: {
       content_hash: contentHash || null,
       organization_id: organizationId,
       ai_metadata: { saved_without_formatting: true },
+      thread_participants: formData.thread_participants || null,
+      internal_sender: formData.internal_sender || null,
     })
     .select()
     .single()

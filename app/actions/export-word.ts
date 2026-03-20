@@ -236,8 +236,8 @@ export async function exportToWord(businessId: string) {
         let metaLine = entryDate
         if (direction) metaLine += ` | ${direction}`
         if (type) metaLine += ` | ${type}`
-        metaLine += ` | ${entry.contact.name}`
-        if (entry.contact.role) metaLine += `, ${entry.contact.role}`
+        if (entry.contact?.name) metaLine += ` | ${entry.contact.name}`
+        if (entry.contact?.role) metaLine += `, ${entry.contact.role}`
 
         sections.push(
           new Paragraph({

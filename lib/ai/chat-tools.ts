@@ -74,7 +74,7 @@ export const CHAT_TOOL_DEFINITIONS = [
         },
         limit: {
           type: 'number',
-          description: 'Max entries to return (default 50)',
+          description: 'Max entries to return (default 200)',
         },
       },
       required: [],
@@ -385,7 +385,7 @@ async function getCorrespondenceHistory(
   orgId: string,
   businessId?: string,
   businessName?: string,
-  limit: number = 50
+  limit: number = 200
 ): Promise<ToolResult> {
   const supabase = await createClient()
 

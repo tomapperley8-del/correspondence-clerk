@@ -141,29 +141,9 @@ export function EditBusinessButton({ business }: { business: Business }) {
                 type="text"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="e.g., Food & Drink, Health & Wellness"
+                placeholder="e.g., Food & Drink, Collaborator, Health & Wellness"
                 className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600"
               />
-            </div>
-
-            {/* Status */}
-            <div className="mb-4">
-              <label htmlFor="editBusinessStatus" className="block text-sm font-semibold text-gray-900 mb-2">
-                Status
-              </label>
-              <select
-                id="editBusinessStatus"
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 border-2 border-gray-300 bg-white focus:border-blue-600 focus:outline-none"
-              >
-                <option value="">Select status...</option>
-                <option value="Prospect">Prospect</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Membership type (Club Card, Advertiser) is set in Contract Details
-              </p>
             </div>
 
             {/* Notes */}

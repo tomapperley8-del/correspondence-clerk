@@ -20,6 +20,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
     contact.phones && contact.phones.length > 0 ? contact.phones : ['']
   )
   const [notes, setNotes] = useState(contact.notes || '')
+  const [isActive, setIsActive] = useState(contact.is_active ?? true)
 
   const handleCancel = () => {
     setName(contact.name)
@@ -27,6 +28,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
     setEmails(contact.emails && contact.emails.length > 0 ? contact.emails : [''])
     setPhones(contact.phones && contact.phones.length > 0 ? contact.phones : [''])
     setNotes(contact.notes || '')
+    setIsActive(contact.is_active ?? true)
     setError(null)
     setIsOpen(false)
   }
@@ -76,6 +78,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
       emails: filteredEmails,
       phones: filteredPhones,
       notes: notes || undefined,
+      is_active: isActive,
     })
 
     if ('error' in result) {
@@ -219,6 +222,32 @@ export function EditContactButton({ contact }: { contact: Contact }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Active/Former toggle */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              Status
+            </label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsActive(true)}
+                className={`px-4 py-2 text-sm font-medium border-2 ${isActive ? 'bg-green-100 border-green-600 text-green-800' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'}`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsActive(false)}
+                className={`px-4 py-2 text-sm font-medium border-2 ${!isActive ? 'bg-gray-200 border-gray-600 text-gray-800' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'}`}
+              >
+                Has left
+              </button>
+            </div>
+            {!isActive && (
+              <p className="text-xs text-gray-500 mt-1">This contact will be shown as "(Former)" throughout the app.</p>
+            )}
           </div>
 
           {/* Notes */}

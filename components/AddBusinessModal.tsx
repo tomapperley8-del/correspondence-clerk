@@ -99,7 +99,7 @@ export function AddBusinessModal({
               onChange={(e) => setCategory(e.target.value)}
               disabled={isLoading}
               className="w-full"
-              placeholder="e.g. Restaurant, Retail, Professional Services"
+              placeholder="e.g. Restaurant, Retail, Collaborator, Professional Services"
             />
           </div>
 

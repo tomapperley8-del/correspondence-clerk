@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+import { PLANS, TRIAL_DAYS } from '@/lib/stripe/config'
 
 export type Organization = {
   id: string
@@ -91,13 +93,32 @@ export async function createOrganization(name: string) {
     return { error: 'User already has an organization' }
   }
 
-  // Create organization
+  // Calculate trial end date if billing is enabled
+  const billingEnabled = isFeatureEnabled('billing')
+  let trialEndsAt: string | null = null
+  if (billingEnabled) {
+    const trialEnd = new Date()
+    trialEnd.setDate(trialEnd.getDate() + TRIAL_DAYS)
+    trialEndsAt = trialEnd.toISOString()
+  }
+
+  // Create organization with billing fields if enabled
+  const orgData: Record<string, unknown> = {
+    name: name.trim(),
+    created_by: user.id,
+  }
+
+  if (billingEnabled) {
+    orgData.subscription_plan = 'trial'
+    orgData.subscription_status = 'trialing'
+    orgData.trial_ends_at = trialEndsAt
+    orgData.seats_limit = PLANS.trial.seats
+    orgData.ai_requests_limit = PLANS.trial.aiRequests
+  }
+
   const { data: organization, error: orgError } = await supabase
     .from('organizations')
-    .insert({
-      name: name.trim(),
-      created_by: user.id,
-    })
+    .insert(orgData)
     .select()
     .single()
 

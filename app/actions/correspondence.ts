@@ -7,23 +7,25 @@ import { z } from 'zod'
 
 const createCorrespondenceSchema = z.object({
   business_id: z.string().uuid('Invalid business ID'),
-  contact_id: z.string().uuid('Invalid contact ID'),
+  contact_id: z.string().uuid('Invalid contact ID').optional(),
   cc_contact_ids: z.array(z.string().uuid('Invalid CC contact ID')).optional(),
   bcc_contact_ids: z.array(z.string().uuid('Invalid BCC contact ID')).optional(),
   raw_text_original: z.string().min(1, 'Correspondence text is required').max(100000, 'Text too long'),
   entry_date: z.string().optional(),
   subject: z.string().max(500).optional(),
-  type: z.enum(['Email', 'Call', 'Meeting']).optional(),
+  type: z.enum(['Email', 'Call', 'Meeting', 'Email Thread', 'Note']).optional(),
   direction: z.enum(['received', 'sent']).optional(),
   action_needed: z.enum(['none', 'prospect', 'follow_up', 'waiting_on_them', 'invoice', 'renewal']).optional(),
   due_at: z.string().optional(),
   ai_metadata: z.record(z.string(), z.unknown()).optional(),
+  thread_participants: z.string().max(500).optional(),
+  internal_sender: z.string().max(100).optional(),
 })
 
 export type Correspondence = {
   id: string
   business_id: string
-  contact_id: string
+  contact_id: string | null
   cc_contact_ids: string[] | null
   bcc_contact_ids: string[] | null
   user_id: string
@@ -32,7 +34,7 @@ export type Correspondence = {
   formatted_text_current: string | null
   entry_date: string | null
   subject: string | null
-  type: 'Email' | 'Call' | 'Meeting' | null
+  type: 'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note' | null
   direction: 'received' | 'sent' | null
   action_needed:
     | 'none'
@@ -50,10 +52,14 @@ export type Correspondence = {
   updated_at: string
   edited_at: string | null
   edited_by: string | null
+  is_pinned: boolean
+  thread_participants: string | null
+  internal_sender: string | null
   contact: {
     name: string
     role: string | null
-  }
+    is_active?: boolean
+  } | null
   cc_contacts?: Array<{
     id: string
     name: string
@@ -89,11 +95,13 @@ export async function getCorrespondenceByBusiness(
       raw_text_original, formatted_text_original, formatted_text_current,
       entry_date, subject, type, direction, formatting_status, action_needed,
       due_at, content_hash, ai_metadata, organization_id, created_at, updated_at, edited_at, edited_by,
-      contact:contacts(name, role)
+      is_pinned, thread_participants, internal_sender,
+      contact:contacts(name, role, is_active)
     `,
       { count: 'exact' }
     )
     .eq('business_id', businessId)
+    .order('is_pinned', { ascending: false })
     .order('entry_date', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
@@ -161,17 +169,21 @@ export async function getCorrespondenceByBusiness(
   // Supabase returns contact as object for foreign key joins, normalize for consistent typing
   const normalizedData = (data || []).map((entry) => {
     // Handle contact - could be object (normal) or array (edge case) or null
-    let contact: { name: string; role: string | null }
+    // Note: contact_id is nullable for Note type entries
+    let contact: { name: string; role: string | null; is_active?: boolean } | null
     if (Array.isArray(entry.contact)) {
-      contact = entry.contact[0] || { name: 'Unknown', role: null }
+      contact = entry.contact[0] || null
     } else if (entry.contact && typeof entry.contact === 'object') {
-      contact = entry.contact as { name: string; role: string | null }
+      contact = entry.contact as { name: string; role: string | null; is_active?: boolean }
     } else {
-      contact = { name: 'Unknown', role: null }
+      contact = null
     }
     return {
       ...entry,
       contact,
+      is_pinned: entry.is_pinned ?? false,
+      thread_participants: (entry as Record<string, unknown>).thread_participants as string | null ?? null,
+      internal_sender: (entry as Record<string, unknown>).internal_sender as string | null ?? null,
     }
   }) as Correspondence[]
 
@@ -180,17 +192,19 @@ export async function getCorrespondenceByBusiness(
 
 export async function createCorrespondence(formData: {
   business_id: string
-  contact_id: string
+  contact_id?: string
   cc_contact_ids?: string[]
   bcc_contact_ids?: string[]
   raw_text_original: string
   entry_date?: string
   subject?: string
-  type?: 'Email' | 'Call' | 'Meeting'
+  type?: 'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note'
   direction?: 'received' | 'sent'
   action_needed?: 'none' | 'prospect' | 'follow_up' | 'waiting_on_them' | 'invoice' | 'renewal'
   due_at?: string
   ai_metadata?: Record<string, unknown>
+  thread_participants?: string
+  internal_sender?: string
 }) {
   const supabase = await createClient()
   const {
@@ -217,7 +231,7 @@ export async function createCorrespondence(formData: {
     .from('correspondence')
     .insert({
       business_id: formData.business_id,
-      contact_id: formData.contact_id,
+      contact_id: formData.contact_id || null,
       cc_contact_ids: formData.cc_contact_ids || [],
       bcc_contact_ids: formData.bcc_contact_ids || [],
       user_id: user.id,
@@ -229,6 +243,8 @@ export async function createCorrespondence(formData: {
       action_needed: formData.action_needed || 'none',
       due_at: formData.due_at || null,
       ai_metadata: formData.ai_metadata || null,
+      thread_participants: formData.thread_participants || null,
+      internal_sender: formData.internal_sender || null,
       organization_id: organizationId,
     })
     .select()
@@ -261,7 +277,9 @@ export async function createCorrespondence(formData: {
 export async function updateFormattedText(
   correspondenceId: string,
   formattedTextCurrent: string,
-  entryDate?: string | null
+  entryDate?: string | null,
+  subject?: string | null,
+  internalSender?: string | null
 ) {
   const supabase = await createClient()
   const {
@@ -272,12 +290,7 @@ export async function updateFormattedText(
     return { error: 'Unauthorized' }
   }
 
-  const updateData: {
-    formatted_text_current: string
-    edited_at: string
-    edited_by: string
-    entry_date?: string | null
-  } = {
+  const updateData: Record<string, unknown> = {
     formatted_text_current: formattedTextCurrent,
     edited_at: new Date().toISOString(),
     edited_by: user.id,
@@ -286,6 +299,16 @@ export async function updateFormattedText(
   // Only update entry_date if explicitly provided
   if (entryDate !== undefined) {
     updateData.entry_date = entryDate
+  }
+
+  // Only update subject if explicitly provided
+  if (subject !== undefined) {
+    updateData.subject = subject
+  }
+
+  // Only update internal_sender if explicitly provided
+  if (internalSender !== undefined) {
+    updateData.internal_sender = internalSender
   }
 
   const { data, error } = await supabase
@@ -648,4 +671,156 @@ export async function findDuplicatesInBusiness(businessId: string) {
   }
 
   return { duplicates }
+}
+
+/**
+ * Toggle is_pinned on a correspondence entry
+ * Pinned entries appear at the top of each section
+ */
+export async function togglePinCorrespondence(id: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  // Get current pin state
+  const { data: entry } = await supabase
+    .from('correspondence')
+    .select('is_pinned, business_id')
+    .eq('id', id)
+    .single()
+
+  if (!entry) {
+    return { error: 'Entry not found' }
+  }
+
+  const { error } = await supabase
+    .from('correspondence')
+    .update({ is_pinned: !entry.is_pinned })
+    .eq('id', id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath(`/businesses/${entry.business_id}`)
+  return { success: true, is_pinned: !entry.is_pinned }
+}
+
+/**
+ * Get all correspondence with due_at set (for reminders page)
+ */
+export async function getUpcomingReminders() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
+  const { data, error } = await supabase
+    .from('correspondence')
+    .select(`
+      id, business_id, contact_id, subject, type, direction, entry_date, due_at, action_needed,
+      formatted_text_current,
+      businesses!inner(id, name),
+      contact:contacts(name, role)
+    `)
+    .eq('organization_id', organizationId)
+    .not('due_at', 'is', null)
+    .neq('action_needed', 'none')
+    .order('due_at', { ascending: true })
+    .limit(200)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { data: data || [] }
+}
+
+/**
+ * Get all correspondence with action_needed != 'none' (for actions page)
+ */
+export async function getOutstandingActions() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
+  const { data, error } = await supabase
+    .from('correspondence')
+    .select(`
+      id, business_id, contact_id, subject, type, direction, entry_date, due_at, action_needed,
+      formatted_text_current,
+      businesses!inner(id, name),
+      contact:contacts(name, role)
+    `)
+    .eq('organization_id', organizationId)
+    .neq('action_needed', 'none')
+    .order('due_at', { ascending: true, nullsFirst: false })
+    .order('entry_date', { ascending: false })
+    .limit(200)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { data: data || [] }
+}
+
+/**
+ * Mark a correspondence entry as done (clears action_needed + due_at)
+ */
+export async function markCorrespondenceDone(id: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const { data: entry } = await supabase
+    .from('correspondence')
+    .select('business_id')
+    .eq('id', id)
+    .single()
+
+  const { error } = await supabase
+    .from('correspondence')
+    .update({ action_needed: 'none', due_at: null })
+    .eq('id', id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  if (entry) {
+    revalidatePath(`/businesses/${entry.business_id}`)
+  }
+  revalidatePath('/reminders')
+  revalidatePath('/actions-page')
+  return { success: true }
 }

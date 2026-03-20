@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
-import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, findDuplicatesInBusiness, type Correspondence } from '@/app/actions/correspondence'
+import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, type Correspondence } from '@/app/actions/correspondence'
 import { dismissDuplicatePair, dismissMultipleDuplicatePairs } from '@/app/actions/duplicate-dismissals'
 import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
 import { AddContactButton } from '@/components/AddContactButton'
@@ -22,7 +22,7 @@ import { SuccessBanner } from '@/components/SuccessBanner'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { CopyButton } from '@/components/CopyButton'
 import { retryFormatting } from '@/app/actions/ai-formatter'
-import { formatDateGB } from '@/lib/utils'
+import { formatDateGB, formatDateTimeGB } from '@/lib/utils'
 
 export default function BusinessDetailPage({
   params,
@@ -46,6 +46,8 @@ export default function BusinessDetailPage({
   const [editedDate, setEditedDate] = useState<string>('')
   const [editedDirection, setEditedDirection] = useState<'received' | 'sent' | ''>('')
   const [editedContactId, setEditedContactId] = useState<string>('')
+  const [editedSubject, setEditedSubject] = useState<string>('')
+  const [editedInternalSender, setEditedInternalSender] = useState<string>('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [contextEntryIds, setContextEntryIds] = useState<Set<string>>(new Set())
@@ -258,8 +260,10 @@ export default function BusinessDetailPage({
       return true
     })
 
-    // Sort based on user preference
+    // Sort: pinned entries first, then by user preference
     const sortFn = (a: typeof correspondence[0], b: typeof correspondence[0]) => {
+      if (a.is_pinned && !b.is_pinned) return -1
+      if (!a.is_pinned && b.is_pinned) return 1
       const dateA = new Date(a.entry_date || a.created_at).getTime()
       const dateB = new Date(b.entry_date || b.created_at).getTime()
       return sortOrder === 'oldest' ? dateA - dateB : dateB - dateA
@@ -342,7 +346,7 @@ export default function BusinessDetailPage({
         || entry.raw_text_original
       return (
         entry.subject?.toLowerCase().includes(query) ||
-        entry.contact.name.toLowerCase().includes(query) ||
+        (entry.contact?.name.toLowerCase().includes(query) ?? false) ||
         displayedText.toLowerCase().includes(query)
       )
     }
@@ -412,7 +416,9 @@ export default function BusinessDetailPage({
       entry.raw_text_original
     )
     setEditedDirection(entry.direction || '')
-    setEditedContactId(entry.contact_id)
+    setEditedContactId(entry.contact_id || '')
+    setEditedSubject(entry.subject || '')
+    setEditedInternalSender(entry.internal_sender || '')
     // Set date in YYYY-MM-DD format for the input field
     if (entry.entry_date) {
       const date = new Date(entry.entry_date)
@@ -429,6 +435,8 @@ export default function BusinessDetailPage({
     setEditedDate('')
     setEditedDirection('')
     setEditedContactId('')
+    setEditedSubject('')
+    setEditedInternalSender('')
     setActionError(null)
   }
 
@@ -450,8 +458,8 @@ export default function BusinessDetailPage({
       const directionChanged = originalEntry && originalEntry.direction !== (editedDirection || null)
       const contactChanged = originalEntry && originalEntry.contact_id !== editedContactId
 
-      // Update formatted text and date
-      const textResult = await updateFormattedText(entryId, editedText, dateToSave)
+      // Update formatted text, date, subject, and internal_sender
+      const textResult = await updateFormattedText(entryId, editedText, dateToSave, editedSubject || null, editedInternalSender || null)
 
       if ('error' in textResult) {
         setActionError(`Error saving: ${textResult.error}`)
@@ -498,6 +506,8 @@ export default function BusinessDetailPage({
       setEditedDate('')
       setEditedDirection('')
       setEditedContactId('')
+      setEditedSubject('')
+      setEditedInternalSender('')
     } catch (err) {
       setActionError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
@@ -801,24 +811,55 @@ export default function BusinessDetailPage({
         </div>
 
         {/* Prominent direction and contact display */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           {entry.direction === 'received' && (
             <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800 font-semibold border-2 border-blue-300">
-              RECEIVED FROM
+              {entry.internal_sender
+                ? `RECEIVED BY ${entry.internal_sender.toUpperCase()}`
+                : 'RECEIVED FROM'}
             </span>
           )}
           {entry.direction === 'sent' && (
             <span className="text-xs bg-green-100 px-2 py-1 text-green-800 font-semibold border-2 border-green-300">
-              SENT TO
+              {entry.internal_sender
+                ? `SENT FROM ${entry.internal_sender.toUpperCase()}`
+                : 'SENT TO'}
             </span>
           )}
-          <span className="text-lg font-bold text-gray-900">
-            {extractedName || entry.contact.name}
-          </span>
-          {entry.contact.role && (
-            <span className="text-sm text-gray-600">({entry.contact.role})</span>
+          {entry.type === 'Note' && !entry.direction && (
+            <span className="text-xs bg-purple-100 px-2 py-1 text-purple-800 font-semibold border-2 border-purple-300">
+              NOTE
+            </span>
+          )}
+          {entry.contact ? (
+            <>
+              <span className="text-lg font-bold text-gray-900">
+                {extractedName || entry.contact.name}
+              </span>
+              {entry.contact.is_active === false && (
+                <span className="text-xs text-gray-500 font-normal">(Former)</span>
+              )}
+              {entry.contact.role && (
+                <span className="text-sm text-gray-600">({entry.contact.role})</span>
+              )}
+            </>
+          ) : entry.type !== 'Note' && (
+            <span className="text-sm text-gray-500 italic">No contact assigned</span>
+          )}
+          {/* Pin indicator */}
+          {entry.is_pinned && (
+            <span className="text-xs bg-yellow-100 px-2 py-1 text-yellow-800 border border-yellow-300">
+              Pinned
+            </span>
           )}
         </div>
+
+        {/* Thread participants (for Email Thread type) */}
+        {entry.thread_participants && (
+          <div className="text-sm text-gray-600 mb-1">
+            <span className="font-medium">Thread between: </span>{entry.thread_participants}
+          </div>
+        )}
 
         {/* CC Contacts */}
         {entry.cc_contacts && entry.cc_contacts.length > 0 && (
@@ -836,7 +877,7 @@ export default function BusinessDetailPage({
 
         {/* Secondary meta line */}
         <div className="text-sm text-gray-600 mb-3">
-          {entry.entry_date && <span>{formatDateGB(entry.entry_date)}</span>}
+          {entry.entry_date && <span>{formatDateTimeGB(entry.entry_date)}</span>}
           {entry.type && <span> • {entry.type}</span>}
         </div>
 
@@ -846,6 +887,20 @@ export default function BusinessDetailPage({
             <p className="text-sm font-semibold text-yellow-900 mb-3">
               Editing entry (manual correction)
             </p>
+
+            {/* Subject */}
+            <div className="mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-1">
+                Subject:
+              </label>
+              <input
+                type="text"
+                value={editedSubject}
+                onChange={(e) => setEditedSubject(e.target.value)}
+                placeholder="Enter subject..."
+                className="w-full px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
+              />
+            </div>
 
             {/* Direction Dropdown */}
             <div className="mb-3">
@@ -860,6 +915,25 @@ export default function BusinessDetailPage({
                 <option value="">-- Unknown Direction --</option>
                 <option value="received">Received</option>
                 <option value="sent">Sent</option>
+              </select>
+            </div>
+
+            {/* Internal Sender */}
+            <div className="mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-1">
+                {editedDirection === 'sent' ? 'Sent from:' : editedDirection === 'received' ? 'Received by:' : 'Internal sender:'}
+              </label>
+              <select
+                value={editedInternalSender}
+                onChange={(e) => setEditedInternalSender(e.target.value)}
+                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+              >
+                <option value="">-- Not specified --</option>
+                <option value="Bridget">Bridget</option>
+                <option value="Tom">Tom</option>
+                <option value="James">James</option>
+                <option value="Dawn">Dawn</option>
+                <option value="info@">info@ (shared)</option>
               </select>
             </div>
 
@@ -942,6 +1016,18 @@ export default function BusinessDetailPage({
                 className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
               >
                 Edit
+              </Button>
+              <Button
+                onClick={async () => {
+                  await togglePinCorrespondence(entry.id)
+                  if (id) {
+                    const result = await getCorrespondenceByBusiness(id)
+                    setCorrespondence('error' in result ? [] : result.data || [])
+                  }
+                }}
+                className={`px-3 py-1 text-xs ${entry.is_pinned ? 'bg-yellow-200 text-yellow-900 hover:bg-yellow-300' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}
+              >
+                {entry.is_pinned ? 'Unpin' : 'Pin'}
               </Button>
               <Button
                 onClick={() => handleDeleteEntry(entry.id, entry.subject || '')}

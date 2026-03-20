@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { searchAll, type SearchResult, type SearchFilters } from '@/app/actions/search'
-import { formatDateGB } from '@/lib/utils'
+import { formatDateTimeGB } from '@/lib/utils'
 
 export default function SearchPage() {
   const [query, setQuery] = useState('')
@@ -18,7 +18,7 @@ export default function SearchPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [direction, setDirection] = useState<'received' | 'sent' | ''>('')
-  const [type, setType] = useState<'Email' | 'Call' | 'Meeting' | ''>('')
+  const [type, setType] = useState<'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note' | ''>('')
   const [sortBy, setSortBy] = useState<'relevance' | 'date_newest' | 'date_oldest'>('relevance')
   const [showFilters, setShowFilters] = useState(false)
 
@@ -168,6 +168,8 @@ export default function SearchPage() {
                   <option value="Email">Email</option>
                   <option value="Call">Call</option>
                   <option value="Meeting">Meeting</option>
+                  <option value="Email Thread">Email Thread</option>
+                  <option value="Note">Note</option>
                 </select>
               </div>
             </div>
@@ -210,8 +212,23 @@ export default function SearchPage() {
         </div>
       )}
 
+      {/* Loading skeleton while searching */}
+      {isSearching && (
+        <div className="bg-white border-2 border-gray-300 p-6 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse border-2 border-gray-200 p-4">
+              <div className="flex gap-2 mb-2">
+                <div className="h-5 w-20 bg-gray-200 rounded" />
+                <div className="h-5 w-48 bg-gray-200 rounded" />
+              </div>
+              <div className="h-4 w-full bg-gray-100 rounded" />
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Results */}
-      {hasSearched && !searchError && (
+      {hasSearched && !isSearching && !searchError && (
         <div className="bg-white border-2 border-gray-300 p-6">
           {/* Result count */}
           <p className="text-sm text-gray-600 mb-4" aria-live="polite">
@@ -262,7 +279,7 @@ export default function SearchPage() {
                       {result.entry_date && (
                         <span>
                           {' '}
-                          • {formatDateGB(result.entry_date)}
+                          • {formatDateTimeGB(result.entry_date)}
                         </span>
                       )}
                     </p>

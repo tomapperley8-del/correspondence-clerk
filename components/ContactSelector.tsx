@@ -38,9 +38,14 @@ function ContactSelectorComponent({
 
   const selectedContact = contacts.find((c) => c.id === selectedContactId)
 
-  const filteredContacts = contacts.filter((contact) =>
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredContacts = contacts
+    .filter((contact) => contact.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      // Active contacts first, then inactive
+      if ((a.is_active ?? true) && !(b.is_active ?? true)) return -1
+      if (!(a.is_active ?? true) && (b.is_active ?? true)) return 1
+      return a.name.localeCompare(b.name)
+    })
 
   const handleSelect = (contactId: string) => {
     onSelect(contactId)
@@ -168,7 +173,12 @@ function ContactSelectorComponent({
                       onClick={() => handleSelect(contact.id)}
                       className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-300 last:border-b-0"
                     >
-                      <div className="font-semibold">{contact.name}</div>
+                      <div className="font-semibold flex items-center gap-2">
+                        {contact.name}
+                        {!(contact.is_active ?? true) && (
+                          <span className="text-xs text-gray-500 font-normal">(Former)</span>
+                        )}
+                      </div>
                       {contact.role && (
                         <div className="text-xs text-gray-600 mt-1">
                           {contact.role}
@@ -327,8 +337,11 @@ function ContactSelectorComponent({
         <div className="border-2 border-green-600 bg-green-50 px-4 py-3">
           <div className="flex justify-between items-start">
             <div className="flex-1">
-              <div className="font-semibold text-gray-900">
+              <div className="font-semibold text-gray-900 flex items-center gap-2">
                 {selectedContact.name}
+                {!(selectedContact.is_active ?? true) && (
+                  <span className="text-xs text-gray-500 font-normal">(Former)</span>
+                )}
               </div>
               {selectedContact.role && (
                 <div className="text-xs text-gray-600 mt-1">

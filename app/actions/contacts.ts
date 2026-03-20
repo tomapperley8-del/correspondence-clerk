@@ -26,6 +26,7 @@ const updateContactSchema = z.object({
   emails: z.array(emailSchema.or(z.literal(''))).optional(),
   phones: z.array(z.string().max(50)).optional(),
   notes: z.string().max(5000).optional(),
+  is_active: z.boolean().optional(),
 })
 
 export type Contact = {
@@ -39,6 +40,7 @@ export type Contact = {
   emails: string[]
   phones: string[]
   notes: string | null
+  is_active: boolean
   organization_id: string
   created_at: string
   updated_at: string
@@ -57,8 +59,9 @@ export async function getContactsByBusiness(businessId: string) {
   // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
-    .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, organization_id, created_at, updated_at')
+    .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, is_active, organization_id, created_at, updated_at')
     .eq('business_id', businessId)
+    .order('is_active', { ascending: false }) // active contacts first
     .order('name', { ascending: true })
 
   if (error) {
@@ -70,6 +73,7 @@ export async function getContactsByBusiness(businessId: string) {
     ...contact,
     emails: typeof contact.emails === 'string' ? JSON.parse(contact.emails) : (contact.emails || []),
     phones: typeof contact.phones === 'string' ? JSON.parse(contact.phones) : (contact.phones || []),
+    is_active: contact.is_active ?? true,
   })) || []
 
   return { data: parsedData }
@@ -88,7 +92,7 @@ export async function getContactById(id: string) {
   // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
-    .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, organization_id, created_at, updated_at')
+    .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, is_active, organization_id, created_at, updated_at')
     .eq('id', id)
     .single()
 
@@ -101,6 +105,7 @@ export async function getContactById(id: string) {
     ...data,
     emails: typeof data.emails === 'string' ? JSON.parse(data.emails) : (data.emails || []),
     phones: typeof data.phones === 'string' ? JSON.parse(data.phones) : (data.phones || []),
+    is_active: data.is_active ?? true,
   }
 
   return { data: parsedData }
@@ -169,10 +174,6 @@ export async function createContact(formData: {
     .single()
 
   if (error) {
-    if (error.code === '23505') {
-      // Unique violation
-      return { error: 'A contact with this email already exists for this business' }
-    }
     return { error: error.message }
   }
 
@@ -197,6 +198,7 @@ export async function updateContact(
     emails?: string[]
     phones?: string[]
     notes?: string
+    is_active?: boolean
   }
 ) {
   const supabase = await createClient()
@@ -246,6 +248,7 @@ export async function updateContact(
 
   if (formData.role !== undefined) updateData.role = formData.role?.trim() || null
   if (formData.notes !== undefined) updateData.notes = formData.notes?.trim() || null
+  if (formData.is_active !== undefined) updateData.is_active = formData.is_active
 
   const { data, error } = await supabase
     .from('contacts')

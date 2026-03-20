@@ -125,8 +125,8 @@ export async function exportToGoogleDocs(businessId: string) {
         documentContent += `${entryDate}`
         if (direction) documentContent += ` | ${direction}`
         if (type) documentContent += ` | ${type}`
-        documentContent += ` | ${entry.contact.name}`
-        if (entry.contact.role) documentContent += `, ${entry.contact.role}`
+        if (entry.contact) documentContent += ` | ${entry.contact.name}`
+        if (entry.contact?.role) documentContent += `, ${entry.contact.role}`
         documentContent += `\n\n`
 
         // Entry text (use formatted_text_current as per PRD)

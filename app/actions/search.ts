@@ -24,7 +24,7 @@ export interface SearchFilters {
   dateFrom?: string
   dateTo?: string
   direction?: 'received' | 'sent' | ''
-  type?: 'Email' | 'Call' | 'Meeting' | ''
+  type?: 'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note' | ''
   sortBy?: 'relevance' | 'date_newest' | 'date_oldest'
 }
 
@@ -37,7 +37,7 @@ interface CorrespondenceSearchResult {
   raw_text_original: string | null
   entry_date: string | null
   direction: 'received' | 'sent' | null
-  type: 'Email' | 'Call' | 'Meeting' | null
+  type: 'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note' | null
   business_id: string
   businesses: { name: string }
   contacts: { name: string }

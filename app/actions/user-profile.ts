@@ -111,3 +111,35 @@ export async function getDisplayNamesForUsers(userIds: string[]) {
 
   return { data: data || [] }
 }
+
+/**
+ * Check the current user's role
+ * Returns { data: { role: 'admin' | 'member' } } or { error: string }
+ */
+export async function checkUserRole(): Promise<{
+  data?: { role: 'admin' | 'member' }
+  error?: string
+}> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated' }
+  }
+
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { data: { role: data.role || 'member' } }
+}

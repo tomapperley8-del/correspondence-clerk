@@ -61,7 +61,29 @@
       "Bash(where:*)",
       "Bash(powershell -ExecutionPolicy Bypass -Command:*)",
       "Bash(npx tsc:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git mv:*)",
+      "Bash(npx eslint:*)",
+      "Bash(del \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\\\\components\\\\ContractTimeline.tsx\")",
+      "Bash(npx next lint)",
+      "Bash(python3:*)",
+      "Bash(wc:*)",
+      "Bash(du:*)",
+      "Bash(npx next build)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\")",
+      "Bash(grep:*)",
+      "Bash(git restore:*)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_migrations",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(claude update:*)",
+      "Bash(npm update:*)",
+      "Bash(claude:*)",
+      "WebFetch(domain:correspondenceclerk.com)",
+      "Bash(xargs cat:*)",
+      "Bash(npx next dev)",
+      "Bash(node -e:*)"
     ]
   }
 }

@@ -64,13 +64,15 @@ export function DuplicateWarningModal({
               <span className="ml-2 text-gray-900">{entryDate}</span>
             </div>
 
-            <div>
-              <span className="font-semibold text-gray-700">Contact:</span>
-              <span className="ml-2 text-gray-900">
-                {existingEntry.contact.name}
-                {existingEntry.contact.role && ` (${existingEntry.contact.role})`}
-              </span>
-            </div>
+            {existingEntry.contact && (
+              <div>
+                <span className="font-semibold text-gray-700">Contact:</span>
+                <span className="ml-2 text-gray-900">
+                  {existingEntry.contact.name}
+                  {existingEntry.contact.role && ` (${existingEntry.contact.role})`}
+                </span>
+              </div>
+            )}
 
             {existingEntry.type && (
               <div>

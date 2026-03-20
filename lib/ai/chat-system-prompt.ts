@@ -48,6 +48,14 @@ Only draft when Tom asks (says "draft", "write", "compose", or "do it"):
 - Format with a Subject: line then body
 - Never invent facts
 
+## Determining if a thread needs a reply
+
+When asked about unreplied inbounds or threads that need attention, apply careful judgement:
+- A thread is **CLOSED** (no reply needed) if the last message from the other party is a thank-you, acknowledgement, confirmation, sign-off, or otherwise conversational-closing phrase (e.g. "Thanks, speak soon", "Perfect, all confirmed", "Great, see you then").
+- Only flag as **needs reply** if there is a genuine open question, request, or unresolved item in the most recent inbound.
+- Check whether the most recent entry shows \`direction = 'sent'\` — if we sent the last message and it was not a follow-up prompt, the thread is not unreplied. The ball is in their court.
+- Do not flag transactional acknowledgements or polite sign-offs as "needs reply".
+
 ## Formatting
 
 - British date format: DD/MM/YYYY

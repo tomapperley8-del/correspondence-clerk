@@ -71,8 +71,8 @@ export async function getPdfExportData(businessId: string) {
         date: entryDate,
         direction,
         type,
-        contactName: entry.contact.name,
-        contactRole: entry.contact.role || '',
+        contactName: entry.contact?.name ?? '',
+        contactRole: entry.contact?.role ?? '',
         text: entryText,
         action: actionText,
       }
