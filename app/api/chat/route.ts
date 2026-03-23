@@ -8,7 +8,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { CHAT_SYSTEM_PROMPT } from '@/lib/ai/chat-system-prompt'
+import { generateChatSystemPrompt } from '@/lib/ai/chat-system-prompt'
 import { CHAT_TOOL_DEFINITIONS, executeTool } from '@/lib/ai/chat-tools'
 
 export const maxDuration = 60 // Allow up to 60s for tool loops
@@ -31,6 +31,14 @@ export async function POST(request: NextRequest) {
   if (!organizationId) {
     return new Response(JSON.stringify({ error: 'No organization found' }), { status: 403 })
   }
+
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('name')
+    .eq('id', organizationId)
+    .single()
+
+  const systemPrompt = generateChatSystemPrompt(org?.name ?? '', '')
 
   // Rate limit: 20 requests per minute
   const rateLimit = await checkRateLimit({ limit: 20, windowMs: 60000, endpoint: 'chat' })
@@ -79,7 +87,7 @@ export async function POST(request: NextRequest) {
             system: [
               {
                 type: 'text',
-                text: CHAT_SYSTEM_PROMPT,
+                text: systemPrompt,
                 cache_control: { type: 'ephemeral' },
               },
             ],

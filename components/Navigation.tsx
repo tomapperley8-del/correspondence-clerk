@@ -15,7 +15,7 @@ function OutreachButton() {
   return (
     <button
       onClick={toggle}
-      className={`px-4 h-16 flex items-center text-sm font-medium transition-colors ${
+      className={`px-4 h-16 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
         isOpen
           ? 'text-white bg-[#7C9A5E]'
           : 'text-white hover:bg-[#7C9A5E]/20'
@@ -141,7 +141,7 @@ export function Navigation() {
             <div className="flex h-16">
               <Link
                 href="/dashboard"
-                className={`px-4 flex items-center text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/dashboard'
                     ? 'text-white bg-[#7C9A5E]'
                     : 'text-white hover:bg-[#7C9A5E]/20'
@@ -149,11 +149,10 @@ export function Navigation() {
               >
                 Dashboard
               </Link>
-              <span className="text-white/30 self-center">|</span>
 
               <Link
                 href="/new-entry"
-                className={`px-4 flex items-center text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/new-entry'
                     ? 'text-white bg-[#7C9A5E]'
                     : 'text-white hover:bg-[#7C9A5E]/20'
@@ -161,11 +160,10 @@ export function Navigation() {
               >
                 New Entry
               </Link>
-              <span className="text-white/30 self-center">|</span>
 
               <Link
                 href="/search"
-                className={`px-4 flex items-center text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/search'
                     ? 'text-white bg-[#7C9A5E]'
                     : 'text-white hover:bg-[#7C9A5E]/20'
@@ -173,11 +171,10 @@ export function Navigation() {
               >
                 Search
               </Link>
-              <span className="text-white/30 self-center">|</span>
 
               <Link
                 href="/reminders"
-                className={`px-4 flex items-center text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/reminders'
                     ? 'text-white bg-[#7C9A5E]'
                     : 'text-white hover:bg-[#7C9A5E]/20'
@@ -185,11 +182,10 @@ export function Navigation() {
               >
                 Reminders
               </Link>
-              <span className="text-white/30 self-center">|</span>
 
               <Link
                 href="/actions-page"
-                className={`px-4 flex items-center text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/actions-page'
                     ? 'text-white bg-[#7C9A5E]'
                     : 'text-white hover:bg-[#7C9A5E]/20'
@@ -197,11 +193,10 @@ export function Navigation() {
               >
                 Actions
               </Link>
-              <span className="text-white/30 self-center">|</span>
 
               <Link
                 href="/help"
-                className={`px-4 flex items-center text-sm font-medium transition-colors ${
+                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/help'
                     ? 'text-white bg-[#7C9A5E]'
                     : 'text-white hover:bg-[#7C9A5E]/20'
@@ -209,7 +204,6 @@ export function Navigation() {
               >
                 Help
               </Link>
-              <span className="text-white/30 self-center">|</span>
               <OutreachButton />
             </div>
           </div>
