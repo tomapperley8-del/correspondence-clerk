@@ -11,6 +11,7 @@ import {
   updateOrganization,
   updateOrganizationProfile,
   getOrganizationMembers,
+  type Organization,
 } from '@/app/actions/organizations'
 import {
   createInvitation,
@@ -20,12 +21,6 @@ import {
 import { useRouter } from 'next/navigation'
 import { formatDateGB } from '@/lib/utils'
 
-type Organization = {
-  id: string
-  name: string
-  business_description: string | null
-  industry: string | null
-}
 
 type Member = {
   id: string
@@ -267,7 +262,8 @@ function OrganizationSettingsContent() {
 
       {/* Business Profile */}
       <div className="bg-white border-2 border-gray-800 p-6 mb-6">
-        <h2 className="text-xl font-bold mb-4 text-gray-900">Business Profile</h2>
+        <h2 className="text-xl font-bold mb-1 text-gray-900">Business Profile</h2>
+        <p className="text-sm text-gray-500 mb-4">Helps your AI assistant understand who it&apos;s working for.</p>
         <form onSubmit={handleSaveProfile} className="space-y-4">
           <div>
             <Label htmlFor="businessDescription" className="block mb-2 font-semibold">
