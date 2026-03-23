@@ -21,7 +21,7 @@ function OutreachButton() {
           : 'text-white hover:bg-[#7C9A5E]/20'
       }`}
     >
-      Outreach
+      Daily Briefing
     </button>
   )
 }

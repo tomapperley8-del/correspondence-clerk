@@ -7,6 +7,7 @@ import { getActiveMembershipTypes, type MembershipType } from '@/app/actions/mem
 import { AddBusinessButton } from '@/components/AddBusinessButton'
 import { Input } from '@/components/ui/input'
 import { formatDateGB } from '@/lib/utils'
+import { ChatPanel } from '@/components/ChatPanel'
 
 type FilterType = 'all' | 'prospect' | string
 type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
@@ -174,6 +175,8 @@ export default function DashboardPage() {
   const endIndex = startIndex + itemsPerPage
   const paginatedBusinesses = filtered.slice(startIndex, endIndex)
 
+  const shouldAutoSend = businesses.some(b => b.last_contacted_at !== null)
+
   const FilterButton = ({
     active,
     onClick,
@@ -197,6 +200,9 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex gap-6 items-start">
+      {/* Left: business list */}
+      <div className="flex-1 min-w-0">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <AddBusinessButton />
@@ -549,6 +555,13 @@ export default function DashboardPage() {
           )}
         </>
       )}
+      </div>{/* end left column */}
+
+      {/* Right: inline Daily Briefing */}
+      <div className="hidden md:flex flex-col w-[380px] shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-hidden">
+        <ChatPanel inline autoSend={shouldAutoSend ? 'what do i need to do today' : undefined} />
+      </div>
+      </div>{/* end two-column flex */}
     </div>
   )
 }
