@@ -7,7 +7,7 @@ import { ChatMessage, type ChatMessageData, type ToolCallInfo } from '@/componen
 
 interface ChatPanelProps {
   inline?: boolean
-  autoSend?: string
+  suggestedPrompt?: string
 }
 
 /**
@@ -15,7 +15,7 @@ interface ChatPanelProps {
  * Renders as slide-out overlay (default) or inline static panel (inline=true).
  * Smooth streaming via rAF render loop with mutable refs.
  */
-export function ChatPanel({ inline = false, autoSend }: ChatPanelProps = {}) {
+export function ChatPanel({ inline = false, suggestedPrompt }: ChatPanelProps = {}) {
   const { isOpen, close } = useChat()
   const [messages, setMessages] = useState<ChatMessageData[]>([])
   const [input, setInput] = useState('')
@@ -25,7 +25,6 @@ export function ChatPanel({ inline = false, autoSend }: ChatPanelProps = {}) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const isNearBottom = useRef(true)
-  const autoSentRef = useRef(false)
 
   const checkNearBottom = useCallback(() => {
     const el = scrollRef.current
@@ -234,13 +233,6 @@ export function ChatPanel({ inline = false, autoSend }: ChatPanelProps = {}) {
     return () => document.removeEventListener('keydown', handler)
   }, [isOpen, close, inline])
 
-  // Auto-send on mount
-  useEffect(() => {
-    if (autoSend && !autoSentRef.current) {
-      autoSentRef.current = true
-      sendMessage(autoSend)
-    }
-  }, [autoSend, sendMessage])
 
   const panelContent = (
     <>
@@ -277,45 +269,37 @@ export function ChatPanel({ inline = false, autoSend }: ChatPanelProps = {}) {
       <div
         ref={scrollRef}
         onScroll={checkNearBottom}
-        className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
+        className="flex-1 overflow-y-auto px-4 py-3"
       >
-        {messages.length === 0 && (
-          <div className="text-center text-sm text-gray-400 mt-8">
-            <p className="mb-2 font-medium text-gray-500">Daily Briefing</p>
-            <p>
-              Ask what you need to do today, or say &ldquo;what do i need to do
-              today&rdquo; to get your daily briefing.
-            </p>
-          </div>
-        )}
-
-        {messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
-        ))}
-
-        {/* Tool call indicators during streaming */}
-        {isStreaming && pendingToolCalls.length > 0 && (
-          <div className="flex flex-col gap-0.5">
-            {pendingToolCalls
-              .filter((tc) => !tc.summary)
-              .map((tc, i) => (
-                <div
-                  key={i}
-                  className="text-xs text-gray-400 italic px-1 animate-pulse"
+        <div className="flex flex-col justify-end min-h-full gap-3">
+          {messages.length === 0 && (
+            <div className="text-center text-sm text-gray-400 px-2 pb-2">
+              {suggestedPrompt && (
+                <button
+                  onClick={() => sendMessage(suggestedPrompt)}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 hover:border-gray-300 transition-colors"
                 >
-                  {formatToolName(tc.name)}...
-                </div>
-              ))}
-          </div>
-        )}
+                  {suggestedPrompt}
+                </button>
+              )}
+              {!suggestedPrompt && (
+                <p>Ask what you need to do today.</p>
+              )}
+            </div>
+          )}
 
-        {/* Thinking indicator — visible when waiting for API or between tool calls */}
-        {isStreaming && (streamingPhase === 'thinking' || streamingPhase === 'tools') && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-400">
-            <span className="inline-block w-1.5 h-1.5 bg-[#7C9A5E] rounded-full animate-pulse" />
-            {streamingPhase === 'tools' ? 'Looking up data...' : 'Thinking...'}
-          </div>
-        )}
+          {messages.map((msg) => (
+            <ChatMessage key={msg.id} message={msg} />
+          ))}
+
+          {/* Thinking/tool indicator */}
+          {isStreaming && (streamingPhase === 'thinking' || streamingPhase === 'tools') && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+              <span className="inline-block w-1.5 h-1.5 bg-[#7C9A5E] rounded-full animate-pulse" />
+              {streamingPhase === 'tools' ? 'Looking up data...' : 'Thinking...'}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Input */}
@@ -339,7 +323,6 @@ export function ChatPanel({ inline = false, autoSend }: ChatPanelProps = {}) {
             Send
           </Button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1">Shift+Enter for new line</p>
       </div>
     </>
   )

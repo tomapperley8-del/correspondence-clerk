@@ -83,7 +83,9 @@
       "WebFetch(domain:correspondenceclerk.com)",
       "Bash(xargs cat:*)",
       "Bash(npx next dev)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(find C:/Users/Bridg/Projects/correspondence-clerk -name *seed* -o -name *test*data* -o -name *dev*setup*)",
+      "Bash(cd:*)"
     ]
   }
 }

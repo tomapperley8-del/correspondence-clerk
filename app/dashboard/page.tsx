@@ -559,7 +559,7 @@ export default function DashboardPage() {
 
       {/* Right: inline Daily Briefing */}
       <div className="hidden md:flex flex-col w-[380px] shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-hidden">
-        <ChatPanel inline autoSend={shouldAutoSend ? 'what do i need to do today' : undefined} />
+        <ChatPanel inline suggestedPrompt={shouldAutoSend ? 'what do i need to do today' : undefined} />
       </div>
       </div>{/* end two-column flex */}
     </div>
