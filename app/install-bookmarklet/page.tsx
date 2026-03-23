@@ -247,6 +247,20 @@ export default function InstallBookmarkletPage() {
         </section>
 
         {/* Support Section */}
+        {/* Bulk import banner */}
+        <div className="bg-[#FAFAF8] border border-[#2C4A6E] rounded p-5 mb-8 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-[#1E293B]">Want to import months of past emails at once?</p>
+            <p className="text-xs text-gray-500 mt-0.5">Bulk import scans your inbox and lets you review everything before saving.</p>
+          </div>
+          <a
+            href="/import"
+            className="flex-shrink-0 text-sm px-4 py-2 bg-[#2C4A6E] text-white font-medium hover:bg-[#1E293B] transition-colors"
+          >
+            Bulk Import
+          </a>
+        </div>
+
         <div className="bg-black text-white p-10 text-center -mx-5">
           <h2 className="text-3xl font-bold mb-4">Need More Help?</h2>
           <p className="mb-4">

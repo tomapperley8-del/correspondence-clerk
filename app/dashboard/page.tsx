@@ -205,7 +205,12 @@ export default function DashboardPage() {
       <div className="flex-1 min-w-0">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <AddBusinessButton />
+        <div className="flex items-center gap-3">
+          <Link href="/import" className="text-sm text-[#2C4A6E] hover:underline">
+            Bulk import
+          </Link>
+          <AddBusinessButton />
+        </div>
       </div>
 
       {/* Bookmarklet Installation Card */}
@@ -266,6 +271,12 @@ export default function DashboardPage() {
               className="inline-block text-center px-5 py-2.5 bg-[#2C4A6E] text-white text-sm font-medium hover:bg-[#1E293B] transition-colors"
             >
               Add your first business
+            </Link>
+            <Link
+              href="/import"
+              className="inline-block text-center px-5 py-2.5 border border-[#2C4A6E] text-[#2C4A6E] text-sm font-medium hover:bg-[#2C4A6E] hover:text-white transition-colors"
+            >
+              Bulk import from Gmail or Outlook
             </Link>
             <Link
               href="/install-bookmarklet"
