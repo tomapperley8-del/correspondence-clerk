@@ -18,6 +18,14 @@ import {
   getInvitations,
   cancelInvitation,
 } from '@/app/actions/invitations'
+import {
+  getMembershipTypes,
+  createMembershipType,
+  updateMembershipTypeOrder,
+  toggleMembershipTypeActive,
+  deleteMembershipType,
+  type MembershipType,
+} from '@/app/actions/membership-types'
 import { useRouter } from 'next/navigation'
 import { formatDateGB } from '@/lib/utils'
 
@@ -50,6 +58,10 @@ function OrganizationSettingsContent() {
   const [industry, setIndustry] = useState('')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
+  const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([])
+  const [newTypeLabel, setNewTypeLabel] = useState('')
+  const [isAddingType, setIsAddingType] = useState(false)
+  const [typeActionError, setTypeActionError] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [isLoadingOrg, setIsLoadingOrg] = useState(true)
@@ -79,6 +91,10 @@ function OrganizationSettingsContent() {
     setOrganizationName(orgResult.data.name)
     setBusinessDescription(orgResult.data.business_description ?? '')
     setIndustry(orgResult.data.industry ?? '')
+
+    // Load membership types
+    const typesResult = await getMembershipTypes()
+    if (typesResult.data) setMembershipTypes(typesResult.data)
 
     // Load members
     const membersResult = await getOrganizationMembers()
@@ -177,6 +193,55 @@ function OrganizationSettingsContent() {
   function getInviteUrl(invitation: Invitation): string {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     return `${appUrl}/invite/accept?token=${invitation.token}`
+  }
+
+  async function handleAddMembershipType(e: React.FormEvent) {
+    e.preventDefault()
+    setTypeActionError(null)
+    if (!newTypeLabel.trim()) return
+    setIsAddingType(true)
+    const result = await createMembershipType(newTypeLabel)
+    if (result.error) {
+      setTypeActionError(result.error)
+    } else {
+      setNewTypeLabel('')
+      const typesResult = await getMembershipTypes()
+      if (typesResult.data) setMembershipTypes(typesResult.data)
+    }
+    setIsAddingType(false)
+  }
+
+  async function handleMoveType(id: string, direction: 'up' | 'down') {
+    setTypeActionError(null)
+    const result = await updateMembershipTypeOrder(id, direction)
+    if (result.error) {
+      setTypeActionError(result.error)
+    } else {
+      const typesResult = await getMembershipTypes()
+      if (typesResult.data) setMembershipTypes(typesResult.data)
+    }
+  }
+
+  async function handleToggleType(id: string) {
+    setTypeActionError(null)
+    const result = await toggleMembershipTypeActive(id)
+    if (result.error) {
+      setTypeActionError(result.error)
+    } else {
+      const typesResult = await getMembershipTypes()
+      if (typesResult.data) setMembershipTypes(typesResult.data)
+    }
+  }
+
+  async function handleDeleteType(id: string) {
+    setTypeActionError(null)
+    const result = await deleteMembershipType(id)
+    if (result.error) {
+      setTypeActionError(result.error)
+    } else {
+      const typesResult = await getMembershipTypes()
+      if (typesResult.data) setMembershipTypes(typesResult.data)
+    }
   }
 
   async function handleCancelInvite(invitationId: string) {
@@ -299,6 +364,99 @@ function OrganizationSettingsContent() {
             className="bg-blue-600 text-white hover:bg-blue-700"
           >
             {isSavingProfile ? 'Saving...' : 'Save Profile'}
+          </Button>
+        </form>
+      </div>
+
+      {/* Membership Types */}
+      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-1 text-gray-900">Membership Types</h2>
+        <p className="text-sm text-gray-500 mb-4">Define the membership categories used for businesses in your organisation.</p>
+
+        {typeActionError && (
+          <div className="border-2 border-red-600 bg-red-50 px-3 py-2 mb-4">
+            <p className="text-red-800 text-sm">{typeActionError}</p>
+          </div>
+        )}
+
+        <div className="space-y-2 mb-4">
+          {membershipTypes.map((t, idx) => (
+            <div
+              key={t.id}
+              className={`flex items-center gap-3 border-2 border-gray-200 px-3 py-2 ${!t.is_active ? 'opacity-50' : ''}`}
+            >
+              <div className="flex-1 min-w-0">
+                <span className="font-semibold text-sm text-gray-900">{t.label}</span>
+                <span className="ml-2 text-xs text-gray-400">{t.value}</span>
+                {!t.is_active && <span className="ml-2 text-xs text-gray-400">(Inactive)</span>}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleMoveType(t.id, 'up')}
+                  disabled={idx === 0}
+                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-30"
+                  title="Move up"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMoveType(t.id, 'down')}
+                  disabled={idx === membershipTypes.length - 1}
+                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-30"
+                  title="Move down"
+                >
+                  ▼
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleType(t.id)}
+                  className={`px-2 py-1 text-xs font-semibold border-2 ${t.is_active ? 'border-gray-300 text-gray-700 hover:border-gray-500' : 'border-green-600 text-green-700 hover:bg-green-50'}`}
+                >
+                  {t.is_active ? 'Deactivate' : 'Activate'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteType(t.id)}
+                  className="px-2 py-1 text-xs font-semibold border-2 border-red-300 text-red-700 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+          {membershipTypes.length === 0 && (
+            <p className="text-sm text-gray-500">No membership types defined yet.</p>
+          )}
+        </div>
+
+        <form onSubmit={handleAddMembershipType} className="flex gap-2 items-end">
+          <div className="flex-1">
+            <Label htmlFor="newTypeLabel" className="block mb-1 text-sm font-semibold">
+              Add new type
+            </Label>
+            <Input
+              id="newTypeLabel"
+              type="text"
+              value={newTypeLabel}
+              onChange={(e) => setNewTypeLabel(e.target.value)}
+              placeholder="e.g. Partner, Sponsor"
+              disabled={isAddingType}
+              className="w-full"
+            />
+            {newTypeLabel.trim() && (
+              <p className="text-xs text-gray-400 mt-1">
+                Value: {newTypeLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}
+              </p>
+            )}
+          </div>
+          <Button
+            type="submit"
+            disabled={isAddingType || !newTypeLabel.trim()}
+            className="bg-blue-600 text-white hover:bg-blue-700 shrink-0"
+          >
+            {isAddingType ? 'Adding...' : 'Add Type'}
           </Button>
         </form>
       </div>

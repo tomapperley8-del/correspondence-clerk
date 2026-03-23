@@ -7,24 +7,34 @@ import { Label } from '@/components/ui/label'
 import { ContractStatusBadge } from '@/components/ContractStatusBadge'
 import { getContractsByBusiness, createContract, updateContract, deleteContract, type Contract } from '@/app/actions/contracts'
 import type { Business } from '@/app/actions/businesses'
+import type { MembershipType } from '@/app/actions/membership-types'
 
 interface ContractDetailsCardProps {
   business: Business
   onUpdate: () => void
+  membershipTypes?: MembershipType[]
 }
 
-const MEMBERSHIP_LABELS: Record<string, string> = {
-  club_card: 'Club Card',
-  advertiser: 'Advertiser',
-  former_club_card: 'Former Club Card',
-  former_advertiser: 'Former Advertiser',
-}
-
-const MEMBERSHIP_COLOURS: Record<string, string> = {
+const LEGACY_COLOURS: Record<string, string> = {
   club_card: 'bg-blue-100 text-blue-800',
   advertiser: 'bg-green-100 text-green-800',
   former_club_card: 'bg-gray-100 text-gray-700',
   former_advertiser: 'bg-gray-100 text-gray-700',
+}
+
+const DEFAULT_COLOURS = [
+  'bg-blue-100 text-blue-800',
+  'bg-green-100 text-green-800',
+  'bg-gray-100 text-gray-700',
+  'bg-yellow-100 text-yellow-800',
+  'bg-purple-100 text-purple-800',
+  'bg-pink-100 text-pink-800',
+]
+
+function getMembershipColour(value: string, types: MembershipType[]): string {
+  if (LEGACY_COLOURS[value]) return LEGACY_COLOURS[value]
+  const idx = types.findIndex((t) => t.value === value)
+  return DEFAULT_COLOURS[idx >= 0 ? idx % DEFAULT_COLOURS.length : 0]
 }
 
 const emptyForm = {
@@ -43,11 +53,13 @@ function ContractForm({
   onSave,
   onCancel,
   saveLabel = 'Save',
+  membershipTypes = [],
 }: {
   initial: typeof emptyForm
   onSave: (data: typeof emptyForm) => Promise<void>
   onCancel: () => void
   saveLabel?: string
+  membershipTypes?: MembershipType[]
 }) {
   const [data, setData] = useState(initial)
   const [saving, setSaving] = useState(false)
@@ -96,10 +108,9 @@ function ContractForm({
           onChange={(e) => setData({ ...data, membership_type: e.target.value })}
           className="w-full px-3 py-2 border-2 border-gray-300 bg-white focus:border-blue-600 focus:outline-none">
           <option value="">None</option>
-          <option value="club_card">Club Card</option>
-          <option value="advertiser">Advertiser</option>
-          <option value="former_club_card">Former Club Card</option>
-          <option value="former_advertiser">Former Advertiser</option>
+          {membershipTypes.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
         </select>
       </div>
 
@@ -146,7 +157,7 @@ function ContractForm({
   )
 }
 
-export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardProps) {
+export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }: ContractDetailsCardProps) {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -241,6 +252,7 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
             onSave={(data) => handleEdit(contract.id, data)}
             onCancel={() => setEditingId(null)}
             saveLabel="Save Changes"
+            membershipTypes={membershipTypes}
           />
         </div>
       )
@@ -252,8 +264,8 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               {contract.membership_type && (
-                <span className={`text-xs px-2 py-0.5 font-semibold ${MEMBERSHIP_COLOURS[contract.membership_type] || 'bg-gray-100 text-gray-700'}`}>
-                  {MEMBERSHIP_LABELS[contract.membership_type] || contract.membership_type}
+                <span className={`text-xs px-2 py-0.5 font-semibold ${getMembershipColour(contract.membership_type, membershipTypes)}`}>
+                  {membershipTypes.find((t) => t.value === contract.membership_type)?.label || contract.membership_type}
                 </span>
               )}
               {!contract.is_current && (
@@ -329,6 +341,7 @@ export function ContractDetailsCard({ business, onUpdate }: ContractDetailsCardP
             onSave={handleAdd}
             onCancel={() => setShowAddForm(false)}
             saveLabel="Add Contract"
+            membershipTypes={membershipTypes}
           />
         </div>
       )}

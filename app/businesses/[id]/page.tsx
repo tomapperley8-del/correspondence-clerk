@@ -23,6 +23,7 @@ import { SuccessBanner } from '@/components/SuccessBanner'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { CopyButton } from '@/components/CopyButton'
 import { retryFormatting } from '@/app/actions/ai-formatter'
+import { getActiveMembershipTypes, type MembershipType } from '@/app/actions/membership-types'
 import { formatDateGB, formatDateTimeGB } from '@/lib/utils'
 
 export default function BusinessDetailPage({
@@ -36,6 +37,7 @@ export default function BusinessDetailPage({
   const [id, setId] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
   const [business, setBusiness] = useState<Business | null>(null)
+  const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
   const [correspondence, setCorrespondence] = useState<Correspondence[]>([])
   const [displayNames, setDisplayNames] = useState<Record<string, string>>({})
@@ -167,12 +169,13 @@ export default function BusinessDetailPage({
       if (!id) return // Type guard for nested function
 
       // Fetch all data in parallel for faster page load
-      const [businessResult, contactsResult, correspondenceResult, duplicatesResult, threadsResult] = await Promise.all([
+      const [businessResult, contactsResult, correspondenceResult, duplicatesResult, threadsResult, membershipTypesResult] = await Promise.all([
         getBusinessById(id),
         getContactsByBusiness(id),
         getCorrespondenceByBusiness(id),
         findDuplicatesInBusiness(id),
         getThreadsByBusiness(id),
+        getActiveMembershipTypes(),
       ])
 
       if ('error' in businessResult || !businessResult.data) {
@@ -181,6 +184,7 @@ export default function BusinessDetailPage({
       }
 
       setBusiness(businessResult.data)
+      setMembershipTypes('error' in membershipTypesResult ? [] : membershipTypesResult.data || [])
       setContacts('error' in contactsResult ? [] : contactsResult.data || [])
       const correspondenceData = 'error' in correspondenceResult ? [] : correspondenceResult.data || []
       setCorrespondence(correspondenceData)
@@ -1391,26 +1395,18 @@ export default function BusinessDetailPage({
                 {business.status}
               </span>
             )}
-            {business.membership_type === 'club_card' && (
-              <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800">
-                Club Card
-              </span>
-            )}
-            {business.membership_type === 'advertiser' && (
-              <span className="text-xs bg-green-100 px-2 py-1 text-green-800">
-                Advertiser
-              </span>
-            )}
-            {business.membership_type === 'former_club_card' && (
-              <span className="text-xs bg-gray-100 px-2 py-1 text-gray-600">
-                Former Club Card
-              </span>
-            )}
-            {business.membership_type === 'former_advertiser' && (
-              <span className="text-xs bg-gray-100 px-2 py-1 text-gray-600">
-                Former Advertiser
-              </span>
-            )}
+            {business.membership_type && (() => {
+              const mt = membershipTypes.find((t) => t.value === business.membership_type)
+              if (!mt) return <span className="text-xs bg-gray-100 px-2 py-1 text-gray-600">{business.membership_type}</span>
+              const legacyColours: Record<string, string> = {
+                club_card: 'bg-blue-100 text-blue-800',
+                advertiser: 'bg-green-100 text-green-800',
+                former_club_card: 'bg-gray-100 text-gray-600',
+                former_advertiser: 'bg-gray-100 text-gray-600',
+              }
+              const colour = legacyColours[mt.value] || 'bg-gray-100 text-gray-700'
+              return <span className={`text-xs px-2 py-1 ${colour}`}>{mt.label}</span>
+            })()}
           </div>
         )}
       </div>
@@ -1454,7 +1450,7 @@ export default function BusinessDetailPage({
 
       {/* Contract Details */}
       <div className="mb-6">
-        <ContractDetailsCard business={business} onUpdate={handleContractUpdate} />
+        <ContractDetailsCard business={business} onUpdate={handleContractUpdate} membershipTypes={membershipTypes} />
       </div>
 
       {/* Correspondence Search */}

@@ -3,15 +3,17 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { getBusinesses, type BusinessListItem } from '@/app/actions/businesses'
+import { getActiveMembershipTypes, type MembershipType } from '@/app/actions/membership-types'
 import { AddBusinessButton } from '@/components/AddBusinessButton'
 import { Input } from '@/components/ui/input'
 import { formatDateGB } from '@/lib/utils'
 
-type FilterType = 'all' | 'club-card' | 'advertiser' | 'both' | 'prospect'
+type FilterType = 'all' | 'prospect' | string
 type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
 
 export default function DashboardPage() {
   const [businesses, setBusinesses] = useState<BusinessListItem[]>([])
+  const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,16 +34,20 @@ export default function DashboardPage() {
   const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
 
   useEffect(() => {
-    async function loadBusinesses() {
-      const result = await getBusinesses()
-      if ('error' in result) {
-        setError(result.error || 'An error occurred')
+    async function loadData() {
+      const [businessesResult, typesResult] = await Promise.all([
+        getBusinesses(),
+        getActiveMembershipTypes(),
+      ])
+      if ('error' in businessesResult) {
+        setError(businessesResult.error || 'An error occurred')
       } else {
-        setBusinesses(result.data || [])
+        setBusinesses(businessesResult.data || [])
       }
+      setMembershipTypes('error' in typesResult ? [] : typesResult.data || [])
       setLoading(false)
     }
-    loadBusinesses()
+    loadData()
   }, [])
 
   // Reset to page 1 when filters/search change and would result in empty page
@@ -50,10 +56,8 @@ export default function DashboardPage() {
       if (searchQuery && !business.name.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false
       }
-      if (filterType === 'club-card' && !business.is_club_card) return false
-      if (filterType === 'advertiser' && !business.is_advertiser) return false
-      if (filterType === 'both' && !(business.is_club_card && business.is_advertiser)) return false
-      if (filterType === 'prospect' && (business.is_club_card || business.is_advertiser)) return false
+      if (filterType === 'prospect' && business.membership_type) return false
+      if (filterType !== 'all' && filterType !== 'prospect' && business.membership_type !== filterType) return false
       if (selectedCategory !== 'all' && business.category !== selectedCategory) return false
       return true
     })
@@ -108,10 +112,8 @@ export default function DashboardPage() {
       }
 
       // Type filter
-      if (filterType === 'club-card' && !business.is_club_card) return false
-      if (filterType === 'advertiser' && !business.is_advertiser) return false
-      if (filterType === 'both' && !(business.is_club_card && business.is_advertiser)) return false
-      if (filterType === 'prospect' && (business.is_club_card || business.is_advertiser)) return false
+      if (filterType === 'prospect' && business.membership_type) return false
+      if (filterType !== 'all' && filterType !== 'prospect' && business.membership_type !== filterType) return false
 
       // Category filter
       if (selectedCategory !== 'all' && business.category !== selectedCategory) return false
@@ -269,24 +271,15 @@ export default function DashboardPage() {
                 >
                   All Businesses
                 </FilterButton>
-                <FilterButton
-                  active={filterType === 'club-card'}
-                  onClick={() => setFilterType('club-card')}
-                >
-                  Club Card Only
-                </FilterButton>
-                <FilterButton
-                  active={filterType === 'advertiser'}
-                  onClick={() => setFilterType('advertiser')}
-                >
-                  Advertiser Only
-                </FilterButton>
-                <FilterButton
-                  active={filterType === 'both'}
-                  onClick={() => setFilterType('both')}
-                >
-                  Both Club Card & Advertiser
-                </FilterButton>
+                {membershipTypes.map((t) => (
+                  <FilterButton
+                    key={t.value}
+                    active={filterType === t.value}
+                    onClick={() => setFilterType(t.value)}
+                  >
+                    {t.label}
+                  </FilterButton>
+                ))}
                 <FilterButton
                   active={filterType === 'prospect'}
                   onClick={() => setFilterType('prospect')}
