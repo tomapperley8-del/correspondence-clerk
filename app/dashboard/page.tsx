@@ -241,14 +241,39 @@ export default function DashboardPage() {
       )}
 
       {businesses.length === 0 ? (
-        <div className="bg-white border border-gray-300 p-12 text-center">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900">
-            No Businesses Yet
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Get started by adding your first business to track correspondence.
-          </p>
-          <AddBusinessButton />
+        <div className="bg-white border border-gray-200 rounded p-10 max-w-lg mx-auto mt-8 shadow-[var(--shadow-md,0_2px_8px_rgba(0,0,0,0.08))]">
+          <h1 className="font-[Lora,serif] text-2xl font-semibold text-[#1E293B] mb-2">
+            Welcome to Correspondence Clerk
+          </h1>
+          <p className="text-gray-500 text-sm mb-8">Get set up in three steps.</p>
+          <ol className="space-y-5 mb-8">
+            {[
+              'Add your first business and contact',
+              'Import an email (bookmarklet) or paste one in',
+              'Ask "what do I need to do today" in the Daily Briefing',
+            ].map((step, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-7 h-7 rounded-full bg-[#2C4A6E] text-white text-sm font-semibold flex items-center justify-center mt-0.5">
+                  {i + 1}
+                </span>
+                <span className="text-gray-700 text-sm leading-relaxed pt-1">{step}</span>
+              </li>
+            ))}
+          </ol>
+          <div className="flex flex-col gap-3">
+            <Link
+              href="/new-entry"
+              className="inline-block text-center px-5 py-2.5 bg-[#2C4A6E] text-white text-sm font-medium hover:bg-[#1E293B] transition-colors"
+            >
+              Add your first business
+            </Link>
+            <Link
+              href="/install-bookmarklet"
+              className="text-sm text-[#2C4A6E] hover:underline text-center"
+            >
+              Install the email import tool
+            </Link>
+          </div>
         </div>
       ) : (
         <>
@@ -559,7 +584,7 @@ export default function DashboardPage() {
 
       {/* Right: inline Daily Briefing */}
       <div className="hidden md:flex flex-col w-[380px] shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-hidden">
-        <ChatPanel inline suggestedPrompt={shouldAutoSend ? 'what do i need to do today' : undefined} />
+        <ChatPanel inline suggestedPrompt={shouldAutoSend ? 'what do i need to do today' : undefined} businessCount={businesses.length} />
       </div>
       </div>{/* end two-column flex */}
     </div>

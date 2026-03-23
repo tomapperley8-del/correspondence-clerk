@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useChat } from '@/components/ChatContext'
 import { ChatMessage, type ChatMessageData, type ToolCallInfo } from '@/components/ChatMessage'
@@ -8,6 +9,7 @@ import { ChatMessage, type ChatMessageData, type ToolCallInfo } from '@/componen
 interface ChatPanelProps {
   inline?: boolean
   suggestedPrompt?: string
+  businessCount?: number
 }
 
 /**
@@ -15,7 +17,7 @@ interface ChatPanelProps {
  * Renders as slide-out overlay (default) or inline static panel (inline=true).
  * Smooth streaming via rAF render loop with mutable refs.
  */
-export function ChatPanel({ inline = false, suggestedPrompt }: ChatPanelProps = {}) {
+export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: ChatPanelProps = {}) {
   const { isOpen, close } = useChat()
   const [messages, setMessages] = useState<ChatMessageData[]>([])
   const [input, setInput] = useState('')
@@ -273,17 +275,41 @@ export function ChatPanel({ inline = false, suggestedPrompt }: ChatPanelProps = 
       >
         <div className="flex flex-col justify-end min-h-full gap-3">
           {messages.length === 0 && (
-            <div className="text-center text-sm text-gray-400 px-2 pb-2">
-              {suggestedPrompt && (
+            <div className="px-2 pb-2">
+              {businessCount === 0 ? (
+                /* Case A: no businesses yet */
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                    Add your first business and import an email, then ask me &ldquo;what do I need to do today&rdquo; — I&apos;ll read all your correspondence and tell you exactly what needs your attention.
+                  </p>
+                  <Link
+                    href="/new-entry"
+                    className="inline-block px-4 py-2 bg-[#2C4A6E] text-white text-sm hover:bg-[#1E293B] transition-colors"
+                  >
+                    Add first entry
+                  </Link>
+                </div>
+              ) : suggestedPrompt ? (
+                /* Case C: has businesses + suggestedPrompt (auto-send flow) */
                 <button
                   onClick={() => sendMessage(suggestedPrompt)}
                   className="w-full text-left px-3 py-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 hover:border-gray-300 transition-colors"
                 >
                   {suggestedPrompt}
                 </button>
-              )}
-              {!suggestedPrompt && (
-                <p>Ask what you need to do today.</p>
+              ) : (
+                /* Case B: has businesses, no suggestedPrompt */
+                <div className="flex flex-col gap-2">
+                  {['What do I need to do today?', 'Any expiring contracts?', 'Who haven\'t I replied to?'].map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => sendMessage(prompt)}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 hover:border-gray-300 transition-colors"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           )}
