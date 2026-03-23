@@ -34,11 +34,11 @@ export async function POST(request: NextRequest) {
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('name')
+    .select('name, business_description')
     .eq('id', organizationId)
     .single()
 
-  const systemPrompt = generateChatSystemPrompt(org?.name ?? '', '')
+  const systemPrompt = generateChatSystemPrompt(org?.name ?? '', org?.business_description ?? '')
 
   // Rate limit: 20 requests per minute
   const rateLimit = await checkRateLimit({ limit: 20, windowMs: 60000, endpoint: 'chat' })

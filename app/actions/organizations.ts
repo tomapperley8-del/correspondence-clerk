@@ -9,6 +9,8 @@ import { PLANS, TRIAL_DAYS } from '@/lib/stripe/config'
 export type Organization = {
   id: string
   name: string
+  business_description: string | null
+  industry: string | null
   created_at: string
   updated_at: string
   created_by: string | null
@@ -44,6 +46,8 @@ export async function getCurrentOrganization() {
       organizations (
         id,
         name,
+        business_description,
+        industry,
         created_at,
         updated_at,
         created_by
@@ -166,6 +170,33 @@ export async function updateOrganization(name: string) {
   const { data, error } = await supabase
     .from('organizations')
     .update({ name: name.trim() })
+    .eq('id', organizationId)
+    .select()
+    .single()
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath('/settings/organization')
+  return { data }
+}
+
+/**
+ * Update organization business description and industry
+ */
+export async function updateOrganizationProfile(description: string, industry: string) {
+  const organizationId = await getCurrentUserOrganizationId()
+
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('organizations')
+    .update({ business_description: description, industry: industry || null })
     .eq('id', organizationId)
     .select()
     .single()

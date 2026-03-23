@@ -31,7 +31,7 @@ export default function CreateOrganizationPage() {
       setIsLoading(false)
     } else {
       // Success - redirect to dashboard
-      router.push('/dashboard')
+      router.push('/settings/organization?welcome=true')
     }
   }
 

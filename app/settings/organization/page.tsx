@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import {
   getCurrentOrganization,
   updateOrganization,
+  updateOrganizationProfile,
   getOrganizationMembers,
 } from '@/app/actions/organizations'
 import {
@@ -21,6 +23,8 @@ import { formatDateGB } from '@/lib/utils'
 type Organization = {
   id: string
   name: string
+  business_description: string | null
+  industry: string | null
 }
 
 type Member = {
@@ -41,10 +45,16 @@ type Invitation = {
   accepted_email?: string | null
 }
 
-export default function OrganizationSettingsPage() {
+function OrganizationSettingsContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isWelcome = searchParams.get('welcome') === 'true'
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [organizationName, setOrganizationName] = useState('')
+  const [businessDescription, setBusinessDescription] = useState('')
+  const [industry, setIndustry] = useState('')
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [profileSaved, setProfileSaved] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [isLoadingOrg, setIsLoadingOrg] = useState(true)
@@ -72,6 +82,8 @@ export default function OrganizationSettingsPage() {
 
     setOrganization(orgResult.data)
     setOrganizationName(orgResult.data.name)
+    setBusinessDescription(orgResult.data.business_description ?? '')
+    setIndustry(orgResult.data.industry ?? '')
 
     // Load members
     const membersResult = await getOrganizationMembers()
@@ -111,6 +123,24 @@ export default function OrganizationSettingsPage() {
     }
 
     setIsSavingName(false)
+  }
+
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSuccess(null)
+
+    setIsSavingProfile(true)
+    const result = await updateOrganizationProfile(businessDescription, industry)
+
+    if (result.error) {
+      setError(result.error)
+    } else {
+      setSuccess('Business profile saved')
+      setProfileSaved(true)
+    }
+
+    setIsSavingProfile(false)
   }
 
   async function handleGenerateLink() {
@@ -224,6 +254,58 @@ export default function OrganizationSettingsPage() {
           <p className="text-green-800 text-sm">{success}</p>
         </div>
       )}
+
+      {/* Welcome banner — only for new users who haven't saved their profile yet */}
+      {isWelcome && !profileSaved && (
+        <div className="border-2 border-blue-600 bg-blue-50 px-4 py-3 mb-6">
+          <p className="text-blue-900 font-semibold">Welcome to Correspondence Clerk!</p>
+          <p className="text-blue-800 text-sm mt-1">
+            Tell us about your business so your assistant knows who it&apos;s working for.
+          </p>
+        </div>
+      )}
+
+      {/* Business Profile */}
+      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-4 text-gray-900">Business Profile</h2>
+        <form onSubmit={handleSaveProfile} className="space-y-4">
+          <div>
+            <Label htmlFor="businessDescription" className="block mb-2 font-semibold">
+              What does your business do?
+            </Label>
+            <textarea
+              id="businessDescription"
+              rows={3}
+              value={businessDescription}
+              onChange={(e) => setBusinessDescription(e.target.value)}
+              disabled={isSavingProfile}
+              placeholder="e.g. We're a local media company publishing news and advertising for businesses in West London."
+              className="w-full border-2 border-gray-300 px-3 py-2 text-sm resize-none focus:outline-none focus:border-blue-600"
+            />
+          </div>
+          <div>
+            <Label htmlFor="industry" className="block mb-2 font-semibold">
+              Industry
+            </Label>
+            <Input
+              id="industry"
+              type="text"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              disabled={isSavingProfile}
+              placeholder="e.g. Media, Accountancy, Consultancy"
+              className="w-full"
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={isSavingProfile}
+            className="bg-blue-600 text-white hover:bg-blue-700"
+          >
+            {isSavingProfile ? 'Saving...' : 'Save Profile'}
+          </Button>
+        </form>
+      </div>
 
       {/* Organization Name */}
       <div className="bg-white border-2 border-gray-800 p-6 mb-6">
@@ -401,5 +483,13 @@ export default function OrganizationSettingsPage() {
         Back to Dashboard
       </Button>
     </div>
+  )
+}
+
+export default function OrganizationSettingsPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto px-4 py-8"><p className="text-gray-600">Loading organization settings...</p></div>}>
+      <OrganizationSettingsContent />
+    </Suspense>
   )
 }
