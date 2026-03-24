@@ -222,7 +222,7 @@ export function Navigation() {
               >
                 Help
               </Link>
-              <OutreachButton />
+              {pathname !== '/daily-briefing' && <OutreachButton />}
             </div>
           </div>
 
