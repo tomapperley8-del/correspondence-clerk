@@ -9,6 +9,37 @@ import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { validateInvitationToken, acceptInvitation } from '@/app/actions/invitations'
 
+function LeftPanel() {
+  return (
+    <div
+      className="hidden md:flex md:w-2/5 flex-col justify-between p-12"
+      style={{ backgroundColor: '#1E293B' }}
+    >
+      <Link
+        href="/"
+        className="text-xl font-bold text-white"
+        style={{ fontFamily: 'Lora, Georgia, serif' }}
+      >
+        Correspondence Clerk
+      </Link>
+      <div>
+        <p
+          className="text-2xl font-semibold text-white leading-snug mb-3"
+          style={{ fontFamily: 'Lora, Georgia, serif' }}
+        >
+          Know exactly what needs your attention today.
+        </p>
+        <p className="text-sm" style={{ color: '#94a3b8' }}>
+          Your business correspondence, organised and ready to act on.
+        </p>
+      </div>
+      <p className="text-xs" style={{ color: '#475569' }}>
+        &copy; {new Date().getFullYear()} Correspondence Clerk
+      </p>
+    </div>
+  )
+}
+
 function SignupPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -24,7 +55,6 @@ function SignupPageContent() {
   const [organizationName, setOrganizationName] = useState<string | null>(null)
   const supabase = createClient()
 
-  // Validate invitation token on mount
   useEffect(() => {
     async function checkInvitation() {
       if (invitationToken) {
@@ -32,7 +62,6 @@ function SignupPageContent() {
         if (result.error) {
           setError(result.error)
         } else if (result.data) {
-          // For shareable links, don't lock the email - just show the org name
           setOrganizationName(result.data.organizations?.name || null)
         }
       }
@@ -44,7 +73,6 @@ function SignupPageContent() {
     e.preventDefault()
     setError(null)
 
-    // Client-side validation
     if (password !== confirmPassword) {
       setError('Passwords do not match')
       return
@@ -62,7 +90,6 @@ function SignupPageContent() {
 
     setIsLoading(true)
 
-    // Add invitation token to redirect URL if present (for email verification flow)
     const redirectUrl = invitationToken
       ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?invitation_token=${invitationToken}`
       : `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
@@ -70,9 +97,7 @@ function SignupPageContent() {
     const { data, error: signupError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo: redirectUrl,
-      },
+      options: { emailRedirectTo: redirectUrl },
     })
 
     if (signupError) {
@@ -81,9 +106,7 @@ function SignupPageContent() {
       return
     }
 
-    // Check if user is immediately signed in (email verification disabled)
     if (data.session && data.user) {
-      // User is signed in - accept invitation if present
       if (invitationToken) {
         const result = await acceptInvitation(invitationToken, data.user.id)
         if (result.error) {
@@ -92,39 +115,45 @@ function SignupPageContent() {
           return
         }
       }
-      // Redirect to dashboard or onboarding
       router.push(invitationToken ? '/dashboard' : '/onboarding/create-organization')
       return
     }
 
-    // Email verification required - show success message
     setSuccess(true)
     setIsLoading(false)
   }
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-md">
-          <div className="bg-white border-2 border-green-600 p-8">
-            <h1 className="text-2xl font-bold mb-4 text-gray-900">
-              Check Your Email
-            </h1>
-            <p className="text-gray-700 mb-6">
-              We&apos;ve sent a confirmation link to <strong>{email}</strong>.
-              Please check your email and click the link to verify your account.
-              {organizationName && (
-                <>
-                  {' '}
-                  After verification, you&apos;ll be added to{' '}
-                  <strong>{organizationName}</strong>.
-                </>
-              )}
-            </p>
-            <Link
-              href="/login"
-              className="text-blue-600 hover:text-blue-800 hover:underline"
+      <div className="min-h-screen flex">
+        <LeftPanel />
+        <div
+          className="flex-1 flex items-center justify-center px-6 py-12"
+          style={{ backgroundColor: '#FAFAF8' }}
+        >
+          <div className="w-full max-w-sm">
+            <h1
+              className="text-2xl font-bold mb-4 text-gray-900"
+              style={{ fontFamily: 'Lora, Georgia, serif' }}
             >
+              Check your email
+            </h1>
+            <div
+              className="px-4 py-4 mb-6 rounded-sm"
+              style={{ backgroundColor: '#F0FDF4', border: '1px solid rgba(34,197,94,0.2)' }}
+            >
+              <p className="text-gray-700 text-sm">
+                We&apos;ve sent a confirmation link to <strong>{email}</strong>.
+                Please click the link to verify your account.
+                {organizationName && (
+                  <>
+                    {' '}After verification, you&apos;ll be added to{' '}
+                    <strong>{organizationName}</strong>.
+                  </>
+                )}
+              </p>
+            </div>
+            <Link href="/login" className="text-sm font-medium" style={{ color: '#2C4A6E' }}>
               Return to login
             </Link>
           </div>
@@ -134,28 +163,42 @@ function SignupPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white border-2 border-gray-800 p-8">
-          <h1 className="text-2xl font-bold mb-2 text-gray-900">
-            Create Account
+    <div className="min-h-screen flex">
+      <LeftPanel />
+      <div
+        className="flex-1 flex items-center justify-center px-6 py-12"
+        style={{ backgroundColor: '#FAFAF8' }}
+      >
+        <div className="w-full max-w-sm">
+          <h1
+            className="text-2xl font-bold mb-2 text-gray-900"
+            style={{ fontFamily: 'Lora, Georgia, serif' }}
+          >
+            Create account
           </h1>
-          {organizationName && (
-            <p className="text-gray-600 mb-6">
+          {organizationName ? (
+            <p className="text-sm text-gray-500 mb-8">
               Join <strong>{organizationName}</strong> on Correspondence Clerk
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500 mb-8">
+              14-day free trial, no credit card required
             </p>
           )}
 
           {error && (
-            <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6">
-              <p className="text-red-800 text-sm">{error}</p>
+            <div
+              className="px-4 py-3 mb-6 rounded-sm"
+              style={{ backgroundColor: '#FEF2F2', border: '1px solid rgba(220,38,38,0.2)' }}
+            >
+              <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSignup} className="space-y-4">
             <div>
-              <Label htmlFor="email" className="block mb-2 font-semibold">
-                Email <span className="text-red-600">*</span>
+              <Label htmlFor="email" className="block mb-2 font-semibold text-sm text-gray-700">
+                Email
               </Label>
               <Input
                 id="email"
@@ -170,8 +213,8 @@ function SignupPageContent() {
             </div>
 
             <div>
-              <Label htmlFor="password" className="block mb-2 font-semibold">
-                Password <span className="text-red-600">*</span>
+              <Label htmlFor="password" className="block mb-2 font-semibold text-sm text-gray-700">
+                Password
               </Label>
               <Input
                 id="password"
@@ -183,14 +226,15 @@ function SignupPageContent() {
                 className="w-full"
                 placeholder="Minimum 8 characters"
               />
-              <p className="text-gray-500 text-xs mt-1">
-                At least 8 characters
-              </p>
+              <p className="text-gray-400 text-xs mt-1">At least 8 characters</p>
             </div>
 
             <div>
-              <Label htmlFor="confirmPassword" className="block mb-2 font-semibold">
-                Confirm Password <span className="text-red-600">*</span>
+              <Label
+                htmlFor="confirmPassword"
+                className="block mb-2 font-semibold text-sm text-gray-700"
+              >
+                Confirm Password
               </Label>
               <Input
                 id="confirmPassword"
@@ -213,12 +257,13 @@ function SignupPageContent() {
                 disabled={isLoading}
                 className="mt-1"
               />
-              <label htmlFor="terms" className="text-sm text-gray-600">
+              <label htmlFor="terms" className="text-sm text-gray-500">
                 I agree to the{' '}
                 <Link
                   href="/terms"
                   target="_blank"
-                  className="text-blue-600 hover:underline"
+                  className="font-medium"
+                  style={{ color: '#2C4A6E' }}
                 >
                   Terms of Service
                 </Link>{' '}
@@ -226,7 +271,8 @@ function SignupPageContent() {
                 <Link
                   href="/privacy"
                   target="_blank"
-                  className="text-blue-600 hover:underline"
+                  className="font-medium"
+                  style={{ color: '#2C4A6E' }}
                 >
                   Privacy Policy
                 </Link>
@@ -236,23 +282,19 @@ function SignupPageContent() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              className="w-full text-white font-semibold py-3"
+              style={{ backgroundColor: '#2C4A6E' }}
             >
               {isLoading ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-600 text-sm">
-              Already have an account?{' '}
-              <Link
-                href="/login"
-                className="text-blue-600 hover:text-blue-800 hover:underline"
-              >
-                Login
-              </Link>
-            </p>
-          </div>
+          <p className="mt-6 text-center text-sm text-gray-500">
+            Already have an account?{' '}
+            <Link href="/login" className="font-medium" style={{ color: '#2C4A6E' }}>
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
     </div>
@@ -263,11 +305,13 @@ export default function SignupPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-          <div className="w-full max-w-md">
-            <div className="bg-white border-2 border-gray-800 p-8">
-              <p className="text-gray-600">Loading...</p>
-            </div>
+        <div className="min-h-screen flex">
+          <div className="hidden md:block md:w-2/5" style={{ backgroundColor: '#1E293B' }} />
+          <div
+            className="flex-1 flex items-center justify-center px-6"
+            style={{ backgroundColor: '#FAFAF8' }}
+          >
+            <p className="text-sm text-gray-400">Loading...</p>
           </div>
         </div>
       }

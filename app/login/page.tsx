@@ -36,23 +36,62 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white border-2 border-gray-800 p-8">
-          <h1 className="text-2xl font-bold mb-6 text-gray-900">
-            Login to Correspondence Clerk
+    <div className="min-h-screen flex">
+      {/* Left panel */}
+      <div
+        className="hidden md:flex md:w-2/5 flex-col justify-between p-12"
+        style={{ backgroundColor: '#1E293B' }}
+      >
+        <Link
+          href="/"
+          className="text-xl font-bold text-white"
+          style={{ fontFamily: 'Lora, Georgia, serif' }}
+        >
+          Correspondence Clerk
+        </Link>
+        <div>
+          <p
+            className="text-2xl font-semibold text-white leading-snug mb-3"
+            style={{ fontFamily: 'Lora, Georgia, serif' }}
+          >
+            Know exactly what needs your attention today.
+          </p>
+          <p className="text-sm" style={{ color: '#94a3b8' }}>
+            Your business correspondence, organised and ready to act on.
+          </p>
+        </div>
+        <p className="text-xs" style={{ color: '#475569' }}>
+          &copy; {new Date().getFullYear()} Correspondence Clerk
+        </p>
+      </div>
+
+      {/* Right panel */}
+      <div
+        className="flex-1 flex items-center justify-center px-6 py-12"
+        style={{ backgroundColor: '#FAFAF8' }}
+      >
+        <div className="w-full max-w-sm">
+          <h1
+            className="text-2xl font-bold mb-2 text-gray-900"
+            style={{ fontFamily: 'Lora, Georgia, serif' }}
+          >
+            Welcome back
           </h1>
+          <p className="text-sm text-gray-500 mb-8">Sign in to your account</p>
 
           {error && (
-            <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6">
-              <p className="text-red-800 text-sm">{error}</p>
+            <div
+              className="px-4 py-3 mb-6 rounded-sm"
+              style={{ backgroundColor: '#FEF2F2', border: '1px solid rgba(220,38,38,0.2)' }}
+            >
+              <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <Label htmlFor="email" className="block mb-2 font-semibold">
-                Email <span className="text-red-600">*</span>
+              <Label htmlFor="email" className="block mb-2 font-semibold text-sm text-gray-700">
+                Email
               </Label>
               <Input
                 id="email"
@@ -67,8 +106,8 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <Label htmlFor="password" className="block mb-2 font-semibold">
-                Password <span className="text-red-600">*</span>
+              <Label htmlFor="password" className="block mb-2 font-semibold text-sm text-gray-700">
+                Password
               </Label>
               <Input
                 id="password"
@@ -85,23 +124,19 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              className="w-full text-white font-semibold py-3"
+              style={{ backgroundColor: '#2C4A6E' }}
             >
-              {isLoading ? 'Logging in...' : 'Login'}
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-600 text-sm">
-              Don&apos;t have an account?{' '}
-              <Link
-                href="/signup"
-                className="text-blue-600 hover:text-blue-800 hover:underline"
-              >
-                Sign up
-              </Link>
-            </p>
-          </div>
+          <p className="mt-6 text-center text-sm text-gray-500">
+            Don&apos;t have an account?{' '}
+            <Link href="/signup" className="font-medium" style={{ color: '#2C4A6E' }}>
+              Sign up
+            </Link>
+          </p>
         </div>
       </div>
     </div>
