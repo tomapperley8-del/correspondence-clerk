@@ -11,7 +11,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   google_failed: 'Google connection failed. Check server logs.',
 }
 
-export default async function ImportPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ error?: string; detail?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
