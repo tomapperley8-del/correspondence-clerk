@@ -112,86 +112,102 @@ export async function POST(request: NextRequest) {
 
             if (!contactId) continue
 
-            // Determine direction: if contact email matches from → received, else sent
-            for (const emailId of contact.emailIds) {
-              const fullEmail = await fetchGmailFullEmail(tokens, emailId, onTokenRefresh)
-              if (!fullEmail) {
-                skipped++
-                send('progress', { imported, skipped, total: totalEmails })
-                continue
-              }
+            // Fetch and process emails in parallel batches for speed
+            const BATCH_SIZE = 10
+            const emailIds = contact.emailIds
+            for (let i = 0; i < emailIds.length; i += BATCH_SIZE) {
+              const batch = emailIds.slice(i, i + BATCH_SIZE)
 
-              // Build raw_text in standard format (same as import-email route)
-              const rawText = `From: ${fullEmail.from}\nTo: ${fullEmail.to}\nDate: ${fullEmail.date}\nSubject: ${fullEmail.subject}\n\n${fullEmail.bodyText}`
+              // Fetch all emails in the batch concurrently
+              const fetchResults = await Promise.allSettled(
+                batch.map((id) => fetchGmailFullEmail(tokens, id, onTokenRefresh))
+              )
 
-              // Compute content hash and check for duplicate
-              const { data: hashData } = await supabase.rpc('compute_content_hash', { raw_text: rawText })
-              const contentHash = hashData as string | null
+              // Process each result sequentially (DB writes)
+              for (let j = 0; j < fetchResults.length; j++) {
+                const emailId = batch[j]
+                const result = fetchResults[j]
 
-              if (contentHash) {
-                const { data: existing } = await supabase
-                  .from('correspondence')
-                  .select('id')
-                  .eq('organization_id', orgId)
-                  .eq('content_hash', contentHash)
-                  .limit(1)
-                  .single()
-
-                if (existing) {
+                if (result.status === 'rejected' || !result.value) {
                   skipped++
                   send('progress', { imported, skipped, total: totalEmails })
                   continue
                 }
+
+                const fullEmail = result.value
+
+                // Build raw_text in standard format (same as import-email route)
+                const rawText = `From: ${fullEmail.from}\nTo: ${fullEmail.to}\nDate: ${fullEmail.date}\nSubject: ${fullEmail.subject}\n\n${fullEmail.bodyText}`
+
+                // Compute content hash and check for duplicate
+                const { data: hashData } = await supabase.rpc('compute_content_hash', { raw_text: rawText })
+                const contentHash = hashData as string | null
+
+                if (contentHash) {
+                  const { data: existing } = await supabase
+                    .from('correspondence')
+                    .select('id')
+                    .eq('organization_id', orgId)
+                    .eq('content_hash', contentHash)
+                    .limit(1)
+                    .single()
+
+                  if (existing) {
+                    skipped++
+                    send('progress', { imported, skipped, total: totalEmails })
+                    continue
+                  }
+                }
+
+                // Determine direction
+                const fromEmail = fullEmail.from.toLowerCase()
+                const isFromContact = fromEmail.includes(contact.email.toLowerCase())
+                const direction: 'sent' | 'received' = isFromContact ? 'received' : 'sent'
+
+                // Create correspondence entry
+                const { data: entry } = await supabase
+                  .from('correspondence')
+                  .insert({
+                    organization_id: orgId,
+                    business_id: businessId,
+                    contact_id: contactId,
+                    user_id: user.id,
+                    raw_text_original: rawText,
+                    formatted_text_original: null,
+                    formatted_text_current: null,
+                    entry_date: fullEmail.date,
+                    subject: fullEmail.subject,
+                    type: 'Email',
+                    direction,
+                    action_needed: 'none',
+                    formatting_status: 'unformatted',
+                    content_hash: contentHash,
+                    ai_metadata: {
+                      bulk_import: true,
+                      source: 'gmail',
+                      external_id: emailId,
+                      imported_at: new Date().toISOString(),
+                    },
+                  })
+                  .select('id')
+                  .single()
+
+                if (entry) {
+                  // Update business last_contacted_at if this email is newer
+                  await supabase
+                    .from('businesses')
+                    .update({ last_contacted_at: fullEmail.date })
+                    .eq('id', businessId!)
+                    .lt('last_contacted_at', fullEmail.date)
+
+                  await enqueueForFormatting(serviceClient, orgId, entry.id)
+                  imported++
+                } else {
+                  skipped++
+                }
+
+                send('progress', { imported, skipped, total: totalEmails })
               }
-
-              // Determine direction
-              const fromEmail = fullEmail.from.toLowerCase()
-              const isFromContact = fromEmail.includes(contact.email.toLowerCase())
-              const direction: 'sent' | 'received' = isFromContact ? 'received' : 'sent'
-
-              // Create correspondence entry
-              const { data: entry } = await supabase
-                .from('correspondence')
-                .insert({
-                  organization_id: orgId,
-                  business_id: businessId,
-                  contact_id: contactId,
-                  user_id: user.id,
-                  raw_text_original: rawText,
-                  formatted_text_original: null,
-                  formatted_text_current: null,
-                  entry_date: fullEmail.date,
-                  subject: fullEmail.subject,
-                  type: 'Email',
-                  direction,
-                  action_needed: 'none',
-                  formatting_status: 'unformatted',
-                  content_hash: contentHash,
-                  ai_metadata: {
-                    bulk_import: true,
-                    source: 'gmail',
-                    external_id: emailId,
-                    imported_at: new Date().toISOString(),
-                  },
-                })
-                .select('id')
-                .single()
-
-              if (entry) {
-                // Update business last_contacted_at if this email is newer
-                await supabase
-                  .from('businesses')
-                  .update({ last_contacted_at: fullEmail.date })
-                  .eq('id', businessId!)
-                  .lt('last_contacted_at', fullEmail.date)
-
-                await enqueueForFormatting(serviceClient, orgId, entry.id)
-                imported++
-              } else {
-                skipped++
-              }
-
-              send('progress', { imported, skipped, total: totalEmails })
             }
           }
         }
