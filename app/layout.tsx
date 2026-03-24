@@ -3,6 +3,7 @@ import './globals.css'
 import { Navigation } from '@/components/Navigation'
 import { ChatProvider } from '@/components/ChatContext'
 import { ChatPanel } from '@/components/ChatPanel'
+import { CommandSearch } from '@/components/CommandSearch'
 
 export const metadata: Metadata = {
   title: 'Correspondence Clerk',
@@ -32,6 +33,7 @@ export default function RootLayout({
           </a>
           <Navigation />
           <ChatPanel />
+          <CommandSearch />
           <main id="main-content">{children}</main>
         </ChatProvider>
       </body>

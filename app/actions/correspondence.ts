@@ -864,3 +864,17 @@ export async function markCorrespondenceDone(id: string) {
   revalidatePath('/actions-page')
   return { success: true }
 }
+
+export async function setCorrespondenceAction(id: string, actionNeeded: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+  const { data: entry } = await supabase.from('correspondence').select('business_id').eq('id', id).single()
+  const { error } = await supabase.from('correspondence').update({ action_needed: actionNeeded }).eq('id', id).eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  if (entry) revalidatePath(`/businesses/${entry.business_id}`)
+  revalidatePath('/actions-page')
+  return { success: true }
+}

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
-import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, type Correspondence } from '@/app/actions/correspondence'
+import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, setCorrespondenceAction, type Correspondence } from '@/app/actions/correspondence'
 import { getThreadsByBusiness, createThread, renameThread, deleteThread, assignCorrespondenceToThread, type ConversationThread } from '@/app/actions/threads'
 import { dismissDuplicatePair, dismissMultipleDuplicatePairs } from '@/app/actions/duplicate-dismissals'
 import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
@@ -95,6 +95,9 @@ export default function BusinessDetailPage({
   const [selectedDuplicateHashes, setSelectedDuplicateHashes] = useState<Set<string>>(new Set())
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [isBulkDismissing, setIsBulkDismissing] = useState(false)
+
+  // Expanded entries for text collapse
+  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set())
 
   // Feature #4: Correspondence view controls state
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest')
@@ -405,8 +408,18 @@ export default function BusinessDetailPage({
 
   if (loading || !business || !id) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <p className="text-gray-600">Loading...</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse">
+        <div className="h-6 bg-gray-200 rounded w-1/4 mb-3" />
+        <div className="h-8 bg-gray-300 rounded w-1/3 mb-6" />
+        <div className="h-4 bg-gray-200 rounded w-1/5 mb-8" />
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="border-t border-gray-200 pt-6 mb-6">
+            <div className="h-4 bg-gray-200 rounded w-1/4 mb-3" />
+            <div className="h-3 bg-gray-100 rounded w-full mb-2" />
+            <div className="h-3 bg-gray-100 rounded w-5/6 mb-2" />
+            <div className="h-3 bg-gray-100 rounded w-4/6" />
+          </div>
+        ))}
       </div>
     )
   }
@@ -808,21 +821,28 @@ export default function BusinessDetailPage({
         )}
         {/* Unformatted indicator */}
         {isUnformatted && (
-          <div className="bg-orange-50 border-2 border-orange-600 p-3 mb-3">
-            <p className="text-sm text-orange-900 font-semibold mb-2">
-              ⚠ Unformatted Entry
-            </p>
-            <p className="text-xs text-orange-800 mb-2">
-              This entry was saved without AI formatting. The raw text is displayed below.
-            </p>
-            <Button
-              onClick={() => handleFormatLater(entry.id)}
-              disabled={formattingInProgress === entry.id}
-              className="bg-orange-600 text-white hover:bg-orange-700 px-3 py-1 text-xs font-semibold"
-            >
-              {formattingInProgress === entry.id ? 'Formatting...' : 'Format Now'}
-            </Button>
-          </div>
+          entry.ai_metadata?.bulk_import ? (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-500">
+              <span className="inline-block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+              Formatting queued…
+            </div>
+          ) : (
+            <div className="bg-orange-50 border-2 border-orange-600 p-3 mb-3">
+              <p className="text-sm text-orange-900 font-semibold mb-2">
+                ⚠ Unformatted Entry
+              </p>
+              <p className="text-xs text-orange-800 mb-2">
+                This entry was saved without AI formatting. The raw text is displayed below.
+              </p>
+              <Button
+                onClick={() => handleFormatLater(entry.id)}
+                disabled={formattingInProgress === entry.id}
+                className="bg-orange-600 text-white hover:bg-orange-700 px-3 py-1 text-xs font-semibold"
+              >
+                {formattingInProgress === entry.id ? 'Formatting...' : 'Format Now'}
+              </Button>
+            </div>
+          )
         )}
 
         {/* Subject line with edit indicator */}
@@ -862,8 +882,24 @@ export default function BusinessDetailPage({
           )}
           {entry.contact ? (
             <>
-              <span className="text-lg font-bold text-gray-900">
-                {extractedName || entry.contact.name}
+              <span className="relative group/contact cursor-default">
+                <span className="text-lg font-bold text-gray-900">
+                  {extractedName || entry.contact.name}
+                </span>
+                {(() => {
+                  const fullContact = contacts.find(c => c.id === entry.contact_id)
+                  if (!fullContact) return null
+                  const hasDetails = fullContact.emails.length > 0 || fullContact.phones.length > 0 || fullContact.role
+                  if (!hasDetails) return null
+                  return (
+                    <span className="absolute left-0 top-full mt-1 z-20 hidden group-hover/contact:block w-56 bg-white border-2 border-gray-300 shadow-lg p-3 pointer-events-none">
+                      <span className="block font-semibold text-gray-900 text-sm mb-1">{fullContact.name}</span>
+                      {fullContact.role && <span className="block text-gray-500 text-xs mb-1">{fullContact.role}</span>}
+                      {fullContact.emails[0] && <span className="block text-gray-700 text-xs truncate">{fullContact.emails[0]}</span>}
+                      {fullContact.phones[0] && <span className="block text-gray-700 text-xs">{fullContact.phones[0]}</span>}
+                    </span>
+                  )
+                })()}
               </span>
               {entry.contact.is_active === false && (
                 <span className="text-xs text-gray-500 font-normal">(Former)</span>
@@ -1057,13 +1093,73 @@ export default function BusinessDetailPage({
           </div>
         ) : (
           <>
-            <div className="text-sm text-gray-800 whitespace-pre-wrap mb-3">
-              {highlightMatch(
-                entry.formatted_text_current ||
-                entry.formatted_text_original ||
-                entry.raw_text_original
-              )}
-            </div>
+            {(() => {
+              const bodyText = entry.formatted_text_current || entry.formatted_text_original || entry.raw_text_original
+              const COLLAPSE_LIMIT = 800
+              const isExpanded = expandedEntries.has(entry.id)
+              const isLong = bodyText.length > COLLAPSE_LIMIT
+              return (
+                <div className="mb-3">
+                  <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                    {highlightMatch(isLong && !isExpanded ? bodyText.slice(0, COLLAPSE_LIMIT) + '…' : bodyText)}
+                  </div>
+                  {isLong && (
+                    <button
+                      type="button"
+                      onClick={() => setExpandedEntries(prev => {
+                        const next = new Set(prev)
+                        if (isExpanded) next.delete(entry.id); else next.add(entry.id)
+                        return next
+                      })}
+                      className="mt-1 text-xs text-blue-600 hover:underline"
+                    >
+                      {isExpanded ? 'Show less' : 'Show more'}
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Quick action buttons */}
+            {entry.action_needed === 'none' && (
+              <div className="flex gap-2 flex-wrap mb-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await setCorrespondenceAction(entry.id, 'follow_up')
+                    if (id) { const r = await getCorrespondenceByBusiness(id); setCorrespondence('error' in r ? [] : r.data || []) }
+                  }}
+                  className="px-3 py-1 text-xs border border-amber-300 text-amber-800 hover:bg-amber-50"
+                >
+                  Follow-up
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await setCorrespondenceAction(entry.id, 'waiting_on_them')
+                    if (id) { const r = await getCorrespondenceByBusiness(id); setCorrespondence('error' in r ? [] : r.data || []) }
+                  }}
+                  className="px-3 py-1 text-xs border border-blue-300 text-blue-800 hover:bg-blue-50"
+                >
+                  Waiting on them
+                </button>
+              </div>
+            )}
+            {entry.action_needed !== 'none' && (
+              <div className="flex gap-2 flex-wrap mb-3 items-center">
+                <span className="text-xs text-amber-700 font-semibold capitalize">{entry.action_needed.replace(/_/g, ' ')}</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await setCorrespondenceAction(entry.id, 'none')
+                    if (id) { const r = await getCorrespondenceByBusiness(id); setCorrespondence('error' in r ? [] : r.data || []) }
+                  }}
+                  className="px-2 py-0.5 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50"
+                >
+                  Mark done
+                </button>
+              </div>
+            )}
 
             {/* Display who created this entry */}
             <div className="text-xs text-gray-500 mb-2">
@@ -1912,6 +2008,21 @@ export default function BusinessDetailPage({
           </div>
         ) : (
           <>
+            {/* Bulk import formatting notice */}
+            {(() => {
+              const pending = correspondence.filter(e =>
+                e.formatting_status !== 'formatted' &&
+                e.ai_metadata?.bulk_import === true
+              ).length
+              if (pending === 0) return null
+              return (
+                <div className="flex items-center gap-2 mb-6 px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-600">
+                  <span className="inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>Formatting {pending} imported {pending === 1 ? 'email' : 'emails'} in the background…</span>
+                </div>
+              )
+            })()}
+
             {/* Pinned Section */}
             {filteredCorrespondence.pinned.length > 0 && (
               <div className="mb-8 pb-8 border-b-2 border-yellow-200">
