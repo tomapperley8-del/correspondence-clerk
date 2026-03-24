@@ -213,8 +213,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bookmarklet Installation Card */}
-      {!bookmarkletInstalled && (
+      {/* Bookmarklet Installation Card — only show once there are businesses */}
+      {!bookmarkletInstalled && businesses.length > 0 && (
         <div className="bg-blue-50 border-2 border-blue-600 p-6 mb-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
