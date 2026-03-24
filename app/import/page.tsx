@@ -8,6 +8,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   google_state: 'Security check failed (state mismatch). Please try again.',
   google_no_token: 'No access token received from Google.',
   google_no_refresh: 'No refresh token received. Try disconnecting and reconnecting your Google account.',
+  google_no_profile: 'Your account isn\'t fully set up yet. Please complete onboarding before connecting Gmail.',
   google_failed: 'Google connection failed. Check server logs.',
 }
 

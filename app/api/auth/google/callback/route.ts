@@ -47,6 +47,11 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
+    // No profile row means the user hasn't completed onboarding
+    if (!existing) {
+      return NextResponse.redirect(new URL('/import?error=google_no_profile', request.url))
+    }
+
     const updateData: Record<string, string | null> = {
       google_access_token: tokens.access_token,
       google_token_expiry: tokens.expiry_date
@@ -57,7 +62,7 @@ export async function GET(request: NextRequest) {
     // Only update refresh token if we received one (Google only sends on first consent)
     if (tokens.refresh_token) {
       updateData.google_refresh_token = tokens.refresh_token
-    } else if (!existing?.google_refresh_token) {
+    } else if (!existing.google_refresh_token) {
       // No existing refresh token and none returned — something's wrong
       return NextResponse.redirect(new URL('/import?error=google_no_refresh', request.url))
     }
