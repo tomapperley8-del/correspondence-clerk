@@ -46,7 +46,7 @@ export function Pricing() {
                         className="text-4xl font-bold"
                         style={{ fontFamily: 'Lora, Georgia, serif', color: isHighlighted ? '#fff' : '#1E293B' }}
                       >
-                        ${plan.priceMonthly}
+                        £{plan.priceMonthly}
                       </span>
                       <span className="text-sm ml-1" style={{ color: isHighlighted ? '#94a3b8' : '#94a3b8' }}>/mo</span>
                     </div>

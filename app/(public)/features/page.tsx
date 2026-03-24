@@ -7,222 +7,210 @@ export const metadata = {
 
 const features = [
   {
-    title: 'Daily Briefing Assistant',
+    title: 'Daily Briefing',
     description:
       'Ask "what do I need to do today?" and get a prioritised breakdown of unreplied emails, expiring contracts, and stale follow-ups — with context from your actual correspondence history, not just counts.',
     details: [
       'Understands your full correspondence history',
       'Surfaces unreplied emails and cold follow-ups',
       'Flags contracts expiring soon',
-      'Ask any question: "who haven\'t I spoken to in 3 months?"',
+      'Ask anything: "who haven\'t I spoken to in 3 months?"',
     ],
-    icon: '🤖',
   },
   {
-    title: 'AI-Powered Formatting',
+    title: 'AI formatting',
     description:
-      'Our AI takes messy email threads and transforms them into clean, professionally formatted correspondence. Every word is preserved exactly as written — no rewrites, no summaries, just better formatting.',
+      'Paste a messy email thread and get clean, professionally formatted correspondence. Every word preserved exactly as written — no rewrites, no summaries, just better structure.',
     details: [
-      'Automatically detects email threads and formats them chronologically',
-      'Preserves original wording — your words, just cleaner',
-      'Handles complex formatting from any email client',
+      'Detects email threads and formats them chronologically',
+      'Preserves original wording exactly',
+      'Handles any email client format',
       'Falls back gracefully if AI is unavailable',
     ],
-    icon: '✨',
   },
   {
-    title: 'One-Click Email Import',
+    title: 'One-click email import',
     description:
-      'Install our browser bookmarklet and import emails directly from Outlook Web or Gmail with a single click. No more copy-pasting or manual data entry.',
+      'A browser bookmarklet imports emails from Outlook or Gmail in a single click. Or connect your inbox and bulk-import months of past correspondence at once.',
     details: [
       'Works with Outlook Web and Gmail',
       'Extracts sender, recipient, date, and subject automatically',
-      'Preserves email body and formatting',
-      'Secure - data goes directly to your account',
+      'Bulk import scans your inbox for review before saving',
+      'Data goes directly to your account — nothing stored in transit',
     ],
-    icon: '📧',
   },
   {
-    title: 'Organized Letter Files',
+    title: 'Organised correspondence files',
     description:
-      'Every piece of correspondence is automatically organized by business and contact. Recent items stay at your fingertips while older correspondence is archived but searchable.',
+      'Every piece of correspondence is filed by business and contact. Recent items at hand, older items archived but fully searchable.',
     details: [
-      'Two-section view: Recent (last 6 months) and Archive',
+      'Two-section view: Recent and Archive',
       'File by business and specific contact',
       'Track CC and BCC recipients',
-      'Add notes and follow-up reminders',
+      'Pin important entries',
     ],
-    icon: '📁',
   },
   {
-    title: 'Professional Exports',
+    title: 'Professional exports',
     description:
-      'Generate print-ready documents whenever you need them. Export to PDF, Word, or Google Docs with professional formatting.',
+      'Generate print-ready documents whenever you need them. Export to PDF or Google Docs with consistent, professional formatting.',
     details: [
       'PDF export for printing and sharing',
-      'Word document export for editing',
       'Google Docs integration',
-      'Consistent, professional layout',
+      'Consistent layout across all exports',
     ],
-    icon: '📄',
   },
   {
-    title: 'Powerful Search',
+    title: 'Full-text search',
     description:
-      'Full-text search across all your correspondence. Find any conversation in seconds, no matter how old. Search by business name, contact, subject, or content.',
+      'Find any conversation in seconds. Search by business name, contact, subject, or content across your entire history.',
     details: [
       'Search across all businesses and contacts',
       'Filter by date range',
-      'Business name prioritization in results',
-      'Instant results as you type',
+      'Business name prioritised in results',
     ],
-    icon: '🔍',
   },
   {
-    title: 'Team Collaboration',
+    title: 'Team access',
     description:
-      'Invite your team members to manage correspondence together. Everyone sees the same organized view, ensuring nothing falls through the cracks.',
+      'Invite your team to manage correspondence together. Role-based permissions, shared view, audit trail.',
     details: [
-      'Invite unlimited team members (Enterprise)',
-      'Share access to all correspondence',
-      'Audit trail of who added what',
-      'Role-based permissions (Admin/Member)',
+      'Invite team members (Pro and Enterprise)',
+      'Admin and Member roles',
+      'Everyone sees the same organised view',
     ],
-    icon: '👥',
   },
   {
-    title: 'Duplicate Detection',
+    title: 'Duplicate detection',
     description:
-      'Automatically detects when the same correspondence has been entered twice. Review and merge duplicates to keep your records clean.',
+      'Automatically flags when the same correspondence has been entered twice. Review and dismiss with one click.',
     details: [
-      'Automatic duplicate detection',
+      'Automatic duplicate detection on save',
       'Side-by-side comparison',
-      'One-click merge or dismiss',
-      'Never lose track of conversations',
+      'One-click dismiss',
     ],
-    icon: '🔄',
-  },
-  {
-    title: 'Business Management',
-    description:
-      'Track all the details about your business contacts in one place. Store addresses, contract details, membership types, and notes.',
-    details: [
-      'Store business addresses and contact info',
-      'Track contract dates and values',
-      'Categorize by type (client, prospect, etc.)',
-      'Add notes and reminders',
-    ],
-    icon: '🏢',
   },
 ]
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ backgroundColor: '#FAFAF8' }}>
       {/* Header */}
-      <header className="bg-white border-b-2 border-gray-800">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/" className="text-xl font-bold text-gray-900">
+      <header style={{ backgroundColor: '#FAFAF8', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+          <Link
+            href="/"
+            className="font-bold text-xl"
+            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+          >
             Correspondence Clerk
           </Link>
-          <div className="flex gap-4">
-            <Link
-              href="/login"
-              className="px-4 py-2 text-gray-700 font-semibold hover:text-blue-600"
-            >
-              Log In
+          <div className="flex items-center gap-5">
+            <Link href="/login" className="text-sm font-medium" style={{ color: '#475569' }}>
+              Log in
             </Link>
             <Link
               href="/signup"
-              className="px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 border-2 border-blue-600"
+              className="text-sm font-semibold px-4 py-2"
+              style={{ backgroundColor: '#2C4A6E', color: '#fff' }}
             >
-              Start Free Trial
+              Start free trial
             </Link>
           </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="bg-white py-16 border-b-2 border-gray-200">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+      <section className="py-20" style={{ backgroundColor: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+        <div className="container mx-auto px-6 max-w-2xl">
+          <p className="text-xs font-semibold tracking-widest uppercase mb-5" style={{ color: '#7C9A5E' }}>
+            Features
+          </p>
+          <h1
+            className="text-4xl md:text-5xl font-bold mb-5 leading-tight"
+            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B', letterSpacing: '-0.02em' }}
+          >
             An AI assistant for your business correspondence
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-lg leading-relaxed" style={{ color: '#475569' }}>
             Start every day knowing exactly who to contact, what to follow up on,
             and which contracts need attention — all from one organised place.
           </p>
         </div>
       </section>
 
-      {/* Features List */}
-      <main className="container mx-auto px-4 py-16">
-        <div className="space-y-16">
+      {/* Features */}
+      <main className="container mx-auto px-6 py-20">
+        <div className="space-y-12">
           {features.map((feature, index) => (
             <div
               key={index}
-              className={`grid md:grid-cols-2 gap-8 items-center ${
-                index % 2 === 1 ? 'md:flex-row-reverse' : ''
-              }`}
+              className="grid md:grid-cols-5 gap-8 py-10"
+              style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
             >
-              <div className={index % 2 === 1 ? 'md:order-2' : ''}>
-                <div className="text-5xl mb-4">{feature.icon}</div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              {/* Description — wider col */}
+              <div className="md:col-span-3">
+                <h2
+                  className="text-xl font-bold mb-3"
+                  style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+                >
                   {feature.title}
                 </h2>
-                <p className="text-lg text-gray-600 mb-6">
+                <p className="text-base leading-relaxed" style={{ color: '#475569' }}>
                   {feature.description}
                 </p>
-                <ul className="space-y-3">
+              </div>
+
+              {/* Detail bullets */}
+              <div className="md:col-span-2">
+                <ul className="space-y-2.5">
                   {feature.details.map((detail, i) => (
                     <li key={i} className="flex items-start gap-3">
-                      <span className="text-green-600 font-bold">✓</span>
-                      <span className="text-gray-700">{detail}</span>
+                      <span
+                        className="mt-2 shrink-0 w-1 h-1 rounded-full block"
+                        style={{ backgroundColor: '#7C9A5E' }}
+                      />
+                      <span className="text-sm leading-relaxed" style={{ color: '#64748b' }}>
+                        {detail}
+                      </span>
                     </li>
                   ))}
                 </ul>
-              </div>
-              <div
-                className={`bg-white border-2 border-gray-800 p-8 ${
-                  index % 2 === 1 ? 'md:order-1' : ''
-                }`}
-              >
-                <div className="text-8xl text-center opacity-20">
-                  {feature.icon}
-                </div>
               </div>
             </div>
           ))}
         </div>
 
         {/* CTA */}
-        <div className="mt-16 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Ready to get started?
+        <div className="mt-20 pt-10" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+          <h2
+            className="text-2xl font-bold mb-3"
+            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+          >
+            Start knowing what needs your attention
           </h2>
-          <p className="text-xl text-gray-600 mb-8">
-            Try Correspondence Clerk free for 14 days. No credit card required.
+          <p className="text-base mb-6" style={{ color: '#64748b' }}>
+            14-day free trial. No credit card required.
           </p>
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 bg-blue-600 text-white font-semibold text-lg hover:bg-blue-700 border-2 border-blue-600"
+            className="inline-block text-sm font-semibold px-6 py-3"
+            style={{ backgroundColor: '#2C4A6E', color: '#fff' }}
           >
-            Start Free Trial
+            Start free trial
           </Link>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t-2 border-gray-800 py-8">
-        <div className="container mx-auto px-4 text-center text-gray-600">
-          <p>&copy; {new Date().getFullYear()} Correspondence Clerk. All rights reserved.</p>
-          <div className="mt-4 space-x-4">
-            <Link href="/terms" className="hover:text-blue-600">
-              Terms of Service
-            </Link>
-            <Link href="/privacy" className="hover:text-blue-600">
-              Privacy Policy
-            </Link>
+      <footer className="py-8" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+        <div className="container mx-auto px-6 flex flex-wrap justify-between items-center gap-4">
+          <p className="text-xs" style={{ color: '#94a3b8' }}>
+            &copy; {new Date().getFullYear()} Correspondence Clerk
+          </p>
+          <div className="flex gap-6 text-xs" style={{ color: '#94a3b8' }}>
+            <Link href="/terms" className="hover:underline">Terms</Link>
+            <Link href="/privacy" className="hover:underline">Privacy</Link>
           </div>
         </div>
       </footer>
