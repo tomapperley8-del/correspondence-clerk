@@ -71,9 +71,10 @@ export async function executeChunk({
   const bizCache = new Map<string, string>()
   const contactCache = new Map<string, string>()
 
-  // Idempotent: resolves existing ID or creates, safe to call across chunks
+  // Idempotent: resolves existing ID or creates, safe to call across chunks.
+  // Cache key uses existing ID when known (stable), falls back to normalised name.
   const resolveBiz = async (b: ScanBusiness): Promise<string | null> => {
-    const key = b.name.toLowerCase().trim()
+    const key = b.existingBusinessId ?? b.name.toLowerCase().trim()
     if (bizCache.has(key)) return bizCache.get(key)!
     if (b.existingBusinessId) {
       bizCache.set(key, b.existingBusinessId)

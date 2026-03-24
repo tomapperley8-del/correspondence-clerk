@@ -16,6 +16,13 @@ export interface GmailFullEmail {
   bodyText: string
 }
 
+/** Safely parse an email date string, returning ISO. Falls back to now() on invalid input. */
+function parseDateSafe(dateStr: string): string {
+  if (!dateStr) return new Date().toISOString()
+  const d = new Date(dateStr)
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
+}
+
 function makeOAuth2Client(tokens: GmailTokens) {
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -109,19 +116,12 @@ export async function scanGmailEmails(
             ? ccRaw.split(/,(?=[^,]*@)/).map((s) => parseEmailAddress(s.trim())).filter((p) => p.email)
             : []
 
-          let parsedDate: string
-          try {
-            parsedDate = new Date(dateStr).toISOString()
-          } catch {
-            parsedDate = new Date().toISOString()
-          }
-
           return {
             externalId: id,
             subject,
             from: fromParsed,
             to: [...toParsed, ...ccParsed],
-            date: parsedDate,
+            date: parseDateSafe(dateStr),
           } satisfies ScanEmailMeta
         }).catch(() => null)
       )
@@ -171,13 +171,6 @@ export async function fetchGmailFullEmail(
     const subject = get('Subject') || '(no subject)'
     const dateStr = get('Date')
 
-    let parsedDate: string
-    try {
-      parsedDate = new Date(dateStr).toISOString()
-    } catch {
-      parsedDate = new Date().toISOString()
-    }
-
     // Extract plain text body, falling back to stripping HTML
     const bodyText = extractBodyText(msg.payload)
 
@@ -186,7 +179,7 @@ export async function fetchGmailFullEmail(
       subject,
       from: fromRaw,
       to: toRaw,
-      date: parsedDate,
+      date: parseDateSafe(dateStr),
       bodyText,
     }
   } catch {

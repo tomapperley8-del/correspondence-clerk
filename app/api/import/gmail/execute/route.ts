@@ -5,6 +5,7 @@ import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { fetchGmailFullEmail } from '@/lib/email-import/gmail-client'
 import { executeChunk } from '@/lib/email-import/execute-chunk'
 import type { ScanBusiness } from '@/lib/email-import/domain-grouper'
+import { makeGmailTokenRefreshHandler } from '@/lib/email-import/token-helpers'
 
 export const maxDuration = 300
 
@@ -50,16 +51,7 @@ export async function POST(request: NextRequest) {
   }
 
   const serviceClient = createServiceRoleClient()
-
-  const onTokenRefresh = async (newAccessToken: string, newExpiry: Date | null) => {
-    await serviceClient
-      .from('user_profiles')
-      .update({
-        google_access_token: newAccessToken,
-        google_token_expiry: newExpiry?.toISOString() ?? null,
-      })
-      .eq('id', user.id)
-  }
+  const onTokenRefresh = makeGmailTokenRefreshHandler(serviceClient, user.id)
 
   const encoder = new TextEncoder()
 
