@@ -5,6 +5,7 @@ import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { scanGmailEmails } from '@/lib/email-import/gmail-client'
 import { buildContactEmailMapDirect } from '@/lib/email-import/contact-matcher'
 import { groupEmailsIntoBusinesses } from '@/lib/email-import/domain-grouper'
+import { makeGmailTokenRefreshHandler } from '@/lib/email-import/token-helpers'
 
 export const maxDuration = 60
 
@@ -39,17 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   const serviceClient = createServiceRoleClient()
-
-  // Token refresh handler — update DB when Google issues new access token
-  const onTokenRefresh = async (newAccessToken: string, newExpiry: Date | null) => {
-    await serviceClient
-      .from('user_profiles')
-      .update({
-        google_access_token: newAccessToken,
-        google_token_expiry: newExpiry?.toISOString() ?? null,
-      })
-      .eq('id', user.id)
-  }
+  const onTokenRefresh = makeGmailTokenRefreshHandler(serviceClient, user.id)
 
   // Scan Gmail headers
   const emails = await scanGmailEmails(tokens, since, onTokenRefresh)
