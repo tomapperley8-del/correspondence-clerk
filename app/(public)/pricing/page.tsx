@@ -76,12 +76,12 @@ export default function PricingPage() {
                   {plan.priceMonthly !== null ? (
                     <>
                       <span className="text-4xl font-bold text-gray-900">
-                        ${plan.priceMonthly}
+                        £{plan.priceMonthly}
                       </span>
                       <span className="text-gray-600">/month</span>
                       {plan.priceYearly && (
                         <p className="text-sm text-gray-500 mt-1">
-                          or ${plan.priceYearly}/year (save ${plan.priceMonthly * 12 - plan.priceYearly})
+                          or £{plan.priceYearly}/year (save £{plan.priceMonthly * 12 - plan.priceYearly})
                         </p>
                       )}
                     </>
