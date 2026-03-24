@@ -1,6 +1,7 @@
 import { MarketingNav } from './MarketingNav'
 import { MarketingFooter } from './MarketingFooter'
 import { Hero } from './Hero'
+import { ProblemStatement } from './ProblemStatement'
 import { Features } from './Features'
 import { HowItWorks } from './HowItWorks'
 import { Pricing } from './Pricing'
@@ -11,6 +12,7 @@ export function LandingPage() {
     <div className="min-h-screen">
       <MarketingNav />
       <Hero />
+      <ProblemStatement />
       <Features />
       <HowItWorks />
       <Pricing />
