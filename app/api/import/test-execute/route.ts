@@ -1,56 +1,69 @@
-import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
-import { fetchGmailFullEmail } from '@/lib/email-import/gmail-client'
-import { enqueueForFormatting } from '@/lib/email-import/queue'
-import type { ScanBusiness, ScanResult } from '@/lib/email-import/domain-grouper'
+/**
+ * DEV-ONLY: Test execute endpoint for the bulk import pipeline.
+ *
+ * Identical to the Gmail execute route except it accepts pre-built email bodies
+ * in the request JSON instead of fetching them from the Gmail API.
+ * This lets us test the full DB-write path (business creation, contact creation,
+ * correspondence insert, dedup, queue enqueue) with zero external dependencies.
+ *
+ * Returns 404 in production.
+ */
 
-export const maxDuration = 300
+import { NextRequest } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { enqueueForFormatting } from '@/lib/email-import/queue'
+import type { ScanBusiness } from '@/lib/email-import/domain-grouper'
+
+export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  if (process.env.NODE_ENV === 'production') {
+    return new Response('Not found', { status: 404 })
+  }
 
-  const orgId = await getCurrentUserOrganizationId()
-  if (!orgId) return new Response('No organisation', { status: 403 })
+  // Accept Bearer token from Authorization header (dev script convenience)
+  const authHeader = request.headers.get('Authorization')
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) return new Response('Unauthorized', { status: 401 })
 
-  const body = await request.json()
-  const { scanId, businesses }: { scanId: string; businesses: ScanBusiness[] } = body
+  // Create an anon client authenticated with the user's access token
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    }
+  )
 
-  if (!scanId || !businesses) return new Response('Missing scanId or businesses', { status: 400 })
+  // Verify token and get user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) return new Response('Unauthorized', { status: 401 })
 
-  // Load Gmail tokens
+  // Get org id
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('google_access_token, google_refresh_token, google_token_expiry')
+    .select('organization_id')
     .eq('id', user.id)
     .single()
 
-  if (!profile?.google_access_token) {
-    return new Response('Gmail not connected', { status: 400 })
+  const orgId = profile?.organization_id
+  if (!orgId) return new Response('No organisation', { status: 403 })
+
+  const body = await request.json()
+  const {
+    businesses,
+    emailBodies,
+  }: {
+    scanId?: string
+    businesses: ScanBusiness[]
+    emailBodies: Record<string, string>
+  } = body
+
+  if (!businesses || !emailBodies) {
+    return new Response('Missing businesses or emailBodies', { status: 400 })
   }
 
-  const tokens = {
-    accessToken: profile.google_access_token,
-    refreshToken: profile.google_refresh_token,
-    tokenExpiry: profile.google_token_expiry,
-  }
-
-  const serviceClient = createServiceRoleClient()
-
-  const onTokenRefresh = async (newAccessToken: string, newExpiry: Date | null) => {
-    await serviceClient
-      .from('user_profiles')
-      .update({
-        google_access_token: newAccessToken,
-        google_token_expiry: newExpiry?.toISOString() ?? null,
-      })
-      .eq('id', user.id)
-  }
-
-  // SSE stream
   const encoder = new TextEncoder()
   let imported = 0
   let skipped = 0
@@ -64,13 +77,13 @@ export async function POST(request: NextRequest) {
       try {
         const activeBusinesses = businesses.filter((b) => !b.excluded)
         const totalEmails = activeBusinesses.reduce(
-          (s, b) => s + b.contacts.filter((c) => !c.excluded).reduce((cs, c) => cs + c.emailIds.length, 0),
+          (s, b) =>
+            s + b.contacts.filter((c) => !c.excluded).reduce((cs, c) => cs + c.emailIds.length, 0),
           0
         )
         send('start', { total: totalEmails })
 
         for (const business of activeBusinesses) {
-          // Resolve or create business
           let businessId = business.existingBusinessId
 
           if (!businessId) {
@@ -92,7 +105,6 @@ export async function POST(request: NextRequest) {
           const activeContacts = business.contacts.filter((c) => !c.excluded)
 
           for (const contact of activeContacts) {
-            // Resolve or create contact
             let contactId = contact.existingContactId
 
             if (!contactId) {
@@ -112,19 +124,27 @@ export async function POST(request: NextRequest) {
 
             if (!contactId) continue
 
-            // Determine direction: if contact email matches from → received, else sent
             for (const emailId of contact.emailIds) {
-              const fullEmail = await fetchGmailFullEmail(tokens, emailId, onTokenRefresh)
-              if (!fullEmail) {
+              const rawBody = emailBodies[emailId]
+              if (!rawBody) {
                 skipped++
                 send('progress', { imported, skipped, total: totalEmails })
                 continue
               }
 
-              // Build raw_text in standard format (same as import-email route)
-              const rawText = `From: ${fullEmail.from}\nTo: ${fullEmail.to}\nDate: ${fullEmail.date}\nSubject: ${fullEmail.subject}\n\n${fullEmail.bodyText}`
+              // Parse minimal headers from the raw body string
+              const lines = rawBody.split('\n')
+              const header = (prefix: string) =>
+                lines.find((l) => l.toLowerCase().startsWith(prefix.toLowerCase()))?.slice(prefix.length).trim() ?? ''
 
-              // Compute content hash and check for duplicate
+              const fromHeader = header('From:')
+              const subjectHeader = header('Subject:')
+              const dateHeader = header('Date:')
+              const bodyText = rawBody.split('\n\n').slice(1).join('\n\n').trim()
+
+              const rawText = `From: ${fromHeader}\nTo: ${contact.email}\nDate: ${dateHeader}\nSubject: ${subjectHeader}\n\n${bodyText}`
+
+              // Dedup check via content hash
               const { data: hashData } = await supabase.rpc('compute_content_hash', { raw_text: rawText })
               const contentHash = hashData as string | null
 
@@ -144,12 +164,10 @@ export async function POST(request: NextRequest) {
                 }
               }
 
-              // Determine direction
-              const fromEmail = fullEmail.from.toLowerCase()
-              const isFromContact = fromEmail.includes(contact.email.toLowerCase())
+              // Direction: if from header contains contact email → received, else sent
+              const isFromContact = fromHeader.toLowerCase().includes(contact.email.toLowerCase())
               const direction: 'sent' | 'received' = isFromContact ? 'received' : 'sent'
 
-              // Create correspondence entry
               const { data: entry } = await supabase
                 .from('correspondence')
                 .insert({
@@ -160,8 +178,8 @@ export async function POST(request: NextRequest) {
                   raw_text_original: rawText,
                   formatted_text_original: null,
                   formatted_text_current: null,
-                  entry_date: fullEmail.date,
-                  subject: fullEmail.subject,
+                  entry_date: dateHeader || new Date().toISOString(),
+                  subject: subjectHeader || '(No subject)',
                   type: 'Email',
                   direction,
                   action_needed: 'none',
@@ -169,7 +187,7 @@ export async function POST(request: NextRequest) {
                   content_hash: contentHash,
                   ai_metadata: {
                     bulk_import: true,
-                    source: 'gmail',
+                    source: 'test',
                     external_id: emailId,
                     imported_at: new Date().toISOString(),
                   },
@@ -178,14 +196,13 @@ export async function POST(request: NextRequest) {
                 .single()
 
               if (entry) {
-                // Update business last_contacted_at if this email is newer
                 await supabase
                   .from('businesses')
-                  .update({ last_contacted_at: fullEmail.date })
+                  .update({ last_contacted_at: dateHeader || new Date().toISOString() })
                   .eq('id', businessId!)
-                  .lt('last_contacted_at', fullEmail.date)
+                  .lt('last_contacted_at', dateHeader || new Date().toISOString())
 
-                await enqueueForFormatting(serviceClient, orgId, entry.id)
+                await enqueueForFormatting(supabase, orgId, entry.id)
                 imported++
               } else {
                 skipped++
@@ -198,7 +215,7 @@ export async function POST(request: NextRequest) {
 
         send('done', { imported, skipped })
       } catch (err) {
-        console.error('Gmail execute error:', err)
+        console.error('test-execute error:', err)
         send('error', { message: err instanceof Error ? err.message : 'Import failed' })
       } finally {
         controller.close()

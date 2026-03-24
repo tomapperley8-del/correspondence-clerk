@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
               .insert({
                 organization_id: orgId,
                 name: business.name,
+                normalized_name: business.name.toLowerCase().trim(),
                 status: 'prospect',
               })
               .select('id')
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest) {
                 .from('contacts')
                 .insert({
                   business_id: businessId,
+                  organization_id: orgId,
                   name: contact.name,
                   normalized_email: contact.email.toLowerCase(),
                   emails: JSON.stringify([contact.email.toLowerCase()]),
