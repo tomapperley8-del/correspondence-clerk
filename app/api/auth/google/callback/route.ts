@@ -77,7 +77,8 @@ export async function GET(request: NextRequest) {
     response.cookies.delete('oauth_state')
     return response
   } catch (err) {
-    console.error('Google OAuth callback error:', err)
-    return NextResponse.redirect(new URL('/import?error=google_failed', request.url))
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('Google OAuth callback error:', msg)
+    return NextResponse.redirect(new URL(`/import?error=google_failed&detail=${encodeURIComponent(msg)}`, request.url))
   }
 }

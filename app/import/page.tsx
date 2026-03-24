@@ -16,7 +16,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { error: errorCode } = await searchParams
+  const { error: errorCode, detail } = await searchParams
   const errorMessage = errorCode ? (ERROR_MESSAGES[errorCode] ?? `Unknown error: ${errorCode}`) : null
 
   // Check which providers are connected
@@ -39,7 +39,8 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
 
       {errorMessage && (
         <div className="border border-red-300 bg-red-50 text-red-800 text-sm px-4 py-3 rounded mb-6">
-          {errorMessage}
+          <p>{errorMessage}</p>
+          {detail && <p className="mt-1 font-mono text-xs opacity-75">{detail}</p>}
         </div>
       )}
 
