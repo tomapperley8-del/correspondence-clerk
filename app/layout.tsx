@@ -4,6 +4,7 @@ import { Navigation } from '@/components/Navigation'
 import { ChatProvider } from '@/components/ChatContext'
 import { ChatPanel } from '@/components/ChatPanel'
 import { CommandSearch } from '@/components/CommandSearch'
+import { ToastContainer } from '@/components/Toast'
 
 export const metadata: Metadata = {
   title: 'Correspondence Clerk',
@@ -34,6 +35,7 @@ export default function RootLayout({
           <Navigation />
           <ChatPanel />
           <CommandSearch />
+          <ToastContainer />
           <main id="main-content">{children}</main>
         </ChatProvider>
       </body>

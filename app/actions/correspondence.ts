@@ -878,3 +878,17 @@ export async function setCorrespondenceAction(id: string, actionNeeded: string) 
   revalidatePath('/actions-page')
   return { success: true }
 }
+
+export async function getOutstandingActionsCount(): Promise<number> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return 0
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return 0
+  const { count } = await supabase
+    .from('correspondence')
+    .select('*', { count: 'exact', head: true })
+    .eq('organization_id', orgId)
+    .neq('action_needed', 'none')
+  return count ?? 0
+}

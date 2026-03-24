@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ import { CopyButton } from '@/components/CopyButton'
 import { retryFormatting } from '@/app/actions/ai-formatter'
 import { getActiveMembershipTypes, type MembershipType } from '@/app/actions/membership-types'
 import { formatDateGB, formatDateTimeGB } from '@/lib/utils'
+import { toast } from '@/lib/toast'
 
 export default function BusinessDetailPage({
   params,
@@ -98,6 +99,10 @@ export default function BusinessDetailPage({
 
   // Expanded entries for text collapse
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set())
+
+  // Jump to today anchor
+  const recentSectionRef = useRef<HTMLDivElement>(null)
+  const [recentSectionVisible, setRecentSectionVisible] = useState(true)
 
   // Feature #4: Correspondence view controls state
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest')
@@ -230,6 +235,15 @@ export default function BusinessDetailPage({
         }, 100)
       }
     }
+  }, [loading])
+
+  // Jump to today: observe recent section visibility
+  useEffect(() => {
+    const el = recentSectionRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => setRecentSectionVisible(entry.isIntersecting), { threshold: 0.1 })
+    obs.observe(el)
+    return () => obs.disconnect()
   }, [loading])
 
   // Feature #4: Split correspondence into recent and archive with filters applied
@@ -1126,20 +1140,32 @@ export default function BusinessDetailPage({
                 <button
                   type="button"
                   onClick={async () => {
-                    await setCorrespondenceAction(entry.id, 'follow_up')
-                    if (id) { const r = await getCorrespondenceByBusiness(id); setCorrespondence('error' in r ? [] : r.data || []) }
+                    setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'follow_up' } : c))
+                    const result = await setCorrespondenceAction(entry.id, 'follow_up')
+                    if (result && 'error' in result) {
+                      setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'none' } : c))
+                      toast.error('Failed to set action')
+                    } else {
+                      toast.success('Follow-up set')
+                    }
                   }}
-                  className="px-3 py-1 text-xs border border-amber-300 text-amber-800 hover:bg-amber-50"
+                  className="px-3 py-2 sm:py-1 text-xs border border-amber-300 text-amber-800 hover:bg-amber-50"
                 >
                   Follow-up
                 </button>
                 <button
                   type="button"
                   onClick={async () => {
-                    await setCorrespondenceAction(entry.id, 'waiting_on_them')
-                    if (id) { const r = await getCorrespondenceByBusiness(id); setCorrespondence('error' in r ? [] : r.data || []) }
+                    setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'waiting_on_them' } : c))
+                    const result = await setCorrespondenceAction(entry.id, 'waiting_on_them')
+                    if (result && 'error' in result) {
+                      setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'none' } : c))
+                      toast.error('Failed to set action')
+                    } else {
+                      toast.success('Waiting on them set')
+                    }
                   }}
-                  className="px-3 py-1 text-xs border border-blue-300 text-blue-800 hover:bg-blue-50"
+                  className="px-3 py-2 sm:py-1 text-xs border border-blue-300 text-blue-800 hover:bg-blue-50"
                 >
                   Waiting on them
                 </button>
@@ -1151,8 +1177,15 @@ export default function BusinessDetailPage({
                 <button
                   type="button"
                   onClick={async () => {
-                    await setCorrespondenceAction(entry.id, 'none')
-                    if (id) { const r = await getCorrespondenceByBusiness(id); setCorrespondence('error' in r ? [] : r.data || []) }
+                    const prev_action = entry.action_needed
+                    setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'none' } : c))
+                    const result = await setCorrespondenceAction(entry.id, 'none')
+                    if (result && 'error' in result) {
+                      setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: prev_action } : c))
+                      toast.error('Failed to mark done')
+                    } else {
+                      toast.success('Marked done')
+                    }
                   }}
                   className="px-2 py-0.5 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50"
                 >
@@ -1664,9 +1697,9 @@ export default function BusinessDetailPage({
         {/* Feature #4: Correspondence View Controls */}
         {correspondence && correspondence.length > 0 && (
           <div className="border-t-2 border-gray-300 pt-4 mb-6">
-            <div className="flex flex-wrap gap-4 items-center mb-3">
+            <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-4 items-start mb-3">
               {/* Date Range */}
-              <div>
+              <div className="sm:order-3">
                 <label className="text-sm font-semibold text-gray-700 block mb-1">
                   Show:
                 </label>
@@ -1747,7 +1780,7 @@ export default function BusinessDetailPage({
               )}
 
               {/* Sort Order */}
-              <div>
+              <div className="sm:order-1">
                 <label className="text-sm font-semibold text-gray-700 block mb-1">
                   Sort:
                 </label>
@@ -1778,7 +1811,7 @@ export default function BusinessDetailPage({
               </div>
 
               {/* Contact Filter */}
-              <div>
+              <div className="sm:order-4">
                 <label className="text-sm font-semibold text-gray-700 block mb-1">
                   Contact:
                 </label>
@@ -1797,7 +1830,7 @@ export default function BusinessDetailPage({
               </div>
 
               {/* Direction Filter */}
-              <div>
+              <div className="sm:order-2">
                 <label className="text-sm font-semibold text-gray-700 block mb-1">
                   Direction:
                 </label>
@@ -2039,7 +2072,7 @@ export default function BusinessDetailPage({
 
             {/* Recent Section */}
             {filteredCorrespondence.recent.length > 0 && (
-              <div className="mb-8">
+              <div className="mb-8" ref={recentSectionRef}>
                 <h3 className="font-bold text-gray-900 mb-4 text-lg">
                   {dateRange === 'custom'
                     ? `Selected Range${customDateFrom ? ` (${formatDateGB(customDateFrom)}` : ''}${customDateTo ? ` - ${formatDateGB(customDateTo)})` : customDateFrom ? ')' : ''}`
@@ -2105,6 +2138,17 @@ export default function BusinessDetailPage({
           </>
         )}
       </div>
+
+      {/* Jump to today floating button */}
+      {!recentSectionVisible && filteredCorrespondence.recent.length > 0 && (
+        <button
+          onClick={() => recentSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          className="fixed bottom-6 left-6 z-40 px-3 py-2 bg-[#1E293B] text-white text-xs font-medium shadow-lg hover:bg-[#2C4A6E] transition-colors"
+          title="Jump to recent entries"
+        >
+          ↑ Today
+        </button>
+      )}
 
       {/* Delete Contact Confirmation Dialog */}
       <ConfirmDialog
