@@ -193,6 +193,11 @@ export async function updateBusiness(
     return { error: parsed.error.issues[0].message }
   }
 
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   const updateData: Record<string, unknown> = {}
 
   if (formData.name !== undefined) {
@@ -216,6 +221,7 @@ export async function updateBusiness(
     .from('businesses')
     .update(updateData)
     .eq('id', id)
+    .eq('organization_id', organizationId)
     .select()
     .single()
 
@@ -239,7 +245,12 @@ export async function deleteBusiness(id: string) {
     return { error: 'Unauthorized' }
   }
 
-  const { error } = await supabase.from('businesses').delete().eq('id', id)
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
+  const { error } = await supabase.from('businesses').delete().eq('id', id).eq('organization_id', organizationId)
 
   if (error) {
     return { error: error.message }

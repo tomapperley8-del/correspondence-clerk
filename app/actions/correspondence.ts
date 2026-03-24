@@ -229,6 +229,18 @@ export async function createCorrespondence(formData: {
     return { error: 'No organization found' }
   }
 
+  // Validate contact belongs to the same business (prevents cross-business data corruption)
+  if (formData.contact_id) {
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('business_id')
+      .eq('id', formData.contact_id)
+      .single()
+    if (!contact || contact.business_id !== formData.business_id) {
+      return { error: 'Contact does not belong to this business' }
+    }
+  }
+
   const { data, error } = await supabase
     .from('correspondence')
     .insert({
@@ -294,6 +306,11 @@ export async function updateFormattedText(
     return { error: 'Unauthorized' }
   }
 
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   const updateData: Record<string, unknown> = {
     formatted_text_current: formattedTextCurrent,
     edited_at: new Date().toISOString(),
@@ -327,6 +344,7 @@ export async function updateFormattedText(
     .from('correspondence')
     .update(updateData)
     .eq('id', correspondenceId)
+    .eq('organization_id', organizationId)
     .select('*, business_id')
     .single()
 
@@ -394,6 +412,11 @@ export async function deleteCorrespondence(id: string) {
     return { error: 'Unauthorized' }
   }
 
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   // Get business_id before deleting
   const { data: entry } = await supabase
     .from('correspondence')
@@ -401,7 +424,7 @@ export async function deleteCorrespondence(id: string) {
     .eq('id', id)
     .single()
 
-  const { error } = await supabase.from('correspondence').delete().eq('id', id)
+  const { error } = await supabase.from('correspondence').delete().eq('id', id).eq('organization_id', organizationId)
 
   if (error) {
     return { error: error.message }
@@ -433,13 +456,18 @@ export async function deleteMultipleCorrespondence(ids: string[]) {
     return { error: 'No entries to delete' }
   }
 
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   // Get business_ids before deleting (for path revalidation)
   const { data: entries } = await supabase
     .from('correspondence')
     .select('business_id')
     .in('id', ids)
 
-  const { error } = await supabase.from('correspondence').delete().in('id', ids)
+  const { error } = await supabase.from('correspondence').delete().in('id', ids).eq('organization_id', organizationId)
 
   if (error) {
     return { error: error.message }

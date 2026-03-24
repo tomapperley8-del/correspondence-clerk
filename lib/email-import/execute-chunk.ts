@@ -89,11 +89,22 @@ export async function executeChunk({
       bizCache.set(key, found.id)
       return found.id
     }
-    const { data: created } = await supabase
+    const { data: created, error: createErr } = await supabase
       .from('businesses')
       .insert({ organization_id: orgId, name: b.name, normalized_name: key, status: 'prospect' })
       .select('id')
       .single()
+    if (createErr?.code === '23505') {
+      // Race condition: another chunk created this business concurrently — re-fetch it
+      const { data: found2 } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('normalized_name', key)
+        .single()
+      if (found2) bizCache.set(key, found2.id)
+      return found2?.id ?? null
+    }
     if (created) bizCache.set(key, created.id)
     return created?.id ?? null
   }
@@ -115,7 +126,7 @@ export async function executeChunk({
       contactCache.set(key, found.id)
       return found.id
     }
-    const { data: created } = await supabase
+    const { data: created, error: createErr } = await supabase
       .from('contacts')
       .insert({
         business_id: businessId,
@@ -126,6 +137,17 @@ export async function executeChunk({
       })
       .select('id')
       .single()
+    if (createErr?.code === '23505') {
+      // Race condition: another chunk created this contact concurrently — re-fetch it
+      const { data: found2 } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('normalized_email', key)
+        .single()
+      if (found2) contactCache.set(key, found2.id)
+      return found2?.id ?? null
+    }
     if (created) contactCache.set(key, created.id)
     return created?.id ?? null
   }

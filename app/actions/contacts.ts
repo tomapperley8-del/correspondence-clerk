@@ -250,10 +250,16 @@ export async function updateContact(
   if (formData.notes !== undefined) updateData.notes = formData.notes?.trim() || null
   if (formData.is_active !== undefined) updateData.is_active = formData.is_active
 
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) {
+    return { error: 'No organization found' }
+  }
+
   const { data, error } = await supabase
     .from('contacts')
     .update(updateData)
     .eq('id', id)
+    .eq('organization_id', organizationId)
     .select()
     .single()
 
@@ -268,7 +274,7 @@ export async function updateContact(
     phones: typeof data.phones === 'string' ? JSON.parse(data.phones) : (data.phones || []),
   }
 
-  // Get business_id to revalidate the business page
+  // Get business_id to revalidate the business page (data already has it from the update select)
   const { data: contact } = await supabase
     .from('contacts')
     .select('business_id')

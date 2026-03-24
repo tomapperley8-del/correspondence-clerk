@@ -54,33 +54,25 @@ export async function buildContactEmailMap(
 }
 
 /**
- * Simpler version that fetches contacts via explicit join query.
- * Used as the primary approach when the RPC is not available.
+ * Fetches all contacts for an org in a single query using organization_id directly.
+ * Contacts have organization_id, so no join through businesses is needed.
  */
 export async function buildContactEmailMapDirect(
   supabase: SupabaseClient,
   orgId: string
 ): Promise<Map<string, ContactMatch>> {
-  // Fetch all contacts for the org via businesses join
-  const { data: businesses } = await supabase
-    .from('businesses')
-    .select('id')
-    .eq('organization_id', orgId)
-
-  if (!businesses || businesses.length === 0) {
-    return new Map()
-  }
-
-  const businessIds = businesses.map((b) => b.id)
-
   const { data: contacts } = await supabase
     .from('contacts')
     .select('id, business_id, normalized_email, emails')
-    .in('business_id', businessIds)
+    .eq('organization_id', orgId)
+
+  if (!contacts || contacts.length === 0) {
+    return new Map()
+  }
 
   const map = new Map<string, ContactMatch>()
 
-  for (const c of contacts ?? []) {
+  for (const c of contacts) {
     const match: ContactMatch = { businessId: c.business_id, contactId: c.id }
 
     if (c.normalized_email) {

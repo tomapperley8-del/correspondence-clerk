@@ -18,6 +18,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/import?error=google_invalid', request.url))
   }
 
+  // Validate CSRF state token
+  const savedState = request.cookies.get('oauth_state')?.value
+  if (!savedState || savedState !== state) {
+    return NextResponse.redirect(new URL('/import?error=google_state', request.url))
+  }
+
   // Must be authenticated
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

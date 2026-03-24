@@ -85,7 +85,21 @@
       "Bash(npx next dev)",
       "Bash(node -e:*)",
       "Bash(find C:/Users/Bridg/Projects/correspondence-clerk -name *seed* -o -name *test*data* -o -name *dev*setup*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "Bash(TEST_USER_EMAIL=\"tomapperley8@gmail.com\" TEST_USER_PASSWORD=\"Goforbroke96\" npx tsx scripts/test-import-flow.ts)",
+      "Bash(TEST_USER_EMAIL=\"tomapperley8@gmail.com\" TEST_USER_PASSWORD=\"Goforbroke96\" npx tsx --env-file=.env.local scripts/test-import-flow.ts)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill:*)",
+      "Bash(1 echo:*)",
+      "Read(//tmp/**)",
+      "mcp__claude_ai_Vercel__get_project",
+      "mcp__claude_ai_Vercel__get_runtime_logs",
+      "Bash(vercel env:*)",
+      "Bash(\"/c/Users/Bridg/Projects/correspondence-clerk/.env.local\")",
+      "Bash(NEXT_PUBLIC_APP_URL=\"https://correspondence-clerk.vercel.app\" TEST_USER_EMAIL=\"tomapperley8@gmail.com\" TEST_USER_PASSWORD=\"Goforbroke96\" npx tsx --env-file=.env.local scripts/test-import-flow.ts)",
+      "mcp__claude_ai_Supabase__get_logs",
+      "mcp__claude_ai_Vercel__get_deployment_build_logs"
     ]
   }
 }
