@@ -14,14 +14,14 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServiceRoleClient()
 
-  // Atomically claim up to 20 pending items
+  // Atomically claim up to 50 pending items
   // Two-step: select then update (Supabase doesn't support UPDATE...RETURNING with filters cleanly)
   const { data: pendingItems } = await supabase
     .from('import_queue')
     .select('id, correspondence_id, org_id, retry_count')
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
-    .limit(20)
+    .limit(50)
 
   if (!pendingItems || pendingItems.length === 0) {
     return NextResponse.json({ processed: 0 })

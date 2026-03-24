@@ -58,40 +58,53 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
     setProgress({ imported: 0, skipped: 0, total: totalSelected })
 
     const executeUrl = `/api/import/${provider}/execute`
-    const res = await fetch(executeUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scanId, businesses }),
-    })
+    let offset = 0
+    let importedSoFar = 0
+    let skippedSoFar = 0
 
-    if (!res.ok || !res.body) {
-      setImporting(false)
-      return
-    }
-
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-
+    // Loop through chunks until done or error
     while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
+      const res = await fetch(executeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scanId, businesses, offset, importedSoFar, skippedSoFar }),
+      })
 
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
+      if (!res.ok || !res.body) {
+        setImporting(false)
+        return
+      }
 
-      for (const line of lines) {
-        if (line.startsWith('event: ')) {
-          // next line has the data
-        } else if (line.startsWith('data: ')) {
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let nextOffset: number | null = null
+      let isDone = false
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
           try {
             const data = JSON.parse(line.slice(6))
-            if (data.imported !== undefined) {
+            if ('imported' in data) {
+              importedSoFar = data.imported
+              skippedSoFar = data.skipped
               setProgress({ imported: data.imported, skipped: data.skipped, total: data.total ?? totalSelected })
             }
-            if (data.imported !== undefined && 'total' in data === false) {
-              // done event
+            // chunk_done: more chunks remain
+            if ('nextOffset' in data) {
+              nextOffset = data.nextOffset
+            }
+            // done: all chunks complete (no total, no nextOffset)
+            if (!('nextOffset' in data) && !('total' in data) && 'imported' in data) {
+              isDone = true
               onImportComplete(data.imported, data.skipped)
             }
           } catch {
@@ -99,6 +112,9 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
           }
         }
       }
+
+      if (isDone || nextOffset === null) break
+      offset = nextOffset
     }
 
     setImporting(false)
