@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
@@ -121,14 +120,13 @@ export default function LoginPage() {
               />
             </div>
 
-            <Button
+            <button
               type="submit"
               disabled={isLoading}
-              className="w-full text-white font-semibold py-3"
-              style={{ backgroundColor: '#2C4A6E' }}
+              className="w-full bg-[#2C4A6E] hover:bg-[#243d5c] text-white font-semibold py-3 rounded-sm transition-colors disabled:opacity-60"
             >
               {isLoading ? 'Signing in...' : 'Sign in'}
-            </Button>
+            </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-500">
