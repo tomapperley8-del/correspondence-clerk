@@ -860,8 +860,7 @@ export async function markCorrespondenceDone(id: string) {
   if (entry) {
     revalidatePath(`/businesses/${entry.business_id}`)
   }
-  revalidatePath('/reminders')
-  revalidatePath('/actions-page')
+  revalidatePath('/actions')
   return { success: true }
 }
 
@@ -875,8 +874,145 @@ export async function setCorrespondenceAction(id: string, actionNeeded: string) 
   const { error } = await supabase.from('correspondence').update({ action_needed: actionNeeded }).eq('id', id).eq('organization_id', orgId)
   if (error) return { error: error.message }
   if (entry) revalidatePath(`/businesses/${entry.business_id}`)
-  revalidatePath('/actions-page')
+  revalidatePath('/actions')
   return { success: true }
+}
+
+export async function snoozeCorrespondence(id: string, days: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+  const dueAt = new Date()
+  dueAt.setDate(dueAt.getDate() + days)
+  const { error } = await supabase
+    .from('correspondence')
+    .update({ due_at: dueAt.toISOString() })
+    .eq('id', id)
+    .eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  revalidatePath('/actions')
+  return { success: true }
+}
+
+/**
+ * Get received correspondence with no reply within 7 days (needs a reply).
+ * Excludes entries where action_needed='waiting_on_them'.
+ */
+export async function getNeedsReply() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const ninetyDaysAgo = new Date()
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
+  const { data, error } = await supabase
+    .from('correspondence')
+    .select(`
+      id, business_id, contact_id, subject, direction, entry_date, action_needed,
+      businesses!inner(id, name),
+      contact:contacts(name, role)
+    `)
+    .eq('organization_id', orgId)
+    .gte('entry_date', ninetyDaysAgo.toISOString())
+    .order('entry_date', { ascending: false })
+    .limit(500)
+
+  if (error) return { error: error.message }
+
+  const entries = data || []
+
+  const needsReply = entries.filter(entry => {
+    if (entry.direction !== 'received') return false
+    if (entry.action_needed === 'waiting_on_them') return false
+    if (!entry.entry_date) return false
+    const entryDate = new Date(entry.entry_date)
+    const sevenDaysLater = new Date(entryDate.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const hasReply = entries.some(other => {
+      if (other.id === entry.id) return false
+      if (other.business_id !== entry.business_id) return false
+      if (!other.entry_date) return false
+      const otherDate = new Date(other.entry_date)
+      return otherDate > entryDate && otherDate <= sevenDaysLater
+    })
+    return !hasReply
+  })
+
+  // Keep only the most recent unreplied received entry per business
+  const seen = new Set<string>()
+  const deduped = needsReply.filter(entry => {
+    if (seen.has(entry.business_id)) return false
+    seen.add(entry.business_id)
+    return true
+  })
+
+  return { data: deduped }
+}
+
+/**
+ * Get businesses gone quiet: last_contacted_at > 60 days ago AND at least 3 correspondence entries.
+ */
+export async function getGoneQuiet() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const sixtyDaysAgo = new Date()
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .select(`
+      id, name, last_contacted_at,
+      correspondence(count)
+    `)
+    .eq('organization_id', orgId)
+    .lt('last_contacted_at', sixtyDaysAgo.toISOString())
+    .not('last_contacted_at', 'is', null)
+    .order('last_contacted_at', { ascending: true })
+    .limit(100)
+
+  if (error) return { error: error.message }
+
+  const goneQuiet = (data || []).filter(biz => {
+    const countArr = biz.correspondence as unknown as [{ count: number }]
+    return (countArr?.[0]?.count ?? 0) >= 3
+  })
+
+  return { data: goneQuiet }
+}
+
+/**
+ * Get correspondence entries with due_at set and action_needed='none' (pure reminders).
+ */
+export async function getPureReminders() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { data, error } = await supabase
+    .from('correspondence')
+    .select(`
+      id, business_id, contact_id, subject, type, direction, entry_date, due_at, action_needed,
+      businesses!inner(id, name),
+      contact:contacts(name, role)
+    `)
+    .eq('organization_id', orgId)
+    .eq('action_needed', 'none')
+    .not('due_at', 'is', null)
+    .order('due_at', { ascending: true })
+    .limit(200)
+
+  if (error) return { error: error.message }
+  return { data: data || [] }
 }
 
 export async function getOutstandingActionsCount(): Promise<number> {
@@ -885,10 +1021,11 @@ export async function getOutstandingActionsCount(): Promise<number> {
   if (!user) return 0
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return 0
-  const { count } = await supabase
-    .from('correspondence')
-    .select('*', { count: 'exact', head: true })
-    .eq('organization_id', orgId)
-    .neq('action_needed', 'none')
-  return count ?? 0
+  const [flagged, reminders] = await Promise.all([
+    supabase.from('correspondence').select('*', { count: 'exact', head: true })
+      .eq('organization_id', orgId).neq('action_needed', 'none'),
+    supabase.from('correspondence').select('*', { count: 'exact', head: true })
+      .eq('organization_id', orgId).eq('action_needed', 'none').not('due_at', 'is', null),
+  ])
+  return (flagged.count ?? 0) + (reminders.count ?? 0)
 }

@@ -186,20 +186,9 @@ export function Navigation() {
               </Link>
 
               <Link
-                href="/reminders"
-                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/reminders'
-                    ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:bg-[#7C9A5E]/20'
-                }`}
-              >
-                Reminders
-              </Link>
-
-              <Link
-                href="/actions-page"
+                href="/actions"
                 className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/actions-page'
+                  pathname === '/actions'
                     ? 'text-white bg-[#7C9A5E]'
                     : 'text-white hover:bg-[#7C9A5E]/20'
                 }`}
