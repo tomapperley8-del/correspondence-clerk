@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createOrganization } from '@/app/actions/organizations'
+import Link from 'next/link'
 
 export default function CreateOrganizationPage() {
   const [organizationName, setOrganizationName] = useState('')
@@ -30,25 +30,60 @@ export default function CreateOrganizationPage() {
       setError(result.error)
       setIsLoading(false)
     } else {
-      // Success - redirect to dashboard
       router.push('/settings/organization?welcome=true')
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white border-2 border-gray-800 p-8">
-          <h1 className="text-2xl font-bold mb-2 text-gray-900">
-            Welcome to Correspondence Clerk
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Create your organization to get started
+    <div className="min-h-screen flex">
+      {/* Left panel */}
+      <div
+        className="hidden md:flex md:w-2/5 flex-col justify-between p-12"
+        style={{ backgroundColor: '#1E293B' }}
+      >
+        <Link
+          href="/"
+          className="text-xl font-bold text-white"
+          style={{ fontFamily: 'Lora, Georgia, serif' }}
+        >
+          Correspondence Clerk
+        </Link>
+        <div>
+          <p
+            className="text-2xl font-semibold text-white leading-snug mb-3"
+            style={{ fontFamily: 'Lora, Georgia, serif' }}
+          >
+            One last step before you get started.
           </p>
+          <p className="text-sm" style={{ color: '#94a3b8' }}>
+            Set up your organisation and you&apos;ll be ready to go.
+          </p>
+        </div>
+        <p className="text-xs" style={{ color: '#475569' }}>
+          &copy; {new Date().getFullYear()} Correspondence Clerk
+        </p>
+      </div>
+
+      {/* Right panel */}
+      <div
+        className="flex-1 flex items-center justify-center px-6 py-12"
+        style={{ backgroundColor: '#FAFAF8' }}
+      >
+        <div className="w-full max-w-sm">
+          <h1
+            className="text-2xl font-bold mb-2 text-gray-900"
+            style={{ fontFamily: 'Lora, Georgia, serif' }}
+          >
+            Name your organisation
+          </h1>
+          <p className="text-sm text-gray-500 mb-8">You can change this later in settings</p>
 
           {error && (
-            <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6">
-              <p className="text-red-800 text-sm">{error}</p>
+            <div
+              className="px-4 py-3 mb-6 rounded-sm"
+              style={{ backgroundColor: '#FEF2F2', border: '1px solid rgba(220,38,38,0.2)' }}
+            >
+              <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
 
@@ -56,9 +91,9 @@ export default function CreateOrganizationPage() {
             <div>
               <Label
                 htmlFor="organizationName"
-                className="block mb-2 font-semibold"
+                className="block mb-2 font-semibold text-sm text-gray-700"
               >
-                Organization Name <span className="text-red-600">*</span>
+                Organisation name
               </Label>
               <Input
                 id="organizationName"
@@ -68,21 +103,18 @@ export default function CreateOrganizationPage() {
                 required
                 disabled={isLoading}
                 className="w-full"
-                placeholder="Enter your organization name"
+                placeholder="e.g. Acme Consulting"
                 autoFocus
               />
-              <p className="text-gray-500 text-xs mt-1">
-                You can change this later in settings
-              </p>
             </div>
 
-            <Button
+            <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              className="w-full bg-[#2C4A6E] hover:bg-[#243d5c] text-white font-semibold py-3 rounded-sm transition-colors disabled:opacity-60"
             >
-              {isLoading ? 'Creating organization...' : 'Create Organization'}
-            </Button>
+              {isLoading ? 'Creating...' : 'Create Organisation'}
+            </button>
           </form>
         </div>
       </div>
