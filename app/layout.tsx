@@ -8,7 +8,7 @@ import { ToastContainer } from '@/components/Toast'
 
 export const metadata: Metadata = {
   title: 'Correspondence Clerk',
-  description: 'Turn messy correspondence into clean, chronological letter files',
+  description: 'Know exactly what needs your attention today. An AI assistant that reads your business correspondence and tells you who to reply to, which contracts are expiring, and which follow-ups have gone cold.',
 }
 
 export default function RootLayout({

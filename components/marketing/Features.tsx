@@ -40,11 +40,11 @@ export function Features() {
             className="text-3xl md:text-4xl font-bold mb-4"
             style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B', letterSpacing: '-0.01em' }}
           >
-            Everything in one place
+            What it actually does
           </h2>
           <p className="text-base leading-relaxed" style={{ color: '#64748b', maxWidth: '48ch' }}>
-            From daily AI briefings to one-click import — your correspondence,
-            organised and always searchable.
+            Not a CRM. Not an email client. A focused tool that tells you what
+            needs doing and keeps your correspondence in order.
           </p>
         </div>
 
