@@ -2,17 +2,29 @@ import Link from 'next/link'
 
 export const metadata = {
   title: 'Features - Correspondence Clerk',
-  description: 'Discover all the features that make Correspondence Clerk the best way to manage business correspondence.',
+  description: 'AI-powered correspondence management: daily briefing assistant, one-click email import, automatic filing, and powerful search — for small businesses and VAs.',
 }
 
 const features = [
   {
+    title: 'Daily Briefing Assistant',
+    description:
+      'Ask "what do I need to do today?" and get a prioritised breakdown of unreplied emails, expiring contracts, and stale follow-ups — with context from your actual correspondence history, not just counts.',
+    details: [
+      'Understands your full correspondence history',
+      'Surfaces unreplied emails and cold follow-ups',
+      'Flags contracts expiring soon',
+      'Ask any question: "who haven\'t I spoken to in 3 months?"',
+    ],
+    icon: '🤖',
+  },
+  {
     title: 'AI-Powered Formatting',
     description:
-      'Our AI takes messy email threads and transforms them into clean, professionally formatted correspondence. Every word is preserved exactly as written - no rewrites, no summaries, just better formatting.',
+      'Our AI takes messy email threads and transforms them into clean, professionally formatted correspondence. Every word is preserved exactly as written — no rewrites, no summaries, just better formatting.',
     details: [
       'Automatically detects email threads and formats them chronologically',
-      'Preserves original wording - your words, just cleaner',
+      'Preserves original wording — your words, just cleaner',
       'Handles complex formatting from any email client',
       'Falls back gracefully if AI is unavailable',
     ],
@@ -134,11 +146,11 @@ export default function FeaturesPage() {
       <section className="bg-white py-16 border-b-2 border-gray-200">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Features Built for Real Business Needs
+            An AI assistant for your business correspondence
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Everything you need to manage business correspondence professionally,
-            from email import to export-ready letter files.
+            Start every day knowing exactly who to contact, what to follow up on,
+            and which contracts need attention — all from one organised place.
           </p>
         </div>
       </section>

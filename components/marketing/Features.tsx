@@ -1,27 +1,21 @@
 const features = [
   {
-    title: 'AI-Powered Formatting',
+    title: 'Daily Briefing Assistant',
     description:
-      'Paste messy email threads and get clean, professionally formatted correspondence. Our AI preserves every word while making it readable.',
-    icon: '✨',
+      'Ask "what do I need to do today?" and get a prioritised list of unreplied emails, expiring contracts, and stale follow-ups — drawn from your actual correspondence history.',
+    icon: '🤖',
   },
   {
     title: 'One-Click Email Import',
     description:
-      'Import emails directly from Outlook Web or Gmail with our browser bookmarklet. No copy-pasting, no manual entry.',
+      'Import emails directly from Outlook Web or Gmail with our browser bookmarklet, or bulk-import months of past emails in one go.',
     icon: '📧',
   },
   {
-    title: 'Organized Letter Files',
+    title: 'Clean Correspondence Filing',
     description:
-      'Every piece of correspondence filed by business and contact. Recent items at your fingertips, older items archived.',
+      'Paste messy email threads and get clean, professionally formatted correspondence filed by business and contact. AI formats; you just paste.',
     icon: '📁',
-  },
-  {
-    title: 'Professional Exports',
-    description:
-      'Export to PDF, Word, or Google Docs. Print-ready letter files for meetings, legal matters, or records.',
-    icon: '📄',
   },
   {
     title: 'Powerful Search',
@@ -30,9 +24,15 @@ const features = [
     icon: '🔍',
   },
   {
+    title: 'Professional Exports',
+    description:
+      'Export to PDF, Word, or Google Docs. Print-ready letter files for meetings, legal matters, or records.',
+    icon: '📄',
+  },
+  {
     title: 'Team Collaboration',
     description:
-      'Invite your team to manage correspondence together. Everyone sees the same organized view.',
+      'Invite your team to manage correspondence together. Everyone sees the same organised view.',
     icon: '👥',
   },
 ]
@@ -42,11 +42,10 @@ export function Features() {
     <section className="py-20 bg-gray-50">
       <div className="container mx-auto px-4">
         <h2 className="text-3xl font-bold text-gray-900 text-center mb-4">
-          Everything you need to manage business correspondence
+          Everything you need to stay on top of business correspondence
         </h2>
         <p className="text-xl text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-          Stop losing important communications in cluttered inboxes.
-          Keep your business correspondence organized and accessible.
+          From daily AI briefings to one-click email import — your correspondence, organised and accessible.
         </p>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
