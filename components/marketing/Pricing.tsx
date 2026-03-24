@@ -5,16 +5,16 @@ export function Pricing() {
   const planOrder: PlanId[] = ['trial', 'pro', 'enterprise']
 
   return (
-    <section className="py-24" style={{ backgroundColor: '#fff', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+    <section className="py-24" style={{ backgroundColor: '#fff' }}>
       <div className="container mx-auto px-6">
-        <div className="max-w-xl mb-14">
+        <div className="mb-16">
           <h2
-            className="text-3xl font-bold mb-4"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+            className="text-3xl md:text-4xl font-bold mb-4"
+            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B', letterSpacing: '-0.01em' }}
           >
             Pricing
           </h2>
-          <p className="text-base" style={{ color: '#475569' }}>
+          <p className="text-base" style={{ color: '#64748b' }}>
             Start free. Upgrade when you&apos;re ready.
           </p>
         </div>
@@ -22,34 +22,48 @@ export function Pricing() {
         <div className="grid md:grid-cols-3 gap-6 max-w-4xl">
           {planOrder.map((planId) => {
             const plan = PLANS[planId]
+            const isHighlighted = plan.highlighted
 
             return (
               <div
                 key={planId}
-                className="p-8"
-                style={{ border: '1px solid rgba(0,0,0,0.08)', backgroundColor: '#FAFAF8' }}
+                className="p-8 rounded-sm flex flex-col"
+                style={{
+                  backgroundColor: isHighlighted ? '#1E293B' : '#FAFAF8',
+                  border: isHighlighted ? 'none' : '1px solid rgba(0,0,0,0.08)',
+                }}
               >
-                <h3 className="text-base font-semibold mb-4" style={{ color: '#1E293B' }}>
-                  {plan.name}
-                </h3>
-
                 <div className="mb-6">
+                  <h3
+                    className="text-sm font-semibold uppercase tracking-wider mb-4"
+                    style={{ color: isHighlighted ? '#7C9A5E' : '#94a3b8', letterSpacing: '0.08em' }}
+                  >
+                    {plan.name}
+                  </h3>
                   {plan.priceMonthly !== null ? (
-                    <>
-                      <span className="text-3xl font-bold" style={{ color: '#1E293B' }}>
+                    <div>
+                      <span
+                        className="text-4xl font-bold"
+                        style={{ fontFamily: 'Lora, Georgia, serif', color: isHighlighted ? '#fff' : '#1E293B' }}
+                      >
                         ${plan.priceMonthly}
                       </span>
-                      <span className="text-sm ml-1" style={{ color: '#94a3b8' }}>/month</span>
-                    </>
+                      <span className="text-sm ml-1" style={{ color: isHighlighted ? '#94a3b8' : '#94a3b8' }}>/mo</span>
+                    </div>
                   ) : (
-                    <span className="text-3xl font-bold" style={{ color: '#1E293B' }}>Free</span>
+                    <span
+                      className="text-4xl font-bold"
+                      style={{ fontFamily: 'Lora, Georgia, serif', color: isHighlighted ? '#fff' : '#1E293B' }}
+                    >
+                      Free
+                    </span>
                   )}
                 </div>
 
-                <ul className="space-y-2 mb-8">
+                <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.slice(0, 4).map((feature, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm" style={{ color: '#475569' }}>
-                      <span className="mt-0.5 shrink-0 text-xs" style={{ color: '#7C9A5E' }}>—</span>
+                    <li key={index} className="flex items-start gap-3 text-sm" style={{ color: isHighlighted ? '#cbd5e1' : '#475569' }}>
+                      <span className="mt-1.5 shrink-0 w-1 h-1 rounded-full block" style={{ backgroundColor: isHighlighted ? '#7C9A5E' : '#cbd5e1' }} />
                       {feature}
                     </li>
                   ))}
@@ -57,8 +71,11 @@ export function Pricing() {
 
                 <Link
                   href={planId === 'trial' ? '/signup' : `/signup?plan=${planId}`}
-                  className="block text-center text-sm font-medium py-2.5"
-                  style={{ backgroundColor: '#2C4A6E', color: '#fff' }}
+                  className="block text-center text-sm font-semibold py-3 transition-opacity hover:opacity-90"
+                  style={{
+                    backgroundColor: isHighlighted ? '#7C9A5E' : '#2C4A6E',
+                    color: '#fff',
+                  }}
                 >
                   {planId === 'trial' ? 'Start free trial' : `Get ${plan.name}`}
                 </Link>
@@ -67,9 +84,9 @@ export function Pricing() {
           })}
         </div>
 
-        <p className="mt-8 text-sm">
+        <p className="mt-10 text-sm">
           <Link href="/pricing" style={{ color: '#2C4A6E' }} className="font-medium hover:underline">
-            See full pricing details
+            Full pricing details
           </Link>
         </p>
       </div>

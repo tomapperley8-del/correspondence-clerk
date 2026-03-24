@@ -35,30 +35,30 @@ export function Features() {
   return (
     <section className="py-24" style={{ backgroundColor: '#fff' }}>
       <div className="container mx-auto px-6">
-        <div className="max-w-xl mb-14">
+        <div className="mb-16">
           <h2
-            className="text-3xl font-bold mb-4"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+            className="text-3xl md:text-4xl font-bold mb-4"
+            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B', letterSpacing: '-0.01em' }}
           >
             Everything in one place
           </h2>
-          <p className="text-base leading-relaxed" style={{ color: '#475569' }}>
+          <p className="text-base leading-relaxed" style={{ color: '#64748b', maxWidth: '48ch' }}>
             From daily AI briefings to one-click import — your correspondence,
-            organised and accessible.
+            organised and always searchable.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
             <div
               key={index}
-              className="p-8"
-              style={{ backgroundColor: '#FAFAF8' }}
+              className="p-8 rounded-sm"
+              style={{ backgroundColor: '#FAFAF8', border: '1px solid rgba(0,0,0,0.06)' }}
             >
-              <h3 className="text-base font-semibold mb-2" style={{ color: '#1E293B' }}>
+              <h3 className="text-base font-semibold mb-3" style={{ color: '#1E293B' }}>
                 {feature.title}
               </h3>
-              <p className="text-sm leading-relaxed" style={{ color: '#64748b' }}>
+              <p className="text-sm leading-relaxed" style={{ color: '#64748b', lineHeight: '1.7' }}>
                 {feature.description}
               </p>
             </div>
