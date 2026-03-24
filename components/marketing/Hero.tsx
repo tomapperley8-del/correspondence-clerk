@@ -74,14 +74,14 @@ export function Hero() {
                 {[
                   {
                     label: 'Overdue reply',
-                    business: 'Acme Ltd',
-                    detail: 'No reply to your proposal sent 8 days ago. Last contact: Sarah Chen.',
+                    business: 'The Richmond Kitchen',
+                    detail: 'No reply to your catering proposal sent 6 days ago. Last contact: Mark Davies.',
                     urgent: true,
                   },
                   {
                     label: 'Contract expiring',
-                    business: 'Greenfield Partners',
-                    detail: 'Renews in 12 days. No renewal discussion on file yet.',
+                    business: 'Hartley & Sons Solicitors',
+                    detail: 'Contract renewal due in 9 days. No renewal discussion on file.',
                     urgent: true,
                   },
                   {
