@@ -2,10 +2,22 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-export default async function ImportPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  google_denied: 'Google access was denied. Please try again.',
+  google_invalid: 'Invalid OAuth response from Google.',
+  google_state: 'Security check failed (state mismatch). Please try again.',
+  google_no_token: 'No access token received from Google.',
+  google_no_refresh: 'No refresh token received. Try disconnecting and reconnecting your Google account.',
+  google_failed: 'Google connection failed. Check server logs.',
+}
+
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
+
+  const { error: errorCode } = await searchParams
+  const errorMessage = errorCode ? (ERROR_MESSAGES[errorCode] ?? `Unknown error: ${errorCode}`) : null
 
   // Check which providers are connected
   const { data: profile } = await supabase
@@ -24,6 +36,12 @@ export default async function ImportPage() {
         Connect your email account to pull in months of past correspondence. New businesses and contacts will be
         discovered automatically — you review everything before it&apos;s saved.
       </p>
+
+      {errorMessage && (
+        <div className="border border-red-300 bg-red-50 text-red-800 text-sm px-4 py-3 rounded mb-6">
+          {errorMessage}
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-4 mb-10">
         {/* Gmail card */}
