@@ -175,7 +175,6 @@ export default function DashboardPage() {
   const endIndex = startIndex + itemsPerPage
   const paginatedBusinesses = filtered.slice(startIndex, endIndex)
 
-  const shouldAutoSend = businesses.some(b => b.last_contacted_at !== null)
 
   const FilterButton = ({
     active,
@@ -595,7 +594,7 @@ export default function DashboardPage() {
 
       {/* Right: inline Daily Briefing */}
       <div className="hidden md:flex flex-col w-[380px] shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-hidden">
-        <ChatPanel inline suggestedPrompt={shouldAutoSend ? 'what do i need to do today' : undefined} businessCount={businesses.length} />
+        <ChatPanel inline businessCount={businesses.length} />
       </div>
       </div>{/* end two-column flex */}
     </div>
