@@ -11,6 +11,7 @@
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { enqueueForFormatting } from '@/lib/email-import/queue'
 import type { ScanBusiness } from '@/lib/email-import/domain-grouper'
 
@@ -202,7 +203,7 @@ export async function POST(request: NextRequest) {
                   .eq('id', businessId!)
                   .lt('last_contacted_at', dateHeader || new Date().toISOString())
 
-                await enqueueForFormatting(supabase, orgId, entry.id)
+                await enqueueForFormatting(createServiceRoleClient(), orgId, entry.id)
                 imported++
               } else {
                 skipped++
