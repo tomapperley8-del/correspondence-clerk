@@ -270,14 +270,12 @@ export default function InstallBookmarkletPage() {
             </a>
           </p>
           <p>
-            Or read the technical documentation:{' '}
+            Questions? Email us at{' '}
             <a
-              href="https://github.com/tomapperley8-del/correspondence-clerk/blob/master/OUTLOOK_INTEGRATION.md"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:support@correspondenceclerk.com"
               className="text-[#98bf64] font-semibold hover:underline"
             >
-              Outlook Integration Guide
+              support@correspondenceclerk.com
             </a>
           </p>
         </div>

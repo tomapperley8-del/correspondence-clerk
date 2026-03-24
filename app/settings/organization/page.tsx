@@ -340,7 +340,7 @@ function OrganizationSettingsContent() {
               value={businessDescription}
               onChange={(e) => setBusinessDescription(e.target.value)}
               disabled={isSavingProfile}
-              placeholder="e.g. We're a local media company publishing news and advertising for businesses in West London."
+              placeholder="e.g. We're a small agency managing client accounts and correspondence across a range of industries."
               className="w-full border-2 border-gray-300 px-3 py-2 text-sm resize-none focus:outline-none focus:border-blue-600"
             />
           </div>
