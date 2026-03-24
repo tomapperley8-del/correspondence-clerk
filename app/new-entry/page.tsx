@@ -100,6 +100,51 @@ function NewEntryPageContent() {
   // Debounce ref for contact extraction
   const contactExtractionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Draft auto-save
+  const [draftStatus, setDraftStatus] = useState<'saved' | 'restored' | null>(null)
+  const draftTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const DRAFT_KEY = 'new_entry_draft'
+
+  // Restore draft on mount (only if rawText is empty and no email import params)
+  useEffect(() => {
+    const hasEmailImport = searchParams.get('awaitingEmail') || searchParams.get('token')
+    if (hasEmailImport) return
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY)
+      if (!saved) return
+      const draft = JSON.parse(saved)
+      if (!draft.rawText) return
+      setRawText(draft.rawText)
+      if (draft.subject) setSubject(draft.subject)
+      if (draft.entryType) setEntryType(draft.entryType)
+      if (draft.direction) setDirection(draft.direction)
+      if (draft.entryDateOnly) setEntryDateOnly(draft.entryDateOnly)
+      if (draft.actionNeeded) setActionNeeded(draft.actionNeeded)
+      setDraftStatus('restored')
+      setTimeout(() => setDraftStatus(null), 3000)
+    } catch {
+      // ignore
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Save draft on change (debounced 1s)
+  useEffect(() => {
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    if (!rawText) return
+    draftTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ rawText, subject, entryType, direction, entryDateOnly, actionNeeded }))
+        setDraftStatus('saved')
+        setTimeout(() => setDraftStatus(null), 2000)
+      } catch {
+        // ignore
+      }
+    }, 1000)
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
+  }, [rawText, subject, entryType, direction, entryDateOnly, actionNeeded])
+
   // AI Preview state (Phase 4)
   const [showPreview, setShowPreview] = useState(false)
   const [previewData, setPreviewData] = useState<AIFormatterResponse | null>(null)
@@ -811,6 +856,7 @@ ${emailBody || ''}`
       setIsLoading(false)
     } else {
       setIsDirty(false)
+      localStorage.removeItem(DRAFT_KEY)
       router.push(`/businesses/${selectedBusinessId}?saved=true`)
     }
   }
@@ -871,6 +917,7 @@ ${emailBody || ''}`
       setIsLoading(false)
     } else {
       setIsDirty(false)
+      localStorage.removeItem(DRAFT_KEY)
       router.push(`/businesses/${selectedBusinessId}?saved=true`)
     }
   }
@@ -916,6 +963,7 @@ ${emailBody || ''}`
       setIsLoading(false)
     } else {
       setIsDirty(false)
+      localStorage.removeItem(DRAFT_KEY)
       router.push(`/businesses/${selectedBusinessId}?saved=true`)
     }
   }
@@ -1301,9 +1349,16 @@ ${emailBody || ''}`
 
         {/* Entry Text */}
         <div>
-          <Label htmlFor="rawText" className="block mb-2 font-semibold">
-            Entry Text <span className="text-red-600">*</span>
-          </Label>
+          <div className="flex items-center justify-between mb-2">
+            <Label htmlFor="rawText" className="font-semibold">
+              Entry Text <span className="text-red-600">*</span>
+            </Label>
+            {draftStatus && (
+              <span className="text-xs text-gray-400 italic">
+                {draftStatus === 'restored' ? 'Draft restored' : 'Draft saved'}
+              </span>
+            )}
+          </div>
           <textarea
             id="rawText"
             value={rawText}

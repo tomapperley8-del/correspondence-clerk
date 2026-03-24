@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import type { User } from '@supabase/supabase-js'
 import { getCurrentOrganization } from '@/app/actions/organizations'
 import { getUserProfile } from '@/app/actions/user-profile'
+import { getOutstandingActionsCount } from '@/app/actions/correspondence'
 import { useChat } from '@/components/ChatContext'
 
 function OutreachButton() {
@@ -36,6 +37,7 @@ export function Navigation() {
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [actionsCount, setActionsCount] = useState(0)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -58,6 +60,8 @@ export function Navigation() {
         if (profileResult.data) {
           setDisplayName(profileResult.data.display_name)
         }
+
+        getOutstandingActionsCount().then(setActionsCount)
       }
 
       setIsLoading(false)
@@ -82,14 +86,22 @@ export function Navigation() {
         if (profileResult.data) {
           setDisplayName(profileResult.data.display_name)
         }
+
+        getOutstandingActionsCount().then(setActionsCount)
       } else {
         setOrganization(null)
         setDisplayName(null)
+        setActionsCount(0)
       }
     })
 
     return () => subscription.unsubscribe()
   }, [supabase.auth])
+
+  // Re-fetch action count on navigation
+  useEffect(() => {
+    if (user) getOutstandingActionsCount().then(setActionsCount)
+  }, [pathname, user])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -185,13 +197,18 @@ export function Navigation() {
 
               <Link
                 href="/actions-page"
-                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
+                className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/actions-page'
                     ? 'text-white bg-[#7C9A5E]'
                     : 'text-white hover:bg-[#7C9A5E]/20'
                 }`}
               >
                 Actions
+                {actionsCount > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                    {actionsCount > 99 ? '99+' : actionsCount}
+                  </span>
+                )}
               </Link>
 
               <Link

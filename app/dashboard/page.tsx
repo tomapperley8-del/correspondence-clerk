@@ -34,6 +34,9 @@ export default function DashboardPage() {
   // Check if bookmarklet is installed
   const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
 
+  // New entries badge: tracks which businesses have activity since last visit
+  const [hasNewEntries, setHasNewEntries] = useState<Set<string>>(new Set())
+
   useEffect(() => {
     async function loadData() {
       const [businessesResult, typesResult] = await Promise.all([
@@ -43,7 +46,18 @@ export default function DashboardPage() {
       if ('error' in businessesResult) {
         setError(businessesResult.error || 'An error occurred')
       } else {
-        setBusinesses(businessesResult.data || [])
+        const biz = businessesResult.data || []
+        setBusinesses(biz)
+        // Compute new entries badges from localStorage
+        const newSet = new Set<string>()
+        for (const b of biz) {
+          if (!b.last_contacted_at) continue
+          const lastVisited = localStorage.getItem(`last_visited_${b.id}`)
+          if (!lastVisited || new Date(b.last_contacted_at) > new Date(lastVisited)) {
+            newSet.add(b.id)
+          }
+        }
+        setHasNewEntries(newSet)
       }
       setMembershipTypes('error' in typesResult ? [] : typesResult.data || [])
       setLoading(false)
@@ -416,8 +430,15 @@ export default function DashboardPage() {
                 <Link
                   key={business.id}
                   href={`/businesses/${business.id}`}
-                  className="bg-white border-2 border-gray-300 p-6 hover:border-blue-600 hover:bg-blue-50 transition-colors duration-150"
+                  onClick={() => {
+                    localStorage.setItem(`last_visited_${business.id}`, new Date().toISOString())
+                    setHasNewEntries((prev) => { const next = new Set(prev); next.delete(business.id); return next })
+                  }}
+                  className="relative bg-white border-2 border-gray-300 p-6 hover:border-blue-600 hover:bg-blue-50 transition-colors duration-150"
                 >
+                  {hasNewEntries.has(business.id) && (
+                    <span className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-green-500" title="New activity" />
+                  )}
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     {business.name}
                   </h3>
