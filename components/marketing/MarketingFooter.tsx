@@ -2,72 +2,33 @@ import Link from 'next/link'
 
 export function MarketingFooter() {
   return (
-    <footer className="bg-gray-900 text-white py-12">
-      <div className="container mx-auto px-4">
-        <div className="grid md:grid-cols-4 gap-8">
-          {/* Brand */}
+    <footer style={{ backgroundColor: '#1E293B', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="container mx-auto px-6 py-12">
+        <div className="flex flex-col md:flex-row md:justify-between gap-8">
           <div>
-            <h3 className="text-xl font-bold mb-4">Correspondence Clerk</h3>
-            <p className="text-gray-400">
-              Turn messy correspondence into organized letter files.
+            <p className="font-semibold mb-1" style={{ fontFamily: 'Lora, Georgia, serif', color: '#fff' }}>
+              Correspondence Clerk
+            </p>
+            <p className="text-sm" style={{ color: '#64748b' }}>
+              Know what needs your attention, every day.
             </p>
           </div>
 
-          {/* Product */}
-          <div>
-            <h4 className="font-bold mb-4">Product</h4>
-            <ul className="space-y-2 text-gray-400">
-              <li>
-                <Link href="/features" className="hover:text-white">
-                  Features
-                </Link>
-              </li>
-              <li>
-                <Link href="/pricing" className="hover:text-white">
-                  Pricing
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <h4 className="font-bold mb-4">Legal</h4>
-            <ul className="space-y-2 text-gray-400">
-              <li>
-                <Link href="/terms" className="hover:text-white">
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy" className="hover:text-white">
-                  Privacy Policy
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div>
-            <h4 className="font-bold mb-4">Support</h4>
-            <ul className="space-y-2 text-gray-400">
-              <li>
-                <a
-                  href="mailto:support@correspondenceclerk.com"
-                  className="hover:text-white"
-                >
-                  Contact Us
-                </a>
-              </li>
-            </ul>
+          <div className="flex gap-12 text-sm">
+            <div className="space-y-2">
+              <Link href="/features" style={{ color: '#94a3b8' }} className="block hover:text-white transition-colors">Features</Link>
+              <Link href="/pricing" style={{ color: '#94a3b8' }} className="block hover:text-white transition-colors">Pricing</Link>
+            </div>
+            <div className="space-y-2">
+              <Link href="/terms" style={{ color: '#94a3b8' }} className="block hover:text-white transition-colors">Terms</Link>
+              <Link href="/privacy" style={{ color: '#94a3b8' }} className="block hover:text-white transition-colors">Privacy</Link>
+              <a href="mailto:support@correspondenceclerk.com" style={{ color: '#94a3b8' }} className="block hover:text-white transition-colors">Contact</a>
+            </div>
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-          <p>
-            &copy; {new Date().getFullYear()} Correspondence Clerk. All rights
-            reserved.
-          </p>
+        <div className="mt-10 pt-6 text-xs" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: '#475569' }}>
+          &copy; {new Date().getFullYear()} Correspondence Clerk
         </div>
       </div>
     </footer>

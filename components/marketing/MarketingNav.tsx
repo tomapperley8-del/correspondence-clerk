@@ -2,37 +2,29 @@ import Link from 'next/link'
 
 export function MarketingNav() {
   return (
-    <header className="bg-white border-b-2 border-gray-800">
-      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <Link href="/" className="text-xl font-bold text-gray-900">
+    <header style={{ backgroundColor: '#FAFAF8', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+      <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+        <Link href="/" className="font-serif text-xl font-bold" style={{ color: '#1E293B', fontFamily: 'Lora, Georgia, serif' }}>
           Correspondence Clerk
         </Link>
-        <nav className="hidden md:flex items-center gap-6">
-          <Link
-            href="/features"
-            className="text-gray-700 font-medium hover:text-blue-600"
-          >
+        <nav className="hidden md:flex items-center gap-8">
+          <Link href="/features" className="text-sm font-medium" style={{ color: '#475569' }}>
             Features
           </Link>
-          <Link
-            href="/pricing"
-            className="text-gray-700 font-medium hover:text-blue-600"
-          >
+          <Link href="/pricing" className="text-sm font-medium" style={{ color: '#475569' }}>
             Pricing
           </Link>
         </nav>
-        <div className="flex gap-4">
-          <Link
-            href="/login"
-            className="px-4 py-2 text-gray-700 font-semibold hover:text-blue-600"
-          >
-            Log In
+        <div className="flex items-center gap-5">
+          <Link href="/login" className="text-sm font-medium" style={{ color: '#475569' }}>
+            Log in
           </Link>
           <Link
             href="/signup"
-            className="px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 border-2 border-blue-600"
+            className="text-sm font-medium px-4 py-2"
+            style={{ backgroundColor: '#2C4A6E', color: '#fff' }}
           >
-            Start Free Trial
+            Start free trial
           </Link>
         </div>
       </div>

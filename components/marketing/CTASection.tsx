@@ -2,22 +2,24 @@ import Link from 'next/link'
 
 export function CTASection() {
   return (
-    <section className="py-20 bg-blue-600">
-      <div className="container mx-auto px-4 text-center">
-        <h2 className="text-3xl font-bold text-white mb-4">
-          Ready to organize your correspondence?
+    <section className="py-24" style={{ backgroundColor: '#1E293B' }}>
+      <div className="container mx-auto px-6 max-w-2xl">
+        <h2
+          className="text-3xl font-bold mb-4"
+          style={{ fontFamily: 'Lora, Georgia, serif', color: '#fff' }}
+        >
+          Start knowing what needs your attention
         </h2>
-        <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-          Join businesses that have transformed their correspondence management.
-          Start your free 14-day trial today.
+        <p className="text-base mb-8 leading-relaxed" style={{ color: '#94a3b8' }}>
+          14-day free trial. No credit card required.
         </p>
         <Link
           href="/signup"
-          className="inline-block px-8 py-4 bg-white text-blue-600 font-semibold text-lg hover:bg-gray-100 border-2 border-white"
+          className="inline-block text-sm font-medium px-6 py-3"
+          style={{ backgroundColor: '#7C9A5E', color: '#fff' }}
         >
-          Start Free Trial
+          Start free trial
         </Link>
-        <p className="mt-4 text-blue-200">No credit card required</p>
       </div>
     </section>
   )

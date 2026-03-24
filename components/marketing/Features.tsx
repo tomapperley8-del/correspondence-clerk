@@ -1,64 +1,66 @@
 const features = [
   {
-    title: 'Daily Briefing Assistant',
+    title: 'Daily Briefing',
     description:
-      'Ask "what do I need to do today?" and get a prioritised list of unreplied emails, expiring contracts, and stale follow-ups — drawn from your actual correspondence history.',
-    icon: '🤖',
+      'Ask what needs doing today. Get a prioritised list of unreplied emails, expiring contracts, and cold follow-ups — drawn from your actual correspondence history.',
   },
   {
-    title: 'One-Click Email Import',
+    title: 'One-click email import',
     description:
-      'Import emails directly from Outlook Web or Gmail with our browser bookmarklet, or bulk-import months of past emails in one go.',
-    icon: '📧',
+      'A browser bookmarklet imports emails from Outlook or Gmail in a single click. Or connect your inbox and bulk-import months of past correspondence at once.',
   },
   {
-    title: 'Clean Correspondence Filing',
+    title: 'AI formatting',
     description:
-      'Paste messy email threads and get clean, professionally formatted correspondence filed by business and contact. AI formats; you just paste.',
-    icon: '📁',
+      'Paste a messy email thread and get clean, chronological correspondence. Every word preserved exactly as written — no rewrites, no summaries.',
   },
   {
-    title: 'Powerful Search',
+    title: 'Full-text search',
     description:
-      'Full-text search across all correspondence. Find any conversation in seconds, no matter how old.',
-    icon: '🔍',
+      'Find any conversation in seconds. Search by business, contact, subject, or content across your entire correspondence history.',
   },
   {
-    title: 'Professional Exports',
+    title: 'Professional exports',
     description:
-      'Export to PDF, Word, or Google Docs. Print-ready letter files for meetings, legal matters, or records.',
-    icon: '📄',
+      'Export to PDF or Google Docs. Print-ready letter files for meetings, legal matters, or client records.',
   },
   {
-    title: 'Team Collaboration',
+    title: 'Team access',
     description:
-      'Invite your team to manage correspondence together. Everyone sees the same organised view.',
-    icon: '👥',
+      'Invite colleagues to manage correspondence together. Everyone works from the same organised view.',
   },
 ]
 
 export function Features() {
   return (
-    <section className="py-20 bg-gray-50">
-      <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold text-gray-900 text-center mb-4">
-          Everything you need to stay on top of business correspondence
-        </h2>
-        <p className="text-xl text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-          From daily AI briefings to one-click email import — your correspondence, organised and accessible.
-        </p>
+    <section className="py-24" style={{ backgroundColor: '#fff' }}>
+      <div className="container mx-auto px-6">
+        <div className="max-w-xl mb-14">
+          <h2
+            className="text-3xl font-bold mb-4"
+            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+          >
+            Everything in one place
+          </h2>
+          <p className="text-base leading-relaxed" style={{ color: '#475569' }}>
+            From daily AI briefings to one-click import — your correspondence,
+            organised and accessible.
+          </p>
+        </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: 'rgba(0,0,0,0.06)' }}>
           {features.map((feature, index) => (
             <div
               key={index}
-              className="bg-white p-6 border-2 border-gray-800"
+              className="p-8"
+              style={{ backgroundColor: '#FAFAF8' }}
             >
-              <div className="text-4xl mb-4">{feature.icon}</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
+              <h3 className="text-base font-semibold mb-2" style={{ color: '#1E293B' }}>
                 {feature.title}
               </h3>
-              <p className="text-gray-600">{feature.description}</p>
+              <p className="text-sm leading-relaxed" style={{ color: '#64748b' }}>
+                {feature.description}
+              </p>
             </div>
           ))}
         </div>
