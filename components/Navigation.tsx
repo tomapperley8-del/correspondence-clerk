@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -36,9 +36,12 @@ export function Navigation() {
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [actionsCount, setActionsCount] = useState(0)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const { close: closeChat } = useChat()
+  const navFetchedAt = useRef(0)
 
   async function loadNavData() {
     const nav = await getNavData()
@@ -55,7 +58,10 @@ export function Navigation() {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-      if (user) await loadNavData()
+      if (user) {
+        navFetchedAt.current = Date.now()
+        await loadNavData()
+      }
       setIsLoading(false)
     }
 
@@ -77,9 +83,15 @@ export function Navigation() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Refresh action count on navigation (lightweight — data already loaded)
+  // Refresh action count on navigation — throttled to once per 30s
+  // Also close the Daily Briefing slide-out when navigating to the dedicated page
   useEffect(() => {
-    if (user) loadNavData()
+    if (user && Date.now() - navFetchedAt.current > 30_000) {
+      navFetchedAt.current = Date.now()
+      loadNavData()
+    }
+    if (pathname === '/daily-briefing') closeChat()
+    setMobileOpen(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
@@ -131,7 +143,7 @@ export function Navigation() {
               Correspondence Clerk
             </Link>
 
-            <div className="flex h-16">
+            <div className="hidden md:flex h-16">
               <Link
                 href="/dashboard"
                 className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
@@ -175,7 +187,10 @@ export function Navigation() {
               >
                 Actions
                 {actionsCount > 0 && (
-                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                  <span
+                    title={`${actionsCount} action${actionsCount === 1 ? '' : 's'} need attention`}
+                    className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                  >
                     {actionsCount > 99 ? '99+' : actionsCount}
                   </span>
                 )}
@@ -196,7 +211,17 @@ export function Navigation() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="text-right">
+            {/* Hamburger — mobile only */}
+            <button
+              onClick={() => setMobileOpen((o) => !o)}
+              aria-label="Toggle navigation menu"
+              className="md:hidden flex flex-col gap-1 p-2 text-white"
+            >
+              <span className="block w-5 h-0.5 bg-white" />
+              <span className="block w-5 h-0.5 bg-white" />
+              <span className="block w-5 h-0.5 bg-white" />
+            </button>
+            <div className="hidden md:block text-right">
               <div className="text-sm text-white">
                 {displayName || user.email?.split('@')[0] || user.email}
               </div>
@@ -206,7 +231,7 @@ export function Navigation() {
             </div>
             <Link
               href="/settings"
-              className={`px-4 h-16 flex items-center text-sm font-medium transition-colors ${
+              className={`hidden md:flex px-4 h-16 items-center text-sm font-medium transition-colors ${
                 pathname?.startsWith('/settings')
                   ? 'text-white bg-[#7C9A5E]'
                   : 'text-white hover:bg-[#7C9A5E]/20'
@@ -217,13 +242,53 @@ export function Navigation() {
             <Button
               onClick={handleLogout}
               variant="ghost"
-              className="text-white hover:text-[#7C9A5E]"
+              className="hidden md:inline-flex text-white hover:text-[#7C9A5E]"
             >
               Logout
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Mobile dropdown menu */}
+      {mobileOpen && (
+        <div className="md:hidden bg-[#1E293B] border-t border-white/20">
+          <div className="px-4 py-2 space-y-1">
+            {[
+              { href: '/dashboard', label: 'Dashboard' },
+              { href: '/new-entry', label: 'New Entry' },
+              { href: '/search', label: 'Search' },
+              { href: '/actions', label: `Actions${actionsCount > 0 ? ` (${actionsCount})` : ''}` },
+              { href: '/help', label: 'Help' },
+              { href: '/settings', label: 'Settings' },
+            ].map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`block px-3 py-2 text-sm font-medium transition-colors ${
+                  pathname === href || (href === '/settings' && pathname?.startsWith('/settings'))
+                    ? 'text-white bg-[#7C9A5E]'
+                    : 'text-white hover:bg-[#7C9A5E]/20'
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+            <div className="pt-2 pb-1 border-t border-white/20">
+              <p className="text-xs text-gray-400 px-3 pb-2">
+                {displayName || user.email?.split('@')[0] || user.email}
+                {organization && ` · ${organization.name}`}
+              </p>
+              <button
+                onClick={handleLogout}
+                className="block w-full text-left px-3 py-2 text-sm font-medium text-white hover:bg-[#7C9A5E]/20 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

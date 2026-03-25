@@ -7,9 +7,9 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  /* Warm, professional fonts */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
+  /* Warm, professional fonts — loaded via next/font (self-hosted, no render-blocking request) */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: var(--font-lora), Georgia, 'Times New Roman', serif;
   --font-mono: "Courier New", monospace;
 
   /* Consistent rounded corners - matches button styling for cohesive look */

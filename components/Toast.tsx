@@ -19,7 +19,7 @@ export function ToastContainer() {
       setToasts((prev) => [...prev, { id, message, variant }])
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id))
-      }, 3000)
+      }, 5000)
     }
     window.addEventListener('app:toast', handler)
     return () => window.removeEventListener('app:toast', handler)
@@ -32,7 +32,10 @@ export function ToastContainer() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`px-4 py-3 text-sm font-medium shadow-lg border-2 pointer-events-auto transition-all duration-200 ${
+          onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+          role="button"
+          aria-label="Dismiss notification"
+          className={`px-4 py-3 text-sm font-medium shadow-lg border-2 pointer-events-auto transition-all duration-200 cursor-pointer ${
             t.variant === 'success'
               ? 'bg-[#7C9A5E] text-white border-[#5a7340]'
               : t.variant === 'error'
