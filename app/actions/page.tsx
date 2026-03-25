@@ -153,7 +153,7 @@ function buildPriorityList(
     return (b.item.daysAgo ?? 0) - (a.item.daysAgo ?? 0)
   })
 
-  return entries.slice(0, 10)
+  return entries
 }
 
 // ─── Section component ────────────────────────────────────────────────────────
