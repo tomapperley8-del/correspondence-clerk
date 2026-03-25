@@ -154,7 +154,13 @@ function likelyNeedsReply(item: CorrespondenceItem): boolean {
     .replace(/\s+/g, ' ')
     .trim()
 
-  const words = cleaned.split(' ').filter(Boolean)
+  // Strip leading salutations: "Hi Tom,", "Hello Sarah,", "Dear all," etc.
+  const withoutSalutation = cleaned
+    .replace(/^(hi|hello|hey|dear|good (morning|afternoon|evening|day))\s+\w+\s*/, '')
+    .replace(/^(hi|hello|hey|dear)\s+(all|there|everyone|team|folks)\s*/, '')
+    .trim()
+
+  const words = withoutSalutation.split(' ').filter(Boolean)
   const wordCount = words.length
 
   // ── Pure closers: the entire message is just a sign-off ──────────────────
@@ -186,10 +192,11 @@ function likelyNeedsReply(item: CorrespondenceItem): boolean {
     /^(as discussed|as per our (call|conversation|chat|discussion|meeting|email))( (please find|i have|see|attached|below).*)?$/,
   ]
 
-  if (wordCount <= 12 && pureClosers.some(p => p.test(cleaned))) return false
+  if (wordCount <= 12 && pureClosers.some(p => p.test(withoutSalutation))) return false
 
   // ── Short message starting with a closer ─────────────────────────────────
   // e.g. "Thanks Tom, much appreciated. Best wishes, Sarah"
+  // e.g. "Hi Tom, Brilliant, thanks! Best, Donna"
   if (wordCount <= 20) {
     const startsWithCloser = [
       /^thanks?\b/,
@@ -204,7 +211,7 @@ function likelyNeedsReply(item: CorrespondenceItem): boolean {
       /^no (problem|worries)\b/,
       /^(received|got it|understood)\b/,
     ]
-    if (startsWithCloser.some(p => p.test(cleaned))) return false
+    if (startsWithCloser.some(p => p.test(withoutSalutation))) return false
   }
 
   return true
