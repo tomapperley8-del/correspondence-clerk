@@ -80,6 +80,136 @@ function makeSnippet(text: string | null | undefined): string | null {
   return stripped.slice(0, 150).replace(/\s\S*$/, '') + '…'
 }
 
+/**
+ * Heuristic filter: returns false if a received message almost certainly
+ * doesn't need a reply (closers, acknowledgements, OOO, etc.).
+ * Errs on the side of inclusion — only filters high-confidence non-replies.
+ */
+function likelyNeedsReply(item: CorrespondenceItem): boolean {
+  const snippet = (item.snippet ?? '').toLowerCase()
+  const subject = (item.subject ?? '').toLowerCase()
+
+  // ── Auto-replies & OOO (subject-based) ───────────────────────────────────
+  const autoSubjects = [
+    'out of office', 'out of the office', 'auto-reply', 'auto reply',
+    'automatic reply', 'autoreply', 'away from office', 'away from the office',
+    'on holiday', 'on annual leave', 'on leave', 'on vacation', 'on maternity',
+    'on paternity', 'do not reply', 'do not respond', 'noreply', 'no-reply',
+    'delivery failed', 'undeliverable', 'mailer-daemon',
+  ]
+  if (autoSubjects.some(p => subject.includes(p))) return false
+
+  // ── No content to judge — keep ────────────────────────────────────────────
+  if (!snippet) return true
+
+  // ── Override: explicit requests/questions always need a reply ────────────
+  // These patterns take priority over any closer detection below.
+  const requestPatterns = [
+    /\?/,
+    /\bplease\b/,
+    /\bcould (you|we)\b/,
+    /\bcan (you|we)\b/,
+    /\bwould (you|mind)\b/,
+    /\bwill you\b/,
+    /\blet me know\b/,
+    /\bget back (to me|to us)\b/,
+    /\bsend (me|us|it|them|direct|over)\b/,
+    /\bforward (it|this|the|me)\b/,
+    /\bconfirm (receipt|that|whether|if)\b/,
+    /\bneed (you|your|this|it|to)\b/,
+    /\bwaiting (for|on)\b/,
+    /\bawaiting\b/,
+    /\bstill (need|haven't|waiting|outstanding)\b/,
+    /\bhaven't (received|heard|got)\b/,
+    /\bchase\b/,
+    /\breminder\b/,
+    /\basap\b/,
+    /\burgent(ly)?\b/,
+    /\bdeadline\b/,
+    /\bby (monday|tuesday|wednesday|thursday|friday|saturday|sunday|end of|close of|cob|eod)\b/,
+    /\bby (the )?([\d]{1,2}(st|nd|rd|th))\b/,
+    /\bcall me\b/,
+    /\bring me\b/,
+    /\bemail me\b/,
+    /\bdrop me\b/,
+    /\bhave you\b/,
+    /\bdid you\b/,
+    /\bare you\b/,
+    /\bwhen (can|will|are|is|do|does)\b/,
+    /\bwhat (is|are|do|did|time|date|about|happened)\b/,
+    /\bhow (do|does|can|should|would|much|many)\b/,
+    /\bwhere (is|are|do|can|should)\b/,
+    /\bwho (is|are|should|can|will)\b/,
+    /\bwhy (is|are|did|has|have|hasn't|haven't)\b/,
+  ]
+  if (requestPatterns.some(p => p.test(snippet))) return true
+
+  // Also check subject for request signals
+  if (requestPatterns.some(p => p.test(subject))) return true
+
+  // ── Strip emojis + punctuation for cleaner closer matching ───────────────
+  const cleaned = snippet
+    .replace(/[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27BF}]/gu, '')
+    .replace(/[^a-z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const words = cleaned.split(' ').filter(Boolean)
+  const wordCount = words.length
+
+  // ── Pure closers: the entire message is just a sign-off ──────────────────
+  const pureClosers = [
+    /^thanks?( so much| very much| a lot| again| for (that|this|everything|your.*))?$/,
+    /^thank you( so much| very much| for (that|this|everything|your.*))?$/,
+    /^(many|much|big|huge) thanks?$/,
+    /^(cheers|ta|ta very much)$/,
+    /^(brilliant|great|perfect|wonderful|excellent|fantastic|fab|fabulous|superb|lovely)( thanks?| thank you)?$/,
+    /^(brilliant|great|perfect|wonderful|excellent|fantastic|fab|superb|lovely)( stuff| one)?$/,
+    /^noted( thanks?| thank you| with thanks)?$/,
+    /^(received|acknowledged?)( thanks?| with thanks)?$/,
+    /^(got it|got that)( thanks?| thank you)?$/,
+    /^(understood|all understood)( thanks?)?$/,
+    /^will do( thanks?)?$/,
+    /^(sounds good|sounds great|that('s| is) (great|fine|good|perfect))( thanks?)?$/,
+    /^no (problem|worries|probs|bother|rush)( at all)?( thanks?)?$/,
+    /^(ok|okay|ok great|ok thanks|okey dokey|sure|fine|all good|all fine)$/,
+    /^(of course|absolutely|certainly)( thanks?)?$/,
+    /^much appreciated( thanks?| tom| everyone)?$/,
+    /^(speak|talk|see you)( soon| then| later| next week| tomorrow)?$/,
+    /^(have|enjoy) (a )?(good|great|lovely|nice|wonderful) (day|weekend|week|evening|one)$/,
+    /^(all the best|best wishes|kind regards|warm regards|best regards|regards|yours (sincerely|faithfully))$/,
+    /^(take care|take it easy)$/,
+    /^(happy to help|glad (to|i could) help)( if (you need|anything else).*)?$/,
+    /^(let me know if (you need|there('s| is) anything)|anything else (i can|let me know)).*$/,
+    /^(consider it done|done|sorted|on it|on my way|heading over|leaving now)$/,
+    /^(fyi|for your (info|information|records|reference))$/,
+    /^(as discussed|as per our (call|conversation|chat|discussion|meeting|email))( (please find|i have|see|attached|below).*)?$/,
+  ]
+
+  if (wordCount <= 12 && pureClosers.some(p => p.test(cleaned))) return false
+
+  // ── Short message starting with a closer ─────────────────────────────────
+  // e.g. "Thanks Tom, much appreciated. Best wishes, Sarah"
+  if (wordCount <= 20) {
+    const startsWithCloser = [
+      /^thanks?\b/,
+      /^thank you\b/,
+      /^many thanks\b/,
+      /^much appreciated\b/,
+      /^noted\b/,
+      /^(brilliant|great|perfect|wonderful|excellent|fantastic)\b/,
+      /^cheers\b/,
+      /^will do\b/,
+      /^sounds good\b/,
+      /^no (problem|worries)\b/,
+      /^(received|got it|understood)\b/,
+    ]
+    if (startsWithCloser.some(p => p.test(cleaned))) return false
+  }
+
+  return true
+}
+
 // ─── ReasonTag ────────────────────────────────────────────────────────────────
 
 type ReasonTagProps = { text: string; colour: 'red' | 'amber' | 'olive' }
@@ -523,7 +653,7 @@ export default function ActionsPage() {
           snippet: makeSnippet(e.formatted_text_current as string | null),
           daysAgo: e.entry_date ? daysAgo(e.entry_date as string) : undefined,
         }
-      })
+      }).filter(likelyNeedsReply)
     )
 
     setGoneQuiet(
