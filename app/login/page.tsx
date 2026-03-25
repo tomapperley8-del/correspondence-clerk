@@ -30,7 +30,6 @@ export default function LoginPage() {
       setIsLoading(false)
     } else {
       router.push('/dashboard')
-      router.refresh()
     }
   }
 

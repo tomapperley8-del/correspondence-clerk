@@ -6,6 +6,48 @@ import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { PLANS, TRIAL_DAYS } from '@/lib/stripe/config'
 
+export type NavData = {
+  displayName: string | null
+  organizationId: string | null
+  organizationName: string | null
+  actionsCount: number
+}
+
+/**
+ * Single-round-trip fetch of everything the nav needs.
+ * One getUser(), one profile+org join, two count queries in parallel.
+ */
+export async function getNavData(): Promise<NavData> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0 }
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('display_name, organization_id, organizations(id, name)')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0 }
+
+  const orgId = profile.organization_id
+  const org = profile.organizations as { id: string; name: string } | null
+
+  const [flagged, reminders] = await Promise.all([
+    supabase.from('correspondence').select('*', { count: 'exact', head: true })
+      .eq('organization_id', orgId).neq('action_needed', 'none'),
+    supabase.from('correspondence').select('*', { count: 'exact', head: true })
+      .eq('organization_id', orgId).eq('action_needed', 'none').not('due_at', 'is', null),
+  ])
+
+  return {
+    displayName: profile.display_name,
+    organizationId: orgId,
+    organizationName: org?.name ?? null,
+    actionsCount: (flagged.count ?? 0) + (reminders.count ?? 0),
+  }
+}
+
 export type Organization = {
   id: string
   name: string
