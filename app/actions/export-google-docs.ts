@@ -36,7 +36,7 @@ export async function exportToGoogleDocs(businessId: string) {
     let offset = 0
     const batchSize = 500
     while (true) {
-      const batch = await getCorrespondenceByBusiness(businessId, batchSize, offset)
+      const batch = await getCorrespondenceByBusiness(businessId, { limit: batchSize, offset })
       const batchData = 'error' in batch ? [] : batch.data || []
       allCorrespondence = allCorrespondence.concat(batchData)
       if (batchData.length < batchSize) break

@@ -121,7 +121,7 @@ export async function detectActions(businessId: string) {
     const twelveMonthsAgo = new Date()
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
 
-    const correspondenceResult = await getCorrespondenceByBusiness(businessId, 1000, 0)
+    const correspondenceResult = await getCorrespondenceByBusiness(businessId, { limit: 1000 })
 
     if ('error' in correspondenceResult) {
       return { error: correspondenceResult.error }
