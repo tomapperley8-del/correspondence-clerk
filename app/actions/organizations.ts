@@ -31,7 +31,8 @@ export async function getNavData(): Promise<NavData> {
   if (!profile) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0 }
 
   const orgId = profile.organization_id
-  const org = profile.organizations as { id: string; name: string } | null
+  const orgs = profile.organizations as { id: string; name: string }[] | { id: string; name: string } | null
+  const org = Array.isArray(orgs) ? orgs[0] ?? null : orgs
 
   const [flagged, reminders] = await Promise.all([
     supabase.from('correspondence').select('*', { count: 'exact', head: true })
