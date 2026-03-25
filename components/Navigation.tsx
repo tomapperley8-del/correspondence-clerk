@@ -191,7 +191,7 @@ export function Navigation() {
               >
                 Help
               </Link>
-              {pathname !== '/daily-briefing' && <OutreachButton />}
+              {pathname !== '/daily-briefing' && pathname !== '/dashboard' && <OutreachButton />}
             </div>
           </div>
 
