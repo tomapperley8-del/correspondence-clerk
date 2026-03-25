@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -273,7 +273,7 @@ export default function BusinessDetailPage({
   }, [loading])
 
   // Refresh correspondence from DB (page 1 with current filters)
-  const refreshCorrespondence = async () => {
+  const refreshCorrespondence = useCallback(async () => {
     if (!id) return
     const result = await getCorrespondenceByBusiness(id, {
       limit: PAGE_SIZE,
@@ -284,10 +284,10 @@ export default function BusinessDetailPage({
       setCorrespondence(result.data ?? [])
       setTotalCount(result.count ?? 0)
     }
-  }
+  }, [id, contactFilter, directionFilter])
 
   // Append next page of correspondence from DB
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
     if (!id || correspondence.length >= totalCount) return
     setIsLoadingMore(true)
     const result = await getCorrespondenceByBusiness(id, {
@@ -300,7 +300,7 @@ export default function BusinessDetailPage({
       setCorrespondence(prev => [...prev, ...(result.data ?? [])])
     }
     setIsLoadingMore(false)
-  }
+  }, [id, correspondence, totalCount, contactFilter, directionFilter])
 
   // Feature #4: Split correspondence into recent and archive with filters applied
   // Memoize to prevent recalculation on every render
@@ -376,31 +376,31 @@ export default function BusinessDetailPage({
     return { chronoIndex: { sorted, indexMap } }
   }, [correspondence])
 
-  const getPreviousEntryId = (id: string): string | null => {
-    const idx = chronoIndex.indexMap.get(id)
+  const getPreviousEntryId = useCallback((entryId: string): string | null => {
+    const idx = chronoIndex.indexMap.get(entryId)
     if (idx === undefined || idx === 0) return null
     return chronoIndex.sorted[idx - 1].id
-  }
+  }, [chronoIndex])
 
-  const getNextEntryId = (id: string): string | null => {
-    const idx = chronoIndex.indexMap.get(id)
+  const getNextEntryId = useCallback((entryId: string): string | null => {
+    const idx = chronoIndex.indexMap.get(entryId)
     if (idx === undefined || idx >= chronoIndex.sorted.length - 1) return null
     return chronoIndex.sorted[idx + 1].id
-  }
+  }, [chronoIndex])
 
-  const handleShowPrevious = (id: string) => {
-    const prevId = getPreviousEntryId(id)
+  const handleShowPrevious = useCallback((entryId: string) => {
+    const prevId = getPreviousEntryId(entryId)
     if (prevId) {
       setContextEntryIds(prev => new Set([...prev, prevId]))
     }
-  }
+  }, [getPreviousEntryId])
 
-  const handleShowNext = (id: string) => {
-    const nextId = getNextEntryId(id)
+  const handleShowNext = useCallback((entryId: string) => {
+    const nextId = getNextEntryId(entryId)
     if (nextId) {
       setContextEntryIds(prev => new Set([...prev, nextId]))
     }
-  }
+  }, [getNextEntryId])
 
   // Filter correspondence based on search query
   // Only searches the displayed text (not raw_text_original when formatted text exists,
@@ -447,28 +447,11 @@ export default function BusinessDetailPage({
     }
   }, [searchQuery, contextEntryIds, filteredCorrespondence.archive])
 
-  // Remaining entries not yet loaded from DB
-  const remainingInDB = Math.max(0, totalCount - correspondence.length)
+  const isExpandedEntry = useCallback((entryId: string) => expandedEntries.has(entryId), [expandedEntries])
 
-  if (loading || !business || !id) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-1/4 mb-3" />
-        <div className="h-8 bg-gray-300 rounded w-1/3 mb-6" />
-        <div className="h-4 bg-gray-200 rounded w-1/5 mb-8" />
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="border-t border-gray-200 pt-6 mb-6">
-            <div className="h-4 bg-gray-200 rounded w-1/4 mb-3" />
-            <div className="h-3 bg-gray-100 rounded w-full mb-2" />
-            <div className="h-3 bg-gray-100 rounded w-5/6 mb-2" />
-            <div className="h-3 bg-gray-100 rounded w-4/6" />
-          </div>
-        ))}
-      </div>
-    )
-  }
+  // Handlers (defined before the loading guard so useCallback hooks are always called)
 
-  const handleFormatLater = async (entryId: string) => {
+  const handleFormatLater = useCallback(async (entryId: string) => {
     setFormattingInProgress(entryId)
     setActionError(null)
 
@@ -481,9 +464,9 @@ export default function BusinessDetailPage({
     }
 
     setFormattingInProgress(null)
-  }
+  }, [refreshCorrespondence])
 
-  const handleStartEdit = (entry: Correspondence) => {
+  const handleStartEdit = useCallback((entry: Correspondence) => {
     setEditingEntryId(entry.id)
     setActionError(null)
     setEditedText(
@@ -505,9 +488,9 @@ export default function BusinessDetailPage({
     } else {
       setEditedDate('')
     }
-  }
+  }, [])
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditingEntryId(null)
     setEditedText('')
     setEditedDate('')
@@ -518,9 +501,9 @@ export default function BusinessDetailPage({
     setEditedActionNeeded('none')
     setEditedDueAt('')
     setActionError(null)
-  }
+  }, [])
 
-  const handleSaveEdit = async (entryId: string) => {
+  const handleSaveEdit = useCallback(async (entryId: string) => {
     if (!editedText.trim()) {
       setActionError('Entry text cannot be empty')
       return
@@ -591,15 +574,15 @@ export default function BusinessDetailPage({
     }
 
     setSavingEdit(false)
-  }
+  }, [id, editedText, editedDate, editedDirection, editedContactId, editedSubject, editedInternalSender, editedActionNeeded, editedDueAt, correspondence, refreshCorrespondence])
 
-  const handleDeleteContact = (contactId: string, contactName: string) => {
+  const handleDeleteContact = useCallback((contactId: string, contactName: string) => {
     // Set the contact to delete and show confirmation dialog
     setContactToDelete({ id: contactId, name: contactName })
     setShowDeleteContactConfirm(true)
-  }
+  }, [])
 
-  const confirmDeleteContact = async () => {
+  const confirmDeleteContact = useCallback(async () => {
     if (!contactToDelete) return
 
     setIsDeletingContact(true)
@@ -620,14 +603,14 @@ export default function BusinessDetailPage({
     setIsDeletingContact(false)
     setShowDeleteContactConfirm(false)
     setContactToDelete(null)
-  }
+  }, [contactToDelete, id])
 
-  const handleDeleteEntry = async (entryId: string, subject: string) => {
+  const handleDeleteEntry = useCallback(async (entryId: string, subject: string) => {
     setEntryToDelete({ id: entryId, subject: subject || undefined })
     setShowDeleteEntryConfirm(true)
-  }
+  }, [])
 
-  const confirmDeleteEntry = async () => {
+  const confirmDeleteEntry = useCallback(async () => {
     if (!entryToDelete) return
 
     setIsDeletingEntry(true)
@@ -639,17 +622,17 @@ export default function BusinessDetailPage({
       setActionError(`Error deleting entry: ${result.error}`)
     } else {
       await refreshCorrespondence()
-      const duplicatesResult = await findDuplicatesInBusiness(id)
+      const duplicatesResult = await findDuplicatesInBusiness(id!)
       setDuplicates(duplicatesResult.duplicates || [])
     }
 
     setIsDeletingEntry(false)
     setShowDeleteEntryConfirm(false)
     setEntryToDelete(null)
-  }
+  }, [entryToDelete, id, refreshCorrespondence])
 
   // Duplicate detection handlers
-  const handleDeleteDuplicate = async (entryId: string, hash: string) => {
+  const handleDeleteDuplicate = useCallback(async (entryId: string, hash: string) => {
     if (!id) return
     setDeletingDuplicate(hash)
     setActionError(null)
@@ -665,9 +648,9 @@ export default function BusinessDetailPage({
     }
 
     setDeletingDuplicate(null)
-  }
+  }, [id, refreshCorrespondence])
 
-  const handleDismissDuplicate = async (id1: string, id2: string, hash: string) => {
+  const handleDismissDuplicate = useCallback(async (id1: string, id2: string, hash: string) => {
     if (!id) return
     setDismissingDuplicate(hash)
     setActionError(null)
@@ -683,13 +666,13 @@ export default function BusinessDetailPage({
     }
 
     setDismissingDuplicate(null)
-  }
+  }, [id, refreshCorrespondence])
 
   // Bulk duplicate action handlers
   const isBulkOperationRunning = isBulkDeleting || isBulkDismissing
   const selectedCount = selectedDuplicateHashes.size
 
-  const toggleDuplicateHash = (hash: string) => {
+  const toggleDuplicateHash = useCallback((hash: string) => {
     setSelectedDuplicateHashes(prev => {
       const next = new Set(prev)
       if (next.has(hash)) {
@@ -699,17 +682,17 @@ export default function BusinessDetailPage({
       }
       return next
     })
-  }
+  }, [])
 
-  const toggleSelectAllDuplicates = () => {
+  const toggleSelectAllDuplicates = useCallback(() => {
     if (selectedDuplicateHashes.size === duplicates.length) {
       setSelectedDuplicateHashes(new Set())
     } else {
       setSelectedDuplicateHashes(new Set(duplicates.map(d => d.hash)))
     }
-  }
+  }, [selectedDuplicateHashes, duplicates])
 
-  const handleBulkDeleteDuplicates = async () => {
+  const handleBulkDeleteDuplicates = useCallback(async () => {
     if (!id || selectedCount === 0) return
     setIsBulkDeleting(true)
     setActionError(null)
@@ -731,9 +714,9 @@ export default function BusinessDetailPage({
     }
 
     setIsBulkDeleting(false)
-  }
+  }, [id, selectedCount, duplicates, selectedDuplicateHashes, refreshCorrespondence])
 
-  const handleBulkDismissDuplicates = async () => {
+  const handleBulkDismissDuplicates = useCallback(async () => {
     if (!id || selectedCount === 0) return
     setIsBulkDismissing(true)
     setActionError(null)
@@ -760,7 +743,7 @@ export default function BusinessDetailPage({
     }
 
     setIsBulkDismissing(false)
-  }
+  }, [id, selectedCount, duplicates, selectedDuplicateHashes])
 
   // Count how many selected groups have exactly 2 entries (dismissable)
   const dismissableSelectedCount = duplicates
@@ -768,7 +751,7 @@ export default function BusinessDetailPage({
     .length
 
   // Feature #3: Handle contract details update with AI summary refresh
-  const handleContractUpdate = async () => {
+  const handleContractUpdate = useCallback(async () => {
     if (!id) return
 
     // Reload business data to get updated contract fields
@@ -782,16 +765,16 @@ export default function BusinessDetailPage({
 
     // Trigger AI summary refresh
     setSummaryRefreshTrigger((prev) => prev + 1)
-  }
+  }, [id])
 
   // Pin handler
-  const handlePin = async (entryId: string, _isPinned: boolean) => {
+  const handlePin = useCallback(async (entryId: string, _isPinned: boolean) => {
     await togglePinCorrespondence(entryId)
     await refreshCorrespondence()
-  }
+  }, [refreshCorrespondence])
 
   // Quick action handler (optimistic)
-  const handleAction = async (entryId: string, action: string) => {
+  const handleAction = useCallback(async (entryId: string, action: string) => {
     const entry = correspondence.find(c => c.id === entryId)
     const prevAction = entry?.action_needed ?? 'none'
     setCorrespondence((prev) => prev.map((c) => c.id === entryId ? { ...c, action_needed: action as Correspondence['action_needed'] } : c))
@@ -808,16 +791,16 @@ export default function BusinessDetailPage({
         toast.success('Waiting on them set')
       }
     }
-  }
+  }, [correspondence, refreshCorrespondence])
 
   // Thread assign handler
-  const handleAssignThread = async (entryId: string, threadId: string | null) => {
+  const handleAssignThread = useCallback(async (entryId: string, threadId: string | null) => {
     await assignCorrespondenceToThread(entryId, threadId, id!)
     await refreshCorrespondence()
-  }
+  }, [id, refreshCorrespondence])
 
   // Thread create handler
-  const handleCreateThread = async (entryId: string, name: string) => {
+  const handleCreateThread = useCallback(async (entryId: string, name: string) => {
     const result = await createThread(id!, name)
     if ('data' in result && result.data) {
       await assignCorrespondenceToThread(entryId, result.data.id, id!)
@@ -827,17 +810,17 @@ export default function BusinessDetailPage({
       ])
       setThreads('error' in threadsRes ? [] : threadsRes.data || [])
     }
-  }
+  }, [id, refreshCorrespondence])
 
   // Thread rename handler
-  const handleRenameThread = async (threadId: string, name: string) => {
+  const handleRenameThread = useCallback(async (threadId: string, name: string) => {
     await renameThread(threadId, id!, name)
     const result = await getThreadsByBusiness(id!)
     setThreads('error' in result ? [] : result.data || [])
-  }
+  }, [id])
 
   // Thread delete handler
-  const handleDeleteThread = async (threadId: string) => {
+  const handleDeleteThread = useCallback(async (threadId: string) => {
     if (!id) return
     await deleteThread(threadId, id)
     const [threadsRes] = await Promise.all([
@@ -845,16 +828,37 @@ export default function BusinessDetailPage({
       refreshCorrespondence(),
     ])
     setThreads('error' in threadsRes ? [] : threadsRes.data || [])
-  }
+  }, [id, refreshCorrespondence])
 
   // Toggle expanded entry
-  const handleToggleExpand = (entryId: string) => {
+  const handleToggleExpand = useCallback((entryId: string) => {
     setExpandedEntries(prev => {
       const next = new Set(prev)
       if (next.has(entryId)) next.delete(entryId)
       else next.add(entryId)
       return next
     })
+  }, [])
+
+  // Remaining entries not yet loaded from DB
+  const remainingInDB = Math.max(0, totalCount - correspondence.length)
+
+  if (loading || !business || !id) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse">
+        <div className="h-6 bg-gray-200 rounded w-1/4 mb-3" />
+        <div className="h-8 bg-gray-300 rounded w-1/3 mb-6" />
+        <div className="h-4 bg-gray-200 rounded w-1/5 mb-8" />
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="border-t border-gray-200 pt-6 mb-6">
+            <div className="h-4 bg-gray-200 rounded w-1/4 mb-3" />
+            <div className="h-3 bg-gray-100 rounded w-full mb-2" />
+            <div className="h-3 bg-gray-100 rounded w-5/6 mb-2" />
+            <div className="h-3 bg-gray-100 rounded w-4/6" />
+          </div>
+        ))}
+      </div>
+    )
   }
 
   // Common props passed to both AllEntriesView and ThreadsView
@@ -862,7 +866,7 @@ export default function BusinessDetailPage({
     contacts,
     displayNames,
     searchQuery,
-    isExpandedEntry: (entryId: string) => expandedEntries.has(entryId),
+    isExpandedEntry,
     onToggleExpand: handleToggleExpand,
     formattingInProgress,
     onFormat: handleFormatLater,
@@ -900,7 +904,7 @@ export default function BusinessDetailPage({
     setNewThreadName,
     onAssignThread: handleAssignThread,
     onCreateThread: handleCreateThread,
-    setActionError: (v: string) => setActionError(v),
+    setActionError,
   }
 
   return (
