@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import {
   getNeedsReply,
@@ -78,6 +78,82 @@ function makeSnippet(text: string | null | undefined): string | null {
   const stripped = text.replace(/\*\*|__|[_*#>`~]/g, '').replace(/\s+/g, ' ').trim()
   if (stripped.length <= 150) return stripped
   return stripped.slice(0, 150).replace(/\s\S*$/, '') + '…'
+}
+
+// ─── ReasonTag ────────────────────────────────────────────────────────────────
+
+type ReasonTagProps = { text: string; colour: 'red' | 'amber' | 'olive' }
+function ReasonTag({ text, colour }: ReasonTagProps) {
+  const classes = {
+    red:   'bg-red-50 border border-red-400 text-red-800',
+    amber: 'bg-amber-50 border border-amber-400 text-amber-800',
+    olive: 'bg-[#7C9A5E]/10 border border-[#7C9A5E]/40 text-[#5a7244]',
+  }[colour]
+  return <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-sm ${classes}`}>{text}</span>
+}
+
+// ─── Priority list ────────────────────────────────────────────────────────────
+
+type PriorityEntry = {
+  item: CorrespondenceItem
+  reasonText: string
+  reasonColour: 'red' | 'amber' | 'olive'
+  urgencyScore: number
+}
+
+function buildPriorityList(
+  needsReply: CorrespondenceItem[],
+  flagged: CorrespondenceItem[],
+): PriorityEntry[] {
+  const now = Date.now()
+  const DAY = 1000 * 60 * 60 * 24
+  const seen = new Set<string>()
+  const entries: PriorityEntry[] = []
+
+  // Flagged items due within 7 days (or overdue)
+  for (const item of flagged) {
+    if (!item.due_at) continue
+    const daysUntil = Math.ceil((new Date(item.due_at).getTime() - now) / DAY)
+    if (daysUntil > 7) continue
+    seen.add(item.id)
+
+    let reasonText: string, reasonColour: 'red' | 'amber' | 'olive', urgencyScore: number
+    if (daysUntil < 0) {
+      const abs = Math.abs(daysUntil)
+      reasonText = abs === 1 ? 'Overdue · 1 day' : `Overdue · ${abs} days`
+      reasonColour = 'red'; urgencyScore = 1
+    } else if (daysUntil === 0) {
+      reasonText = 'Due today'; reasonColour = 'red'; urgencyScore = 2
+    } else if (daysUntil === 1) {
+      reasonText = 'Due tomorrow'; reasonColour = 'red'; urgencyScore = 3
+    } else if (daysUntil <= 3) {
+      reasonText = `Due in ${daysUntil} days`; reasonColour = 'amber'; urgencyScore = 4
+    } else {
+      reasonText = `Due in ${daysUntil} days`; reasonColour = 'olive'; urgencyScore = 7
+    }
+    entries.push({ item, reasonText, reasonColour, urgencyScore })
+  }
+
+  // Needs reply >= 3 days (not already captured from flagged)
+  for (const item of needsReply) {
+    if (seen.has(item.id)) continue
+    const days = item.daysAgo ?? 0
+    if (days < 3) continue
+    const reasonText = days >= 7 ? `Overdue reply · ${days} days` : `No reply · ${days} days`
+    const reasonColour: 'red' | 'amber' = days >= 7 ? 'red' : 'amber'
+    const urgencyScore = days >= 7 ? 5 : 6
+    entries.push({ item, reasonText, reasonColour, urgencyScore })
+  }
+
+  // Sort: urgencyScore ASC, then secondary (earliest due / most days ago)
+  entries.sort((a, b) => {
+    if (a.urgencyScore !== b.urgencyScore) return a.urgencyScore - b.urgencyScore
+    if (a.urgencyScore <= 4 && a.item.due_at && b.item.due_at)
+      return new Date(a.item.due_at).getTime() - new Date(b.item.due_at).getTime()
+    return (b.item.daysAgo ?? 0) - (a.item.daysAgo ?? 0)
+  })
+
+  return entries.slice(0, 10)
 }
 
 // ─── Section component ────────────────────────────────────────────────────────
@@ -242,6 +318,7 @@ type ItemRowProps = {
   onSnoozeToggle: () => void
   onReplyToggle: () => void
   onReplySave: () => void
+  reasonTag?: React.ReactNode
 }
 
 function ItemRow({
@@ -256,6 +333,7 @@ function ItemRow({
   onSnoozeToggle,
   onReplyToggle,
   onReplySave,
+  reasonTag,
 }: ItemRowProps) {
   const isCorr = item.kind === 'correspondence'
 
@@ -308,6 +386,8 @@ function ItemRow({
               )}
             </div>
           )}
+
+          {reasonTag && <div className="mt-0.5 mb-1">{reasonTag}</div>}
 
           <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
             {isCorr && (item as CorrespondenceItem).action_needed !== 'none' && (
@@ -390,10 +470,10 @@ export default function ActionsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({
-    needs_reply: false,
-    gone_quiet: false,
-    flagged: false,
-    reminders: false,
+    needs_reply: true,
+    gone_quiet: true,
+    flagged: true,
+    reminders: true,
   })
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const [replyOpenId, setReplyOpenId] = useState<string | null>(null)
@@ -487,14 +567,25 @@ export default function ActionsPage() {
     setLoading(false)
   }
 
+  // ── Priority list (derived, no extra fetch) ──────────────────────────────────
+
+  const priorityList = useMemo(
+    () => buildPriorityList(needsReply, flagged),
+    [needsReply, flagged]
+  )
+
   // ── Flat ordered list for keyboard navigation ───────────────────────────────
 
-  const allItems: Item[] = [
-    ...(!collapsed.needs_reply ? needsReply : []),
-    ...(!collapsed.gone_quiet ? goneQuiet : []),
-    ...(!collapsed.flagged ? flagged : []),
-    ...(!collapsed.reminders ? reminders : []),
-  ]
+  const allItems: Item[] = useMemo(() => {
+    const seen = new Set<string>()
+    const result: Item[] = []
+    for (const { item } of priorityList) { seen.add(item.id); result.push(item) }
+    if (!collapsed.needs_reply) needsReply.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
+    if (!collapsed.gone_quiet) goneQuiet.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
+    if (!collapsed.flagged) flagged.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
+    if (!collapsed.reminders) reminders.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
+    return result
+  }, [priorityList, collapsed, needsReply, goneQuiet, flagged, reminders])
 
   const focusedIndex = allItems.findIndex(item => item.id === focusedId)
 
@@ -611,14 +702,47 @@ export default function ActionsPage() {
         </div>
       )}
 
-      {allEmpty ? (
-        <div className="border-2 border-[#7C9A5E] bg-green-50/30 p-10 text-center">
-          <p className="text-lg text-gray-700 font-medium" style={{ fontFamily: 'Lora, serif' }}>
-            All clear — nothing outstanding
-          </p>
-          <p className="text-gray-500 text-sm mt-1">{formatDateGB(new Date().toISOString())}</p>
-        </div>
-      ) : (
+      {/* Priority section — always shown */}
+      <div className="mb-8">
+        <h2 className="text-base font-semibold text-gray-900 mb-3" style={{ fontFamily: 'Lora, serif' }}>
+          Needs Your Attention
+          {priorityList.length > 0 && (
+            <span className="ml-2 text-sm font-normal text-gray-500">({priorityList.length})</span>
+          )}
+        </h2>
+
+        {priorityList.length === 0 ? (
+          <div className="border border-[#7C9A5E]/40 bg-green-50/30 px-6 py-4 flex items-center gap-3 rounded-sm">
+            <span className="text-[#7C9A5E] font-bold">✓</span>
+            <div>
+              <p className="text-sm font-medium text-gray-700">You&apos;re on top of it</p>
+              <p className="text-xs text-gray-400 mt-0.5">{formatDateGB(new Date().toISOString())}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="border-2 border-gray-200 bg-white divide-y divide-gray-100">
+            {priorityList.map(({ item, reasonText, reasonColour }) => (
+              <ItemRow
+                key={`priority-${item.id}`}
+                item={item}
+                focused={focusedId === item.id}
+                replyOpen={replyOpenId === item.id}
+                snoozeOpen={snoozeOpenId === item.id}
+                processing={processingId === item.id}
+                onFocus={() => setFocusedId(item.id)}
+                onDone={() => handleDone(item)}
+                onSnooze={days => handleSnooze(item.id, days)}
+                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
+                onReplyToggle={() => setReplyOpenId(id => id === item.id ? null : item.id)}
+                onReplySave={() => removeItem(item.id)}
+                reasonTag={<ReasonTag text={reasonText} colour={reasonColour} />}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {!allEmpty && (
         <>
           {/* 1. Needs a Reply */}
           <Section
@@ -740,3 +864,4 @@ export default function ActionsPage() {
     </div>
   )
 }
+
