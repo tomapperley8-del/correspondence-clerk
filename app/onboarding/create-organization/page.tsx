@@ -30,7 +30,7 @@ export default function CreateOrganizationPage() {
       setError(result.error)
       setIsLoading(false)
     } else {
-      router.push('/settings/organization?welcome=true')
+      router.push('/onboarding/first-business')
     }
   }
 
@@ -49,14 +49,20 @@ export default function CreateOrganizationPage() {
           Correspondence Clerk
         </Link>
         <div>
+          <div className="mb-4 flex gap-2">
+            <span className="inline-block w-6 h-1 rounded-full bg-white opacity-90" />
+            <span className="inline-block w-6 h-1 rounded-full bg-white opacity-30" />
+            <span className="inline-block w-6 h-1 rounded-full bg-white opacity-30" />
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#94a3b8' }}>Step 1 of 3</p>
           <p
             className="text-2xl font-semibold text-white leading-snug mb-3"
             style={{ fontFamily: 'Lora, Georgia, serif' }}
           >
-            One last step before you get started.
+            Name your organisation.
           </p>
           <p className="text-sm" style={{ color: '#94a3b8' }}>
-            Set up your organisation and you&apos;ll be ready to go.
+            Then we&apos;ll add your first business and contact.
           </p>
         </div>
         <p className="text-xs" style={{ color: '#475569' }}>
