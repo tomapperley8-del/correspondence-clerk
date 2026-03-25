@@ -6,9 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import type { User } from '@supabase/supabase-js'
-import { getCurrentOrganization } from '@/app/actions/organizations'
-import { getUserProfile } from '@/app/actions/user-profile'
-import { getOutstandingActionsCount } from '@/app/actions/correspondence'
+import { getNavData } from '@/app/actions/organizations'
 import { useChat } from '@/components/ChatContext'
 
 function OutreachButton() {
@@ -42,52 +40,32 @@ export function Navigation() {
   const router = useRouter()
   const supabase = createClient()
 
+  async function loadNavData() {
+    const nav = await getNavData()
+    setDisplayName(nav.displayName)
+    setActionsCount(nav.actionsCount)
+    if (nav.organizationId) {
+      setOrganization({ id: nav.organizationId, name: nav.organizationName ?? '' })
+    } else {
+      setOrganization(null)
+    }
+  }
+
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-
-      // Fetch organization and display name if user is authenticated
-      if (user) {
-        const orgResult = await getCurrentOrganization()
-        if (orgResult.data) {
-          setOrganization(orgResult.data)
-        }
-
-        const profileResult = await getUserProfile()
-        if (profileResult.data) {
-          setDisplayName(profileResult.data.display_name)
-        }
-
-        getOutstandingActionsCount().then(setActionsCount)
-      }
-
+      if (user) await loadNavData()
       setIsLoading(false)
     }
 
-    getUser()
+    init()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null
       setUser(currentUser)
-
-      // Fetch organization and display name when user logs in
       if (currentUser) {
-        const orgResult = await getCurrentOrganization()
-        if (orgResult.data) {
-          setOrganization(orgResult.data)
-        }
-
-        const profileResult = await getUserProfile()
-        if (profileResult.data) {
-          setDisplayName(profileResult.data.display_name)
-        }
-
-        getOutstandingActionsCount().then(setActionsCount)
+        await loadNavData()
       } else {
         setOrganization(null)
         setDisplayName(null)
@@ -96,12 +74,14 @@ export function Navigation() {
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase.auth])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Re-fetch action count on navigation
+  // Refresh action count on navigation (lightweight — data already loaded)
   useEffect(() => {
-    if (user) getOutstandingActionsCount().then(setActionsCount)
-  }, [pathname, user])
+    if (user) loadNavData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
