@@ -112,9 +112,11 @@ export default function BusinessDetailPage({
   const [customDateFrom, setCustomDateFrom] = useState<string>('')
   const [customDateTo, setCustomDateTo] = useState<string>('')
 
-  // Load More pagination state
-  const [recentDisplayCount, setRecentDisplayCount] = useState(50)
-  const [archiveDisplayCount, setArchiveDisplayCount] = useState(50)
+  // DB pagination state
+  const PAGE_SIZE = 100
+  const [totalCount, setTotalCount] = useState(0)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const filtersInitialized = useRef(false)
 
   useEffect(() => {
     async function loadParams() {
@@ -125,27 +127,6 @@ export default function BusinessDetailPage({
     }
     loadParams()
   }, [params, searchParams])
-
-  // Feature #4: Load filter preferences from localStorage
-  useEffect(() => {
-    if (!id) return
-
-    const storageKey = `business_${id}_view`
-    const savedPrefs = localStorage.getItem(storageKey)
-    if (savedPrefs) {
-      try {
-        const prefs = JSON.parse(savedPrefs)
-        if (prefs.sortOrder) setSortOrder(prefs.sortOrder)
-        if (prefs.contactFilter) setContactFilter(prefs.contactFilter)
-        if (prefs.directionFilter) setDirectionFilter(prefs.directionFilter)
-        if (prefs.dateRange) setDateRange(prefs.dateRange)
-        if (prefs.customDateFrom) setCustomDateFrom(prefs.customDateFrom)
-        if (prefs.customDateTo) setCustomDateTo(prefs.customDateTo)
-      } catch (e) {
-        console.error('Error loading view preferences:', e)
-      }
-    }
-  }, [id])
 
   // Feature #4: Save filter preferences to localStorage
   useEffect(() => {
@@ -163,15 +144,52 @@ export default function BusinessDetailPage({
     localStorage.setItem(storageKey, JSON.stringify(prefs))
   }, [id, sortOrder, contactFilter, directionFilter, dateRange, customDateFrom, customDateTo])
 
-  // Reset display counts and context entries when filters change
+  // Reset context entries when filters/search change
   useEffect(() => {
-    setRecentDisplayCount(50)
-    setArchiveDisplayCount(50)
     setContextEntryIds(new Set())
   }, [contactFilter, directionFilter, dateRange, customDateFrom, customDateTo, searchQuery])
 
+  // Re-fetch from DB when contact/direction filter changes (after initial load)
+  useEffect(() => {
+    if (!id || !filtersInitialized.current) return
+
+    getCorrespondenceByBusiness(id, {
+      limit: PAGE_SIZE,
+      contactId: contactFilter,
+      direction: directionFilter as 'all' | 'received' | 'sent' | 'conversation',
+    }).then(result => {
+      if (!('error' in result)) {
+        setCorrespondence(result.data ?? [])
+        setTotalCount(result.count ?? 0)
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, contactFilter, directionFilter])
+
   useEffect(() => {
     if (!id) return
+
+    // Mark filters as uninitialized for this business
+    filtersInitialized.current = false
+
+    // Read localStorage prefs synchronously so we fetch with correct filters on first load
+    const storageKey = `business_${id}_view`
+    let initialContact = 'all'
+    let initialDirection: 'all' | 'received' | 'sent' | 'conversation' = 'all'
+    try {
+      const savedPrefs = localStorage.getItem(storageKey)
+      if (savedPrefs) {
+        const prefs = JSON.parse(savedPrefs)
+        if (prefs.sortOrder) setSortOrder(prefs.sortOrder)
+        if (prefs.contactFilter) { initialContact = prefs.contactFilter; setContactFilter(prefs.contactFilter) }
+        if (prefs.directionFilter) { initialDirection = prefs.directionFilter; setDirectionFilter(prefs.directionFilter) }
+        if (prefs.dateRange) setDateRange(prefs.dateRange)
+        if (prefs.customDateFrom) setCustomDateFrom(prefs.customDateFrom)
+        if (prefs.customDateTo) setCustomDateTo(prefs.customDateTo)
+      }
+    } catch (e) {
+      console.error('Error loading view preferences:', e)
+    }
 
     async function loadData() {
       if (!id) return // Type guard for nested function
@@ -180,7 +198,7 @@ export default function BusinessDetailPage({
       const [businessResult, contactsResult, correspondenceResult, duplicatesResult, threadsResult, membershipTypesResult] = await Promise.all([
         getBusinessById(id),
         getContactsByBusiness(id),
-        getCorrespondenceByBusiness(id),
+        getCorrespondenceByBusiness(id, { limit: PAGE_SIZE, contactId: initialContact, direction: initialDirection }),
         findDuplicatesInBusiness(id),
         getThreadsByBusiness(id),
         getActiveMembershipTypes(),
@@ -196,6 +214,7 @@ export default function BusinessDetailPage({
       setContacts('error' in contactsResult ? [] : contactsResult.data || [])
       const correspondenceData = 'error' in correspondenceResult ? [] : correspondenceResult.data || []
       setCorrespondence(correspondenceData)
+      setTotalCount('error' in correspondenceResult ? 0 : correspondenceResult.count ?? 0)
       setDuplicates(duplicatesResult.duplicates || [])
       setThreads('error' in threadsResult ? [] : threadsResult.data || [])
 
@@ -213,9 +232,11 @@ export default function BusinessDetailPage({
       }
 
       setLoading(false)
+      filtersInitialized.current = true
     }
 
     loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, router])
 
   // Scroll to entry if hash is present in URL (for "View Existing Entry" from duplicate warning)
@@ -246,6 +267,36 @@ export default function BusinessDetailPage({
     return () => obs.disconnect()
   }, [loading])
 
+  // Refresh correspondence from DB (page 1 with current filters)
+  const refreshCorrespondence = async () => {
+    if (!id) return
+    const result = await getCorrespondenceByBusiness(id, {
+      limit: PAGE_SIZE,
+      contactId: contactFilter,
+      direction: directionFilter as 'all' | 'received' | 'sent' | 'conversation',
+    })
+    if (!('error' in result)) {
+      setCorrespondence(result.data ?? [])
+      setTotalCount(result.count ?? 0)
+    }
+  }
+
+  // Append next page of correspondence from DB
+  const loadMore = async () => {
+    if (!id || correspondence.length >= totalCount) return
+    setIsLoadingMore(true)
+    const result = await getCorrespondenceByBusiness(id, {
+      limit: PAGE_SIZE,
+      offset: correspondence.length,
+      contactId: contactFilter,
+      direction: directionFilter as 'all' | 'received' | 'sent' | 'conversation',
+    })
+    if (!('error' in result)) {
+      setCorrespondence(prev => [...prev, ...(result.data ?? [])])
+    }
+    setIsLoadingMore(false)
+  }
+
   // Feature #4: Split correspondence into recent and archive with filters applied
   // Memoize to prevent recalculation on every render
   const { recentEntries, archiveEntries, pinnedEntries } = useMemo(() => {
@@ -272,38 +323,15 @@ export default function BusinessDetailPage({
     // For custom range, also use the "to" date if set
     const endDate = dateRange === 'custom' && customDateTo ? new Date(customDateTo) : null
 
-    // Apply contact and direction filters (context entries bypass these)
-    const filtered = correspondence.filter((e) => {
-      // Context entries bypass contact/direction filters
-      if (contextEntryIds.has(e.id)) return true
-
-      // Contact filter
-      if (contactFilter !== 'all' && e.contact_id !== contactFilter) {
-        return false
-      }
-
-      // Direction filter
-      if (directionFilter === 'received' && e.direction !== 'received') {
-        return false
-      }
-      if (directionFilter === 'sent' && e.direction !== 'sent') {
-        return false
-      }
-      if (directionFilter === 'conversation' && e.direction !== 'received' && e.direction !== 'sent') {
-        return false
-      }
-
-      return true
-    })
-
-    // Sort by user preference (no pinned-first — pinned entries appear in a separate section AND in place)
+    // Contact/direction filtering is done at DB level — just split by date here
+    // Sort by user preference
     const sortFn = (a: typeof correspondence[0], b: typeof correspondence[0]) => {
       const dateA = new Date(a.entry_date || a.created_at).getTime()
       const dateB = new Date(b.entry_date || b.created_at).getTime()
       return sortOrder === 'oldest' ? dateA - dateB : dateB - dateA
     }
 
-    const recent = filtered
+    const recent = correspondence
       .filter((e) => {
         const entryDate = new Date(e.entry_date || e.created_at)
         const afterCutoff = entryDate >= cutoffDate
@@ -312,7 +340,7 @@ export default function BusinessDetailPage({
       })
       .sort(sortFn)
 
-    const archive = filtered
+    const archive = correspondence
       .filter((e) => {
         const entryDate = new Date(e.entry_date || e.created_at)
         // In custom mode with end date, archive is entries outside the range
@@ -323,13 +351,13 @@ export default function BusinessDetailPage({
       })
       .sort(sortFn)
 
-    // Pinned entries from ALL filtered correspondence (regardless of date range), sorted newest first
-    const pinned = filtered
+    // Pinned entries from all loaded correspondence (regardless of date range), sorted newest first
+    const pinned = correspondence
       .filter((e) => e.is_pinned)
       .sort((a, b) => new Date(b.entry_date || b.created_at).getTime() - new Date(a.entry_date || a.created_at).getTime())
 
     return { recentEntries: recent, archiveEntries: archive, pinnedEntries: pinned }
-  }, [correspondence, contactFilter, directionFilter, sortOrder, dateRange, customDateFrom, customDateTo, contextEntryIds])
+  }, [correspondence, sortOrder, dateRange, customDateFrom, customDateTo])
 
   // Chronological index: all entries sorted oldest-first for neighbour lookup
   const { chronoIndex } = useMemo(() => {
@@ -414,11 +442,8 @@ export default function BusinessDetailPage({
     }
   }, [searchQuery, contextEntryIds, filteredCorrespondence.archive])
 
-  // Sliced arrays for pagination
-  const displayedRecent = filteredCorrespondence.recent.slice(0, recentDisplayCount)
-  const displayedArchive = filteredCorrespondence.archive.slice(0, archiveDisplayCount)
-  const remainingRecent = Math.max(0, filteredCorrespondence.recent.length - recentDisplayCount)
-  const remainingArchive = Math.max(0, filteredCorrespondence.archive.length - archiveDisplayCount)
+  // Remaining entries not yet loaded from DB
+  const remainingInDB = Math.max(0, totalCount - correspondence.length)
 
   if (loading || !business || !id) {
     return (
@@ -447,11 +472,7 @@ export default function BusinessDetailPage({
     if ('error' in result) {
       setActionError(`Formatting failed: ${result.error}`)
     } else {
-      // Reload correspondence to show updated entry
-      if (id) {
-        const correspondenceResult = await getCorrespondenceByBusiness(id)
-        setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
-      }
+      await refreshCorrespondence()
     }
 
     setFormattingInProgress(null)
@@ -549,11 +570,7 @@ export default function BusinessDetailPage({
         }
       }
 
-      // Reload correspondence to show updated entry
-      if (id) {
-        const correspondenceResult = await getCorrespondenceByBusiness(id)
-        setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
-      }
+      await refreshCorrespondence()
 
       setEditingEntryId(null)
       setEditedText('')
@@ -616,15 +633,9 @@ export default function BusinessDetailPage({
     if ('error' in result) {
       setActionError(`Error deleting entry: ${result.error}`)
     } else {
-      // Reload correspondence and duplicates
-      if (id) {
-        const [correspondenceResult, duplicatesResult] = await Promise.all([
-          getCorrespondenceByBusiness(id),
-          findDuplicatesInBusiness(id)
-        ])
-        setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
-        setDuplicates(duplicatesResult.duplicates || [])
-      }
+      await refreshCorrespondence()
+      const duplicatesResult = await findDuplicatesInBusiness(id)
+      setDuplicates(duplicatesResult.duplicates || [])
     }
 
     setIsDeletingEntry(false)
@@ -643,12 +654,8 @@ export default function BusinessDetailPage({
     if ('error' in result) {
       setActionError(`Error deleting entry: ${result.error}`)
     } else {
-      // Refresh both correspondence and duplicates
-      const [correspondenceResult, duplicatesResult] = await Promise.all([
-        getCorrespondenceByBusiness(id),
-        findDuplicatesInBusiness(id)
-      ])
-      setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
+      await refreshCorrespondence()
+      const duplicatesResult = await findDuplicatesInBusiness(id)
       setDuplicates(duplicatesResult.duplicates || [])
     }
 
@@ -712,13 +719,9 @@ export default function BusinessDetailPage({
     if ('error' in result) {
       setActionError(`Error deleting entries: ${result.error}`)
     } else {
-      // Refresh data and clear selection
-      const [correspondenceResult, duplicatesResult] = await Promise.all([
-        getCorrespondenceByBusiness(id),
-        findDuplicatesInBusiness(id),
-      ])
-      setCorrespondence('error' in correspondenceResult ? [] : correspondenceResult.data || [])
-      setDuplicates(duplicatesResult.duplicates || [])
+      await refreshCorrespondence()
+      const dupResult = await findDuplicatesInBusiness(id)
+      setDuplicates(dupResult.duplicates || [])
       setSelectedDuplicateHashes(new Set())
     }
 
@@ -1212,10 +1215,7 @@ export default function BusinessDetailPage({
               <Button
                 onClick={async () => {
                   await togglePinCorrespondence(entry.id)
-                  if (id) {
-                    const result = await getCorrespondenceByBusiness(id)
-                    setCorrespondence('error' in result ? [] : result.data || [])
-                  }
+                  await refreshCorrespondence()
                 }}
                 className={`px-3 py-1 text-xs ${entry.is_pinned ? 'bg-yellow-200 text-yellow-900 hover:bg-yellow-300' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}
               >
@@ -1271,8 +1271,7 @@ export default function BusinessDetailPage({
                       onClick={async () => {
                         const newId = entry.thread_id === thread.id ? null : thread.id
                         await assignCorrespondenceToThread(entry.id, newId, id!)
-                        const result = await getCorrespondenceByBusiness(id!)
-                        setCorrespondence('error' in result ? [] : result.data || [])
+                        await refreshCorrespondence()
                         setAssigningThreadEntryId(null)
                       }}
                       className={`px-3 py-1 text-xs border-2 font-semibold ${entry.thread_id === thread.id ? 'border-indigo-600 bg-indigo-200 text-indigo-900' : 'border-gray-300 bg-white text-gray-700 hover:border-indigo-400'}`}
@@ -1294,12 +1293,11 @@ export default function BusinessDetailPage({
                             const result = await createThread(id, newThreadName.trim())
                             if ('data' in result && result.data) {
                               await assignCorrespondenceToThread(entry.id, result.data.id, id)
-                              const [threadsRes, corrRes] = await Promise.all([
+                              const [threadsRes] = await Promise.all([
                                 getThreadsByBusiness(id),
-                                getCorrespondenceByBusiness(id),
+                                refreshCorrespondence(),
                               ])
                               setThreads('error' in threadsRes ? [] : threadsRes.data || [])
-                              setCorrespondence('error' in corrRes ? [] : corrRes.data || [])
                             }
                             setAssigningThreadEntryId(null)
                             setCreatingThreadFor(null)
@@ -2000,12 +1998,11 @@ export default function BusinessDetailPage({
                         onClick={async () => {
                           if (!id) return
                           await deleteThread(thread.id, id)
-                          const [threadsRes, corrRes] = await Promise.all([
+                          const [threadsRes] = await Promise.all([
                             getThreadsByBusiness(id),
-                            getCorrespondenceByBusiness(id),
+                            refreshCorrespondence(),
                           ])
                           setThreads('error' in threadsRes ? [] : threadsRes.data || [])
-                          setCorrespondence('error' in corrRes ? [] : corrRes.data || [])
                         }}
                         className="text-xs text-red-500 hover:text-red-700"
                       >
@@ -2081,21 +2078,22 @@ export default function BusinessDetailPage({
                     : 'Last 12 Months'}
                 </h3>
                 <div className="space-y-6">
-                  {displayedRecent.map((entry) => renderEntry(entry, {
+                  {filteredCorrespondence.recent.map((entry) => renderEntry(entry, {
                     isContext: searchQuery.trim() !== '' && !filteredCorrespondence.matchedIds.has(entry.id)
                   }))}
                 </div>
-                {remainingRecent > 0 && (
+                {remainingInDB > 0 && filteredCorrespondence.archive.length === 0 && (
                   <div className="mt-6 text-center">
                     <button
                       type="button"
-                      onClick={() => setRecentDisplayCount(prev => prev + 50)}
-                      className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold"
+                      onClick={loadMore}
+                      disabled={isLoadingMore}
+                      className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold disabled:opacity-50"
                     >
-                      Load 50 More ({remainingRecent} remaining)
+                      {isLoadingMore ? 'Loading…' : `Load More (${remainingInDB} remaining)`}
                     </button>
                     <p className="text-sm text-gray-500 mt-2">
-                      Showing {displayedRecent.length} of {filteredCorrespondence.recent.length}
+                      Showing {correspondence.length} of {totalCount}
                     </p>
                   </div>
                 )}
@@ -2109,25 +2107,26 @@ export default function BusinessDetailPage({
                   onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
                   className="w-full flex justify-between items-center font-bold text-gray-900 mb-4 text-lg hover:text-blue-600"
                 >
-                  <span>Archive ({filteredCorrespondence.archive.length} {dateRange === 'custom' ? 'other' : 'older'} entries)</span>
+                  <span>Archive ({filteredCorrespondence.archive.length}{remainingInDB > 0 ? '+' : ''} {dateRange === 'custom' ? 'other' : 'older'} entries)</span>
                   <span>{isArchiveExpanded ? '▼' : '▶'}</span>
                 </button>
                 {isArchiveExpanded && (
                   <div className="space-y-6 pl-4 border-l-2 border-gray-300">
-                    {displayedArchive.map((entry) => renderEntry(entry, {
+                    {filteredCorrespondence.archive.map((entry) => renderEntry(entry, {
                       isContext: searchQuery.trim() !== '' && !filteredCorrespondence.matchedIds.has(entry.id)
                     }))}
-                    {remainingArchive > 0 && (
+                    {remainingInDB > 0 && (
                       <div className="mt-6 text-center">
                         <button
                           type="button"
-                          onClick={() => setArchiveDisplayCount(prev => prev + 50)}
-                          className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold"
+                          onClick={loadMore}
+                          disabled={isLoadingMore}
+                          className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold disabled:opacity-50"
                         >
-                          Load 50 More ({remainingArchive} remaining)
+                          {isLoadingMore ? 'Loading…' : `Load More (${remainingInDB} remaining)`}
                         </button>
                         <p className="text-sm text-gray-500 mt-2">
-                          Showing {displayedArchive.length} of {filteredCorrespondence.archive.length}
+                          Showing {correspondence.length} of {totalCount}
                         </p>
                       </div>
                     )}

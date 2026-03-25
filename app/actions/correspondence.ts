@@ -75,9 +75,14 @@ export type Correspondence = {
 
 export async function getCorrespondenceByBusiness(
   businessId: string,
-  limit: number = 1000,
-  offset: number = 0
+  options: {
+    limit?: number
+    offset?: number
+    contactId?: string
+    direction?: 'all' | 'received' | 'sent' | 'conversation'
+  } = {}
 ) {
+  const { limit = 100, offset = 0, contactId, direction } = options
   const supabase = await createClient()
   const {
     data: { user },
@@ -88,7 +93,7 @@ export async function getCorrespondenceByBusiness(
   }
 
   // Select only columns needed for list view (excludes large text fields for performance)
-  const { data, error, count } = await supabase
+  let query = supabase
     .from('correspondence')
     .select(
       `
@@ -102,6 +107,17 @@ export async function getCorrespondenceByBusiness(
       { count: 'exact' }
     )
     .eq('business_id', businessId)
+
+  if (contactId && contactId !== 'all') {
+    query = query.eq('contact_id', contactId)
+  }
+  if (direction === 'received' || direction === 'sent') {
+    query = query.eq('direction', direction)
+  } else if (direction === 'conversation') {
+    query = query.in('direction', ['received', 'sent'])
+  }
+
+  const { data, error, count } = await query
     .order('is_pinned', { ascending: false })
     .order('entry_date', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
