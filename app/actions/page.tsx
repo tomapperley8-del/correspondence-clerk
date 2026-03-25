@@ -224,7 +224,7 @@ function ReasonTag({ text, colour }: ReasonTagProps) {
   const classes = {
     red:   'bg-red-50 border border-red-400 text-red-800',
     amber: 'bg-amber-50 border border-amber-400 text-amber-800',
-    olive: 'bg-[#7C9A5E]/10 border border-[#7C9A5E]/40 text-[#5a7244]',
+    olive: 'bg-brand-olive/10 border border-brand-olive/40 text-[#5a7244]',
   }[colour]
   return <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-sm ${classes}`}>{text}</span>
 }
@@ -419,14 +419,14 @@ function ReplyPanel({ businessId, contactId, onSave, onCancel }: ReplyPanelProps
         onChange={e => setText(e.target.value)}
         placeholder="Type your reply or note…"
         rows={3}
-        className="w-full text-sm border border-gray-300 px-3 py-2 resize-none focus:outline-none focus:border-[#2C4A6E]"
+        className="w-full text-sm border border-gray-300 px-3 py-2 resize-none focus:outline-none focus:border-brand-navy"
       />
       {error && <p className="text-red-700 text-xs mt-1">{error}</p>}
       <div className="flex gap-2 mt-2">
         <button
           onClick={handleSave}
           disabled={saving || !text.trim()}
-          className="px-3 py-1 text-xs font-semibold bg-[#2C4A6E] text-white hover:bg-[#243d5c] transition-colors disabled:opacity-50"
+          className="px-3 py-1 text-xs font-semibold bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save reply'}
         </button>
@@ -492,7 +492,7 @@ function ItemRow({
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
             <Link
               href={`/businesses/${item.business_id}`}
-              className="font-semibold text-gray-900 hover:text-[#2C4A6E] hover:underline text-sm"
+              className="font-semibold text-gray-900 hover:text-brand-navy hover:underline text-sm"
               onClick={e => e.stopPropagation()}
             >
               {item.business_name}
@@ -513,10 +513,10 @@ function ItemRow({
           {isCorr && ((item as CorrespondenceItem).direction || (item as CorrespondenceItem).snippet) && (
             <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
               {(item as CorrespondenceItem).direction === 'received' && (
-                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-[#2C4A6E]/8 text-[#2C4A6E] border border-[#2C4A6E]/20">↓ Received</span>
+                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-brand-navy/8 text-brand-navy border border-brand-navy/20">↓ Received</span>
               )}
               {(item as CorrespondenceItem).direction === 'sent' && (
-                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-[#7C9A5E]/10 text-[#7C9A5E] border border-[#7C9A5E]/20">↑ Sent</span>
+                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-brand-olive/10 text-brand-olive border border-brand-olive/20">↑ Sent</span>
               )}
               {(item as CorrespondenceItem).snippet && (
                 <span className="text-xs text-gray-400 italic">{(item as CorrespondenceItem).snippet}</span>
@@ -564,7 +564,7 @@ function ItemRow({
           <button
             onClick={e => { e.stopPropagation(); onDone() }}
             disabled={processing}
-            className="px-3 py-1 text-xs font-semibold bg-[#7C9A5E] text-white hover:bg-[#6a8550] transition-colors disabled:opacity-50"
+            className="px-3 py-1 text-xs font-semibold bg-brand-olive text-white hover:bg-[#6a8550] transition-colors disabled:opacity-50"
           >
             {processing ? '…' : 'Done'}
           </button>
@@ -578,7 +578,7 @@ function ItemRow({
 
           <button
             onClick={e => { e.stopPropagation(); onReplyToggle() }}
-            className={`px-3 py-1 text-xs font-medium border transition-colors ${replyOpen ? 'bg-[#2C4A6E] border-[#2C4A6E] text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-3 py-1 text-xs font-medium border transition-colors ${replyOpen ? 'bg-brand-navy border-brand-navy text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
           >
             Reply
           </button>
@@ -849,8 +849,8 @@ export default function ActionsPage() {
         </h2>
 
         {priorityList.length === 0 ? (
-          <div className="border border-[#7C9A5E]/40 bg-green-50/30 px-6 py-4 flex items-center gap-3 rounded-sm">
-            <span className="text-[#7C9A5E] font-bold">✓</span>
+          <div className="border border-brand-olive/40 bg-green-50/30 px-6 py-4 flex items-center gap-3 rounded-sm">
+            <span className="text-brand-olive font-bold">✓</span>
             <div>
               <p className="text-sm font-medium text-gray-700">You&apos;re on top of it</p>
               <p className="text-xs text-gray-400 mt-0.5">{formatDateGB(new Date().toISOString())}</p>

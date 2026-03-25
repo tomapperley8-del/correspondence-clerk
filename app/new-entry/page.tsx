@@ -1085,18 +1085,18 @@ ${emailBody || ''}`
       {/* Step indicator — CSS only, dims incomplete steps */}
       <div className="flex items-center gap-2 mb-6 text-sm">
         <div className="flex items-center gap-1.5">
-          <span className="w-5 h-5 rounded-full bg-[#1E293B] text-white text-xs font-bold flex items-center justify-center shrink-0">1</span>
-          <span className="font-medium text-[#1E293B]">Business</span>
+          <span className="w-5 h-5 rounded-full bg-brand-dark text-white text-xs font-bold flex items-center justify-center shrink-0">1</span>
+          <span className="font-medium text-brand-dark">Business</span>
         </div>
         <span className="w-6 h-px bg-gray-300 shrink-0" />
         <div className={`flex items-center gap-1.5 transition-opacity ${!selectedBusinessId ? 'opacity-35' : ''}`}>
-          <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${selectedBusinessId ? 'bg-[#1E293B] text-white' : 'bg-gray-200 text-gray-500'}`}>2</span>
-          <span className={`font-medium ${selectedBusinessId ? 'text-[#1E293B]' : 'text-gray-400'}`}>Contact</span>
+          <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${selectedBusinessId ? 'bg-brand-dark text-white' : 'bg-gray-200 text-gray-500'}`}>2</span>
+          <span className={`font-medium ${selectedBusinessId ? 'text-brand-dark' : 'text-gray-400'}`}>Contact</span>
         </div>
         <span className="w-6 h-px bg-gray-300 shrink-0" />
         <div className={`flex items-center gap-1.5 transition-opacity ${(!selectedBusinessId || (!selectedContactId && entryType !== 'Note')) ? 'opacity-35' : ''}`}>
-          <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${(selectedBusinessId && (selectedContactId || entryType === 'Note')) ? 'bg-[#1E293B] text-white' : 'bg-gray-200 text-gray-500'}`}>3</span>
-          <span className={`font-medium ${(selectedBusinessId && (selectedContactId || entryType === 'Note')) ? 'text-[#1E293B]' : 'text-gray-400'}`}>Correspondence</span>
+          <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${(selectedBusinessId && (selectedContactId || entryType === 'Note')) ? 'bg-brand-dark text-white' : 'bg-gray-200 text-gray-500'}`}>3</span>
+          <span className={`font-medium ${(selectedBusinessId && (selectedContactId || entryType === 'Note')) ? 'text-brand-dark' : 'text-gray-400'}`}>Correspondence</span>
         </div>
       </div>
 

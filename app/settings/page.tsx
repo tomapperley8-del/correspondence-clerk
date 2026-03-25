@@ -139,7 +139,7 @@ export default function SettingsPage() {
           <p className="block mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
             Email address (cannot be changed)
           </p>
-          <p className="text-sm text-[#1E293B] py-2">{userEmail}</p>
+          <p className="text-sm text-brand-dark py-2">{userEmail}</p>
         </div>
       </div>
 

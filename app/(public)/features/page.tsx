@@ -94,14 +94,14 @@ const features = [
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#FAFAF8' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--main-bg)' }}>
       {/* Header */}
-      <header style={{ backgroundColor: '#FAFAF8', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+      <header style={{ backgroundColor: 'var(--main-bg)', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <Link
             href="/"
             className="font-bold text-xl"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
           >
             Correspondence Clerk
           </Link>
@@ -112,7 +112,7 @@ export default function FeaturesPage() {
             <Link
               href="/signup"
               className="text-sm font-semibold px-4 py-2"
-              style={{ backgroundColor: '#2C4A6E', color: '#fff' }}
+              style={{ backgroundColor: 'var(--link-blue)', color: '#fff' }}
             >
               Start free trial
             </Link>
@@ -123,12 +123,12 @@ export default function FeaturesPage() {
       {/* Hero */}
       <section className="py-20" style={{ backgroundColor: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
         <div className="container mx-auto px-6 max-w-2xl">
-          <p className="text-xs font-semibold tracking-widest uppercase mb-5" style={{ color: '#7C9A5E' }}>
+          <p className="text-xs font-semibold tracking-widest uppercase mb-5" style={{ color: 'var(--link-hover)' }}>
             Features
           </p>
           <h1
             className="text-4xl md:text-5xl font-bold mb-5 leading-tight"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B', letterSpacing: '-0.02em' }}
+            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.02em' }}
           >
             An AI assistant for your business correspondence
           </h1>
@@ -152,7 +152,7 @@ export default function FeaturesPage() {
               <div className="md:col-span-3">
                 <h2
                   className="text-xl font-bold mb-3"
-                  style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+                  style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
                 >
                   {feature.title}
                 </h2>
@@ -168,7 +168,7 @@ export default function FeaturesPage() {
                     <li key={i} className="flex items-start gap-3">
                       <span
                         className="mt-2 shrink-0 w-1 h-1 rounded-full block"
-                        style={{ backgroundColor: '#7C9A5E' }}
+                        style={{ backgroundColor: 'var(--link-hover)' }}
                       />
                       <span className="text-sm leading-relaxed" style={{ color: '#64748b' }}>
                         {detail}
@@ -185,7 +185,7 @@ export default function FeaturesPage() {
         <div className="mt-20 pt-10" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
           <h2
             className="text-2xl font-bold mb-3"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
           >
             Start knowing what needs your attention
           </h2>
@@ -195,7 +195,7 @@ export default function FeaturesPage() {
           <Link
             href="/signup"
             className="inline-block text-sm font-semibold px-6 py-3"
-            style={{ backgroundColor: '#2C4A6E', color: '#fff' }}
+            style={{ backgroundColor: 'var(--link-blue)', color: '#fff' }}
           >
             Start free trial
           </Link>

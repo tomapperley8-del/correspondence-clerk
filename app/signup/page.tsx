@@ -12,7 +12,7 @@ function LeftPanel() {
   return (
     <div
       className="hidden md:flex md:w-2/5 flex-col justify-between p-12"
-      style={{ backgroundColor: '#1E293B' }}
+      style={{ backgroundColor: 'var(--header-bg)' }}
     >
       <Link
         href="/"
@@ -128,7 +128,7 @@ function SignupPageContent() {
         <LeftPanel />
         <div
           className="flex-1 flex items-center justify-center px-6 py-12"
-          style={{ backgroundColor: '#FAFAF8' }}
+          style={{ backgroundColor: 'var(--main-bg)' }}
         >
           <div className="w-full max-w-sm">
             <h1
@@ -152,7 +152,7 @@ function SignupPageContent() {
                 )}
               </p>
             </div>
-            <Link href="/login" className="text-sm font-medium" style={{ color: '#2C4A6E' }}>
+            <Link href="/login" className="text-sm font-medium" style={{ color: 'var(--link-blue)' }}>
               Return to login
             </Link>
           </div>
@@ -166,7 +166,7 @@ function SignupPageContent() {
       <LeftPanel />
       <div
         className="flex-1 flex items-center justify-center px-6 py-12"
-        style={{ backgroundColor: '#FAFAF8' }}
+        style={{ backgroundColor: 'var(--main-bg)' }}
       >
         <div className="w-full max-w-sm">
           <h1
@@ -262,7 +262,7 @@ function SignupPageContent() {
                   href="/terms"
                   target="_blank"
                   className="font-medium"
-                  style={{ color: '#2C4A6E' }}
+                  style={{ color: 'var(--link-blue)' }}
                 >
                   Terms of Service
                 </Link>{' '}
@@ -271,7 +271,7 @@ function SignupPageContent() {
                   href="/privacy"
                   target="_blank"
                   className="font-medium"
-                  style={{ color: '#2C4A6E' }}
+                  style={{ color: 'var(--link-blue)' }}
                 >
                   Privacy Policy
                 </Link>
@@ -281,7 +281,7 @@ function SignupPageContent() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#2C4A6E] hover:bg-[#243d5c] text-white font-semibold py-3 rounded-sm transition-colors disabled:opacity-60"
+              className="w-full bg-brand-navy hover:bg-brand-navy-hover text-white font-semibold py-3 rounded-sm transition-colors disabled:opacity-60"
             >
               {isLoading ? 'Creating account...' : 'Create Account'}
             </button>
@@ -289,7 +289,7 @@ function SignupPageContent() {
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{' '}
-            <Link href="/login" className="font-medium" style={{ color: '#2C4A6E' }}>
+            <Link href="/login" className="font-medium" style={{ color: 'var(--link-blue)' }}>
               Sign in
             </Link>
           </p>
@@ -304,10 +304,10 @@ export default function SignupPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex">
-          <div className="hidden md:block md:w-2/5" style={{ backgroundColor: '#1E293B' }} />
+          <div className="hidden md:block md:w-2/5" style={{ backgroundColor: 'var(--header-bg)' }} />
           <div
             className="flex-1 flex items-center justify-center px-6"
-            style={{ backgroundColor: '#FAFAF8' }}
+            style={{ backgroundColor: 'var(--main-bg)' }}
           >
             <p className="text-sm text-gray-400">Loading...</p>
           </div>

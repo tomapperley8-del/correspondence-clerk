@@ -38,7 +38,7 @@ export function Features() {
         <div className="mb-16">
           <h2
             className="text-3xl md:text-4xl font-bold mb-4"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B', letterSpacing: '-0.01em' }}
+            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.01em' }}
           >
             What it actually does
           </h2>
@@ -53,9 +53,9 @@ export function Features() {
             <div
               key={index}
               className="p-8 rounded-sm"
-              style={{ backgroundColor: '#FAFAF8', border: '1px solid rgba(0,0,0,0.06)' }}
+              style={{ backgroundColor: 'var(--main-bg)', border: '1px solid rgba(0,0,0,0.06)' }}
             >
-              <h3 className="text-base font-semibold mb-3" style={{ color: '#1E293B' }}>
+              <h3 className="text-base font-semibold mb-3" style={{ color: 'var(--header-bg)' }}>
                 {feature.title}
               </h3>
               <p className="text-sm leading-relaxed" style={{ color: '#64748b', lineHeight: '1.7' }}>

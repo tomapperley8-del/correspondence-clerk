@@ -1,6 +1,6 @@
 export function SocialProof() {
   return (
-    <section style={{ backgroundColor: '#1E293B' }}>
+    <section style={{ backgroundColor: 'var(--header-bg)' }}>
       {/* Trust bar */}
       <div className="container mx-auto px-6 py-14">
         <div className="grid md:grid-cols-3 gap-8 md:gap-4 items-center text-center">

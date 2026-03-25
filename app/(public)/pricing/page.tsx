@@ -12,14 +12,14 @@ export default function PricingPage() {
   const planOrder: PlanId[] = ['trial', 'pro', 'enterprise']
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#FAFAF8' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--main-bg)' }}>
       <MarketingNav />
 
       <main className="container mx-auto px-6 py-20">
         <div className="text-center mb-16">
           <h1
             className="text-4xl font-bold mb-4"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
           >
             Simple, transparent pricing
           </h1>
@@ -40,11 +40,11 @@ export default function PricingPage() {
                 className="p-8 rounded-sm"
                 style={
                   isHighlighted
-                    ? { backgroundColor: '#1E293B', color: '#fff' }
+                    ? { backgroundColor: 'var(--header-bg)', color: '#fff' }
                     : {
                         backgroundColor: '#fff',
                         border: '1px solid rgba(0,0,0,0.08)',
-                        color: '#1E293B',
+                        color: 'var(--header-bg)',
                       }
                 }
               >
@@ -89,7 +89,7 @@ export default function PricingPage() {
                 <ul className="space-y-2 mb-8 text-sm">
                   {plan.features.map((feature, index) => (
                     <li key={index} className="flex items-start gap-2">
-                      <span style={{ color: '#7C9A5E' }}>–</span>
+                      <span style={{ color: 'var(--link-hover)' }}>–</span>
                       <span style={{ color: isHighlighted ? '#cbd5e1' : '#475569' }}>
                         {feature}
                       </span>
@@ -102,8 +102,8 @@ export default function PricingPage() {
                   className="block text-center py-2.5 text-sm font-semibold rounded-sm transition-opacity hover:opacity-90"
                   style={
                     isHighlighted
-                      ? { backgroundColor: '#7C9A5E', color: '#fff' }
-                      : { backgroundColor: '#2C4A6E', color: '#fff' }
+                      ? { backgroundColor: 'var(--link-hover)', color: '#fff' }
+                      : { backgroundColor: 'var(--link-blue)', color: '#fff' }
                   }
                 >
                   {planId === 'trial' ? 'Start free trial' : `Get ${plan.name}`}
@@ -117,7 +117,7 @@ export default function PricingPage() {
         <div className="max-w-2xl mx-auto mt-24">
           <h2
             className="text-2xl font-bold mb-10 text-center"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
           >
             Frequently asked questions
           </h2>
@@ -146,7 +146,7 @@ export default function PricingPage() {
                 className="py-6"
                 style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}
               >
-                <h3 className="font-semibold mb-2" style={{ color: '#1E293B' }}>
+                <h3 className="font-semibold mb-2" style={{ color: 'var(--header-bg)' }}>
                   {q}
                 </h3>
                 <p className="text-sm" style={{ color: '#64748b' }}>

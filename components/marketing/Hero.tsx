@@ -2,18 +2,18 @@ import Link from 'next/link'
 
 export function Hero() {
   return (
-    <section style={{ backgroundColor: '#FAFAF8', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+    <section style={{ backgroundColor: 'var(--main-bg)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
       <div className="container mx-auto px-6 py-20 md:py-28">
         <div className="grid md:grid-cols-2 gap-16 items-start">
 
           {/* Left: headline + CTAs */}
           <div className="pt-4">
-            <p className="text-xs font-semibold tracking-widest uppercase mb-6" style={{ color: '#7C9A5E' }}>
+            <p className="text-xs font-semibold tracking-widest uppercase mb-6" style={{ color: 'var(--link-hover)' }}>
               AI-powered correspondence management
             </p>
             <h1
               className="text-5xl md:text-6xl font-bold leading-tight mb-7"
-              style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B', letterSpacing: '-0.02em' }}
+              style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.02em' }}
             >
               Know exactly what needs your attention today
             </h1>
@@ -26,14 +26,14 @@ export function Hero() {
               <Link
                 href="/signup"
                 className="text-sm font-semibold px-7 py-3.5 transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#2C4A6E', color: '#fff' }}
+                style={{ backgroundColor: 'var(--link-blue)', color: '#fff' }}
               >
                 Start free 14-day trial
               </Link>
               <Link
                 href="/features"
                 className="text-sm font-semibold px-7 py-3.5 transition-colors"
-                style={{ border: '1px solid rgba(0,0,0,0.15)', color: '#1E293B', backgroundColor: 'transparent' }}
+                style={{ border: '1px solid rgba(0,0,0,0.15)', color: 'var(--header-bg)', backgroundColor: 'transparent' }}
               >
                 See how it works
               </Link>
@@ -58,16 +58,16 @@ export function Hero() {
             </div>
 
             {/* Chat input */}
-            <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', backgroundColor: '#FAFAF8' }}>
+            <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', backgroundColor: 'var(--main-bg)' }}>
               <p className="text-sm" style={{ color: '#64748b' }}>
-                <span className="font-medium" style={{ color: '#1E293B' }}>You:</span>{' '}
+                <span className="font-medium" style={{ color: 'var(--header-bg)' }}>You:</span>{' '}
                 What do I need to do today?
               </p>
             </div>
 
             {/* Assistant response */}
             <div className="px-5 py-5">
-              <p className="text-sm font-medium mb-4" style={{ color: '#1E293B' }}>
+              <p className="text-sm font-medium mb-4" style={{ color: 'var(--header-bg)' }}>
                 Here&apos;s what needs your attention:
               </p>
               <div className="space-y-4">
@@ -94,13 +94,13 @@ export function Hero() {
                   <div key={i} className="flex gap-3">
                     <div
                       className="mt-1 shrink-0 w-1.5 h-1.5 rounded-full"
-                      style={{ backgroundColor: item.urgent ? '#2C4A6E' : '#7C9A5E' }}
+                      style={{ backgroundColor: item.urgent ? 'var(--link-blue)' : 'var(--link-hover)' }}
                     />
                     <div>
                       <p className="text-xs font-semibold mb-0.5" style={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         {item.label}
                       </p>
-                      <p className="text-sm" style={{ color: '#1E293B' }}>
+                      <p className="text-sm" style={{ color: 'var(--header-bg)' }}>
                         <span className="font-medium">{item.business}</span>
                         {' '}— {item.detail}
                       </p>

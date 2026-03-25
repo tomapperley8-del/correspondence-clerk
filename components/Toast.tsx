@@ -37,10 +37,10 @@ export function ToastContainer() {
           aria-label="Dismiss notification"
           className={`px-4 py-3 text-sm font-medium shadow-lg border-2 pointer-events-auto transition-all duration-200 cursor-pointer ${
             t.variant === 'success'
-              ? 'bg-[#7C9A5E] text-white border-[#5a7340]'
+              ? 'bg-brand-olive text-white border-[#5a7340]'
               : t.variant === 'error'
               ? 'bg-red-600 text-white border-red-800'
-              : 'bg-[#1E293B] text-white border-[#2C4A6E]'
+              : 'bg-brand-dark text-white border-brand-navy'
           }`}
         >
           {t.message}

@@ -18,7 +18,7 @@ export function ProblemStatement() {
     <section className="bg-white py-20 px-6">
       <div className="max-w-5xl mx-auto">
         <h2
-          className="text-3xl text-center text-[#1E293B] mb-14"
+          className="text-3xl text-center text-brand-dark mb-14"
           style={{ fontFamily: 'Lora, Georgia, serif' }}
         >
           Sound familiar?
@@ -27,7 +27,7 @@ export function ProblemStatement() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           {scenarios.map((s, i) => (
             <div key={i} className="flex flex-col gap-3">
-              <p className="text-[#1E293B] text-base leading-relaxed italic">
+              <p className="text-brand-dark text-base leading-relaxed italic">
                 {s.quote}
               </p>
               <p className="text-sm text-slate-500 font-medium">{s.label}</p>
@@ -37,7 +37,7 @@ export function ProblemStatement() {
 
         <p
           className="mt-14 text-center text-base font-medium"
-          style={{ color: '#7C9A5E' }}
+          style={{ color: 'var(--link-hover)' }}
         >
           Correspondence Clerk fixes all three — every morning, in seconds.
         </p>

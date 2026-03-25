@@ -124,10 +124,10 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
     const pct = progress.total > 0 ? Math.round((progress.imported / progress.total) * 100) : 0
     return (
       <div className="max-w-lg mx-auto mt-8 text-center">
-        <h2 className="font-[Lora,serif] text-xl font-semibold text-[#1E293B] mb-6">Importing emails…</h2>
+        <h2 className="font-[Lora,serif] text-xl font-semibold text-brand-dark mb-6">Importing emails…</h2>
         <div className="w-full bg-gray-100 rounded-full h-3 mb-4 overflow-hidden">
           <div
-            className="h-3 bg-[#2C4A6E] rounded-full transition-all duration-300"
+            className="h-3 bg-brand-navy rounded-full transition-all duration-300"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -143,14 +143,14 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
       {/* Summary bar */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <p className="text-sm text-gray-600">
-          <span className="font-medium text-[#1E293B]">{totalBusinessesSelected}</span> businesses ·{' '}
-          <span className="font-medium text-[#1E293B]">{totalContactsSelected}</span> contacts ·{' '}
-          <span className="font-medium text-[#1E293B]">{totalSelected}</span> emails to import
+          <span className="font-medium text-brand-dark">{totalBusinessesSelected}</span> businesses ·{' '}
+          <span className="font-medium text-brand-dark">{totalContactsSelected}</span> contacts ·{' '}
+          <span className="font-medium text-brand-dark">{totalSelected}</span> emails to import
         </p>
         <button
           onClick={handleStartImport}
           disabled={totalSelected === 0}
-          className="px-5 py-2 bg-[#2C4A6E] text-white text-sm font-medium hover:bg-[#1E293B] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-5 py-2 bg-brand-navy text-white text-sm font-medium hover:bg-brand-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Start Import
         </button>
@@ -189,7 +189,7 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
                   value={business.name}
                   onChange={(e) => updateBusiness(business.id, { name: e.target.value })}
                   disabled={business.excluded}
-                  className="flex-1 min-w-0 text-sm font-medium text-[#1E293B] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#2C4A6E] outline-none px-1 py-0.5 transition-colors"
+                  className="flex-1 min-w-0 text-sm font-medium text-brand-dark bg-transparent border-b border-transparent hover:border-gray-300 focus:border-brand-navy outline-none px-1 py-0.5 transition-colors"
                   placeholder="Business name"
                 />
 
@@ -214,7 +214,7 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
                     onClick={() => updateBusiness(business.id, { excluded: !business.excluded })}
                     className={`text-xs px-2 py-0.5 border rounded transition-colors ${
                       business.excluded
-                        ? 'border-gray-300 text-gray-400 hover:border-[#2C4A6E] hover:text-[#2C4A6E]'
+                        ? 'border-gray-300 text-gray-400 hover:border-brand-navy hover:text-brand-navy'
                         : 'border-red-200 text-red-500 hover:bg-red-50'
                     }`}
                   >
@@ -239,7 +239,7 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
                         value={contact.name}
                         onChange={(e) => updateContact(business.id, contact.id, { name: e.target.value })}
                         disabled={contact.excluded}
-                        className="flex-1 min-w-0 text-sm text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#2C4A6E] outline-none px-1 py-0.5 transition-colors"
+                        className="flex-1 min-w-0 text-sm text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-brand-navy outline-none px-1 py-0.5 transition-colors"
                         placeholder="Contact name"
                       />
 
@@ -266,7 +266,7 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
                           onClick={() => updateContact(business.id, contact.id, { excluded: !contact.excluded })}
                           className={`text-xs px-2 py-0.5 border rounded transition-colors ${
                             contact.excluded
-                              ? 'border-gray-300 text-gray-400 hover:border-[#2C4A6E] hover:text-[#2C4A6E]'
+                              ? 'border-gray-300 text-gray-400 hover:border-brand-navy hover:text-brand-navy'
                               : 'border-red-200 text-red-500 hover:bg-red-50'
                           }`}
                         >
@@ -294,7 +294,7 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
           <button
             onClick={handleStartImport}
             disabled={totalSelected === 0}
-            className="px-6 py-2.5 bg-[#2C4A6E] text-white text-sm font-medium hover:bg-[#1E293B] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-6 py-2.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Import {totalSelected} email{totalSelected !== 1 ? 's' : ''}
           </button>

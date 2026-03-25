@@ -16,8 +16,8 @@ function OutreachButton() {
       onClick={toggle}
       className={`px-4 h-16 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
         isOpen
-          ? 'text-white bg-[#7C9A5E]'
-          : 'text-white hover:bg-[#7C9A5E]/20'
+          ? 'text-white bg-brand-olive'
+          : 'text-white hover:bg-brand-olive/20'
       }`}
     >
       Daily Briefing
@@ -114,7 +114,7 @@ export function Navigation() {
 
   if (isLoading) {
     return (
-      <nav className="bg-[#1E293B] border-b-2 border-[#1E293B]">
+      <nav className="bg-brand-dark border-b-2 border-brand-dark">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -131,7 +131,7 @@ export function Navigation() {
   }
 
   return (
-    <nav aria-label="Main navigation" className="bg-[#1E293B] border-b-2 border-[#1E293B]">
+    <nav aria-label="Main navigation" className="bg-brand-dark border-b-2 border-brand-dark">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">
@@ -148,8 +148,8 @@ export function Navigation() {
                 href="/dashboard"
                 className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/dashboard'
-                    ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:bg-[#7C9A5E]/20'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
                 Dashboard
@@ -159,8 +159,8 @@ export function Navigation() {
                 href="/new-entry"
                 className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/new-entry'
-                    ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:bg-[#7C9A5E]/20'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
                 New Entry
@@ -170,8 +170,8 @@ export function Navigation() {
                 href="/search"
                 className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/search'
-                    ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:bg-[#7C9A5E]/20'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
                 Search
@@ -181,8 +181,8 @@ export function Navigation() {
                 href="/actions"
                 className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/actions'
-                    ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:bg-[#7C9A5E]/20'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
                 Actions
@@ -200,8 +200,8 @@ export function Navigation() {
                 href="/help"
                 className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/help'
-                    ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:bg-[#7C9A5E]/20'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
                 Help
@@ -233,8 +233,8 @@ export function Navigation() {
               href="/settings"
               className={`hidden md:flex px-4 h-16 items-center text-sm font-medium transition-colors ${
                 pathname?.startsWith('/settings')
-                  ? 'text-white bg-[#7C9A5E]'
-                  : 'text-white hover:bg-[#7C9A5E]/20'
+                  ? 'text-white bg-brand-olive'
+                  : 'text-white hover:bg-brand-olive/20'
               }`}
             >
               Settings
@@ -242,7 +242,7 @@ export function Navigation() {
             <Button
               onClick={handleLogout}
               variant="ghost"
-              className="hidden md:inline-flex text-white hover:text-[#7C9A5E]"
+              className="hidden md:inline-flex text-white hover:text-brand-olive"
             >
               Logout
             </Button>
@@ -252,7 +252,7 @@ export function Navigation() {
 
       {/* Mobile dropdown menu */}
       {mobileOpen && (
-        <div className="md:hidden bg-[#1E293B] border-t border-white/20">
+        <div className="md:hidden bg-brand-dark border-t border-white/20">
           <div className="px-4 py-2 space-y-1">
             {[
               { href: '/dashboard', label: 'Dashboard' },
@@ -267,8 +267,8 @@ export function Navigation() {
                 href={href}
                 className={`block px-3 py-2 text-sm font-medium transition-colors ${
                   pathname === href || (href === '/settings' && pathname?.startsWith('/settings'))
-                    ? 'text-white bg-[#7C9A5E]'
-                    : 'text-white hover:bg-[#7C9A5E]/20'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
                 {label}
@@ -281,7 +281,7 @@ export function Navigation() {
               </p>
               <button
                 onClick={handleLogout}
-                className="block w-full text-left px-3 py-2 text-sm font-medium text-white hover:bg-[#7C9A5E]/20 transition-colors"
+                className="block w-full text-left px-3 py-2 text-sm font-medium text-white hover:bg-brand-olive/20 transition-colors"
               >
                 Logout
               </button>
