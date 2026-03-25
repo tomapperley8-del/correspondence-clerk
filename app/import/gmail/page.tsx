@@ -70,14 +70,14 @@ export default function GmailImportPage() {
           </Link>
         </div>
         <div className="bg-white border border-gray-200 rounded p-8 shadow-[var(--shadow-sm,0_1px_3px_rgba(0,0,0,0.06))]">
-          <h1 className="font-[Lora,serif] text-2xl font-semibold text-[#1E293B] mb-2">Connect Gmail</h1>
+          <h1 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-2">Connect Gmail</h1>
           <p className="text-gray-500 text-sm mb-6">
             Connect your Gmail account to import your email history. We only read your emails — we never send,
             delete, or modify anything.
           </p>
           <a
             href="/api/auth/google"
-            className="inline-block px-5 py-2.5 bg-[#2C4A6E] text-white text-sm font-medium hover:bg-[#1E293B] transition-colors"
+            className="inline-block px-5 py-2.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-dark transition-colors"
           >
             Connect Gmail
           </a>
@@ -93,9 +93,9 @@ export default function GmailImportPage() {
           <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600 text-xl">
             ✓
           </div>
-          <h2 className="font-[Lora,serif] text-2xl font-semibold text-[#1E293B] mb-2">Import complete</h2>
+          <h2 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-2">Import complete</h2>
           <p className="text-gray-500 text-sm mb-2">
-            <span className="font-medium text-[#1E293B]">{doneStats.imported}</span> email{doneStats.imported !== 1 ? 's' : ''} imported
+            <span className="font-medium text-brand-dark">{doneStats.imported}</span> email{doneStats.imported !== 1 ? 's' : ''} imported
             {doneStats.skipped > 0 && `, ${doneStats.skipped} skipped (duplicates)`}
           </p>
           <p className="text-gray-400 text-xs mb-8">
@@ -104,13 +104,13 @@ export default function GmailImportPage() {
           <div className="flex flex-col gap-3">
             <Link
               href="/dashboard"
-              className="inline-block text-center px-5 py-2.5 bg-[#2C4A6E] text-white text-sm font-medium hover:bg-[#1E293B] transition-colors"
+              className="inline-block text-center px-5 py-2.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-dark transition-colors"
             >
               Go to Dashboard
             </Link>
             <button
               onClick={() => { setStep('configure'); setDoneStats(null); setScanResult(null) }}
-              className="text-sm text-gray-500 hover:text-[#2C4A6E]"
+              className="text-sm text-gray-500 hover:text-brand-navy"
             >
               Import more emails
             </button>
@@ -128,7 +128,7 @@ export default function GmailImportPage() {
         </Link>
       </div>
 
-      <h1 className="font-[Lora,serif] text-2xl font-semibold text-[#1E293B] mb-1">Import from Gmail</h1>
+      <h1 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-1">Import from Gmail</h1>
       <p className="text-gray-500 text-sm mb-8">
         Scan your Gmail inbox and choose which emails to import. New businesses and contacts will be created automatically.
       </p>
@@ -145,8 +145,8 @@ export default function GmailImportPage() {
                   onClick={() => setMonths(m)}
                   className={`px-4 py-2 text-sm border transition-colors ${
                     months === m
-                      ? 'border-[#2C4A6E] bg-[#2C4A6E] text-white'
-                      : 'border-gray-300 text-gray-600 hover:border-[#2C4A6E]'
+                      ? 'border-brand-navy bg-brand-navy text-white'
+                      : 'border-gray-300 text-gray-600 hover:border-brand-navy'
                   }`}
                 >
                   {m} month{m !== 1 ? 's' : ''}
@@ -161,7 +161,7 @@ export default function GmailImportPage() {
 
           <button
             onClick={handleScan}
-            className="px-5 py-2.5 bg-[#2C4A6E] text-white text-sm font-medium hover:bg-[#1E293B] transition-colors"
+            className="px-5 py-2.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-dark transition-colors"
           >
             Scan Gmail
           </button>
@@ -171,7 +171,7 @@ export default function GmailImportPage() {
       {/* Step: scanning */}
       {step === 'scanning' && (
         <div className="bg-white border border-gray-200 rounded p-8 text-center shadow-[var(--shadow-sm,0_1px_3px_rgba(0,0,0,0.06))]">
-          <div className="w-8 h-8 border-2 border-[#2C4A6E] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-8 h-8 border-2 border-brand-navy border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600 text-sm">Scanning your Gmail inbox…</p>
           <p className="text-gray-400 text-xs mt-1">Reading the last {months} month{months !== 1 ? 's' : ''} of email headers</p>
         </div>
@@ -180,11 +180,11 @@ export default function GmailImportPage() {
       {/* Step: review */}
       {step === 'review' && scanResult && scanId && (
         <>
-          <div className="bg-[#FAFAF8] border border-gray-200 rounded px-4 py-3 mb-6 text-sm text-gray-600">
+          <div className="bg-brand-paper border border-gray-200 rounded px-4 py-3 mb-6 text-sm text-gray-600">
             Found{' '}
-            <span className="font-medium text-[#1E293B]">{scanStats?.emails ?? 0}</span> emails across{' '}
-            <span className="font-medium text-[#1E293B]">{scanStats?.businesses ?? 0}</span> businesses and{' '}
-            <span className="font-medium text-[#1E293B]">{scanStats?.contacts ?? 0}</span> contacts.
+            <span className="font-medium text-brand-dark">{scanStats?.emails ?? 0}</span> emails across{' '}
+            <span className="font-medium text-brand-dark">{scanStats?.businesses ?? 0}</span> businesses and{' '}
+            <span className="font-medium text-brand-dark">{scanStats?.contacts ?? 0}</span> contacts.
             Edit names or exclude rows you don&apos;t want before importing.
           </div>
           <ReviewWizard

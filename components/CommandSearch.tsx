@@ -113,7 +113,7 @@ export function CommandSearch() {
                     <button
                       onClick={() => navigate(b)}
                       className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between ${
-                        i === activeIdx ? 'bg-blue-50 text-[#2C4A6E]' : 'text-gray-800 hover:bg-gray-50'
+                        i === activeIdx ? 'bg-blue-50 text-brand-navy' : 'text-gray-800 hover:bg-gray-50'
                       }`}
                     >
                       <span className="font-medium">{b.name}</span>

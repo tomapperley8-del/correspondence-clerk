@@ -21,12 +21,12 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section className="py-24" style={{ backgroundColor: '#FAFAF8', borderTop: '1px solid rgba(0,0,0,0.06)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+    <section className="py-24" style={{ backgroundColor: 'var(--main-bg)', borderTop: '1px solid rgba(0,0,0,0.06)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
       <div className="container mx-auto px-6">
         <div className="mb-16">
           <h2
             className="text-3xl md:text-4xl font-bold"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B', letterSpacing: '-0.01em' }}
+            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.01em' }}
           >
             How it works
           </h2>
@@ -37,12 +37,12 @@ export function HowItWorks() {
             <div key={step.number} className="relative pl-10" style={{ borderLeft: '2px solid rgba(0,0,0,0.07)' }}>
               <p
                 className="absolute -left-px top-0 text-xs font-bold tracking-widest"
-                style={{ color: '#7C9A5E', writingMode: undefined }}
+                style={{ color: 'var(--link-hover)', writingMode: undefined }}
               >
                 {step.number}
               </p>
               <div className="pt-6">
-                <h3 className="text-lg font-semibold mb-3" style={{ color: '#1E293B' }}>
+                <h3 className="text-lg font-semibold mb-3" style={{ color: 'var(--header-bg)' }}>
                   {step.title}
                 </h3>
                 <p className="text-sm leading-relaxed" style={{ color: '#64748b', lineHeight: '1.7' }}>

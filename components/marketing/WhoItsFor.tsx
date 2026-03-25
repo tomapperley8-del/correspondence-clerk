@@ -23,11 +23,11 @@ const audience = [
 
 export function WhoItsFor() {
   return (
-    <section className="py-24" style={{ backgroundColor: '#FAFAF8' }}>
+    <section className="py-24" style={{ backgroundColor: 'var(--main-bg)' }}>
       <div className="container mx-auto px-6">
         <h2
           className="text-3xl md:text-4xl font-bold mb-16 text-center"
-          style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B', letterSpacing: '-0.01em' }}
+          style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.01em' }}
         >
           Built for anyone managing ongoing business relationships
         </h2>
@@ -40,12 +40,12 @@ export function WhoItsFor() {
               style={{
                 backgroundColor: '#fff',
                 border: '1px solid rgba(0,0,0,0.08)',
-                borderTop: '3px solid #7C9A5E',
+                borderTop: '3px solid var(--link-hover)',
               }}
             >
               <h3
                 className="text-base font-semibold mb-3"
-                style={{ fontFamily: 'Lora, Georgia, serif', color: '#1E293B' }}
+                style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
               >
                 {item.title}
               </h3>

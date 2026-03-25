@@ -46,7 +46,7 @@ export const ChatMessage = memo(function ChatMessage({ message }: ChatMessagePro
       <div
         className={`max-w-[90%] rounded-sm px-3 py-2 text-sm leading-relaxed ${
           isUser
-            ? 'bg-[#2C4A6E] text-white'
+            ? 'bg-brand-navy text-white'
             : 'bg-[#F5F5F3] text-gray-800 border border-gray-200'
         }`}
       >
@@ -107,7 +107,7 @@ function EmailDraftCard({ content }: { content: string }) {
   return (
     <div className="bg-white border-2 border-gray-300 rounded-sm p-3 relative">
       <div className="flex justify-between items-start mb-1">
-        <span className="text-xs font-medium text-[#7C9A5E] uppercase tracking-wide">
+        <span className="text-xs font-medium text-brand-olive uppercase tracking-wide">
           Draft Email
         </span>
         <Button

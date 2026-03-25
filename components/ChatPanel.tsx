@@ -239,8 +239,8 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
   const panelContent = (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-[#FAFAF8]">
-        <h2 className="font-[Lora,serif] text-lg font-semibold text-[#1E293B]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-brand-paper">
+        <h2 className="font-[Lora,serif] text-lg font-semibold text-brand-dark">
           Daily Briefing
         </h2>
         <div className="flex items-center gap-2">
@@ -284,7 +284,7 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
                   </p>
                   <Link
                     href="/new-entry"
-                    className="inline-block px-4 py-2 bg-[#2C4A6E] text-white text-sm hover:bg-[#1E293B] transition-colors"
+                    className="inline-block px-4 py-2 bg-brand-navy text-white text-sm hover:bg-brand-dark transition-colors"
                   >
                     Add first entry
                   </Link>
@@ -321,7 +321,7 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
           {/* Thinking/tool indicator */}
           {isStreaming && (streamingPhase === 'thinking' || streamingPhase === 'tools') && (
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
-              <span className="inline-block w-1.5 h-1.5 bg-[#7C9A5E] rounded-full animate-pulse" />
+              <span className="inline-block w-1.5 h-1.5 bg-brand-olive rounded-full animate-pulse" />
               {streamingPhase === 'tools' ? 'Looking up data...' : 'Thinking...'}
             </div>
           )}
@@ -329,7 +329,7 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 px-4 py-3 bg-[#FAFAF8]">
+      <div className="border-t border-gray-200 px-4 py-3 bg-brand-paper">
         {input.length > 500 && (
           <p className="text-xs text-gray-400 text-right mb-1">{input.length} / 2000</p>
         )}
@@ -341,13 +341,13 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
             onKeyDown={handleKeyDown}
             placeholder="Ask about your businesses..."
             rows={1}
-            className="flex-1 resize-none rounded-sm border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[#2C4A6E] focus:ring-1 focus:ring-[#2C4A6E] bg-white max-h-32 overflow-y-auto"
+            className="flex-1 resize-none rounded-sm border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy bg-white max-h-32 overflow-y-auto"
             disabled={isStreaming}
           />
           <Button
             onClick={handleSend}
             disabled={!input.trim() || isStreaming}
-            className="bg-[#2C4A6E] text-white hover:bg-[#1E293B] rounded-sm px-4 self-end"
+            className="bg-brand-navy text-white hover:bg-brand-dark rounded-sm px-4 self-end"
           >
             Send
           </Button>

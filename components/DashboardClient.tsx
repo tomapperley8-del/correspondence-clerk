@@ -173,7 +173,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes }: D
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <div className="flex items-center gap-3">
-          <Link href="/import" className="text-sm text-[#2C4A6E] hover:underline">
+          <Link href="/import" className="text-sm text-brand-navy hover:underline">
             Bulk import
           </Link>
           <AddBusinessButton />
@@ -214,7 +214,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes }: D
 
       {businesses.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded p-10 max-w-lg mx-auto mt-8 shadow-[var(--shadow-md,0_2px_8px_rgba(0,0,0,0.08))]">
-          <h1 className="font-[Lora,serif] text-2xl font-semibold text-[#1E293B] mb-2">
+          <h1 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-2">
             Welcome to Correspondence Clerk
           </h1>
           <p className="text-gray-500 text-sm mb-8">Get set up in three steps.</p>
@@ -225,7 +225,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes }: D
               'Ask "what do I need to do today" in the Daily Briefing',
             ].map((step, i) => (
               <li key={i} className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-7 h-7 rounded-full bg-[#2C4A6E] text-white text-sm font-semibold flex items-center justify-center mt-0.5">
+                <span className="flex-shrink-0 w-7 h-7 rounded-full bg-brand-navy text-white text-sm font-semibold flex items-center justify-center mt-0.5">
                   {i + 1}
                 </span>
                 <span className="text-gray-700 text-sm leading-relaxed pt-1">{step}</span>
@@ -235,19 +235,19 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes }: D
           <div className="flex flex-col gap-3">
             <Link
               href="/new-entry"
-              className="inline-block text-center px-5 py-2.5 bg-[#2C4A6E] text-white text-sm font-medium hover:bg-[#1E293B] transition-colors"
+              className="inline-block text-center px-5 py-2.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-dark transition-colors"
             >
               Add your first business
             </Link>
             <Link
               href="/import"
-              className="inline-block text-center px-5 py-2.5 border border-[#2C4A6E] text-[#2C4A6E] text-sm font-medium hover:bg-[#2C4A6E] hover:text-white transition-colors"
+              className="inline-block text-center px-5 py-2.5 border border-brand-navy text-brand-navy text-sm font-medium hover:bg-brand-navy hover:text-white transition-colors"
             >
               Bulk import from Gmail or Outlook
             </Link>
             <Link
               href="/install-bookmarklet"
-              className="text-sm text-[#2C4A6E] hover:underline text-center"
+              className="text-sm text-brand-navy hover:underline text-center"
             >
               Install the email import tool
             </Link>

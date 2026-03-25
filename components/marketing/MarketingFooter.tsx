@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 export function MarketingFooter() {
   return (
-    <footer style={{ backgroundColor: '#1E293B', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+    <footer style={{ backgroundColor: 'var(--header-bg)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
       <div className="container mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row md:justify-between gap-8">
           <div>

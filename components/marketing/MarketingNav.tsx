@@ -2,9 +2,9 @@ import Link from 'next/link'
 
 export function MarketingNav() {
   return (
-    <header style={{ backgroundColor: '#FAFAF8', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+    <header style={{ backgroundColor: 'var(--main-bg)', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
       <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-        <Link href="/" className="font-serif text-xl font-bold" style={{ color: '#1E293B', fontFamily: 'Lora, Georgia, serif' }}>
+        <Link href="/" className="font-serif text-xl font-bold" style={{ color: 'var(--header-bg)', fontFamily: 'Lora, Georgia, serif' }}>
           Correspondence Clerk
         </Link>
         <nav className="hidden md:flex items-center gap-8">
@@ -22,7 +22,7 @@ export function MarketingNav() {
           <Link
             href="/signup"
             className="text-sm font-medium px-4 py-2"
-            style={{ backgroundColor: '#2C4A6E', color: '#fff' }}
+            style={{ backgroundColor: 'var(--link-blue)', color: '#fff' }}
           >
             Start free trial
           </Link>

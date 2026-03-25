@@ -22,6 +22,15 @@
   --radius-2xl: 10px;
   --radius-3xl: 12px;
   --radius-full: 9999px;
+  /* Brand design tokens — exposed as Tailwind utilities */
+  --color-brand-dark: var(--header-bg);        /* #1E293B → bg-brand-dark, text-brand-dark */
+  --color-brand-navy: var(--link-blue);         /* #2C4A6E → bg-brand-navy, text-brand-navy */
+  --color-brand-navy-hover: var(--brand-navy-hover); /* #243d5c → hover:bg-brand-navy-hover */
+  --color-brand-navy-dark: var(--brand-navy-dark);   /* #1E3A5F → deeper navy */
+  --color-brand-olive: var(--link-hover);       /* #7C9A5E → bg-brand-olive, text-brand-olive */
+  --color-brand-paper: var(--main-bg);          /* #FAFAF8 → bg-brand-paper */
+  --color-brand-warm: var(--sidebar-bg);        /* #F8F7F4 → bg-brand-warm */
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -62,6 +71,10 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Hover/dark variants not already defined above */
+  --brand-navy-hover: #243d5c;
+  --brand-navy-dark: #1E3A5F;
 }
 
 /* Gentle transitions for interactive elements */
@@ -83,7 +96,7 @@ button:active {
 /* Focus states - softer double-ring effect for accessibility */
 *:focus-visible {
   outline: none !important;
-  box-shadow: 0 0 0 2px #FAFAF8, 0 0 0 4px #7C9A5E !important;
+  box-shadow: 0 0 0 2px var(--main-bg), 0 0 0 4px var(--link-hover) !important;
 }
 
 button:focus-visible,
@@ -91,7 +104,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none !important;
-  box-shadow: 0 0 0 2px #FAFAF8, 0 0 0 4px #7C9A5E !important;
+  box-shadow: 0 0 0 2px var(--main-bg), 0 0 0 4px var(--link-hover) !important;
 }
 
 /* Typography hierarchy - editorial serif headings, clean sans body */
@@ -231,17 +244,17 @@ h4 {
 /* Override Tailwind blues with warmer, more trustworthy navy-slate */
 /* This transforms "tech startup blue" into "professional services blue" */
 .bg-blue-600 {
-  background-color: #2C4A6E !important;
+  background-color: var(--link-blue) !important;
 }
 .bg-blue-700, .hover\:bg-blue-700:hover {
-  background-color: #1E3A5F !important;
+  background-color: var(--brand-navy-dark) !important;
 }
 .text-blue-600, .hover\:text-blue-600:hover {
-  color: #2C4A6E !important;
+  color: var(--link-blue) !important;
 }
 .text-blue-800, .hover\:text-blue-800:hover {
-  color: #1E3A5F !important;
+  color: var(--brand-navy-dark) !important;
 }
 .border-blue-600 {
-  border-color: #2C4A6E !important;
+  border-color: var(--link-blue) !important;
 }

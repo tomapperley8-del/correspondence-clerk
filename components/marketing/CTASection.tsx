@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 export function CTASection() {
   return (
-    <section className="py-24" style={{ backgroundColor: '#1E293B' }}>
+    <section className="py-24" style={{ backgroundColor: 'var(--header-bg)' }}>
       <div className="container mx-auto px-6 max-w-2xl">
         <h2
           className="text-3xl font-bold mb-4"
@@ -16,7 +16,7 @@ export function CTASection() {
         <Link
           href="/signup"
           className="inline-block text-sm font-medium px-6 py-3"
-          style={{ backgroundColor: '#7C9A5E', color: '#fff' }}
+          style={{ backgroundColor: 'var(--link-hover)', color: '#fff' }}
         >
           Start free trial
         </Link>
