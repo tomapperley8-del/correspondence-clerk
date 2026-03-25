@@ -913,7 +913,8 @@ export async function getNeedsReply() {
   const { data, error } = await supabase
     .from('correspondence')
     .select(`
-      id, business_id, contact_id, subject, direction, entry_date, action_needed,
+      id, business_id, contact_id, subject, type, direction, entry_date, action_needed,
+      formatted_text_current,
       businesses!inner(id, name),
       contact:contacts(name, role)
     `)

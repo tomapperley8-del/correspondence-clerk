@@ -28,6 +28,8 @@ type CorrespondenceItem = {
   due_at: string | null
   entry_date: string | null
   direction: string | null
+  type: string | null
+  snippet: string | null
   daysAgo?: number
 }
 
@@ -69,6 +71,13 @@ function daysAgo(dateStr: string): number {
 
 function isOverdue(dueAt: string): boolean {
   return new Date(dueAt) < new Date()
+}
+
+function makeSnippet(text: string | null | undefined): string | null {
+  if (!text) return null
+  const stripped = text.replace(/\*\*|__|[_*#>`~]/g, '').replace(/\s+/g, ' ').trim()
+  if (stripped.length <= 150) return stripped
+  return stripped.slice(0, 150).replace(/\s\S*$/, '') + '…'
 }
 
 // ─── Section component ────────────────────────────────────────────────────────
@@ -286,6 +295,20 @@ function ItemRow({
             <p className="text-sm text-gray-800 mb-0.5">{(item as CorrespondenceItem).subject}</p>
           )}
 
+          {isCorr && ((item as CorrespondenceItem).direction || (item as CorrespondenceItem).snippet) && (
+            <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
+              {(item as CorrespondenceItem).direction === 'received' && (
+                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-[#2C4A6E]/8 text-[#2C4A6E] border border-[#2C4A6E]/20">↓ Received</span>
+              )}
+              {(item as CorrespondenceItem).direction === 'sent' && (
+                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-[#7C9A5E]/10 text-[#7C9A5E] border border-[#7C9A5E]/20">↑ Sent</span>
+              )}
+              {(item as CorrespondenceItem).snippet && (
+                <span className="text-xs text-gray-400 italic">{(item as CorrespondenceItem).snippet}</span>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
             {isCorr && (item as CorrespondenceItem).action_needed !== 'none' && (
               <span className={`px-1.5 py-0.5 border text-[10px] font-semibold ${ACTION_COLOURS[(item as CorrespondenceItem).action_needed] || 'bg-gray-100 border-gray-300 text-gray-700'}`}>
@@ -416,6 +439,8 @@ export default function ActionsPage() {
           due_at: null,
           entry_date: e.entry_date as string | null,
           direction: e.direction as string | null,
+          type: e.type as string | null,
+          snippet: makeSnippet(e.formatted_text_current as string | null),
           daysAgo: e.entry_date ? daysAgo(e.entry_date as string) : undefined,
         }
       })
@@ -451,6 +476,8 @@ export default function ActionsPage() {
         due_at: e.due_at as string | null,
         entry_date: e.entry_date as string | null,
         direction: e.direction as string | null,
+        type: e.type as string | null,
+        snippet: makeSnippet(e.formatted_text_current as string | null),
       }
     }
 
