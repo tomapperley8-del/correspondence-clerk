@@ -1080,6 +1080,28 @@ ${emailBody || ''}`
         </div>
       )}
 
+      {searchParams.get('onboarding') === 'true' && (
+        <div
+          className="flex items-center justify-between px-4 py-3 rounded-sm mb-6"
+          style={{ backgroundColor: 'var(--header-bg)' }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1.5">
+              <span className="inline-block w-5 h-1 rounded-full bg-white opacity-30" />
+              <span className="inline-block w-5 h-1 rounded-full bg-white opacity-30" />
+              <span className="inline-block w-5 h-1 rounded-full bg-white opacity-90" />
+            </div>
+            <span className="text-sm font-semibold text-white">Step 3 of 3 — Add your first entry</span>
+          </div>
+          <a
+            href={`/businesses/${businessIdFromQuery}`}
+            className="text-xs text-white opacity-60 hover:opacity-100 transition-opacity"
+          >
+            Skip for now
+          </a>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold text-gray-900 mb-4">New Entry</h1>
 
       {/* Step indicator — CSS only, dims incomplete steps */}
