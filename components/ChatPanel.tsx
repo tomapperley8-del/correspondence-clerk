@@ -330,6 +330,9 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
 
       {/* Input */}
       <div className="border-t border-gray-200 px-4 py-3 bg-[#FAFAF8]">
+        {input.length > 500 && (
+          <p className="text-xs text-gray-400 text-right mb-1">{input.length} / 2000</p>
+        )}
         <div className="flex gap-2">
           <textarea
             ref={inputRef}
@@ -338,7 +341,7 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
             onKeyDown={handleKeyDown}
             placeholder="Ask about your businesses..."
             rows={1}
-            className="flex-1 resize-none rounded-sm border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[#2C4A6E] focus:ring-1 focus:ring-[#2C4A6E] bg-white"
+            className="flex-1 resize-none rounded-sm border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[#2C4A6E] focus:ring-1 focus:ring-[#2C4A6E] bg-white max-h-32 overflow-y-auto"
             disabled={isStreaming}
           />
           <Button

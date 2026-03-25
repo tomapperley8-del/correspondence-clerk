@@ -99,7 +99,8 @@
       "Bash(\"/c/Users/Bridg/Projects/correspondence-clerk/.env.local\")",
       "Bash(NEXT_PUBLIC_APP_URL=\"https://correspondence-clerk.vercel.app\" TEST_USER_EMAIL=\"tomapperley8@gmail.com\" TEST_USER_PASSWORD=\"REDACTED\" npx tsx --env-file=.env.local scripts/test-import-flow.ts)",
       "mcp__claude_ai_Supabase__get_logs",
-      "mcp__claude_ai_Vercel__get_deployment_build_logs"
+      "mcp__claude_ai_Vercel__get_deployment_build_logs",
+      "mcp__claude_ai_Vercel__deploy_to_vercel"
     ]
   }
 }

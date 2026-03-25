@@ -136,16 +136,10 @@ export default function SettingsPage() {
           be changed here.
         </p>
         <div>
-          <Label htmlFor="email" className="block mb-2 font-semibold">
-            Email
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            value={userEmail}
-            disabled
-            className="w-full bg-gray-100"
-          />
+          <p className="block mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Email address (cannot be changed)
+          </p>
+          <p className="text-sm text-[#1E293B] py-2">{userEmail}</p>
         </div>
       </div>
 

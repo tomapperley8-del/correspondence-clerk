@@ -1080,7 +1080,25 @@ ${emailBody || ''}`
         </div>
       )}
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">New Entry</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-4">New Entry</h1>
+
+      {/* Step indicator — CSS only, dims incomplete steps */}
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <div className="flex items-center gap-1.5">
+          <span className="w-5 h-5 rounded-full bg-[#1E293B] text-white text-xs font-bold flex items-center justify-center shrink-0">1</span>
+          <span className="font-medium text-[#1E293B]">Business</span>
+        </div>
+        <span className="w-6 h-px bg-gray-300 shrink-0" />
+        <div className={`flex items-center gap-1.5 transition-opacity ${!selectedBusinessId ? 'opacity-35' : ''}`}>
+          <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${selectedBusinessId ? 'bg-[#1E293B] text-white' : 'bg-gray-200 text-gray-500'}`}>2</span>
+          <span className={`font-medium ${selectedBusinessId ? 'text-[#1E293B]' : 'text-gray-400'}`}>Contact</span>
+        </div>
+        <span className="w-6 h-px bg-gray-300 shrink-0" />
+        <div className={`flex items-center gap-1.5 transition-opacity ${(!selectedBusinessId || (!selectedContactId && entryType !== 'Note')) ? 'opacity-35' : ''}`}>
+          <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${(selectedBusinessId && (selectedContactId || entryType === 'Note')) ? 'bg-[#1E293B] text-white' : 'bg-gray-200 text-gray-500'}`}>3</span>
+          <span className={`font-medium ${(selectedBusinessId && (selectedContactId || entryType === 'Note')) ? 'text-[#1E293B]' : 'text-gray-400'}`}>Correspondence</span>
+        </div>
+      </div>
 
       {/* Action Error Banner */}
       {actionError && (
@@ -1245,66 +1263,67 @@ ${emailBody || ''}`
               <p className="text-gray-500 text-xs mt-1">Leave blank if time is unknown</p>
             </div>
 
-            {/* Direction - only show for emails and email threads */}
-            {(entryType === 'Email' || entryType === 'Email Thread') && (
-              <div>
-                <Label className="block mb-2 font-semibold">
-                  Direction <span className="text-red-600">*</span>
-                </Label>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="direction"
-                      value="received"
-                      checked={direction === 'received'}
-                      onChange={(e) => {
-                        setDirection(e.target.value as 'received')
-                        setErrors((prev) => ({ ...prev, direction: undefined }))
-                      }}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">Received from them</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="direction"
-                      value="sent"
-                      checked={direction === 'sent'}
-                      onChange={(e) => {
-                        setDirection(e.target.value as 'sent')
-                        setErrors((prev) => ({ ...prev, direction: undefined }))
-                      }}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">Sent to them</span>
-                  </label>
-                </div>
-                {errors.direction && (
-                  <p className="text-red-600 text-xs mt-1">{errors.direction}</p>
-                )}
-              </div>
-            )}
-
-            {/* Entry Type */}
+            {/* Entry kind — combines Type + Direction into one natural-language selector */}
             <div>
-              <Label htmlFor="entryType" className="block mb-2 font-semibold">
-                Type
+              <Label htmlFor="entryKind" className="block mb-2 font-semibold">
+                What kind of entry is this?
               </Label>
               <select
-                id="entryType"
-                value={entryType}
-                onChange={(e) => setEntryType(e.target.value as any)}
-                className="w-full px-3 py-2 border-2 border-gray-300 focus:outline-none focus:border-blue-600"
+                id="entryKind"
+                value={(() => {
+                  if (!entryType) return ''
+                  if (entryType === 'Email') return direction ? `email_${direction}` : ''
+                  if (entryType === 'Email Thread') return direction ? `thread_${direction}` : ''
+                  if (entryType === 'Call') return direction === 'sent' ? 'call_made' : direction === 'received' ? 'call_received' : ''
+                  if (entryType === 'Meeting') return 'meeting'
+                  if (entryType === 'Note') return 'note'
+                  return ''
+                })()}
+                onChange={(e) => {
+                  const v = e.target.value
+                  const map: Record<string, { type: typeof entryType; dir: typeof direction }> = {
+                    email_received: { type: 'Email', dir: 'received' },
+                    email_sent:     { type: 'Email', dir: 'sent' },
+                    thread_received: { type: 'Email Thread', dir: 'received' },
+                    thread_sent:    { type: 'Email Thread', dir: 'sent' },
+                    call_received:  { type: 'Call', dir: 'received' },
+                    call_made:      { type: 'Call', dir: 'sent' },
+                    meeting:        { type: 'Meeting', dir: '' },
+                    note:           { type: 'Note', dir: '' },
+                  }
+                  const picked = map[v]
+                  if (picked) {
+                    setEntryType(picked.type)
+                    setDirection(picked.dir)
+                  } else {
+                    setEntryType('')
+                    setDirection('')
+                  }
+                  setErrors((prev) => ({ ...prev, direction: undefined }))
+                }}
+                className={`w-full px-3 py-2 border-2 ${errors.direction ? 'border-red-600' : 'border-gray-300'} focus:outline-none focus:border-blue-600`}
               >
                 <option value="">Not specified</option>
-                <option value="Email">Email</option>
-                <option value="Call">Call</option>
-                <option value="Meeting">Meeting</option>
-                <option value="Email Thread">Email Thread</option>
-                <option value="Note">Note</option>
+                <optgroup label="Email">
+                  <option value="email_received">I received an email</option>
+                  <option value="email_sent">I sent an email</option>
+                </optgroup>
+                <optgroup label="Email Thread">
+                  <option value="thread_received">I received an email thread</option>
+                  <option value="thread_sent">I sent an email thread</option>
+                </optgroup>
+                <optgroup label="Call">
+                  <option value="call_received">I received a phone call</option>
+                  <option value="call_made">I made a phone call</option>
+                </optgroup>
+                <optgroup label="Other">
+                  <option value="meeting">I had a meeting</option>
+                  <option value="note">I&apos;m adding a note</option>
+                </optgroup>
               </select>
+              {errors.direction && (
+                <p className="text-red-600 text-xs mt-1">{errors.direction}</p>
+              )}
             </div>
 
             {/* Thread Participants - only shown for Email Thread type */}
