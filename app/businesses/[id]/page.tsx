@@ -26,6 +26,11 @@ import { retryFormatting } from '@/app/actions/ai-formatter'
 import { getActiveMembershipTypes, type MembershipType } from '@/app/actions/membership-types'
 import { formatDateGB, formatDateTimeGB } from '@/lib/utils'
 import { toast } from '@/lib/toast'
+import { ContactsList } from './_components/ContactsList'
+import { DuplicatesWarningBanner } from './_components/DuplicatesWarningBanner'
+import { CorrespondenceFilterBar } from './_components/CorrespondenceFilterBar'
+import { AllEntriesView } from './_components/AllEntriesView'
+import { ThreadsView } from './_components/ThreadsView'
 
 export default function BusinessDetailPage({
   params,
@@ -779,591 +784,123 @@ export default function BusinessDetailPage({
     setSummaryRefreshTrigger((prev) => prev + 1)
   }
 
-  // Helper to extract sender/recipient name from AI metadata
-  const getExtractedName = (entry: Correspondence): string | null => {
-    if (!entry.ai_metadata) return null
-    try {
-      const metadata = entry.ai_metadata as any
-      // Try to get matched contact name
-      if (metadata.matched_contact?.matched_from) {
-        return metadata.matched_contact.matched_from
+  // Pin handler
+  const handlePin = async (entryId: string, _isPinned: boolean) => {
+    await togglePinCorrespondence(entryId)
+    await refreshCorrespondence()
+  }
+
+  // Quick action handler (optimistic)
+  const handleAction = async (entryId: string, action: string) => {
+    const entry = correspondence.find(c => c.id === entryId)
+    const prevAction = entry?.action_needed ?? 'none'
+    setCorrespondence((prev) => prev.map((c) => c.id === entryId ? { ...c, action_needed: action as Correspondence['action_needed'] } : c))
+    const result = await setCorrespondenceAction(entryId, action)
+    if (result && 'error' in result) {
+      setCorrespondence((prev) => prev.map((c) => c.id === entryId ? { ...c, action_needed: prevAction } : c))
+      toast.error(action === 'none' ? 'Failed to mark done' : 'Failed to set action')
+    } else {
+      if (action === 'none') {
+        toast.success('Marked done')
+      } else if (action === 'follow_up') {
+        toast.success('Follow-up set')
+      } else {
+        toast.success('Waiting on them set')
       }
-      // Try to get extracted names
-      if (metadata.extracted_names?.length > 0) {
-        return metadata.extracted_names[0]
-      }
-    } catch {
-      // Silently fail and fall back to contact name
     }
-    return null
   }
 
-  // Highlight matching text when searching
-  const highlightMatch = (text: string): React.ReactNode => {
-    if (!searchQuery.trim()) return text
-    const query = searchQuery.trim()
-    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-    const parts = text.split(regex)
-    if (parts.length === 1) return text
-    return parts.map((part, i) =>
-      regex.test(part)
-        ? <mark key={i} className="bg-yellow-200 text-yellow-900">{part}</mark>
-        : part
-    )
+  // Thread assign handler
+  const handleAssignThread = async (entryId: string, threadId: string | null) => {
+    await assignCorrespondenceToThread(entryId, threadId, id!)
+    await refreshCorrespondence()
   }
 
-  const renderEntry = (entry: Correspondence, options?: { isContext: boolean }) => {
-    const isContext = options?.isContext ?? false
-    const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
-    const isUnformatted = entry.formatting_status !== 'formatted'
-    const isEdited = entry.edited_at !== null
-    const isEditing = editingEntryId === entry.id
-    const extractedName = getExtractedName(entry)
-    const isSearchActive = searchQuery.trim() !== ''
+  // Thread create handler
+  const handleCreateThread = async (entryId: string, name: string) => {
+    const result = await createThread(id!, name)
+    if ('data' in result && result.data) {
+      await assignCorrespondenceToThread(entryId, result.data.id, id!)
+      const [threadsRes] = await Promise.all([
+        getThreadsByBusiness(id!),
+        refreshCorrespondence(),
+      ])
+      setThreads('error' in threadsRes ? [] : threadsRes.data || [])
+    }
+  }
 
-    // Context button visibility
-    const prevId = getPreviousEntryId(entry.id)
-    const nextId = getNextEntryId(entry.id)
-    const allVisibleIds = new Set([
-      ...filteredCorrespondence.recent.map(e => e.id),
-      ...filteredCorrespondence.archive.map(e => e.id),
+  // Thread rename handler
+  const handleRenameThread = async (threadId: string, name: string) => {
+    await renameThread(threadId, id!, name)
+    const result = await getThreadsByBusiness(id!)
+    setThreads('error' in result ? [] : result.data || [])
+  }
+
+  // Thread delete handler
+  const handleDeleteThread = async (threadId: string) => {
+    if (!id) return
+    await deleteThread(threadId, id)
+    const [threadsRes] = await Promise.all([
+      getThreadsByBusiness(id),
+      refreshCorrespondence(),
     ])
-    const showPrevButton = isSearchActive && prevId && !allVisibleIds.has(prevId)
-    const showNextButton = isSearchActive && nextId && !allVisibleIds.has(nextId)
+    setThreads('error' in threadsRes ? [] : threadsRes.data || [])
+  }
 
-    return (
-      <div id={`entry-${entry.id}`} key={entry.id} className={`border-t border-gray-300 pt-6 first:border-t-0 first:pt-0 ${isContext ? 'border-l-2 border-l-amber-300 bg-amber-50/30 pl-4' : ''}`}>
-        {isContext && (
-          <p className="text-xs text-amber-700 font-medium mb-2">Surrounding context</p>
-        )}
-        {/* Unformatted indicator */}
-        {isUnformatted && (
-          entry.ai_metadata?.bulk_import ? (
-            <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-500">
-              <span className="inline-block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
-              Formatting queued…
-            </div>
-          ) : (
-            <div className="bg-orange-50 border-2 border-orange-600 p-3 mb-3">
-              <p className="text-sm text-orange-900 font-semibold mb-2">
-                ⚠ Unformatted Entry
-              </p>
-              <p className="text-xs text-orange-800 mb-2">
-                This entry was saved without AI formatting. The raw text is displayed below.
-              </p>
-              <Button
-                onClick={() => handleFormatLater(entry.id)}
-                disabled={formattingInProgress === entry.id}
-                className="bg-orange-600 text-white hover:bg-orange-700 px-3 py-1 text-xs font-semibold"
-              >
-                {formattingInProgress === entry.id ? 'Formatting...' : 'Format Now'}
-              </Button>
-            </div>
-          )
-        )}
+  // Toggle expanded entry
+  const handleToggleExpand = (entryId: string) => {
+    setExpandedEntries(prev => {
+      const next = new Set(prev)
+      if (next.has(entryId)) next.delete(entryId)
+      else next.add(entryId)
+      return next
+    })
+  }
 
-        {/* Subject line with edit indicator */}
-        <div className="flex items-center gap-2 mb-2">
-          {entry.subject && (
-            <h3 className="font-semibold text-gray-900">
-              {highlightMatch(entry.subject)}
-            </h3>
-          )}
-          {isEdited && (
-            <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800">
-              Corrected
-            </span>
-          )}
-        </div>
-
-        {/* Prominent direction and contact display */}
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          {entry.direction === 'received' && (
-            <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800 font-semibold border-2 border-blue-300">
-              {entry.internal_sender
-                ? `RECEIVED BY ${entry.internal_sender.toUpperCase()}`
-                : 'RECEIVED FROM'}
-            </span>
-          )}
-          {entry.direction === 'sent' && (
-            <span className="text-xs bg-green-100 px-2 py-1 text-green-800 font-semibold border-2 border-green-300">
-              {entry.internal_sender
-                ? `SENT FROM ${entry.internal_sender.toUpperCase()}`
-                : 'SENT TO'}
-            </span>
-          )}
-          {entry.type === 'Note' && !entry.direction && (
-            <span className="text-xs bg-purple-100 px-2 py-1 text-purple-800 font-semibold border-2 border-purple-300">
-              NOTE
-            </span>
-          )}
-          {entry.contact ? (
-            <>
-              <span className="relative group/contact cursor-default">
-                <span className="text-lg font-bold text-gray-900">
-                  {extractedName || entry.contact.name}
-                </span>
-                {(() => {
-                  const fullContact = contacts.find(c => c.id === entry.contact_id)
-                  if (!fullContact) return null
-                  const hasDetails = fullContact.emails.length > 0 || fullContact.phones.length > 0 || fullContact.role
-                  if (!hasDetails) return null
-                  return (
-                    <span className="absolute left-0 top-full mt-1 z-20 hidden group-hover/contact:block w-56 bg-white border-2 border-gray-300 shadow-lg p-3 pointer-events-none">
-                      <span className="block font-semibold text-gray-900 text-sm mb-1">{fullContact.name}</span>
-                      {fullContact.role && <span className="block text-gray-500 text-xs mb-1">{fullContact.role}</span>}
-                      {fullContact.emails[0] && <span className="block text-gray-700 text-xs truncate">{fullContact.emails[0]}</span>}
-                      {fullContact.phones[0] && <span className="block text-gray-700 text-xs">{fullContact.phones[0]}</span>}
-                    </span>
-                  )
-                })()}
-              </span>
-              {entry.contact.is_active === false && (
-                <span className="text-xs text-gray-500 font-normal">(Former)</span>
-              )}
-              {entry.contact.role && (
-                <span className="text-sm text-gray-600">({entry.contact.role})</span>
-              )}
-            </>
-          ) : entry.type !== 'Note' && (
-            <span className="text-sm text-gray-500 italic">No contact assigned</span>
-          )}
-          {/* Pin indicator */}
-          {entry.is_pinned && (
-            <span className="text-xs bg-yellow-100 px-2 py-1 text-yellow-800 border border-yellow-300">
-              Pinned
-            </span>
-          )}
-        </div>
-
-        {/* Thread participants (for Email Thread type) */}
-        {entry.thread_participants && (
-          <div className="text-sm text-gray-600 mb-1">
-            <span className="font-medium">Thread between: </span>{entry.thread_participants}
-          </div>
-        )}
-
-        {/* CC Contacts */}
-        {entry.cc_contacts && entry.cc_contacts.length > 0 && (
-          <div className="text-sm text-gray-600 mt-1">
-            <span className="font-medium">CC: </span>
-            {entry.cc_contacts.map((cc: { id: string; name: string; role: string | null }, idx: number) => (
-              <span key={cc.id}>
-                {cc.name}
-                {cc.role && <span className="text-gray-400"> ({cc.role})</span>}
-                {idx < (entry.cc_contacts?.length || 0) - 1 && ', '}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Secondary meta line */}
-        <div className="text-sm text-gray-600 mb-3">
-          {entry.entry_date && <span>{formatDateTimeGB(entry.entry_date)}</span>}
-          {entry.type && <span> • {entry.type}</span>}
-        </div>
-
-        {/* Body text or edit textarea */}
-        {isEditing ? (
-          <div className="bg-yellow-50 border-2 border-yellow-600 p-4 mb-4">
-            <p className="text-sm font-semibold text-yellow-900 mb-3">
-              Editing entry (manual correction)
-            </p>
-
-            {/* Subject */}
-            <div className="mb-3">
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
-                Subject:
-              </label>
-              <input
-                type="text"
-                value={editedSubject}
-                onChange={(e) => setEditedSubject(e.target.value)}
-                placeholder="Enter subject..."
-                className="w-full px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
-              />
-            </div>
-
-            {/* Direction Dropdown */}
-            <div className="mb-3">
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
-                Direction:
-              </label>
-              <select
-                value={editedDirection}
-                onChange={(e) => setEditedDirection(e.target.value as 'received' | 'sent' | '')}
-                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
-              >
-                <option value="">-- Unknown Direction --</option>
-                <option value="received">Received</option>
-                <option value="sent">Sent</option>
-              </select>
-            </div>
-
-            {/* Internal Sender */}
-            <div className="mb-3">
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
-                {editedDirection === 'sent' ? 'Sent from:' : editedDirection === 'received' ? 'Received by:' : 'Internal sender:'}
-              </label>
-              <select
-                value={editedInternalSender}
-                onChange={(e) => setEditedInternalSender(e.target.value)}
-                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
-              >
-                <option value="">-- Not specified --</option>
-                <option value="Bridget">Bridget</option>
-                <option value="Tom">Tom</option>
-                <option value="James">James</option>
-                <option value="Dawn">Dawn</option>
-                <option value="info@">info@ (shared)</option>
-              </select>
-            </div>
-
-            {/* Contact Dropdown */}
-            <div className="mb-3">
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
-                Contact:
-              </label>
-              <select
-                value={editedContactId}
-                onChange={(e) => setEditedContactId(e.target.value)}
-                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
-              >
-                {contacts.map((contact) => (
-                  <option key={contact.id} value={contact.id}>
-                    {contact.name}{contact.role ? ` (${contact.role})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date Input */}
-            <div className="mb-3">
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
-                Entry Date:
-              </label>
-              <input
-                type="date"
-                value={editedDate}
-                onChange={(e) => setEditedDate(e.target.value)}
-                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
-              />
-            </div>
-
-            {/* Action Needed */}
-            <div className="mb-3">
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
-                Action needed:
-              </label>
-              <select
-                value={editedActionNeeded}
-                onChange={(e) => setEditedActionNeeded(e.target.value)}
-                className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
-              >
-                <option value="none">None</option>
-                <option value="follow_up">Follow-up</option>
-                <option value="waiting_on_them">Waiting on them</option>
-                <option value="invoice">Invoice</option>
-                <option value="renewal">Renewal</option>
-                <option value="prospect">Prospect</option>
-              </select>
-            </div>
-
-            {/* Due Date (only shown when action is set) */}
-            {editedActionNeeded !== 'none' && (
-              <div className="mb-3">
-                <label className="block text-sm font-semibold text-gray-900 mb-1">
-                  Due date (optional):
-                </label>
-                <input
-                  type="date"
-                  value={editedDueAt}
-                  onChange={(e) => setEditedDueAt(e.target.value)}
-                  className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-            )}
-
-            {/* Text Textarea */}
-            <textarea
-              value={editedText}
-              onChange={(e) => setEditedText(e.target.value)}
-              className="w-full min-h-[200px] px-3 py-2 border-2 border-gray-300 text-sm font-mono focus:border-blue-600 focus:outline-none"
-            />
-
-            <div className="flex gap-2 mt-3">
-              <Button
-                onClick={() => handleSaveEdit(entry.id)}
-                disabled={savingEdit}
-                className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm font-semibold"
-              >
-                {savingEdit ? 'Saving...' : 'Save Changes'}
-              </Button>
-              <Button
-                onClick={handleCancelEdit}
-                disabled={savingEdit}
-                className="bg-gray-200 text-gray-900 hover:bg-gray-300 px-4 py-2 text-sm"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {(() => {
-              const bodyText = entry.formatted_text_current || entry.formatted_text_original || entry.raw_text_original
-              const COLLAPSE_LIMIT = 800
-              const isExpanded = expandedEntries.has(entry.id)
-              const isLong = bodyText.length > COLLAPSE_LIMIT
-              return (
-                <div className="mb-3">
-                  <div className="text-sm text-gray-800 whitespace-pre-wrap">
-                    {highlightMatch(isLong && !isExpanded ? bodyText.slice(0, COLLAPSE_LIMIT) + '…' : bodyText)}
-                  </div>
-                  {isLong && (
-                    <button
-                      type="button"
-                      onClick={() => setExpandedEntries(prev => {
-                        const next = new Set(prev)
-                        if (isExpanded) next.delete(entry.id); else next.add(entry.id)
-                        return next
-                      })}
-                      className="mt-1 text-xs text-blue-600 hover:underline"
-                    >
-                      {isExpanded ? 'Show less' : 'Show more'}
-                    </button>
-                  )}
-                </div>
-              )
-            })()}
-
-            {/* Quick action buttons */}
-            {entry.action_needed === 'none' && (
-              <div className="flex gap-2 flex-wrap mb-3">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'follow_up' } : c))
-                    const result = await setCorrespondenceAction(entry.id, 'follow_up')
-                    if (result && 'error' in result) {
-                      setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'none' } : c))
-                      toast.error('Failed to set action')
-                    } else {
-                      toast.success('Follow-up set')
-                    }
-                  }}
-                  className="px-3 py-2 sm:py-1 text-xs border border-amber-300 text-amber-800 hover:bg-amber-50"
-                >
-                  Follow-up
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'waiting_on_them' } : c))
-                    const result = await setCorrespondenceAction(entry.id, 'waiting_on_them')
-                    if (result && 'error' in result) {
-                      setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'none' } : c))
-                      toast.error('Failed to set action')
-                    } else {
-                      toast.success('Waiting on them set')
-                    }
-                  }}
-                  className="px-3 py-2 sm:py-1 text-xs border border-blue-300 text-blue-800 hover:bg-blue-50"
-                >
-                  Waiting on them
-                </button>
-              </div>
-            )}
-            {entry.action_needed !== 'none' && (
-              <div className="flex gap-2 flex-wrap mb-3 items-center">
-                <span className="text-xs text-amber-700 font-semibold capitalize">{entry.action_needed.replace(/_/g, ' ')}</span>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const prev_action = entry.action_needed
-                    setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: 'none' } : c))
-                    const result = await setCorrespondenceAction(entry.id, 'none')
-                    if (result && 'error' in result) {
-                      setCorrespondence((prev) => prev.map((c) => c.id === entry.id ? { ...c, action_needed: prev_action } : c))
-                      toast.error('Failed to mark done')
-                    } else {
-                      toast.success('Marked done')
-                    }
-                  }}
-                  className="px-2 py-0.5 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50"
-                >
-                  Mark done
-                </button>
-              </div>
-            )}
-
-            {/* Display who created this entry */}
-            <div className="text-xs text-gray-500 mb-2">
-              Created by {displayNames[entry.user_id] || 'Unknown'}
-              {entry.edited_at && entry.edited_by && (
-                <span> • Edited by {displayNames[entry.edited_by] || 'Unknown'}</span>
-              )}
-            </div>
-
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                onClick={() => handleStartEdit(entry)}
-                className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
-              >
-                Edit
-              </Button>
-              <Button
-                onClick={async () => {
-                  await togglePinCorrespondence(entry.id)
-                  await refreshCorrespondence()
-                }}
-                className={`px-3 py-1 text-xs ${entry.is_pinned ? 'bg-yellow-200 text-yellow-900 hover:bg-yellow-300' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}
-              >
-                {entry.is_pinned ? 'Unpin' : 'Pin'}
-              </Button>
-              <Button
-                onClick={() => {
-                  if (assigningThreadEntryId === entry.id) {
-                    setAssigningThreadEntryId(null)
-                    setCreatingThreadFor(null)
-                  } else {
-                    setAssigningThreadEntryId(entry.id)
-                    setCreatingThreadFor(null)
-                    setNewThreadName('')
-                  }
-                }}
-                className={`px-3 py-1 text-xs ${entry.thread_id ? 'bg-indigo-100 text-indigo-900 hover:bg-indigo-200' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}
-              >
-                {entry.thread_id ? `Thread: ${threads.find(t => t.id === entry.thread_id)?.name || '…'}` : 'Thread'}
-              </Button>
-              <Button
-                onClick={() => handleDeleteEntry(entry.id, entry.subject || '')}
-                className="bg-red-100 text-red-900 hover:bg-red-200 px-3 py-1 text-xs"
-              >
-                Delete
-              </Button>
-              {/* Feature #9: View Original Email in Outlook */}
-              {entry.ai_metadata && (entry.ai_metadata as any).email_source && (entry.ai_metadata as any).email_source.web_link && (
-                <Button
-                  onClick={() => {
-                    const webLink = (entry.ai_metadata as any).email_source.web_link
-                    try {
-                      window.open(webLink, '_blank', 'noopener,noreferrer')
-                    } catch {
-                      setActionError('Could not open email link. The email may have been moved or deleted in Outlook.')
-                    }
-                  }}
-                  className="bg-blue-100 text-blue-900 hover:bg-blue-200 px-3 py-1 text-xs"
-                >
-                  View Original Email
-                </Button>
-              )}
-            </div>
-            {/* Thread assignment panel */}
-            {assigningThreadEntryId === entry.id && (
-              <div className="mt-2 p-3 border-2 border-indigo-300 bg-indigo-50">
-                <p className="text-xs font-semibold text-gray-700 mb-2">Assign to thread:</p>
-                <div className="flex flex-wrap gap-2">
-                  {threads.map((thread) => (
-                    <button
-                      key={thread.id}
-                      type="button"
-                      onClick={async () => {
-                        const newId = entry.thread_id === thread.id ? null : thread.id
-                        await assignCorrespondenceToThread(entry.id, newId, id!)
-                        await refreshCorrespondence()
-                        setAssigningThreadEntryId(null)
-                      }}
-                      className={`px-3 py-1 text-xs border-2 font-semibold ${entry.thread_id === thread.id ? 'border-indigo-600 bg-indigo-200 text-indigo-900' : 'border-gray-300 bg-white text-gray-700 hover:border-indigo-400'}`}
-                    >
-                      {entry.thread_id === thread.id ? `✓ ${thread.name}` : thread.name}
-                    </button>
-                  ))}
-                  {creatingThreadFor === entry.id ? (
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        value={newThreadName}
-                        onChange={(e) => setNewThreadName(e.target.value)}
-                        placeholder="Thread name…"
-                        className="px-2 py-1 text-xs border-2 border-gray-300 focus:border-indigo-600 focus:outline-none"
-                        autoFocus
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter' && newThreadName.trim() && id) {
-                            const result = await createThread(id, newThreadName.trim())
-                            if ('data' in result && result.data) {
-                              await assignCorrespondenceToThread(entry.id, result.data.id, id)
-                              const [threadsRes] = await Promise.all([
-                                getThreadsByBusiness(id),
-                                refreshCorrespondence(),
-                              ])
-                              setThreads('error' in threadsRes ? [] : threadsRes.data || [])
-                            }
-                            setAssigningThreadEntryId(null)
-                            setCreatingThreadFor(null)
-                            setNewThreadName('')
-                          } else if (e.key === 'Escape') {
-                            setCreatingThreadFor(null)
-                          }
-                        }}
-                      />
-                      <span className="text-xs text-gray-500">Enter to save</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setCreatingThreadFor(entry.id)}
-                      className="px-3 py-1 text-xs border-2 border-dashed border-gray-300 text-gray-500 hover:border-indigo-400 hover:text-indigo-700"
-                    >
-                      + New thread
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Search context expansion buttons */}
-            {(showPrevButton || showNextButton) && (
-              <div className="flex gap-2 mt-2">
-                {showPrevButton && (
-                  <button
-                    type="button"
-                    onClick={() => handleShowPrevious(entry.id)}
-                    className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-100 px-2 py-1"
-                  >
-                    Show Previous
-                  </button>
-                )}
-                {showNextButton && (
-                  <button
-                    type="button"
-                    onClick={() => handleShowNext(entry.id)}
-                    className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-100 px-2 py-1"
-                  >
-                    Show Next
-                  </button>
-                )}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Action needed badge and due date */}
-        {entry.action_needed !== 'none' && (
-          <div className="mt-3 space-y-2">
-            <span className="text-xs bg-yellow-100 px-2 py-1 text-yellow-800">
-              Action: {entry.action_needed.replace(/_/g, ' ')}
-            </span>
-            {entry.due_at && (
-              <div className={`text-xs ${isOverdue ? 'text-red-600 font-semibold' : 'text-yellow-700'}`}>
-                Due: {formatDateGB(entry.due_at)}
-                {isOverdue && ' (Overdue)'}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    )
+  // Common props passed to both AllEntriesView and ThreadsView
+  const entryPassthroughProps = {
+    contacts,
+    displayNames,
+    searchQuery,
+    isExpandedEntry: (entryId: string) => expandedEntries.has(entryId),
+    onToggleExpand: handleToggleExpand,
+    formattingInProgress,
+    onFormat: handleFormatLater,
+    editingEntryId,
+    editedText,
+    setEditedText,
+    editedDate,
+    setEditedDate,
+    editedDirection,
+    setEditedDirection,
+    editedContactId,
+    setEditedContactId,
+    editedSubject,
+    setEditedSubject,
+    editedInternalSender,
+    setEditedInternalSender,
+    editedActionNeeded,
+    setEditedActionNeeded,
+    editedDueAt,
+    setEditedDueAt,
+    savingEdit,
+    onStartEdit: handleStartEdit,
+    onSaveEdit: handleSaveEdit,
+    onCancelEdit: handleCancelEdit,
+    onDelete: handleDeleteEntry,
+    onPin: handlePin,
+    onAction: handleAction,
+    onShowPrevious: handleShowPrevious,
+    onShowNext: handleShowNext,
+    assigningThreadEntryId,
+    setAssigningThreadEntryId,
+    creatingThreadFor,
+    setCreatingThreadFor,
+    newThreadName,
+    setNewThreadName,
+    onAssignThread: handleAssignThread,
+    onCreateThread: handleCreateThread,
+    setActionError: (v: string) => setActionError(v),
   }
 
   return (
@@ -1394,92 +931,24 @@ export default function BusinessDetailPage({
 
       {/* Duplicate Warning Banner */}
       {duplicates.length > 0 && (
-        <div className="bg-orange-50 border-2 border-orange-600 p-4 mb-6">
-          <div className="flex justify-between items-start mb-2">
-            <div className="flex items-center gap-3">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedDuplicateHashes.size === duplicates.length && duplicates.length > 0}
-                  onChange={toggleSelectAllDuplicates}
-                  disabled={isBulkOperationRunning}
-                  className="mr-2 w-4 h-4"
-                />
-                <span className="font-semibold text-orange-900">
-                  {duplicates.length} Potential Duplicate{duplicates.length !== 1 ? 's' : ''} Found
-                </span>
-              </label>
-              {selectedCount > 0 && (
-                <span className="text-xs text-orange-700">
-                  ({selectedCount} selected)
-                </span>
-              )}
-            </div>
-            {selectedCount > 0 && (
-              <div className="flex gap-2">
-                <button
-                  onClick={handleBulkDeleteDuplicates}
-                  disabled={isBulkOperationRunning}
-                  className="px-3 py-1 text-xs bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 font-semibold"
-                >
-                  {isBulkDeleting ? 'Deleting...' : `Delete ${selectedCount} Newer Entr${selectedCount === 1 ? 'y' : 'ies'}`}
-                </button>
-                {dismissableSelectedCount > 0 && (
-                  <button
-                    onClick={handleBulkDismissDuplicates}
-                    disabled={isBulkOperationRunning}
-                    className="px-3 py-1 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-                  >
-                    {isBulkDismissing ? 'Dismissing...' : `Dismiss ${dismissableSelectedCount} as Not Duplicate${dismissableSelectedCount === 1 ? '' : 's'}`}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          {duplicates.map((dup) => (
-            <div key={dup.hash} className="border-t border-orange-300 pt-3 mt-3 first:border-t-0 first:pt-0 first:mt-0">
-              <div className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedDuplicateHashes.has(dup.hash)}
-                  onChange={() => toggleDuplicateHash(dup.hash)}
-                  disabled={isBulkOperationRunning}
-                  className="mt-1 w-4 h-4 shrink-0"
-                />
-                <div className="flex-1">
-                  <p className="text-sm text-orange-800 mb-2">
-                    <strong>{dup.entries.length} entries</strong> with identical content:
-                  </p>
-                  <ul className="text-sm text-orange-700 mb-2 space-y-1">
-                    {dup.entries.map(entry => (
-                      <li key={entry.id}>
-                        {entry.subject || 'No subject'} ({entry.entry_date ? formatDateGB(entry.entry_date) : 'No date'}) - {entry.contact?.name || 'Unknown contact'}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleDeleteDuplicate(dup.entries[dup.entries.length - 1].id, dup.hash)}
-                      disabled={deletingDuplicate === dup.hash || dismissingDuplicate === dup.hash || isBulkOperationRunning}
-                      className="px-3 py-1 text-xs bg-red-100 text-red-900 hover:bg-red-200 disabled:opacity-50"
-                    >
-                      {deletingDuplicate === dup.hash ? 'Deleting...' : 'Delete Newer Entry'}
-                    </button>
-                    {dup.entries.length === 2 && (
-                      <button
-                        onClick={() => handleDismissDuplicate(dup.entries[0].id, dup.entries[1].id, dup.hash)}
-                        disabled={deletingDuplicate === dup.hash || dismissingDuplicate === dup.hash || isBulkOperationRunning}
-                        className="px-3 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
-                      >
-                        {dismissingDuplicate === dup.hash ? 'Dismissing...' : 'Not a Duplicate'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <DuplicatesWarningBanner
+          duplicates={duplicates}
+          selectedDuplicateHashes={selectedDuplicateHashes}
+          isBulkOperationRunning={isBulkOperationRunning}
+          isBulkDeleting={isBulkDeleting}
+          isBulkDismissing={isBulkDismissing}
+          selectedCount={selectedCount}
+          dismissableSelectedCount={dismissableSelectedCount}
+          dismissingDuplicate={dismissingDuplicate}
+          deletingDuplicate={deletingDuplicate}
+          onToggleHash={toggleDuplicateHash}
+          onToggleSelectAll={toggleSelectAllDuplicates}
+          onBulkDelete={handleBulkDeleteDuplicates}
+          onBulkDismiss={handleBulkDismissDuplicates}
+          onDeleteDuplicate={handleDeleteDuplicate}
+          onDismissDuplicate={handleDismissDuplicate}
+          businessId={id}
+        />
       )}
 
       {/* Header */}
@@ -1603,80 +1072,11 @@ export default function BusinessDetailPage({
       </div>
 
       {/* Contacts Section */}
-      <div className="bg-white border-2 border-gray-300 p-6 mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Contacts</h2>
-          <AddContactButton businessId={id} />
-        </div>
-
-        {contacts && contacts.length === 0 ? (
-          <p className="text-gray-600 text-sm">
-            No contacts yet. Add a contact to get started.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {contacts?.map((contact) => (
-              <div key={contact.id} className="border border-gray-300 p-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{contact.name}</h3>
-                    {contact.role && (
-                      <p className="text-sm text-gray-600">{contact.role}</p>
-                    )}
-                    {contact.emails && contact.emails.length > 0 && (
-                      <div className="mt-1">
-                        {contact.emails.map((email, index) => (
-                          <p key={index} className="text-sm text-gray-600 flex items-center">
-                            <a
-                              href={`mailto:${email}`}
-                              className="text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {email}
-                            </a>
-                            <CopyButton text={email} />
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    {contact.phones && contact.phones.length > 0 && (
-                      <div>
-                        {contact.phones.map((phone, index) => (
-                          <p key={index} className="text-sm text-gray-600 flex items-center">
-                            <a
-                              href={`tel:${phone}`}
-                              className="text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {phone}
-                            </a>
-                            <CopyButton text={phone} />
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    {contact.notes && (
-                      <div className="mt-2 text-sm text-gray-500 italic">
-                        <span className="font-medium not-italic text-gray-600">Notes: </span>
-                        {contact.notes.length > 150
-                          ? `${contact.notes.substring(0, 150)}...`
-                          : contact.notes}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <EditContactButton contact={contact} />
-                    <Button
-                      onClick={() => handleDeleteContact(contact.id, contact.name)}
-                      className="bg-red-100 text-red-900 hover:bg-red-200 px-3 py-1 text-xs"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <ContactsList
+        contacts={contacts}
+        business={business}
+        onDeleteContact={handleDeleteContact}
+      />
 
       {/* Letter File / Correspondence */}
       <div className="bg-white border-2 border-gray-300 p-6">
@@ -1694,238 +1094,27 @@ export default function BusinessDetailPage({
 
         {/* Feature #4: Correspondence View Controls */}
         {correspondence && correspondence.length > 0 && (
-          <div className="border-t-2 border-gray-300 pt-4 mb-6">
-            <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-4 items-start mb-3">
-              {/* Date Range */}
-              <div className="sm:order-3">
-                <label className="text-sm font-semibold text-gray-700 block mb-1">
-                  Show:
-                </label>
-                <div className="flex border-2 border-gray-300">
-                  <button
-                    type="button"
-                    onClick={() => setDateRange('1m')}
-                    className={`px-3 py-1 text-sm font-medium ${
-                      dateRange === '1m'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    1 Month
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDateRange('6m')}
-                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
-                      dateRange === '6m'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    6 Months
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDateRange('12m')}
-                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
-                      dateRange === '12m'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    12 Months
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDateRange('custom')}
-                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
-                      dateRange === 'custom'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    Custom
-                  </button>
-                </div>
-              </div>
-
-              {/* Custom Date Range Inputs */}
-              {dateRange === 'custom' && (
-                <div className="flex gap-2 items-end">
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700 block mb-1">
-                      From:
-                    </label>
-                    <input
-                      type="date"
-                      value={customDateFrom}
-                      onChange={(e) => setCustomDateFrom(e.target.value)}
-                      className="px-2 py-1 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700 block mb-1">
-                      To:
-                    </label>
-                    <input
-                      type="date"
-                      value={customDateTo}
-                      onChange={(e) => setCustomDateTo(e.target.value)}
-                      className="px-2 py-1 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Sort Order */}
-              <div className="sm:order-1">
-                <label className="text-sm font-semibold text-gray-700 block mb-1">
-                  Sort:
-                </label>
-                <div className="flex border-2 border-gray-300">
-                  <button
-                    type="button"
-                    onClick={() => setSortOrder('oldest')}
-                    className={`px-3 py-1 text-sm font-medium ${
-                      sortOrder === 'oldest'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    Oldest First
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSortOrder('newest')}
-                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
-                      sortOrder === 'newest'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    Newest First
-                  </button>
-                </div>
-              </div>
-
-              {/* Contact Filter */}
-              <div className="sm:order-4">
-                <label className="text-sm font-semibold text-gray-700 block mb-1">
-                  Contact:
-                </label>
-                <select
-                  value={contactFilter}
-                  onChange={(e) => setContactFilter(e.target.value)}
-                  className="px-3 py-1 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
-                >
-                  <option value="all">All Contacts</option>
-                  {contacts.map((contact) => (
-                    <option key={contact.id} value={contact.id}>
-                      {contact.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Direction Filter */}
-              <div className="sm:order-2">
-                <label className="text-sm font-semibold text-gray-700 block mb-1">
-                  Direction:
-                </label>
-                <div className="flex border-2 border-gray-300">
-                  <button
-                    type="button"
-                    onClick={() => setDirectionFilter('all')}
-                    className={`px-3 py-1 text-sm font-medium ${
-                      directionFilter === 'all'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDirectionFilter('received')}
-                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
-                      directionFilter === 'received'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    Received
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDirectionFilter('sent')}
-                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
-                      directionFilter === 'sent'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    Sent
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDirectionFilter('conversation')}
-                    className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
-                      directionFilter === 'conversation'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    Conversation
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Entry Count and Reset */}
-            <div className="flex justify-between items-center text-sm">
-              <p className="text-gray-600">
-                Showing {filteredCorrespondence.recent.length + filteredCorrespondence.archive.length} of {correspondence.length} entries
-              </p>
-              {(sortOrder !== 'oldest' || contactFilter !== 'all' || directionFilter !== 'all' || dateRange !== '12m') && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortOrder('oldest')
-                    setContactFilter('all')
-                    setDirectionFilter('all')
-                    setDateRange('12m')
-                    setCustomDateFrom('')
-                    setCustomDateTo('')
-                  }}
-                  className="text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  Reset to default view
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* View mode toggle */}
-        {correspondence && correspondence.length > 0 && threads.length > 0 && (
-          <div className="flex items-center gap-2 mb-4">
-            <div className="flex border-2 border-gray-300 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setViewMode('all')}
-                className={`px-4 py-1.5 text-sm font-semibold ${viewMode === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('threads')}
-                className={`px-4 py-1.5 text-sm font-semibold border-l-2 border-gray-300 ${viewMode === 'threads' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-              >
-                Threads ({threads.length})
-              </button>
-            </div>
-          </div>
+          <CorrespondenceFilterBar
+            sortOrder={sortOrder}
+            setSortOrder={setSortOrder}
+            contactFilter={contactFilter}
+            setContactFilter={setContactFilter}
+            directionFilter={directionFilter}
+            setDirectionFilter={setDirectionFilter}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            customDateFrom={customDateFrom}
+            setCustomDateFrom={setCustomDateFrom}
+            customDateTo={customDateTo}
+            setCustomDateTo={setCustomDateTo}
+            contacts={contacts}
+            totalFilteredCount={filteredCorrespondence.recent.length + filteredCorrespondence.archive.length}
+            totalLoadedCount={correspondence.length}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            threadsCount={threads.length}
+            exportProps={{ businessId: business.id }}
+          />
         )}
 
         {correspondence && correspondence.length === 0 ? (
@@ -1934,207 +1123,39 @@ export default function BusinessDetailPage({
             letter file.
           </p>
         ) : viewMode === 'threads' ? (
-          /* Threads view */
-          <div>
-            {threads.map((thread) => {
-              const threadEntries = correspondence
-                .filter((e) => e.thread_id === thread.id)
-                .sort((a, b) => {
-                  const da = new Date(a.entry_date || a.created_at).getTime()
-                  const db = new Date(b.entry_date || b.created_at).getTime()
-                  return da - db
-                })
-              const isCollapsed = collapsedThreads.has(thread.id)
-              return (
-                <div key={thread.id} className="mb-6 border-2 border-indigo-200">
-                  <div className="flex items-center justify-between bg-indigo-50 px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = new Set(collapsedThreads)
-                          if (next.has(thread.id)) next.delete(thread.id)
-                          else next.add(thread.id)
-                          setCollapsedThreads(next)
-                        }}
-                        className="text-indigo-700 font-bold text-sm"
-                      >
-                        {isCollapsed ? '▸' : '▾'}
-                      </button>
-                      {renamingThreadId === thread.id ? (
-                        <input
-                          type="text"
-                          value={renameThreadName}
-                          onChange={(e) => setRenameThreadName(e.target.value)}
-                          className="text-sm font-bold border-2 border-indigo-400 px-2 py-0.5 focus:outline-none"
-                          autoFocus
-                          onKeyDown={async (e) => {
-                            if (e.key === 'Enter' && renameThreadName.trim() && id) {
-                              await renameThread(thread.id, id, renameThreadName.trim())
-                              const result = await getThreadsByBusiness(id)
-                              setThreads('error' in result ? [] : result.data || [])
-                              setRenamingThreadId(null)
-                            } else if (e.key === 'Escape') {
-                              setRenamingThreadId(null)
-                            }
-                          }}
-                          onBlur={() => setRenamingThreadId(null)}
-                        />
-                      ) : (
-                        <span className="font-bold text-gray-900 text-sm">{thread.name}</span>
-                      )}
-                      <span className="text-xs text-gray-500">{threadEntries.length} {threadEntries.length === 1 ? 'entry' : 'entries'}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { setRenamingThreadId(thread.id); setRenameThreadName(thread.name) }}
-                        className="text-xs text-gray-500 hover:text-gray-700"
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!id) return
-                          await deleteThread(thread.id, id)
-                          const [threadsRes] = await Promise.all([
-                            getThreadsByBusiness(id),
-                            refreshCorrespondence(),
-                          ])
-                          setThreads('error' in threadsRes ? [] : threadsRes.data || [])
-                        }}
-                        className="text-xs text-red-500 hover:text-red-700"
-                      >
-                        Delete thread
-                      </button>
-                    </div>
-                  </div>
-                  {!isCollapsed && (
-                    <div className="p-4 space-y-6">
-                      {threadEntries.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">No entries assigned to this thread yet.</p>
-                      ) : (
-                        threadEntries.map((entry) => renderEntry(entry, { isContext: false }))
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-            {/* Unthreaded entries */}
-            {(() => {
-              const unthreaded = correspondence.filter((e) => !e.thread_id)
-              if (unthreaded.length === 0) return null
-              return (
-                <div className="mb-6">
-                  <h3 className="font-bold text-gray-700 text-sm mb-3 text-gray-500">Unassigned ({unthreaded.length})</h3>
-                  <div className="space-y-6">
-                    {unthreaded.map((entry) => renderEntry(entry, { isContext: false }))}
-                  </div>
-                </div>
-              )
-            })()}
-          </div>
+          <ThreadsView
+            threads={threads}
+            correspondence={correspondence}
+            collapsedThreads={collapsedThreads}
+            setCollapsedThreads={setCollapsedThreads}
+            renamingThreadId={renamingThreadId}
+            setRenamingThreadId={setRenamingThreadId}
+            renameThreadName={renameThreadName}
+            setRenameThreadName={setRenameThreadName}
+            onRenameThread={handleRenameThread}
+            onDeleteThread={handleDeleteThread}
+            {...entryPassthroughProps}
+          />
         ) : (
-          <>
-            {/* Bulk import formatting notice */}
-            {(() => {
-              const pending = correspondence.filter(e =>
-                e.formatting_status !== 'formatted' &&
-                e.ai_metadata?.bulk_import === true
-              ).length
-              if (pending === 0) return null
-              return (
-                <div className="flex items-center gap-2 mb-6 px-4 py-3 bg-gray-50 border border-gray-200 text-sm text-gray-600">
-                  <span className="inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin shrink-0" />
-                  <span>Formatting {pending} imported {pending === 1 ? 'email' : 'emails'} in the background…</span>
-                </div>
-              )
-            })()}
-
-            {/* Pinned Section */}
-            {filteredCorrespondence.pinned.length > 0 && (
-              <div className="mb-8 pb-8 border-b-2 border-yellow-200">
-                <h3 className="font-bold text-gray-900 mb-4 text-lg flex items-center gap-2">
-                  <span className="text-yellow-600">📌</span> Pinned
-                </h3>
-                <div className="space-y-6">
-                  {filteredCorrespondence.pinned.map((entry) => renderEntry(entry, {
-                    isContext: false
-                  }))}
-                </div>
-              </div>
-            )}
-
-            {/* Recent Section */}
-            {filteredCorrespondence.recent.length > 0 && (
-              <div className="mb-8" ref={recentSectionRef}>
-                <h3 className="font-bold text-gray-900 mb-4 text-lg">
-                  {dateRange === 'custom'
-                    ? `Selected Range${customDateFrom ? ` (${formatDateGB(customDateFrom)}` : ''}${customDateTo ? ` - ${formatDateGB(customDateTo)})` : customDateFrom ? ')' : ''}`
-                    : dateRange === '1m' ? 'Last Month'
-                    : dateRange === '6m' ? 'Last 6 Months'
-                    : 'Last 12 Months'}
-                </h3>
-                <div className="space-y-6">
-                  {filteredCorrespondence.recent.map((entry) => renderEntry(entry, {
-                    isContext: searchQuery.trim() !== '' && !filteredCorrespondence.matchedIds.has(entry.id)
-                  }))}
-                </div>
-                {remainingInDB > 0 && filteredCorrespondence.archive.length === 0 && (
-                  <div className="mt-6 text-center">
-                    <button
-                      type="button"
-                      onClick={loadMore}
-                      disabled={isLoadingMore}
-                      className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold disabled:opacity-50"
-                    >
-                      {isLoadingMore ? 'Loading…' : `Load More (${remainingInDB} remaining)`}
-                    </button>
-                    <p className="text-sm text-gray-500 mt-2">
-                      Showing {correspondence.length} of {totalCount}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Archive Section */}
-            {filteredCorrespondence.archive.length > 0 && (
-              <div>
-                <button
-                  onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
-                  className="w-full flex justify-between items-center font-bold text-gray-900 mb-4 text-lg hover:text-blue-600"
-                >
-                  <span>Archive ({filteredCorrespondence.archive.length}{remainingInDB > 0 ? '+' : ''} {dateRange === 'custom' ? 'other' : 'older'} entries)</span>
-                  <span>{isArchiveExpanded ? '▼' : '▶'}</span>
-                </button>
-                {isArchiveExpanded && (
-                  <div className="space-y-6 pl-4 border-l-2 border-gray-300">
-                    {filteredCorrespondence.archive.map((entry) => renderEntry(entry, {
-                      isContext: searchQuery.trim() !== '' && !filteredCorrespondence.matchedIds.has(entry.id)
-                    }))}
-                    {remainingInDB > 0 && (
-                      <div className="mt-6 text-center">
-                        <button
-                          type="button"
-                          onClick={loadMore}
-                          disabled={isLoadingMore}
-                          className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold disabled:opacity-50"
-                        >
-                          {isLoadingMore ? 'Loading…' : `Load More (${remainingInDB} remaining)`}
-                        </button>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Showing {correspondence.length} of {totalCount}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+          <AllEntriesView
+            correspondence={correspondence}
+            filteredCorrespondence={filteredCorrespondence}
+            contextEntryIds={contextEntryIds}
+            isArchiveExpanded={isArchiveExpanded}
+            setIsArchiveExpanded={setIsArchiveExpanded}
+            isLoadingMore={isLoadingMore}
+            loadMore={loadMore}
+            remainingInDB={remainingInDB}
+            totalCount={totalCount}
+            recentSectionRef={recentSectionRef}
+            dateRange={dateRange}
+            customDateFrom={customDateFrom}
+            customDateTo={customDateTo}
+            getPreviousEntryId={getPreviousEntryId}
+            getNextEntryId={getNextEntryId}
+            threads={threads}
+            {...entryPassthroughProps}
+          />
         )}
       </div>
 
