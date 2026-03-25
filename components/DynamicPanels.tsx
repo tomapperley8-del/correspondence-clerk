@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { usePathname } from 'next/navigation'
 
 const ChatPanel = dynamic(
   () => import('@/components/ChatPanel').then((m) => ({ default: m.ChatPanel })),
@@ -13,9 +14,10 @@ const CommandSearch = dynamic(
 )
 
 export function DynamicPanels() {
+  const pathname = usePathname()
   return (
     <>
-      <ChatPanel />
+      {pathname !== '/daily-briefing' && <ChatPanel />}
       <CommandSearch />
     </>
   )
