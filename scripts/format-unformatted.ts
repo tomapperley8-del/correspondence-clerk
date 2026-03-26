@@ -44,12 +44,13 @@ async function main() {
     const result = await formatCorrespondence(entry.raw_text_original, false)
 
     if (!result.success || !result.data) {
-      console.log(`FAILED — ${result.error}`)
+      const errMsg = !result.success ? result.error : 'no data returned'
+      console.log(`FAILED — ${errMsg}`)
       await supabase
         .from('correspondence')
         .update({
           formatting_status: 'failed',
-          ai_metadata: { ...entry.ai_metadata, retry_error: result.error, retried_at: new Date().toISOString() },
+          ai_metadata: { ...entry.ai_metadata, retry_error: errMsg, retried_at: new Date().toISOString() },
         })
         .eq('id', entry.id)
       failed++
