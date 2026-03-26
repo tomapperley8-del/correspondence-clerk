@@ -11,6 +11,7 @@ export type NavData = {
   organizationId: string | null
   organizationName: string | null
   actionsCount: number
+  inboundCount: number
 }
 
 /**
@@ -20,7 +21,7 @@ export type NavData = {
 export async function getNavData(): Promise<NavData> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0 }
+  if (!user) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, inboundCount: 0 }
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -28,17 +29,19 @@ export async function getNavData(): Promise<NavData> {
     .eq('id', user.id)
     .single()
 
-  if (!profile) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0 }
+  if (!profile) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, inboundCount: 0 }
 
   const orgId = profile.organization_id
   const orgs = profile.organizations as { id: string; name: string }[] | { id: string; name: string } | null
   const org = Array.isArray(orgs) ? orgs[0] ?? null : orgs
 
-  const [flagged, reminders] = await Promise.all([
+  const [flagged, reminders, inbound] = await Promise.all([
     supabase.from('correspondence').select('*', { count: 'exact', head: true })
       .eq('organization_id', orgId).neq('action_needed', 'none'),
     supabase.from('correspondence').select('*', { count: 'exact', head: true })
       .eq('organization_id', orgId).eq('action_needed', 'none').not('due_at', 'is', null),
+    supabase.from('inbound_queue').select('*', { count: 'exact', head: true })
+      .eq('org_id', orgId).eq('status', 'pending'),
   ])
 
   return {
@@ -46,6 +49,7 @@ export async function getNavData(): Promise<NavData> {
     organizationId: orgId,
     organizationName: org?.name ?? null,
     actionsCount: (flagged.count ?? 0) + (reminders.count ?? 0),
+    inboundCount: inbound.count ?? 0,
   }
 }
 
@@ -173,6 +177,11 @@ export async function createOrganization(name: string) {
     return { error: orgError.message }
   }
 
+  // Generate unique inbound email token for this user (e.g. 'tom-a4x9')
+  const nameSlug = name.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12)
+  const rand = Math.random().toString(36).slice(2, 6)
+  const inboundEmailToken = `${nameSlug || 'user'}-${rand}`
+
   // Create user profile
   const { error: profileError } = await supabase
     .from('user_profiles')
@@ -180,6 +189,7 @@ export async function createOrganization(name: string) {
       id: user.id,
       organization_id: organization.id,
       display_name: user.email,
+      inbound_email_token: inboundEmailToken,
     })
     .select()
     .single()

@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getUserProfile, updateDisplayName, type UserProfile } from '@/app/actions/user-profile'
+import { getInboundEmailToken } from '@/app/actions/inbound-email'
+import { toast } from '@/lib/toast'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SettingsPage() {
@@ -19,6 +21,9 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [inboundToken, setInboundToken] = useState<string | null>(null)
+  const [lastEmailReceived, setLastEmailReceived] = useState<string | null>(null)
+  const [sendingTest, setSendingTest] = useState(false)
 
   useEffect(() => {
     loadProfile()
@@ -47,6 +52,13 @@ export default function SettingsPage() {
 
     setProfile(result.data)
     setDisplayName(result.data.display_name || '')
+
+    // Load inbound email token
+    const tokenResult = await getInboundEmailToken()
+    if (tokenResult.data) {
+      setInboundToken(tokenResult.data.token)
+      setLastEmailReceived(tokenResult.data.lastReceivedAt)
+    }
 
     setIsLoading(false)
   }
@@ -77,6 +89,30 @@ export default function SettingsPage() {
     }
 
     setIsSaving(false)
+  }
+
+  async function handleSendTest() {
+    setSendingTest(true)
+    try {
+      const res = await fetch('/api/inbound-email/send-test', { method: 'POST' })
+      const data = await res.json()
+      if (data.error) {
+        toast.error(`Could not send test email: ${data.error}`)
+      } else {
+        toast.success('Test email sent — check your Inbox queue in a moment')
+      }
+    } catch {
+      toast.error('Failed to send test email')
+    }
+    setSendingTest(false)
+  }
+
+  function formatLastReceived(iso: string): string {
+    const d = new Date(iso)
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const year = d.getFullYear()
+    return `${day}/${month}/${year}`
   }
 
   if (isLoading) {
@@ -180,6 +216,101 @@ export default function SettingsPage() {
             {isSaving ? 'Saving...' : 'Save Display Name'}
           </Button>
         </form>
+      </div>
+
+      {/* Email Forwarding */}
+      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-2 text-gray-900">Email Forwarding</h2>
+        <p className="text-sm text-gray-600 mb-5">
+          Forward emails to your unique address and they&rsquo;ll appear in your{' '}
+          <Link href="/inbox" className="underline" style={{ color: 'var(--brand-navy)' }}>Inbox</Link>{' '}
+          for filing. Once you file an email from a domain, future emails from that domain auto-file.
+        </p>
+
+        {inboundToken ? (
+          <>
+            {/* Address display + copy */}
+            <div className="flex items-center gap-2 mb-5">
+              <code
+                className="flex-1 text-sm px-3 py-2 rounded bg-gray-50 border border-gray-200 select-all"
+                style={{ fontFamily: 'monospace', color: 'var(--brand-dark)' }}
+              >
+                {inboundToken}@in.correspondenceclerk.com
+              </code>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${inboundToken}@in.correspondenceclerk.com`)
+                  toast.success('Address copied')
+                }}
+                className="px-3 py-2 text-sm font-medium rounded border border-gray-300 hover:border-gray-500 transition-colors whitespace-nowrap"
+                style={{ color: 'var(--brand-dark)' }}
+              >
+                Copy
+              </button>
+            </div>
+
+            {/* Setup instructions */}
+            <div className="space-y-3 mb-5">
+              <details className="border border-gray-200 rounded">
+                <summary
+                  className="px-4 py-3 text-sm font-semibold cursor-pointer select-none"
+                  style={{ color: 'var(--brand-dark)' }}
+                >
+                  Set up Gmail forwarding
+                </summary>
+                <ol className="px-4 pb-4 pt-2 space-y-2 text-sm text-gray-700 list-decimal list-inside">
+                  <li>Open Gmail &rarr; Settings (gear icon) &rarr; <strong>See all settings</strong></li>
+                  <li>Go to <strong>Forwarding and POP/IMAP</strong> &rarr; <strong>Add a forwarding address</strong></li>
+                  <li>Paste your address above and confirm the verification email Gmail sends you</li>
+                  <li>
+                    Optional: create a Gmail filter (<strong>Filters and Blocked Addresses</strong> tab) to only
+                    forward emails from specific senders or domains
+                  </li>
+                </ol>
+              </details>
+
+              <details className="border border-gray-200 rounded">
+                <summary
+                  className="px-4 py-3 text-sm font-semibold cursor-pointer select-none"
+                  style={{ color: 'var(--brand-dark)' }}
+                >
+                  Set up Outlook forwarding
+                </summary>
+                <ol className="px-4 pb-4 pt-2 space-y-2 text-sm text-gray-700 list-decimal list-inside">
+                  <li>Open Outlook &rarr; Settings (gear icon) &rarr; <strong>Mail</strong> &rarr; <strong>Forwarding</strong></li>
+                  <li>Toggle <strong>Enable forwarding</strong> on and paste your address above</li>
+                  <li>Click <strong>Save</strong> — all new incoming emails will forward automatically</li>
+                  <li>
+                    Alternative: use <strong>Rules</strong> to forward only emails from specific contacts
+                    (Mail &rarr; Rules &rarr; Add new rule)
+                  </li>
+                </ol>
+              </details>
+            </div>
+
+            {/* Test + status */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <button
+                onClick={handleSendTest}
+                disabled={sendingTest}
+                className="px-4 py-2 text-sm font-medium text-white rounded transition-colors"
+                style={{
+                  backgroundColor: sendingTest ? 'rgba(0,0,0,0.2)' : 'var(--brand-navy)',
+                  cursor: sendingTest ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {sendingTest ? 'Sending…' : 'Send test email'}
+              </button>
+              <p className="text-xs" style={{ color: 'rgba(0,0,0,0.45)' }}>
+                {lastEmailReceived
+                  ? `Last email received: ${formatLastReceived(lastEmailReceived)}`
+                  : 'No emails received yet'}
+              </p>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-gray-500">Loading your inbound address…</p>
+        )}
       </div>
 
       {/* Tools Section */}

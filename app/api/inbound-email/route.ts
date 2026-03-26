@@ -1,0 +1,381 @@
+/**
+ * Postmark inbound email webhook
+ *
+ * Postmark POSTs parsed email JSON to this endpoint when an email arrives at
+ * {token}@in.correspondenceclerk.com
+ *
+ * ALWAYS returns 200 — any other status causes Postmark to retry.
+ *
+ * Flow:
+ *  1. Verify Postmark signature
+ *  2. Extract token → look up user
+ *  3. Rate limit check (per org)
+ *  4. Spam/junk filter
+ *  5. Strip quoted content
+ *  6. Domain match → auto-file OR save to inbound_queue
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { formatCorrespondence } from '@/lib/ai/formatter'
+import { isThreadSplitResponse } from '@/lib/ai/types'
+import { isPersonalDomain, stripQuotedContent } from '@/lib/inbound/utils'
+
+export const maxDuration = 30
+
+// Personal domains are defined in inbound-email actions and re-exported here.
+// isPersonalDomain is imported above.
+
+type PostmarkHeader = { Name: string; Value: string }
+
+type PostmarkPayload = {
+  From: string
+  FromName: string
+  FromFull: { Email: string; Name: string }
+  To: string
+  Subject: string
+  TextBody: string
+  HtmlBody: string
+  StrippedTextReply: string
+  Date: string
+  Headers: PostmarkHeader[]
+  MessageID: string
+}
+
+// ---------------------------------------------------------------------------
+// Signature verification
+// ---------------------------------------------------------------------------
+function verifyPostmarkSignature(rawBody: string, signature: string): boolean {
+  const secret = process.env.POSTMARK_WEBHOOK_TOKEN
+  if (!secret) return true // not configured → allow all (dev mode)
+  if (!signature) return false
+
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('base64')
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))
+  } catch {
+    return false
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Token extraction
+// ---------------------------------------------------------------------------
+function extractToken(toField: string): string | null {
+  const match = toField.match(/([a-z0-9-]+)@in\.correspondenceclerk\.com/i)
+  return match ? match[1].toLowerCase() : null
+}
+
+// ---------------------------------------------------------------------------
+// Spam / junk filter
+// Returns a discard reason string if the email should be silently dropped.
+// ---------------------------------------------------------------------------
+function shouldDiscard(payload: PostmarkPayload, headers: Map<string, string>): string | null {
+  const from = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
+  const subject = (payload.Subject ?? '').toLowerCase()
+  const body = (payload.StrippedTextReply || payload.TextBody || '').replace(/\s+/g, ' ').trim()
+
+  // No-reply senders
+  if (/^(no.?reply|noreply|do.?not.?reply|mailer.?daemon|postmaster|bounce)@/i.test(from)) {
+    return 'no-reply sender'
+  }
+
+  // Mailing list headers (definitive newsletter signal)
+  if (headers.has('list-unsubscribe') || headers.has('list-id')) {
+    return 'mailing list header'
+  }
+
+  // Auto-submitted header
+  const autoSubmitted = headers.get('auto-submitted')
+  if (autoSubmitted && autoSubmitted.toLowerCase() !== 'no') {
+    return 'auto-submitted'
+  }
+
+  // Promotional subject keywords
+  if (/\b(unsubscribe|newsletter|marketing|promotion|promotional)\b/i.test(subject)) {
+    return 'promotional subject'
+  }
+
+  // Body too short to be useful
+  if (body.length < 20) {
+    return 'body too short'
+  }
+
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Rate limiting (org-keyed, 200 emails/hour)
+// ---------------------------------------------------------------------------
+async function checkOrgRateLimit(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  orgId: string
+): Promise<boolean> {
+  const windowMs = 60 * 60 * 1000 // 1 hour
+  const limit = 200
+  const now = Date.now()
+  const windowStart = new Date(now - windowMs).toISOString()
+  const expiresAt = new Date(now + windowMs).toISOString()
+
+  // Upsert a rate_limits row for this org + endpoint
+  const { data, error } = await supabase
+    .from('rate_limits')
+    .select('request_count, window_start')
+    .eq('identifier', orgId)
+    .eq('endpoint', 'inbound-email')
+    .maybeSingle()
+
+  if (error) return true // fail open
+
+  if (!data || data.window_start < windowStart) {
+    // No row or expired window — start fresh
+    await supabase
+      .from('rate_limits')
+      .upsert(
+        {
+          identifier: orgId,
+          endpoint: 'inbound-email',
+          request_count: 1,
+          window_start: new Date().toISOString(),
+          expires_at: expiresAt,
+        },
+        { onConflict: 'identifier,endpoint' }
+      )
+    return true
+  }
+
+  if (data.request_count >= limit) return false // over limit
+
+  await supabase
+    .from('rate_limits')
+    .update({ request_count: data.request_count + 1 })
+    .eq('identifier', orgId)
+    .eq('endpoint', 'inbound-email')
+
+  return true
+}
+
+// ---------------------------------------------------------------------------
+// Build raw text for AI formatter
+// ---------------------------------------------------------------------------
+function buildRawForAI(payload: PostmarkPayload, strippedBody: string): string {
+  const fromName = payload.FromFull?.Name ?? payload.FromName ?? ''
+  const fromEmail = payload.FromFull?.Email ?? payload.From ?? ''
+  return [
+    `From: ${fromName} <${fromEmail}>`,
+    `Date: ${payload.Date}`,
+    `Subject: ${payload.Subject ?? ''}`,
+    '',
+    strippedBody,
+  ].join('\n')
+}
+
+// ---------------------------------------------------------------------------
+// Service-role correspondence insert (no user session in webhook context)
+// ---------------------------------------------------------------------------
+async function insertCorrespondenceServiceRole(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  opts: {
+    orgId: string
+    userId: string
+    businessId: string
+    contactId: string | null
+    rawText: string
+    formattedText: string | null
+    subject: string
+    entryDate: string
+    formattingStatus: string
+    fromEmail: string
+  }
+): Promise<void> {
+  const { data: contentHash } = await supabase.rpc('compute_content_hash', {
+    raw_text: opts.rawText,
+  })
+
+  // Dedup check
+  if (contentHash) {
+    const { data: existing } = await supabase
+      .from('correspondence')
+      .select('id')
+      .eq('organization_id', opts.orgId)
+      .eq('content_hash', contentHash)
+      .limit(1)
+      .maybeSingle()
+    if (existing) return // already stored
+  }
+
+  await supabase.from('correspondence').insert({
+    organization_id: opts.orgId,
+    business_id: opts.businessId,
+    contact_id: opts.contactId,
+    user_id: opts.userId,
+    raw_text_original: opts.rawText,
+    formatted_text_original: opts.formattedText,
+    formatted_text_current: opts.formattedText,
+    entry_date: opts.entryDate,
+    subject: opts.subject,
+    type: 'Email',
+    direction: 'received',
+    action_needed: 'none',
+    formatting_status: opts.formattingStatus,
+    content_hash: contentHash || null,
+    ai_metadata: {
+      source: 'inbound_email',
+      from_email: opts.fromEmail,
+    },
+  })
+
+  await supabase
+    .from('businesses')
+    .update({ last_contacted_at: opts.entryDate })
+    .eq('id', opts.businessId)
+}
+
+// ---------------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------------
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const rawBody = await request.text()
+
+  // 1. Verify signature
+  const sig = request.headers.get('x-postmark-signature') ?? ''
+  if (!verifyPostmarkSignature(rawBody, sig)) {
+    console.warn('[inbound-email] Signature mismatch — discarding')
+    return NextResponse.json({}, { status: 200 })
+  }
+
+  // 2. Parse payload
+  let payload: PostmarkPayload
+  try {
+    payload = JSON.parse(rawBody)
+  } catch {
+    return NextResponse.json({}, { status: 200 })
+  }
+
+  // 3. Extract token and look up user
+  const token = extractToken(payload.To ?? '')
+  if (!token) return NextResponse.json({}, { status: 200 })
+
+  const supabase = createServiceRoleClient()
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('id, organization_id')
+    .eq('inbound_email_token', token)
+    .maybeSingle()
+
+  if (!profile) return NextResponse.json({}, { status: 200 })
+
+  const orgId: string = profile.organization_id
+  const userId: string = profile.id
+
+  // 4. Rate limit
+  const allowed = await checkOrgRateLimit(supabase, orgId)
+  if (!allowed) {
+    console.warn(`[inbound-email] Rate limit hit for org ${orgId}`)
+    return NextResponse.json({}, { status: 200 })
+  }
+
+  // 5. Parse headers into map
+  const headers = new Map<string, string>(
+    (payload.Headers ?? []).map((h: PostmarkHeader) => [h.Name.toLowerCase(), h.Value])
+  )
+
+  // 6. Spam filter
+  const discardReason = shouldDiscard(payload, headers)
+  if (discardReason) {
+    // Store as discarded for audit trail
+    await supabase.from('inbound_queue').insert({
+      org_id: orgId,
+      from_email: payload.FromFull?.Email ?? payload.From ?? '',
+      from_name: payload.FromFull?.Name ?? payload.FromName ?? null,
+      subject: payload.Subject ?? null,
+      body_preview: null,
+      raw_payload: JSON.parse(rawBody),
+      status: 'discarded',
+    })
+    return NextResponse.json({}, { status: 200 })
+  }
+
+  // 7. Extract body
+  const rawBody2 = stripQuotedContent(payload.StrippedTextReply || payload.TextBody || '')
+  const bodyPreview = rawBody2.slice(0, 500)
+  const fromEmail = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
+
+  // 8. Domain match → auto-file or queue
+  const domain = fromEmail.split('@')[1] ?? ''
+  let autoFiledBusinessId: string | null = null
+
+  if (domain && !isPersonalDomain(domain)) {
+    const { data: mapping } = await supabase
+      .from('domain_mappings')
+      .select('business_id')
+      .eq('org_id', orgId)
+      .eq('domain', domain)
+      .maybeSingle()
+
+    autoFiledBusinessId = mapping?.business_id ?? null
+  }
+
+  if (autoFiledBusinessId) {
+    // Find matching contact
+    let contactId: string | null = null
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('business_id', autoFiledBusinessId)
+      .contains('emails', [fromEmail])
+      .limit(1)
+      .maybeSingle()
+    contactId = contact?.id ?? null
+
+    // AI format
+    const rawForAI = buildRawForAI(payload, rawBody2)
+    const formatResult = await formatCorrespondence(rawForAI, false)
+
+    let formattedText: string | null = null
+    let entryDate = payload.Date ?? new Date().toISOString()
+    let subject = payload.Subject || '(No subject)'
+    let formattingStatus = 'unformatted'
+
+    if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
+      const ai = formatResult.data
+      formattedText = ai.formatted_text
+      entryDate = ai.entry_date_guess || entryDate
+      subject = ai.subject_guess || subject
+      formattingStatus = 'formatted'
+    }
+
+    await insertCorrespondenceServiceRole(supabase, {
+      orgId, userId,
+      businessId: autoFiledBusinessId,
+      contactId,
+      rawText: rawForAI,
+      formattedText,
+      subject,
+      entryDate,
+      formattingStatus,
+      fromEmail,
+    })
+
+    return NextResponse.json({}, { status: 200 })
+  }
+
+  // 9. No domain match → add to inbound_queue for manual triage
+  await supabase.from('inbound_queue').insert({
+    org_id: orgId,
+    from_email: fromEmail,
+    from_name: payload.FromFull?.Name ?? payload.FromName ?? null,
+    subject: payload.Subject ?? null,
+    body_preview: bodyPreview || null,
+    raw_payload: JSON.parse(rawBody),
+    status: 'pending',
+  })
+
+  return NextResponse.json({}, { status: 200 })
+}

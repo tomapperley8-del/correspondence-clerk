@@ -104,7 +104,7 @@ export default function BusinessDetailPage({
   // Feature #4: Correspondence view controls state
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest')
   const [contactFilter, setContactFilter] = useState<string>('all')
-  const [directionFilter, setDirectionFilter] = useState<'all' | 'received' | 'sent' | 'conversation'>('all')
+  const [directionFilter, setDirectionFilter] = useState<'all' | 'received' | 'sent'>('all')
   const [dateRange, setDateRange] = useState<'1m' | '6m' | '12m' | 'custom'>('12m')
   const [customDateFrom, setCustomDateFrom] = useState<string>('')
   const [customDateTo, setCustomDateTo] = useState<string>('')
@@ -153,7 +153,7 @@ export default function BusinessDetailPage({
     getCorrespondenceByBusiness(id, {
       limit: PAGE_SIZE,
       contactId: contactFilter,
-      direction: directionFilter as 'all' | 'received' | 'sent' | 'conversation',
+      direction: directionFilter as 'all' | 'received' | 'sent',
     }).then(result => {
       if (!('error' in result)) {
         setCorrespondence(result.data ?? [])
@@ -172,7 +172,7 @@ export default function BusinessDetailPage({
     // Read localStorage prefs synchronously so we fetch with correct filters on first load
     const storageKey = `business_${id}_view`
     let initialContact = 'all'
-    let initialDirection: 'all' | 'received' | 'sent' | 'conversation' = 'all'
+    let initialDirection: 'all' | 'received' | 'sent' = 'all'
     try {
       const savedPrefs = localStorage.getItem(storageKey)
       if (savedPrefs) {
@@ -270,7 +270,7 @@ export default function BusinessDetailPage({
     const result = await getCorrespondenceByBusiness(id, {
       limit: PAGE_SIZE,
       contactId: contactFilter,
-      direction: directionFilter as 'all' | 'received' | 'sent' | 'conversation',
+      direction: directionFilter as 'all' | 'received' | 'sent',
     })
     if (!('error' in result)) {
       setCorrespondence(result.data ?? [])
@@ -286,7 +286,7 @@ export default function BusinessDetailPage({
       limit: PAGE_SIZE,
       offset: correspondence.length,
       contactId: contactFilter,
-      direction: directionFilter as 'all' | 'received' | 'sent' | 'conversation',
+      direction: directionFilter as 'all' | 'received' | 'sent',
     })
     if (!('error' in result)) {
       setCorrespondence(prev => [...prev, ...(result.data ?? [])])

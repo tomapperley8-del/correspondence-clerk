@@ -161,14 +161,18 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         {entry.direction === 'received' && (
           <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800 font-semibold border-2 border-blue-300">
-            {entry.internal_sender
+            {entry.type === 'Call'
+              ? 'CALL FROM'
+              : entry.internal_sender
               ? `RECEIVED BY ${entry.internal_sender.toUpperCase()}`
               : 'RECEIVED FROM'}
           </span>
         )}
         {entry.direction === 'sent' && (
           <span className="text-xs bg-green-100 px-2 py-1 text-green-800 font-semibold border-2 border-green-300">
-            {entry.internal_sender
+            {entry.type === 'Call'
+              ? 'CALLED'
+              : entry.internal_sender
               ? `SENT FROM ${entry.internal_sender.toUpperCase()}`
               : 'SENT TO'}
           </span>
