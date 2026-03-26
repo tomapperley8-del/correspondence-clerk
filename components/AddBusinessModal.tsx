@@ -51,6 +51,7 @@ export function AddBusinessModal({
       setIsClubCard(false)
       setIsAdvertiser(false)
       setIsLoading(false)
+      window.dispatchEvent(new CustomEvent('businesses:changed'))
       onBusinessAdded(result.data)
       onClose()
     }
