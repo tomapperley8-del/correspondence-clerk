@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { formatDateGB } from '@/lib/utils'
 
 type DuplicateEntry = {
@@ -34,7 +35,7 @@ interface DuplicatesWarningBannerProps {
   businessId: string
 }
 
-export function DuplicatesWarningBanner({
+export const DuplicatesWarningBanner = React.memo(function DuplicatesWarningBanner({
   duplicates,
   selectedDuplicateHashes,
   isBulkOperationRunning,
@@ -139,4 +140,4 @@ export function DuplicatesWarningBanner({
       ))}
     </div>
   )
-}
+})

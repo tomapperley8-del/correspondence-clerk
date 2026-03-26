@@ -31,6 +31,7 @@ import { DuplicatesWarningBanner } from './_components/DuplicatesWarningBanner'
 import { CorrespondenceFilterBar } from './_components/CorrespondenceFilterBar'
 import { AllEntriesView } from './_components/AllEntriesView'
 import { ThreadsView } from './_components/ThreadsView'
+import { type EditFields } from './_components/CorrespondenceEditForm'
 
 export default function BusinessDetailPage({
   params,
@@ -51,15 +52,6 @@ export default function BusinessDetailPage({
   const [loading, setLoading] = useState(true)
   const [formattingInProgress, setFormattingInProgress] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
-  const [editedText, setEditedText] = useState<string>('')
-  const [editedDate, setEditedDate] = useState<string>('')
-  const [editedDirection, setEditedDirection] = useState<'received' | 'sent' | ''>('')
-  const [editedContactId, setEditedContactId] = useState<string>('')
-  const [editedSubject, setEditedSubject] = useState<string>('')
-  const [editedInternalSender, setEditedInternalSender] = useState<string>('')
-  const [editedActionNeeded, setEditedActionNeeded] = useState<string>('none')
-  const [editedDueAt, setEditedDueAt] = useState<string>('')
-  const [savingEdit, setSavingEdit] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [contextEntryIds, setContextEntryIds] = useState<Set<string>>(new Set())
 
@@ -469,64 +461,35 @@ export default function BusinessDetailPage({
   const handleStartEdit = useCallback((entry: Correspondence) => {
     setEditingEntryId(entry.id)
     setActionError(null)
-    setEditedText(
-      entry.formatted_text_current ||
-      entry.formatted_text_original ||
-      entry.raw_text_original
-    )
-    setEditedDirection(entry.direction || '')
-    setEditedContactId(entry.contact_id || '')
-    setEditedSubject(entry.subject || '')
-    setEditedInternalSender(entry.internal_sender || '')
-    setEditedActionNeeded(entry.action_needed || 'none')
-    setEditedDueAt(entry.due_at ? new Date(entry.due_at).toISOString().split('T')[0] : '')
-    // Set date in YYYY-MM-DD format for the input field
-    if (entry.entry_date) {
-      const date = new Date(entry.entry_date)
-      const formattedDate = date.toISOString().split('T')[0]
-      setEditedDate(formattedDate)
-    } else {
-      setEditedDate('')
-    }
   }, [])
 
   const handleCancelEdit = useCallback(() => {
     setEditingEntryId(null)
-    setEditedText('')
-    setEditedDate('')
-    setEditedDirection('')
-    setEditedContactId('')
-    setEditedSubject('')
-    setEditedInternalSender('')
-    setEditedActionNeeded('none')
-    setEditedDueAt('')
     setActionError(null)
   }, [])
 
-  const handleSaveEdit = useCallback(async (entryId: string) => {
-    if (!editedText.trim()) {
+  const handleSaveEdit = useCallback(async (entryId: string, fields: EditFields) => {
+    if (!fields.text.trim()) {
       setActionError('Entry text cannot be empty')
       return
     }
 
-    setSavingEdit(true)
     setActionError(null)
 
     try {
       // Convert edited date to ISO format if provided
-      const dateToSave = editedDate ? new Date(editedDate).toISOString() : null
+      const dateToSave = fields.date ? new Date(fields.date).toISOString() : null
 
       // Find the original entry to check if direction or contact changed
       const originalEntry = correspondence.find(e => e.id === entryId)
-      const directionChanged = originalEntry && originalEntry.direction !== (editedDirection || null)
-      const contactChanged = originalEntry && originalEntry.contact_id !== editedContactId
+      const directionChanged = originalEntry && originalEntry.direction !== (fields.direction || null)
+      const contactChanged = originalEntry && originalEntry.contact_id !== fields.contactId
 
       // Update formatted text, date, subject, and internal_sender
-      const textResult = await updateFormattedText(entryId, editedText, dateToSave, editedSubject || null, editedInternalSender || null, editedActionNeeded || 'none', editedDueAt || null)
+      const textResult = await updateFormattedText(entryId, fields.text, dateToSave, fields.subject || null, fields.internalSender || null, fields.actionNeeded || 'none', fields.dueAt || null)
 
       if ('error' in textResult) {
         setActionError(`Error saving: ${textResult.error}`)
-        setSavingEdit(false)
         return
       }
 
@@ -534,12 +497,11 @@ export default function BusinessDetailPage({
       if (directionChanged) {
         const directionResult = await updateCorrespondenceDirection(
           entryId,
-          editedDirection === '' ? null : editedDirection as 'received' | 'sent'
+          fields.direction === '' ? null : fields.direction as 'received' | 'sent'
         )
 
         if ('error' in directionResult) {
           setActionError(`Error updating direction: ${directionResult.error}`)
-          setSavingEdit(false)
           return
         }
 
@@ -548,33 +510,21 @@ export default function BusinessDetailPage({
       }
 
       // Update contact if changed
-      if (contactChanged && editedContactId) {
-        const contactResult = await updateCorrespondenceContact(entryId, editedContactId)
+      if (contactChanged && fields.contactId) {
+        const contactResult = await updateCorrespondenceContact(entryId, fields.contactId)
 
         if ('error' in contactResult) {
           setActionError(`Error updating contact: ${contactResult.error}`)
-          setSavingEdit(false)
           return
         }
       }
 
       await refreshCorrespondence()
-
       setEditingEntryId(null)
-      setEditedText('')
-      setEditedDate('')
-      setEditedDirection('')
-      setEditedContactId('')
-      setEditedSubject('')
-      setEditedInternalSender('')
-      setEditedActionNeeded('none')
-      setEditedDueAt('')
     } catch (err) {
       setActionError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
-
-    setSavingEdit(false)
-  }, [id, editedText, editedDate, editedDirection, editedContactId, editedSubject, editedInternalSender, editedActionNeeded, editedDueAt, correspondence, refreshCorrespondence])
+  }, [correspondence, refreshCorrespondence])
 
   const handleDeleteContact = useCallback((contactId: string, contactName: string) => {
     // Set the contact to delete and show confirmation dialog
@@ -871,23 +821,6 @@ export default function BusinessDetailPage({
     formattingInProgress,
     onFormat: handleFormatLater,
     editingEntryId,
-    editedText,
-    setEditedText,
-    editedDate,
-    setEditedDate,
-    editedDirection,
-    setEditedDirection,
-    editedContactId,
-    setEditedContactId,
-    editedSubject,
-    setEditedSubject,
-    editedInternalSender,
-    setEditedInternalSender,
-    editedActionNeeded,
-    setEditedActionNeeded,
-    editedDueAt,
-    setEditedDueAt,
-    savingEdit,
     onStartEdit: handleStartEdit,
     onSaveEdit: handleSaveEdit,
     onCancelEdit: handleCancelEdit,

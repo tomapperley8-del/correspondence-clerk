@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { type ConversationThread } from '@/app/actions/threads'
 
 interface ThreadAssignPanelProps {
@@ -16,7 +17,7 @@ interface ThreadAssignPanelProps {
   onClose: () => void
 }
 
-export function ThreadAssignPanel({
+export const ThreadAssignPanel = React.memo(function ThreadAssignPanel({
   entryId,
   entryThreadId,
   threads,
@@ -80,4 +81,4 @@ export function ThreadAssignPanel({
       </div>
     </div>
   )
-}
+})
