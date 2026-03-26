@@ -853,48 +853,52 @@ export default function ActionsPage() {
         </div>
       )}
 
-      {/* Priority section — always shown */}
+      {allEmpty ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-12 h-12 rounded-full bg-brand-olive/10 flex items-center justify-center mb-4">
+            <svg className="w-6 h-6 text-brand-olive" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-gray-800 mb-1" style={{ fontFamily: 'Lora, serif' }}>
+            You&apos;re all caught up
+          </h2>
+          <p className="text-sm text-gray-400 mb-6">Nothing needs your attention right now.</p>
+          <Link href="/dashboard" className="text-sm text-brand-navy hover:underline">
+            Go to dashboard
+          </Link>
+        </div>
+      ) : (
+        <>
+      {/* Priority section — shown when there are items */}
+      {priorityList.length > 0 && (
       <div className="mb-8">
         <h2 className="text-base font-semibold text-gray-900 mb-3" style={{ fontFamily: 'Lora, serif' }}>
           Needs Your Attention
-          {priorityList.length > 0 && (
-            <span className="ml-2 text-sm font-normal text-gray-500">({priorityList.length})</span>
-          )}
+          <span className="ml-2 text-sm font-normal text-gray-500">({priorityList.length})</span>
         </h2>
-
-        {priorityList.length === 0 ? (
-          <div className="border border-brand-olive/40 bg-green-50/30 px-6 py-4 flex items-center gap-3 rounded-sm">
-            <span className="text-brand-olive font-bold">✓</span>
-            <div>
-              <p className="text-sm font-medium text-gray-700">You&apos;re on top of it</p>
-              <p className="text-xs text-gray-400 mt-0.5">{formatDateGB(new Date().toISOString())}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="border-2 border-gray-200 bg-white divide-y divide-gray-100">
-            {priorityList.map(({ item, reasonText, reasonColour }) => (
-              <ItemRow
-                key={`priority-${item.id}`}
-                item={item}
-                focused={focusedId === item.id}
-                replyOpen={replyOpenId === item.id}
-                snoozeOpen={snoozeOpenId === item.id}
-                processing={processingId === item.id}
-                onFocus={() => setFocusedId(item.id)}
-                onDone={() => handleDone(item)}
-                onSnooze={days => handleSnooze(item.id, days)}
-                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-                onReplyToggle={() => setReplyOpenId(id => id === item.id ? null : item.id)}
-                onReplySave={() => removeItem(item.id)}
-                reasonTag={<ReasonTag text={reasonText} colour={reasonColour} />}
-              />
-            ))}
-          </div>
-        )}
+        <div className="border-2 border-gray-200 bg-white divide-y divide-gray-100">
+          {priorityList.map(({ item, reasonText, reasonColour }) => (
+            <ItemRow
+              key={`priority-${item.id}`}
+              item={item}
+              focused={focusedId === item.id}
+              replyOpen={replyOpenId === item.id}
+              snoozeOpen={snoozeOpenId === item.id}
+              processing={processingId === item.id}
+              onFocus={() => setFocusedId(item.id)}
+              onDone={() => handleDone(item)}
+              onSnooze={days => handleSnooze(item.id, days)}
+              onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
+              onReplyToggle={() => setReplyOpenId(id => id === item.id ? null : item.id)}
+              onReplySave={() => removeItem(item.id)}
+              reasonTag={<ReasonTag text={reasonText} colour={reasonColour} />}
+            />
+          ))}
+        </div>
       </div>
+      )}
 
-      {!allEmpty && (
-        <>
           {/* 1. Needs a Reply */}
           <Section
             title="Needs a Reply"

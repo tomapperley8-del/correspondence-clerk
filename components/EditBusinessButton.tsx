@@ -57,6 +57,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       setError(result.error || 'An error occurred')
       setSaving(false)
     } else {
+      window.dispatchEvent(new CustomEvent('businesses:changed'))
       setSaving(false)
       setIsOpen(false)
       window.location.reload()
@@ -88,6 +89,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       setError(result.error || 'An error occurred')
       setSaving(false)
     } else {
+      window.dispatchEvent(new CustomEvent('businesses:changed'))
       router.push('/dashboard')
     }
   }

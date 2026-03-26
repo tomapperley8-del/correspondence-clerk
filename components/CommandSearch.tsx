@@ -6,6 +6,36 @@ import { getBusinesses, type BusinessListItem } from '@/app/actions/businesses'
 
 const RECENT_KEY = 'cmd_k_recent'
 const MAX_RECENT = 5
+const CACHE_KEY = 'cmd_k_businesses'
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+function getCachedBusinesses(): BusinessListItem[] | null {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const { data, ts } = JSON.parse(raw)
+    if (Date.now() - ts > CACHE_TTL) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+function setCachedBusinesses(data: BusinessListItem[]) {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
+  } catch {
+    // sessionStorage unavailable — no-op
+  }
+}
+
+function clearBusinessCache() {
+  try {
+    sessionStorage.removeItem(CACHE_KEY)
+  } catch {
+    // no-op
+  }
+}
 
 type RecentItem = { id: string; name: string }
 
@@ -39,8 +69,13 @@ export function CommandSearch() {
       }
       if (e.key === 'Escape') setOpen(false)
     }
+    const invalidate = () => clearBusinessCache()
     document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
+    window.addEventListener('businesses:changed', invalidate)
+    return () => {
+      document.removeEventListener('keydown', handler)
+      window.removeEventListener('businesses:changed', invalidate)
+    }
   }, [])
 
   useEffect(() => {
@@ -49,12 +84,19 @@ export function CommandSearch() {
     setActiveIdx(0)
     setRecent(getRecent())
     setTimeout(() => inputRef.current?.focus(), 50)
-    if (businesses.length === 0) {
+    const cached = getCachedBusinesses()
+    if (cached) {
+      setBusinesses(cached)
+    } else {
       getBusinesses().then((r) => {
-        if (!('error' in r)) setBusinesses(r.data || [])
+        if (!('error' in r)) {
+          const data = r.data || []
+          setBusinesses(data)
+          setCachedBusinesses(data)
+        }
       })
     }
-  }, [open, businesses.length])
+  }, [open])
 
   const filtered = query.trim()
     ? businesses.filter((b) => b.name.toLowerCase().includes(query.toLowerCase())).slice(0, 8)

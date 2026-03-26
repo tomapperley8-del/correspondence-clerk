@@ -42,6 +42,7 @@ export function AddBusinessButton() {
       setIsClubCard(false)
       setIsAdvertiser(false)
       setIsLoading(false)
+      window.dispatchEvent(new CustomEvent('businesses:changed'))
       router.refresh()
     }
   }

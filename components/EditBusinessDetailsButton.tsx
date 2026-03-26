@@ -39,12 +39,13 @@ export function EditBusinessDetailsButton({
       setError(result.error || 'An error occurred')
       setSaving(false)
     } else {
+      window.dispatchEvent(new CustomEvent('businesses:changed'))
       setSaving(false)
       setIsOpen(false)
       if (onUpdate) {
         onUpdate()
       } else {
-        window.location.reload() // Refresh to show updated data
+        window.location.reload()
       }
     }
   }
