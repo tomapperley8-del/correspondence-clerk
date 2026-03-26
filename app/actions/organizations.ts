@@ -12,6 +12,7 @@ export type NavData = {
   organizationName: string | null
   actionsCount: number
   inboundCount: number
+  hasCorrespondence: boolean
 }
 
 /**
@@ -21,7 +22,7 @@ export type NavData = {
 export async function getNavData(): Promise<NavData> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, inboundCount: 0 }
+  if (!user) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, inboundCount: 0, hasCorrespondence: false }
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -29,19 +30,21 @@ export async function getNavData(): Promise<NavData> {
     .eq('id', user.id)
     .single()
 
-  if (!profile) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, inboundCount: 0 }
+  if (!profile) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, inboundCount: 0, hasCorrespondence: false }
 
   const orgId = profile.organization_id
   const orgs = profile.organizations as { id: string; name: string }[] | { id: string; name: string } | null
   const org = Array.isArray(orgs) ? orgs[0] ?? null : orgs
 
-  const [flagged, reminders, inbound] = await Promise.all([
+  const [flagged, reminders, inbound, anyCorrespondence] = await Promise.all([
     supabase.from('correspondence').select('*', { count: 'exact', head: true })
       .eq('organization_id', orgId).neq('action_needed', 'none'),
     supabase.from('correspondence').select('*', { count: 'exact', head: true })
       .eq('organization_id', orgId).eq('action_needed', 'none').not('due_at', 'is', null),
     supabase.from('inbound_queue').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('status', 'pending'),
+    supabase.from('correspondence').select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId).limit(1),
   ])
 
   return {
@@ -50,6 +53,7 @@ export async function getNavData(): Promise<NavData> {
     organizationName: org?.name ?? null,
     actionsCount: (flagged.count ?? 0) + (reminders.count ?? 0),
     inboundCount: inbound.count ?? 0,
+    hasCorrespondence: (anyCorrespondence.count ?? 0) > 0,
   }
 }
 

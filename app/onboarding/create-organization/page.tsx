@@ -30,7 +30,7 @@ export default function CreateOrganizationPage() {
       setError(result.error)
       setIsLoading(false)
     } else {
-      router.push('/onboarding/first-business')
+      router.push('/onboarding/describe-your-business')
     }
   }
 
@@ -53,8 +53,9 @@ export default function CreateOrganizationPage() {
             <span className="inline-block w-6 h-1 rounded-full bg-white opacity-90" />
             <span className="inline-block w-6 h-1 rounded-full bg-white opacity-30" />
             <span className="inline-block w-6 h-1 rounded-full bg-white opacity-30" />
+            <span className="inline-block w-6 h-1 rounded-full bg-white opacity-30" />
           </div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#94a3b8' }}>Step 1 of 3</p>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#94a3b8' }}>Step 1 of 4</p>
           <p
             className="text-2xl font-semibold text-white leading-snug mb-3"
             style={{ fontFamily: 'Lora, Georgia, serif' }}

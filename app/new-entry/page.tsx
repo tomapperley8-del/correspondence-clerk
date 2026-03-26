@@ -1089,9 +1089,10 @@ ${emailBody || ''}`
             <div className="flex gap-1.5">
               <span className="inline-block w-5 h-1 rounded-full bg-white opacity-30" />
               <span className="inline-block w-5 h-1 rounded-full bg-white opacity-30" />
+              <span className="inline-block w-5 h-1 rounded-full bg-white opacity-30" />
               <span className="inline-block w-5 h-1 rounded-full bg-white opacity-90" />
             </div>
-            <span className="text-sm font-semibold text-white">Step 3 of 3 — Add your first entry</span>
+            <span className="text-sm font-semibold text-white">Step 4 of 4 — Add your first entry</span>
           </div>
           <a
             href={`/businesses/${businessIdFromQuery}`}

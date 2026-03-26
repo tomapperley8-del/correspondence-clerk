@@ -37,6 +37,7 @@ export function Navigation() {
   const [isLoading, setIsLoading] = useState(true)
   const [actionsCount, setActionsCount] = useState(0)
   const [inboundCount, setInboundCount] = useState(0)
+  const [hasCorrespondence, setHasCorrespondence] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -49,6 +50,7 @@ export function Navigation() {
     setDisplayName(nav.displayName)
     setActionsCount(nav.actionsCount)
     setInboundCount(nav.inboundCount)
+    setHasCorrespondence(nav.hasCorrespondence)
     if (nav.organizationId) {
       setOrganization({ id: nav.organizationId, name: nav.organizationName ?? '' })
     } else {
@@ -79,6 +81,7 @@ export function Navigation() {
         setDisplayName(null)
         setActionsCount(0)
         setInboundCount(0)
+        setHasCorrespondence(false)
       }
     })
 
@@ -199,24 +202,26 @@ export function Navigation() {
                 )}
               </Link>
 
-              <Link
-                href="/actions"
-                className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/actions'
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
-              >
-                Actions
-                {actionsCount > 0 && (
-                  <span
-                    title={`${actionsCount} action${actionsCount === 1 ? '' : 's'} need attention`}
-                    className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
-                  >
-                    {actionsCount > 99 ? '99+' : actionsCount}
-                  </span>
-                )}
-              </Link>
+              {hasCorrespondence && (
+                <Link
+                  href="/actions"
+                  className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
+                    pathname === '/actions'
+                      ? 'text-white bg-brand-olive'
+                      : 'text-white hover:bg-brand-olive/20'
+                  }`}
+                >
+                  Actions
+                  {actionsCount > 0 && (
+                    <span
+                      title={`${actionsCount} action${actionsCount === 1 ? '' : 's'} need attention`}
+                      className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                    >
+                      {actionsCount > 99 ? '99+' : actionsCount}
+                    </span>
+                  )}
+                </Link>
+              )}
 
               <Link
                 href="/help"
@@ -281,7 +286,7 @@ export function Navigation() {
               { href: '/new-entry', label: 'New Entry' },
               { href: '/search', label: 'Search' },
               { href: '/inbox', label: `Inbox${inboundCount > 0 ? ` (${inboundCount})` : ''}` },
-              { href: '/actions', label: `Actions${actionsCount > 0 ? ` (${actionsCount})` : ''}` },
+              ...(hasCorrespondence ? [{ href: '/actions', label: `Actions${actionsCount > 0 ? ` (${actionsCount})` : ''}` }] : []),
               { href: '/help', label: 'Help' },
               { href: '/settings', label: 'Settings' },
             ].map(({ href, label }) => (
