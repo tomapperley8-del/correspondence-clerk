@@ -9,8 +9,8 @@ interface CorrespondenceFilterBarProps {
   setSortOrder: (v: 'oldest' | 'newest') => void
   contactFilter: string
   setContactFilter: (v: string) => void
-  directionFilter: 'all' | 'received' | 'sent' | 'conversation'
-  setDirectionFilter: (v: 'all' | 'received' | 'sent' | 'conversation') => void
+  directionFilter: 'all' | 'received' | 'sent'
+  setDirectionFilter: (v: 'all' | 'received' | 'sent') => void
   dateRange: '1m' | '6m' | '12m' | 'custom'
   setDateRange: (v: '1m' | '6m' | '12m' | 'custom') => void
   customDateFrom: string
@@ -221,17 +221,6 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 }`}
               >
                 Sent
-              </button>
-              <button
-                type="button"
-                onClick={() => setDirectionFilter('conversation')}
-                className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
-                  directionFilter === 'conversation'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                Conversation
               </button>
             </div>
           </div>

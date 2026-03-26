@@ -716,13 +716,14 @@ export default function ActionsPage() {
   const allItems: Item[] = useMemo(() => {
     const seen = new Set<string>()
     const result: Item[] = []
+    // Always include all items regardless of collapsed state so keyboard nav works
     for (const { item } of priorityList) { seen.add(item.id); result.push(item) }
-    if (!collapsed.needs_reply) needsReply.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
-    if (!collapsed.gone_quiet) goneQuiet.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
-    if (!collapsed.flagged) flagged.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
-    if (!collapsed.reminders) reminders.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
+    needsReply.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
+    goneQuiet.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
+    flagged.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
+    reminders.forEach(i => { if (!seen.has(i.id)) { seen.add(i.id); result.push(i) } })
     return result
-  }, [priorityList, collapsed, needsReply, goneQuiet, flagged, reminders])
+  }, [priorityList, needsReply, goneQuiet, flagged, reminders])
 
   const focusedIndex = allItems.findIndex(item => item.id === focusedId)
 
@@ -737,11 +738,24 @@ export default function ActionsPage() {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       const next = focusedIndex < allItems.length - 1 ? allItems[focusedIndex + 1] : allItems[0]
-      if (next) setFocusedId(next.id)
+      if (next) {
+        setFocusedId(next.id)
+        // Auto-expand the section containing this item
+        if (needsReply.some(i => i.id === next.id)) setCollapsed(c => ({ ...c, needs_reply: false }))
+        else if (goneQuiet.some(i => i.id === next.id)) setCollapsed(c => ({ ...c, gone_quiet: false }))
+        else if (flagged.some(i => i.id === next.id)) setCollapsed(c => ({ ...c, flagged: false }))
+        else if (reminders.some(i => i.id === next.id)) setCollapsed(c => ({ ...c, reminders: false }))
+      }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       const prev = focusedIndex > 0 ? allItems[focusedIndex - 1] : allItems[allItems.length - 1]
-      if (prev) setFocusedId(prev.id)
+      if (prev) {
+        setFocusedId(prev.id)
+        if (needsReply.some(i => i.id === prev.id)) setCollapsed(c => ({ ...c, needs_reply: false }))
+        else if (goneQuiet.some(i => i.id === prev.id)) setCollapsed(c => ({ ...c, gone_quiet: false }))
+        else if (flagged.some(i => i.id === prev.id)) setCollapsed(c => ({ ...c, flagged: false }))
+        else if (reminders.some(i => i.id === prev.id)) setCollapsed(c => ({ ...c, reminders: false }))
+      }
     } else if (e.key === 'd' || e.key === 'D') {
       if (focused) handleDone(focused)
     } else if (e.key === 's' || e.key === 'S') {
@@ -750,7 +764,7 @@ export default function ActionsPage() {
       if (focused) setReplyOpenId(id => id === focused.id ? null : focused.id)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusedId, focusedIndex, allItems])
+  }, [focusedId, focusedIndex, allItems, needsReply, goneQuiet, flagged, reminders])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)

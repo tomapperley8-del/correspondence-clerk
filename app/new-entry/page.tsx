@@ -821,7 +821,7 @@ ${emailBody || ''}`
   }
 
   const handleConfirmPreview = async () => {
-    if (!previewData || !selectedBusinessId || !selectedContactId) return
+    if (!previewData || !selectedBusinessId) return
 
     setIsLoading(true)
     setShowPreview(false)

@@ -36,6 +36,7 @@ export function Navigation() {
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [actionsCount, setActionsCount] = useState(0)
+  const [inboundCount, setInboundCount] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -47,6 +48,7 @@ export function Navigation() {
     const nav = await getNavData()
     setDisplayName(nav.displayName)
     setActionsCount(nav.actionsCount)
+    setInboundCount(nav.inboundCount)
     if (nav.organizationId) {
       setOrganization({ id: nav.organizationId, name: nav.organizationName ?? '' })
     } else {
@@ -76,6 +78,7 @@ export function Navigation() {
         setOrganization(null)
         setDisplayName(null)
         setActionsCount(0)
+        setInboundCount(0)
       }
     })
 
@@ -178,6 +181,25 @@ export function Navigation() {
               </Link>
 
               <Link
+                href="/inbox"
+                className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
+                  pathname === '/inbox'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
+                }`}
+              >
+                Inbox
+                {inboundCount > 0 && (
+                  <span
+                    title={`${inboundCount} email${inboundCount === 1 ? '' : 's'} to file`}
+                    className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                  >
+                    {inboundCount > 99 ? '99+' : inboundCount}
+                  </span>
+                )}
+              </Link>
+
+              <Link
                 href="/actions"
                 className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/actions'
@@ -258,6 +280,7 @@ export function Navigation() {
               { href: '/dashboard', label: 'Dashboard' },
               { href: '/new-entry', label: 'New Entry' },
               { href: '/search', label: 'Search' },
+              { href: '/inbox', label: `Inbox${inboundCount > 0 ? ` (${inboundCount})` : ''}` },
               { href: '/actions', label: `Actions${actionsCount > 0 ? ` (${actionsCount})` : ''}` },
               { href: '/help', label: 'Help' },
               { href: '/settings', label: 'Settings' },

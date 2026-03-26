@@ -24,7 +24,8 @@ interface RateLimitResult {
  * Uses Supabase for persistence across serverless instances
  */
 export async function checkRateLimit(
-  config: RateLimitConfig
+  config: RateLimitConfig,
+  _depth = 0
 ): Promise<RateLimitResult> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -104,8 +105,8 @@ export async function checkRateLimit(
       if (insertError) {
         // Could be a race condition - another request created the entry
         // Try to increment instead
-        if (insertError.code === '23505') { // Unique violation
-          return checkRateLimit(config) // Retry
+        if (insertError.code === '23505' && _depth < 2) { // Unique violation
+          return checkRateLimit(config, _depth + 1) // Retry (max 2 times)
         }
         console.error('Rate limit insert error:', insertError)
         // Fail open
