@@ -25,12 +25,12 @@ Pick up from the first incomplete item each session.
 
 ## Batch 2 — Hardening
 
-- [ ] **P3-Fix1** — Wrap `JSON.parse` calls in `contacts.ts` (emails, phones) in try-catch, return `[]` on failure
-- [ ] **P3-Fix2** — Replace module-level Anthropic client in `ai-summary.ts` with lazy singleton
-- [ ] **P3-Fix5** — Switch `search.ts` to `websearch` type for `textSearch` (more robust query parsing)
-- [ ] **P3-Fix6** — Add `viewport` export to `app/layout.tsx`
-- [ ] **P3-Fix7** — Add Supabase preconnect `<link>` hint to `app/layout.tsx`
-- [ ] **P3-Fix8** — Replace raw error strings in `ChatPanel.tsx` with friendly messages; ensure AI formatter fallback shows useful text
+- [x] **P3-Fix1** — Wrap `JSON.parse` calls in `contacts.ts` (emails, phones) in try-catch, return `[]` on failure (26/03/2026)
+- [x] **P3-Fix2** — Replace module-level Anthropic client in `ai-summary.ts` with lazy singleton (26/03/2026)
+- [x] **P3-Fix5** — Switch `search.ts` to `websearch` type for `textSearch` (more robust query parsing) (26/03/2026)
+- [x] **P3-Fix6** — Add `viewport` export to `app/layout.tsx` (26/03/2026)
+- [x] **P3-Fix7** — Add Supabase preconnect `<link>` hint to `app/layout.tsx` (26/03/2026)
+- [x] **P3-Fix8** — Replace raw error strings in `ChatPanel.tsx` with friendly messages (26/03/2026)
 
 ---
 

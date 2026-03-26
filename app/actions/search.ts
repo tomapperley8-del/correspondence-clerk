@@ -87,9 +87,6 @@ export async function searchAll(query: string, filters?: SearchFilters) {
   }
 
   // Search correspondence using GIN full-text index (search_vector column)
-  // Convert query to tsquery format: split words and join with &
-  const tsQuery = query.trim().split(/\s+/).map(w => w.replace(/[^\w]/g, '')).filter(Boolean).join(' & ')
-
   let correspondenceQuery = supabase
     .from('correspondence')
     .select(
@@ -107,7 +104,7 @@ export async function searchAll(query: string, filters?: SearchFilters) {
       contacts!inner(name)
     `
     )
-    .textSearch('search_vector', tsQuery)
+    .textSearch('search_vector', query.trim(), { type: 'websearch' })
 
   // Apply filters
   if (filters?.dateFrom) {

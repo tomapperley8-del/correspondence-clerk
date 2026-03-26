@@ -113,11 +113,11 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `Request failed (${response.status})`)
+        throw new Error(errorData.error || 'The assistant is unavailable right now — please try again shortly.')
       }
 
       const reader = response.body?.getReader()
-      if (!reader) throw new Error('No response stream')
+      if (!reader) throw new Error('Connection error — please try again.')
 
       const decoder = new TextDecoder()
       let buffer = ''
@@ -166,7 +166,7 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
                 }
 
                 case 'error':
-                  accText += `\n\nError: ${data.message}`
+                  accText += `\n\nSomething went wrong — ${data.message || 'please try again.'}`
                   break
 
                 case 'done':
@@ -191,10 +191,10 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
       )
     } catch (err) {
       rendering = false
-      const errorMessage = err instanceof Error ? err.message : 'Something went wrong'
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong — please try again.'
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId ? { ...m, content: `Error: ${errorMessage}` } : m
+          m.id === assistantId ? { ...m, content: errorMessage } : m
         )
       )
     } finally {

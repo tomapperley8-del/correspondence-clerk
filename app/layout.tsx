@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Lora, Inter } from 'next/font/google'
 import './globals.css'
 import { Navigation } from '@/components/Navigation'
@@ -20,6 +20,11 @@ const inter = Inter({
   display: 'swap',
 })
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+}
+
 export const metadata: Metadata = {
   title: 'Correspondence Clerk',
   description: 'Know exactly what needs your attention today. An AI assistant that reads your business correspondence and tells you who to reply to, which contracts are expiring, and which follow-ups have gone cold.',
@@ -30,8 +35,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
   return (
     <html lang="en" className={`${lora.variable} ${inter.variable}`}>
+      <head>
+        {supabaseUrl && <link rel="preconnect" href={supabaseUrl} />}
+      </head>
       <body>
         <ChatProvider>
           <a
