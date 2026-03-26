@@ -66,9 +66,7 @@ async function main() {
         formatted_text_original: aiData.formatted_text,
         formatted_text_current: aiData.formatted_text,
         formatting_status: 'formatted',
-        subject: aiData.subject ?? null,
-        action_needed: aiData.action_needed ?? 'none',
-        due_at: aiData.due_at ?? null,
+        subject: aiData.subject_guess ?? null,
         ai_metadata: { ...entry.ai_metadata, retried_at: new Date().toISOString() },
       })
       .eq('id', entry.id)
