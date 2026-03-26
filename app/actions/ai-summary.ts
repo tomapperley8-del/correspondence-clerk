@@ -5,9 +5,11 @@ import { getCorrespondenceByBusiness } from './correspondence'
 import { getBusinessById } from './businesses'
 import Anthropic from '@anthropic-ai/sdk'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+let _anthropic: Anthropic | null = null
+function getAnthropicClient(): Anthropic {
+  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return _anthropic
+}
 
 export type AISummaryResult = {
   summary: string
@@ -84,7 +86,7 @@ export async function generateCorrespondenceSummary(businessId: string) {
       }
 
       // Generate contract-only summary
-      const contractOnlyMessage = await anthropic.messages.create({
+      const contractOnlyMessage = await getAnthropicClient().messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 150,
         messages: [
@@ -134,7 +136,7 @@ Provide a brief 1-2 sentence summary noting the lack of recent correspondence an
       .join('\n\n')
 
     // Single combined AI call
-    const message = await anthropic.messages.create({
+    const message = await getAnthropicClient().messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 300,
       messages: [

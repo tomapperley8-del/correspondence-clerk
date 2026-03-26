@@ -7,6 +7,14 @@ import { z } from 'zod'
 
 const emailSchema = z.string().email('Invalid email format').max(254)
 
+function parseJsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value as string[]
+  if (typeof value === 'string') {
+    try { return JSON.parse(value) } catch { return [] }
+  }
+  return []
+}
+
 const createContactSchema = z.object({
   business_id: z.string().uuid('Invalid business ID'),
   name: z.string().min(1, 'Contact name is required').max(200, 'Contact name too long'),
@@ -71,8 +79,8 @@ export async function getContactsByBusiness(businessId: string) {
   // Parse JSONB fields
   const parsedData = data?.map(contact => ({
     ...contact,
-    emails: typeof contact.emails === 'string' ? JSON.parse(contact.emails) : (contact.emails || []),
-    phones: typeof contact.phones === 'string' ? JSON.parse(contact.phones) : (contact.phones || []),
+    emails: parseJsonArray(contact.emails),
+    phones: parseJsonArray(contact.phones),
     is_active: contact.is_active ?? true,
   })) || []
 
@@ -103,8 +111,8 @@ export async function getContactById(id: string) {
   // Parse JSONB fields
   const parsedData = {
     ...data,
-    emails: typeof data.emails === 'string' ? JSON.parse(data.emails) : (data.emails || []),
-    phones: typeof data.phones === 'string' ? JSON.parse(data.phones) : (data.phones || []),
+    emails: parseJsonArray(data.emails),
+    phones: parseJsonArray(data.phones),
     is_active: data.is_active ?? true,
   }
 
@@ -180,8 +188,8 @@ export async function createContact(formData: {
   // Parse JSONB fields before returning
   const parsedData = {
     ...data,
-    emails: typeof data.emails === 'string' ? JSON.parse(data.emails) : (data.emails || []),
-    phones: typeof data.phones === 'string' ? JSON.parse(data.phones) : (data.phones || []),
+    emails: parseJsonArray(data.emails),
+    phones: parseJsonArray(data.phones),
   }
 
   revalidatePath(`/businesses/${formData.business_id}`)
@@ -270,8 +278,8 @@ export async function updateContact(
   // Parse JSONB fields before returning
   const parsedData = {
     ...data,
-    emails: typeof data.emails === 'string' ? JSON.parse(data.emails) : (data.emails || []),
-    phones: typeof data.phones === 'string' ? JSON.parse(data.phones) : (data.phones || []),
+    emails: parseJsonArray(data.emails),
+    phones: parseJsonArray(data.phones),
   }
 
   // Get business_id to revalidate the business page (data already has it from the update select)
