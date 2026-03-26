@@ -54,6 +54,18 @@ export type Contact = {
   updated_at: string
 }
 
+export async function getHasAnyContact(): Promise<boolean> {
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) return false
+  const supabase = await createClient()
+  const { count } = await supabase
+    .from('contacts')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .limit(1)
+  return (count ?? 0) > 0
+}
+
 export async function getContactsByBusiness(businessId: string) {
   const supabase = await createClient()
   const {

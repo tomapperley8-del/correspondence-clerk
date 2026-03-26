@@ -15,9 +15,10 @@ type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
 interface DashboardClientProps {
   initialBusinesses: BusinessListItem[]
   initialMembershipTypes: MembershipType[]
+  hasContact: boolean
 }
 
-export function DashboardClient({ initialBusinesses, initialMembershipTypes }: DashboardClientProps) {
+export function DashboardClient({ initialBusinesses, initialMembershipTypes, hasContact }: DashboardClientProps) {
   const [businesses] = useState<BusinessListItem[]>(initialBusinesses)
   const [membershipTypes] = useState<MembershipType[]>(initialMembershipTypes)
 
@@ -37,6 +38,12 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes }: D
   // Check if bookmarklet is installed
   const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
 
+  // Onboarding checklist
+  const hasBusiness = businesses.length > 0
+  const hasEntry = businesses.some((b) => b.last_contacted_at)
+  const allDone = hasBusiness && hasContact && hasEntry
+  const [checklistDismissed, setChecklistDismissed] = useState(true) // start hidden, read from localStorage
+
   // New entries badge: tracks which businesses have activity since last visit
   const [hasNewEntries, setHasNewEntries] = useState<Set<string>>(new Set())
 
@@ -44,6 +51,9 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes }: D
   useEffect(() => {
     const installed = localStorage.getItem('bookmarklet-installed')
     setBookmarkletInstalled(!!installed)
+
+    const dismissed = localStorage.getItem('checklist_dismissed')
+    setChecklistDismissed(dismissed === 'true')
 
     // Restore dashboard preferences from localStorage
     try {
@@ -179,6 +189,52 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes }: D
           <AddBusinessButton />
         </div>
       </div>
+
+      {/* Onboarding checklist — hidden when dismissed or all steps complete */}
+      {!checklistDismissed && !allDone && (
+        <div
+          className="mb-6 rounded-sm border px-5 py-4"
+          style={{ backgroundColor: '#F0F4F0', borderColor: 'rgba(124,154,94,0.3)' }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-700 mb-3">Get started</p>
+              <ol className="space-y-2">
+                {[
+                  { done: hasBusiness, label: 'Add your first business', href: '/dashboard' },
+                  { done: hasContact, label: 'Add a contact', href: hasBusiness ? undefined : undefined },
+                  { done: hasEntry, label: 'Log your first correspondence entry', href: '/new-entry' },
+                ].map(({ done, label, href }, i) => (
+                  <li key={i} className="flex items-center gap-3 text-sm">
+                    <span
+                      className="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold"
+                      style={done
+                        ? { backgroundColor: '#7C9A5E', borderColor: '#7C9A5E', color: 'white' }
+                        : { borderColor: 'rgba(0,0,0,0.2)', color: 'transparent' }
+                      }
+                    >
+                      {done ? '✓' : ''}
+                    </span>
+                    <span className={done ? 'line-through text-gray-400' : 'text-gray-700'}>
+                      {href && !done ? <Link href={href} className="hover:underline">{label}</Link> : label}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.setItem('checklist_dismissed', 'true')
+                setChecklistDismissed(true)
+              }}
+              className="text-gray-400 hover:text-gray-600 text-xs flex-shrink-0 mt-0.5"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Bookmarklet Installation Card — only show once there are businesses */}
       {!bookmarkletInstalled && businesses.length > 0 && (
