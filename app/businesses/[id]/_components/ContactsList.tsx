@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { Button } from '@/components/ui/button'
 import { type Contact } from '@/app/actions/contacts'
 import { type Business } from '@/app/actions/businesses'
@@ -13,7 +14,7 @@ interface ContactsListProps {
   onDeleteContact: (id: string, name: string) => void
 }
 
-export function ContactsList({ contacts, business, onDeleteContact }: ContactsListProps) {
+export const ContactsList = React.memo(function ContactsList({ contacts, business, onDeleteContact }: ContactsListProps) {
   return (
     <div className="bg-white border-2 border-gray-300 p-6 mb-6">
       <div className="flex justify-between items-center mb-4">
@@ -90,4 +91,4 @@ export function ContactsList({ contacts, business, onDeleteContact }: ContactsLi
       )}
     </div>
   )
-}
+})

@@ -6,6 +6,7 @@ import { type Contact } from '@/app/actions/contacts'
 import { type ConversationThread } from '@/app/actions/threads'
 import { formatDateGB } from '@/lib/utils'
 import { CorrespondenceEntry } from './CorrespondenceEntry'
+import { type EditFields } from './CorrespondenceEditForm'
 
 interface AllEntriesViewProps {
   correspondence: Correspondence[]
@@ -36,25 +37,8 @@ interface AllEntriesViewProps {
   formattingInProgress: string | null
   onFormat: (id: string) => void
   editingEntryId: string | null
-  editedText: string
-  setEditedText: (v: string) => void
-  editedDate: string
-  setEditedDate: (v: string) => void
-  editedDirection: 'received' | 'sent' | ''
-  setEditedDirection: (v: 'received' | 'sent' | '') => void
-  editedContactId: string
-  setEditedContactId: (v: string) => void
-  editedSubject: string
-  setEditedSubject: (v: string) => void
-  editedInternalSender: string
-  setEditedInternalSender: (v: string) => void
-  editedActionNeeded: string
-  setEditedActionNeeded: (v: string) => void
-  editedDueAt: string
-  setEditedDueAt: (v: string) => void
-  savingEdit: boolean
   onStartEdit: (entry: Correspondence) => void
-  onSaveEdit: (id: string) => void
+  onSaveEdit: (id: string, fields: EditFields) => Promise<void>
   onCancelEdit: () => void
   onDelete: (id: string, subject: string) => void
   onPin: (id: string, isPinned: boolean) => Promise<void>
@@ -74,7 +58,7 @@ interface AllEntriesViewProps {
   setActionError: (v: string) => void
 }
 
-export function AllEntriesView({
+export const AllEntriesView = React.memo(function AllEntriesView({
   correspondence,
   filteredCorrespondence,
   contextEntryIds,
@@ -97,23 +81,6 @@ export function AllEntriesView({
   formattingInProgress,
   onFormat,
   editingEntryId,
-  editedText,
-  setEditedText,
-  editedDate,
-  setEditedDate,
-  editedDirection,
-  setEditedDirection,
-  editedContactId,
-  setEditedContactId,
-  editedSubject,
-  setEditedSubject,
-  editedInternalSender,
-  setEditedInternalSender,
-  editedActionNeeded,
-  setEditedActionNeeded,
-  editedDueAt,
-  setEditedDueAt,
-  savingEdit,
   onStartEdit,
   onSaveEdit,
   onCancelEdit,
@@ -157,23 +124,6 @@ export function AllEntriesView({
     formattingInProgress,
     onFormat,
     editingEntryId,
-    editedText,
-    setEditedText,
-    editedDate,
-    setEditedDate,
-    editedDirection,
-    setEditedDirection,
-    editedContactId,
-    setEditedContactId,
-    editedSubject,
-    setEditedSubject,
-    editedInternalSender,
-    setEditedInternalSender,
-    editedActionNeeded,
-    setEditedActionNeeded,
-    editedDueAt,
-    setEditedDueAt,
-    savingEdit,
     onStartEdit,
     onSaveEdit,
     onCancelEdit,
@@ -328,4 +278,4 @@ export function AllEntriesView({
       )}
     </>
   )
-}
+})

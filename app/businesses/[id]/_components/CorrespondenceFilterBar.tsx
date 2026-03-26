@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { type Contact } from '@/app/actions/contacts'
 import { ExportDropdown } from '@/components/ExportDropdown'
 
@@ -25,7 +26,7 @@ interface CorrespondenceFilterBarProps {
   exportProps: { businessId: string; businessName?: string; contactId?: string }
 }
 
-export function CorrespondenceFilterBar({
+export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterBar({
   sortOrder,
   setSortOrder,
   contactFilter,
@@ -283,4 +284,4 @@ export function CorrespondenceFilterBar({
       )}
     </>
   )
-}
+})

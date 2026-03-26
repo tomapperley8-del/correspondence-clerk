@@ -7,7 +7,7 @@ import { type Contact } from '@/app/actions/contacts'
 import { type ConversationThread } from '@/app/actions/threads'
 import { formatDateGB, formatDateTimeGB } from '@/lib/utils'
 import { CopyButton } from '@/components/CopyButton'
-import { CorrespondenceEditForm } from './CorrespondenceEditForm'
+import { CorrespondenceEditForm, type EditFields } from './CorrespondenceEditForm'
 import { ThreadAssignPanel } from './ThreadAssignPanel'
 
 interface CorrespondenceEntryProps {
@@ -22,25 +22,8 @@ interface CorrespondenceEntryProps {
   formattingInProgress: string | null
   onFormat: (id: string) => void
   editingEntryId: string | null
-  editedText: string
-  setEditedText: (v: string) => void
-  editedDate: string
-  setEditedDate: (v: string) => void
-  editedDirection: 'received' | 'sent' | ''
-  setEditedDirection: (v: 'received' | 'sent' | '') => void
-  editedContactId: string
-  setEditedContactId: (v: string) => void
-  editedSubject: string
-  setEditedSubject: (v: string) => void
-  editedInternalSender: string
-  setEditedInternalSender: (v: string) => void
-  editedActionNeeded: string
-  setEditedActionNeeded: (v: string) => void
-  editedDueAt: string
-  setEditedDueAt: (v: string) => void
-  savingEdit: boolean
   onStartEdit: (entry: Correspondence) => void
-  onSaveEdit: (id: string) => void
+  onSaveEdit: (id: string, fields: EditFields) => Promise<void>
   onCancelEdit: () => void
   onDelete: (id: string, subject: string) => void
   onPin: (id: string, isPinned: boolean) => Promise<void>
@@ -103,23 +86,6 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
   formattingInProgress,
   onFormat,
   editingEntryId,
-  editedText,
-  setEditedText,
-  editedDate,
-  setEditedDate,
-  editedDirection,
-  setEditedDirection,
-  editedContactId,
-  setEditedContactId,
-  editedSubject,
-  setEditedSubject,
-  editedInternalSender,
-  setEditedInternalSender,
-  editedActionNeeded,
-  setEditedActionNeeded,
-  editedDueAt,
-  setEditedDueAt,
-  savingEdit,
   onStartEdit,
   onSaveEdit,
   onCancelEdit,
@@ -281,27 +247,10 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
       {/* Body text or edit form */}
       {isEditing ? (
         <CorrespondenceEditForm
-          editedText={editedText}
-          setEditedText={setEditedText}
-          editedDate={editedDate}
-          setEditedDate={setEditedDate}
-          editedDirection={editedDirection}
-          setEditedDirection={setEditedDirection}
-          editedContactId={editedContactId}
-          setEditedContactId={setEditedContactId}
-          editedSubject={editedSubject}
-          setEditedSubject={setEditedSubject}
-          editedInternalSender={editedInternalSender}
-          setEditedInternalSender={setEditedInternalSender}
-          editedActionNeeded={editedActionNeeded}
-          setEditedActionNeeded={setEditedActionNeeded}
-          editedDueAt={editedDueAt}
-          setEditedDueAt={setEditedDueAt}
-          savingEdit={savingEdit}
+          entry={entry}
           contacts={contacts}
-          onSave={() => onSaveEdit(entry.id)}
+          onSave={(fields) => onSaveEdit(entry.id, fields)}
           onCancel={onCancelEdit}
-          entryId={entry.id}
         />
       ) : (
         <>

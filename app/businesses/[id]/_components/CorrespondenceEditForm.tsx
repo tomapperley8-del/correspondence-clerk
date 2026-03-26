@@ -1,54 +1,71 @@
 'use client'
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { type Contact } from '@/app/actions/contacts'
+import { type Correspondence } from '@/app/actions/correspondence'
+
+export interface EditFields {
+  text: string
+  date: string
+  direction: 'received' | 'sent' | ''
+  contactId: string
+  subject: string
+  internalSender: string
+  actionNeeded: string
+  dueAt: string
+}
 
 interface CorrespondenceEditFormProps {
-  editedText: string
-  setEditedText: (v: string) => void
-  editedDate: string
-  setEditedDate: (v: string) => void
-  editedDirection: 'received' | 'sent' | ''
-  setEditedDirection: (v: 'received' | 'sent' | '') => void
-  editedContactId: string
-  setEditedContactId: (v: string) => void
-  editedSubject: string
-  setEditedSubject: (v: string) => void
-  editedInternalSender: string
-  setEditedInternalSender: (v: string) => void
-  editedActionNeeded: string
-  setEditedActionNeeded: (v: string) => void
-  editedDueAt: string
-  setEditedDueAt: (v: string) => void
-  savingEdit: boolean
+  entry: Correspondence
   contacts: Contact[]
-  onSave: () => void
+  onSave: (fields: EditFields) => Promise<void>
   onCancel: () => void
-  entryId: string
 }
 
 export function CorrespondenceEditForm({
-  editedText,
-  setEditedText,
-  editedDate,
-  setEditedDate,
-  editedDirection,
-  setEditedDirection,
-  editedContactId,
-  setEditedContactId,
-  editedSubject,
-  setEditedSubject,
-  editedInternalSender,
-  setEditedInternalSender,
-  editedActionNeeded,
-  setEditedActionNeeded,
-  editedDueAt,
-  setEditedDueAt,
-  savingEdit,
+  entry,
   contacts,
   onSave,
   onCancel,
 }: CorrespondenceEditFormProps) {
+  const [editedText, setEditedText] = useState(
+    entry.formatted_text_current || entry.formatted_text_original || entry.raw_text_original
+  )
+  const [editedDate, setEditedDate] = useState(() => {
+    if (entry.entry_date) return new Date(entry.entry_date).toISOString().split('T')[0]
+    return ''
+  })
+  const [editedDirection, setEditedDirection] = useState<'received' | 'sent' | ''>(entry.direction || '')
+  const [editedContactId, setEditedContactId] = useState(entry.contact_id || '')
+  const [editedSubject, setEditedSubject] = useState(entry.subject || '')
+  const [editedInternalSender, setEditedInternalSender] = useState(entry.internal_sender || '')
+  const [editedActionNeeded, setEditedActionNeeded] = useState<string>(entry.action_needed || 'none')
+  const [editedDueAt, setEditedDueAt] = useState(() => {
+    if (entry.due_at) return new Date(entry.due_at).toISOString().split('T')[0]
+    return ''
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  async function handleSave() {
+    if (!editedText.trim()) return
+    setSavingEdit(true)
+    try {
+      await onSave({
+        text: editedText,
+        date: editedDate,
+        direction: editedDirection,
+        contactId: editedContactId,
+        subject: editedSubject,
+        internalSender: editedInternalSender,
+        actionNeeded: editedActionNeeded,
+        dueAt: editedDueAt,
+      })
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   return (
     <div className="bg-yellow-50 border-2 border-yellow-600 p-4 mb-4">
       <p className="text-sm font-semibold text-yellow-900 mb-3">
@@ -178,7 +195,7 @@ export function CorrespondenceEditForm({
 
       <div className="flex gap-2 mt-3">
         <Button
-          onClick={onSave}
+          onClick={handleSave}
           disabled={savingEdit}
           className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm font-semibold"
         >
