@@ -78,7 +78,7 @@ function ContractForm({
   }
 
   return (
-    <div className="border-2 border-blue-600 bg-blue-50 p-4">
+    <div className="border border-brand-navy/20 bg-brand-navy/[0.03] p-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
           <Label htmlFor="contractStart" className="block text-sm font-semibold mb-1">Start Date</Label>
@@ -95,7 +95,7 @@ function ContractForm({
       <div className="mb-4">
         <Label htmlFor="contractAmount" className="block text-sm font-semibold mb-1">Amount (£ GBP)</Label>
         <div className="flex gap-2">
-          <span className="flex items-center px-3 py-2 bg-gray-100 border-2 border-gray-300 font-bold">£</span>
+          <span className="flex items-center px-3 py-2 bg-gray-100 border border-gray-200 font-bold">£</span>
           <Input id="contractAmount" type="number" step="0.01" min="0" value={data.contract_amount}
             onChange={(e) => setData({ ...data, contract_amount: e.target.value })}
             placeholder="0.00" className="flex-1" />
@@ -106,7 +106,7 @@ function ContractForm({
         <Label htmlFor="membershipType" className="block text-sm font-semibold mb-1">Membership Type</Label>
         <select id="membershipType" value={data.membership_type}
           onChange={(e) => setData({ ...data, membership_type: e.target.value })}
-          className="w-full px-3 py-2 border-2 border-gray-300 bg-white focus:border-blue-600 focus:outline-none">
+          className="w-full px-3 py-2 border border-gray-200 bg-white focus:border-brand-navy focus:outline-none">
           <option value="">None</option>
           {membershipTypes.map((t) => (
             <option key={t.value} value={t.value}>{t.label}</option>
@@ -119,7 +119,7 @@ function ContractForm({
         <textarea id="dealTerms" value={data.deal_terms}
           onChange={(e) => setData({ ...data, deal_terms: e.target.value })}
           placeholder="Enter contract terms, renewal conditions, special notes..."
-          className="w-full min-h-[80px] px-3 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none" />
+          className="w-full min-h-[80px] px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none" />
       </div>
 
       <div className="mb-4 flex items-center gap-3">
@@ -138,14 +138,14 @@ function ContractForm({
       </div>
 
       {error && (
-        <div className="mb-3 bg-red-50 border-2 border-red-600 p-2">
+        <div className="mb-3 bg-red-50 border border-red-300 p-2">
           <p className="text-sm text-red-800">{error}</p>
         </div>
       )}
 
       <div className="flex gap-2">
         <Button type="button" onClick={handleSave} disabled={saving}
-          className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 font-semibold">
+          className="bg-brand-navy text-white hover:bg-brand-navy-hover px-4 py-2 font-semibold">
           {saving ? 'Saving...' : saveLabel}
         </Button>
         <Button type="button" onClick={onCancel} disabled={saving}
@@ -259,7 +259,7 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
     }
 
     return (
-      <div key={contract.id} className="border-2 border-gray-300 bg-white p-4 mb-3">
+      <div key={contract.id} className="border border-gray-200 bg-white p-4 mb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -309,7 +309,7 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
 
           <div className="flex flex-col gap-1 shrink-0">
             <Button type="button" onClick={() => setEditingId(contract.id)}
-              className="bg-blue-100 text-blue-900 hover:bg-blue-200 px-3 py-1 text-xs font-semibold">
+              className="bg-brand-navy/10 text-brand-navy hover:bg-brand-navy/20 px-3 py-1 text-xs font-semibold">
               Edit
             </Button>
             <Button type="button" onClick={() => handleDelete(contract.id)}
@@ -324,11 +324,11 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
   }
 
   return (
-    <div className="bg-white border-2 border-gray-300 p-6">
+    <div className="bg-white border border-gray-200 p-6">
       <div className="flex justify-between items-start mb-4">
         <h3 className="text-xl font-bold text-gray-900">Contract Details</h3>
         <Button type="button" onClick={() => { setShowAddForm(true); setEditingId(null) }}
-          className="bg-blue-100 text-blue-900 hover:bg-blue-200 px-4 py-2 text-sm font-semibold">
+          className="bg-brand-navy/10 text-brand-navy hover:bg-brand-navy/20 px-4 py-2 text-sm font-semibold">
           Add Contract
         </Button>
       </div>

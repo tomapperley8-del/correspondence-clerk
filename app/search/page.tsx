@@ -81,7 +81,7 @@ export default function SearchPage() {
           <Button
             type="submit"
             disabled={isSearching || !query.trim()}
-            className="bg-blue-600 text-white hover:bg-blue-700 px-8 py-3 text-lg font-semibold"
+            className="bg-brand-navy text-white hover:bg-brand-navy-hover px-8 py-3 text-lg font-semibold"
           >
             {isSearching ? 'Searching...' : 'Search'}
           </Button>
@@ -92,7 +92,7 @@ export default function SearchPage() {
           <button
             type="button"
             onClick={() => setShowFilters(!showFilters)}
-            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            className="text-sm text-brand-navy hover:underline"
           >
             {showFilters ? 'Hide Filters' : 'Show Filters'}
             {hasActiveFilters && ' (active)'}
@@ -110,7 +110,7 @@ export default function SearchPage() {
 
         {/* Filters Panel */}
         {showFilters && (
-          <div className="mt-4 bg-gray-50 border-2 border-gray-300 p-4">
+          <div className="mt-4 bg-gray-50 border border-gray-200 p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Date From */}
               <div>
@@ -121,7 +121,7 @@ export default function SearchPage() {
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+                  className="w-full px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
                 />
               </div>
 
@@ -134,7 +134,7 @@ export default function SearchPage() {
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+                  className="w-full px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
                 />
               </div>
 
@@ -146,7 +146,7 @@ export default function SearchPage() {
                 <select
                   value={direction}
                   onChange={(e) => setDirection(e.target.value as any)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+                  className="w-full px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
                 >
                   <option value="">All</option>
                   <option value="received">Received</option>
@@ -162,7 +162,7 @@ export default function SearchPage() {
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as any)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+                  className="w-full px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
                 >
                   <option value="">All</option>
                   <option value="Email">Email</option>
@@ -182,7 +182,7 @@ export default function SearchPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+                className="px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
               >
                 <option value="relevance">Relevance</option>
                 <option value="date_newest">Date (newest first)</option>
@@ -195,7 +195,7 @@ export default function SearchPage() {
 
       {/* Pre-search hint */}
       {!hasSearched && (
-        <div className="bg-gray-50 border-2 border-gray-300 p-8 text-center">
+        <div className="bg-gray-50 border border-gray-200 p-8 text-center">
           <p className="text-gray-600">
             Search across all businesses and correspondence entries.
           </p>
@@ -207,16 +207,16 @@ export default function SearchPage() {
 
       {/* Search Error */}
       {searchError && (
-        <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6" role="alert">
+        <div className="border border-red-300 bg-red-50 px-4 py-3 mb-6" role="alert">
           <p className="text-red-800 text-sm">Search error: {searchError}</p>
         </div>
       )}
 
       {/* Loading skeleton while searching */}
       {isSearching && (
-        <div className="bg-white border-2 border-gray-300 p-6 space-y-4">
+        <div className="bg-white border border-gray-200 p-6 space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse border-2 border-gray-200 p-4">
+            <div key={i} className="animate-pulse border border-gray-100 p-4">
               <div className="flex gap-2 mb-2">
                 <div className="h-5 w-20 bg-gray-200 rounded" />
                 <div className="h-5 w-48 bg-gray-200 rounded" />
@@ -229,7 +229,7 @@ export default function SearchPage() {
 
       {/* Results */}
       {hasSearched && !isSearching && !searchError && (
-        <div className="bg-white border-2 border-gray-300 p-6">
+        <div className="bg-white border border-gray-200 p-6">
           {/* Result count */}
           <p className="text-sm text-gray-600 mb-4" aria-live="polite">
             {results.length === 0
@@ -244,7 +244,7 @@ export default function SearchPage() {
                   <Link
                     key={`business-${result.id}`}
                     href={`/businesses/${result.id}`}
-                    className="block border-2 border-gray-300 p-4 hover:border-blue-600 hover:bg-blue-50"
+                    className="block border border-gray-200 p-4 hover:border-brand-navy/40 hover:bg-brand-navy/[0.03]"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs bg-green-100 px-2 py-1 text-green-800">
@@ -260,10 +260,10 @@ export default function SearchPage() {
                   <Link
                     key={`correspondence-${result.id}`}
                     href={`/businesses/${result.business_id}`}
-                    className="block border-2 border-gray-300 p-4 hover:border-blue-600 hover:bg-blue-50"
+                    className="block border border-gray-200 p-4 hover:border-brand-navy/40 hover:bg-brand-navy/[0.03]"
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs bg-blue-100 px-2 py-1 text-blue-800">
+                      <span className="text-xs bg-brand-navy/10 px-2 py-1 text-brand-navy">
                         Correspondence
                       </span>
                       <h3 className="font-semibold text-gray-900">{result.title}</h3>

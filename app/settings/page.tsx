@@ -134,38 +134,38 @@ export default function SettingsPage() {
       <div className="flex gap-2 mb-6 pb-6 border-b-2 border-gray-300">
         <Link
           href="/settings"
-          className="px-4 py-2 bg-blue-600 text-white font-semibold border-2 border-blue-600"
+          className="px-4 py-2 bg-brand-navy text-white font-semibold border border-brand-navy"
         >
           User Profile
         </Link>
         <Link
           href="/settings/organization"
-          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-blue-600"
+          className="px-4 py-2 bg-white text-gray-700 font-semibold border border-gray-200 hover:border-brand-navy"
         >
           Organization
         </Link>
         <Link
           href="/settings/billing"
-          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-blue-600"
+          className="px-4 py-2 bg-white text-gray-700 font-semibold border border-gray-200 hover:border-brand-navy"
         >
           Billing
         </Link>
       </div>
 
       {error && (
-        <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6">
+        <div className="border border-red-300 bg-red-50 px-4 py-3 mb-6">
           <p className="text-red-800 text-sm">{error}</p>
         </div>
       )}
 
       {success && (
-        <div className="border-2 border-green-600 bg-green-50 px-4 py-3 mb-6">
+        <div className="border border-green-400 bg-green-50 px-4 py-3 mb-6">
           <p className="text-green-800 text-sm">{success}</p>
         </div>
       )}
 
       {/* User Email (Read-only) */}
-      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+      <div className="bg-white border border-gray-200 p-6 mb-6">
         <h2 className="text-xl font-bold mb-4 text-gray-900">Email Address</h2>
         <p className="text-sm text-gray-600 mb-4">
           Your email address is managed by your authentication provider and cannot
@@ -180,7 +180,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Display Name */}
-      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+      <div className="bg-white border border-gray-200 p-6 mb-6">
         <h2 className="text-xl font-bold mb-4 text-gray-900">Display Name</h2>
         <p className="text-sm text-gray-600 mb-4">
           Your display name is shown to other users and on correspondence entries
@@ -211,7 +211,7 @@ export default function SettingsPage() {
           <Button
             type="submit"
             disabled={isSaving || displayName === (profile?.display_name || '')}
-            className="bg-blue-600 text-white hover:bg-blue-700"
+            className="bg-brand-navy text-white hover:bg-brand-navy-hover"
           >
             {isSaving ? 'Saving...' : 'Save Display Name'}
           </Button>
@@ -219,7 +219,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Email Forwarding */}
-      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+      <div className="bg-white border border-gray-200 p-6 mb-6">
         <h2 className="text-xl font-bold mb-2 text-gray-900">Email Forwarding</h2>
         <p className="text-sm text-gray-600 mb-5">
           Forward emails to your unique address and they&rsquo;ll appear in your{' '}
@@ -314,7 +314,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Tools Section */}
-      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+      <div className="bg-white border border-gray-200 p-6 mb-6">
         <h2 className="text-xl font-bold mb-4 text-gray-900">Tools</h2>
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-4">
@@ -329,7 +329,7 @@ export default function SettingsPage() {
             </div>
             <Link
               href="/bookmarklet"
-              className="shrink-0 px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 border-2 border-blue-600"
+              className="shrink-0 px-4 py-2 bg-brand-navy text-white font-semibold hover:bg-brand-navy-hover"
             >
               Install
             </Link>
@@ -341,7 +341,7 @@ export default function SettingsPage() {
       <Button
         variant="outline"
         onClick={() => router.push('/dashboard')}
-        className="border-2 border-gray-800"
+        className="border border-gray-200"
       >
         Back to Dashboard
       </Button>
