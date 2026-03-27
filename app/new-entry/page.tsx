@@ -857,7 +857,11 @@ ${emailBody || ''}`
     } else {
       setIsDirty(false)
       localStorage.removeItem(DRAFT_KEY)
-      router.push(`/businesses/${selectedBusinessId}?saved=true`)
+      if (searchParams.get('onboarding') === 'true') {
+        router.push('/onboarding/email-forwarding')
+      } else {
+        router.push(`/businesses/${selectedBusinessId}?saved=true`)
+      }
     }
   }
 
@@ -918,7 +922,11 @@ ${emailBody || ''}`
     } else {
       setIsDirty(false)
       localStorage.removeItem(DRAFT_KEY)
-      router.push(`/businesses/${selectedBusinessId}?saved=true`)
+      if (searchParams.get('onboarding') === 'true') {
+        router.push('/onboarding/email-forwarding')
+      } else {
+        router.push(`/businesses/${selectedBusinessId}?saved=true`)
+      }
     }
   }
 
@@ -1092,7 +1100,7 @@ ${emailBody || ''}`
               <span className="inline-block w-5 h-1 rounded-full bg-white opacity-30" />
               <span className="inline-block w-5 h-1 rounded-full bg-white opacity-90" />
             </div>
-            <span className="text-sm font-semibold text-white">Step 4 of 4 — Add your first entry</span>
+            <span className="text-sm font-semibold text-white">Step 4 of 5 — Add your first entry</span>
           </div>
           <a
             href={`/businesses/${businessIdFromQuery}`}

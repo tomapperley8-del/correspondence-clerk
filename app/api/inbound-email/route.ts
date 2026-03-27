@@ -12,7 +12,12 @@
  *  3. Rate limit check (per org)
  *  4. Spam/junk filter
  *  5. Strip quoted content
- *  6. Domain match → auto-file OR save to inbound_queue
+ *  6. Detect direction: received (forwarded) vs sent (BCCed)
+ *  7. Domain match → auto-file OR save to inbound_queue
+ *
+ * Direction detection:
+ *  - Forwarded (received): user's token address appears in the To/Cc headers
+ *  - BCCed (sent): token only appears in OriginalRecipient — To shows real recipients
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -24,16 +29,20 @@ import { isPersonalDomain, stripQuotedContent } from '@/lib/inbound/utils'
 
 export const maxDuration = 30
 
-// Personal domains are defined in inbound-email actions and re-exported here.
-// isPersonalDomain is imported above.
-
 type PostmarkHeader = { Name: string; Value: string }
+type PostmarkEmailAddress = { Email: string; Name: string; MailboxHash?: string }
 
 type PostmarkPayload = {
   From: string
   FromName: string
   FromFull: { Email: string; Name: string }
   To: string
+  ToFull: PostmarkEmailAddress[]
+  Cc: string
+  CcFull: PostmarkEmailAddress[]
+  Bcc: string
+  BccFull: PostmarkEmailAddress[]
+  OriginalRecipient: string
   Subject: string
   TextBody: string
   HtmlBody: string
@@ -64,11 +73,45 @@ function verifyPostmarkSignature(rawBody: string, signature: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Token extraction
+// Token extraction — checks OriginalRecipient, To, Cc, Bcc in order
 // ---------------------------------------------------------------------------
-function extractToken(toField: string): string | null {
-  const match = toField.match(/([a-z0-9-]+)@in\.correspondenceclerk\.com/i)
-  return match ? match[1].toLowerCase() : null
+function extractToken(payload: PostmarkPayload): string | null {
+  const candidates = [
+    payload.OriginalRecipient ?? '',
+    payload.To ?? '',
+    payload.Cc ?? '',
+    payload.Bcc ?? '',
+  ]
+  for (const field of candidates) {
+    const match = field.match(/([a-z0-9-]+)@in\.correspondenceclerk\.com/i)
+    if (match) return match[1].toLowerCase()
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Direction detection
+// BCCed (sent): token is in OriginalRecipient but NOT in To/Cc headers.
+// Forwarded (received): token appears in To or Cc headers.
+// ---------------------------------------------------------------------------
+function detectDirection(payload: PostmarkPayload, token: string): 'received' | 'sent' {
+  const pattern = new RegExp(`${token}@in\\.correspondenceclerk\\.com`, 'i')
+  const inTo = pattern.test(payload.To ?? '')
+  const inCc = pattern.test(payload.Cc ?? '')
+  return inTo || inCc ? 'received' : 'sent'
+}
+
+// ---------------------------------------------------------------------------
+// Extract recipient emails from To + Cc, excluding our own inbound address
+// ---------------------------------------------------------------------------
+function extractRecipientEmails(payload: PostmarkPayload): string[] {
+  const all: PostmarkEmailAddress[] = [
+    ...(payload.ToFull ?? []),
+    ...(payload.CcFull ?? []),
+  ]
+  return all
+    .map(r => r.Email?.toLowerCase() ?? '')
+    .filter(e => e && !e.includes('@in.correspondenceclerk.com'))
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +165,6 @@ async function checkOrgRateLimit(
   const windowStart = new Date(now - windowMs).toISOString()
   const expiresAt = new Date(now + windowMs).toISOString()
 
-  // Upsert a rate_limits row for this org + endpoint
   const { data, error } = await supabase
     .from('rate_limits')
     .select('request_count, window_start')
@@ -133,7 +175,6 @@ async function checkOrgRateLimit(
   if (error) return true // fail open
 
   if (!data || data.window_start < windowStart) {
-    // No row or expired window — start fresh
     await supabase
       .from('rate_limits')
       .upsert(
@@ -149,7 +190,7 @@ async function checkOrgRateLimit(
     return true
   }
 
-  if (data.request_count >= limit) return false // over limit
+  if (data.request_count >= limit) return false
 
   await supabase
     .from('rate_limits')
@@ -163,9 +204,25 @@ async function checkOrgRateLimit(
 // ---------------------------------------------------------------------------
 // Build raw text for AI formatter
 // ---------------------------------------------------------------------------
-function buildRawForAI(payload: PostmarkPayload, strippedBody: string): string {
+function buildRawForAI(payload: PostmarkPayload, strippedBody: string, direction: 'received' | 'sent'): string {
   const fromName = payload.FromFull?.Name ?? payload.FromName ?? ''
   const fromEmail = payload.FromFull?.Email ?? payload.From ?? ''
+
+  if (direction === 'sent') {
+    // For sent emails, show recipients in the header block
+    const toLine = payload.To ? `To: ${payload.To}` : ''
+    const ccLine = payload.Cc ? `Cc: ${payload.Cc}` : ''
+    return [
+      `From: ${fromName} <${fromEmail}>`,
+      toLine,
+      ccLine,
+      `Date: ${payload.Date}`,
+      `Subject: ${payload.Subject ?? ''}`,
+      '',
+      strippedBody,
+    ].filter(Boolean).join('\n')
+  }
+
   return [
     `From: ${fromName} <${fromEmail}>`,
     `Date: ${payload.Date}`,
@@ -191,6 +248,7 @@ async function insertCorrespondenceServiceRole(
     entryDate: string
     formattingStatus: string
     fromEmail: string
+    direction: 'received' | 'sent'
   }
 ): Promise<void> {
   const { data: contentHash } = await supabase.rpc('compute_content_hash', {
@@ -220,12 +278,12 @@ async function insertCorrespondenceServiceRole(
     entry_date: opts.entryDate,
     subject: opts.subject,
     type: 'Email',
-    direction: 'received',
+    direction: opts.direction,
     action_needed: 'none',
     formatting_status: opts.formattingStatus,
     content_hash: contentHash || null,
     ai_metadata: {
-      source: 'inbound_email',
+      source: opts.direction === 'sent' ? 'bcc_capture' : 'inbound_email',
       from_email: opts.fromEmail,
     },
   })
@@ -234,6 +292,47 @@ async function insertCorrespondenceServiceRole(
     .from('businesses')
     .update({ last_contacted_at: opts.entryDate })
     .eq('id', opts.businessId)
+}
+
+// ---------------------------------------------------------------------------
+// Match a business from a list of email addresses (used for sent/BCC path)
+// Returns { businessId, contactId } for the first recognisable domain, or null.
+// ---------------------------------------------------------------------------
+async function matchBusinessFromRecipients(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  orgId: string,
+  recipientEmails: string[]
+): Promise<{ businessId: string; contactId: string | null; matchedEmail: string } | null> {
+  for (const email of recipientEmails) {
+    const domain = email.split('@')[1] ?? ''
+    if (!domain || isPersonalDomain(domain)) continue
+
+    // Check domain_mappings first (fastest)
+    const { data: mapping } = await supabase
+      .from('domain_mappings')
+      .select('business_id')
+      .eq('org_id', orgId)
+      .eq('domain', domain)
+      .maybeSingle()
+
+    if (mapping?.business_id) {
+      // Find matching contact by exact email
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('business_id', mapping.business_id)
+        .contains('emails', [email])
+        .limit(1)
+        .maybeSingle()
+
+      return {
+        businessId: mapping.business_id,
+        contactId: contact?.id ?? null,
+        matchedEmail: email,
+      }
+    }
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +357,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // 3. Extract token and look up user
-  const token = extractToken(payload.To ?? '')
+  const token = extractToken(payload)
   if (!token) return NextResponse.json({}, { status: 200 })
 
   const supabase = createServiceRoleClient()
@@ -286,10 +385,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     (payload.Headers ?? []).map((h: PostmarkHeader) => [h.Name.toLowerCase(), h.Value])
   )
 
-  // 6. Spam filter
+  // 6. Spam filter (applies to both directions)
   const discardReason = shouldDiscard(payload, headers)
   if (discardReason) {
-    // Store as discarded for audit trail
     await supabase.from('inbound_queue').insert({
       org_id: orgId,
       from_email: payload.FromFull?.Email ?? payload.From ?? '',
@@ -302,12 +400,74 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({}, { status: 200 })
   }
 
-  // 7. Extract body
-  const rawBody2 = stripQuotedContent(payload.StrippedTextReply || payload.TextBody || '')
-  const bodyPreview = rawBody2.slice(0, 500)
+  // 7. Detect direction
+  const direction = detectDirection(payload, token)
+
+  // 8. Extract body
+  const strippedBody = stripQuotedContent(payload.StrippedTextReply || payload.TextBody || '')
+  const bodyPreview = strippedBody.slice(0, 500)
   const fromEmail = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
 
-  // 8. Domain match → auto-file or queue
+  // -------------------------------------------------------------------------
+  // SENT path (BCCed email)
+  // -------------------------------------------------------------------------
+  if (direction === 'sent') {
+    const recipientEmails = extractRecipientEmails(payload)
+
+    const match = await matchBusinessFromRecipients(supabase, orgId, recipientEmails)
+
+    if (match) {
+      const rawForAI = buildRawForAI(payload, strippedBody, 'sent')
+      const formatResult = await formatCorrespondence(rawForAI, false)
+
+      let formattedText: string | null = null
+      let entryDate = payload.Date ?? new Date().toISOString()
+      let subject = payload.Subject || '(No subject)'
+      let formattingStatus = 'unformatted'
+
+      if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
+        const ai = formatResult.data
+        formattedText = ai.formatted_text
+        entryDate = ai.entry_date_guess || entryDate
+        subject = ai.subject_guess || subject
+        formattingStatus = 'formatted'
+      }
+
+      await insertCorrespondenceServiceRole(supabase, {
+        orgId, userId,
+        businessId: match.businessId,
+        contactId: match.contactId,
+        rawText: rawForAI,
+        formattedText,
+        subject,
+        entryDate,
+        formattingStatus,
+        fromEmail,
+        direction: 'sent',
+      })
+
+      return NextResponse.json({}, { status: 200 })
+    }
+
+    // No domain match → queue for manual triage
+    // Use primary recipient as the "from" for display purposes in the queue
+    const primaryRecipient = recipientEmails[0] ?? ''
+    await supabase.from('inbound_queue').insert({
+      org_id: orgId,
+      from_email: primaryRecipient || fromEmail,
+      from_name: null,
+      subject: payload.Subject ?? null,
+      body_preview: bodyPreview || null,
+      raw_payload: JSON.parse(rawBody),
+      status: 'pending',
+    })
+
+    return NextResponse.json({}, { status: 200 })
+  }
+
+  // -------------------------------------------------------------------------
+  // RECEIVED path (forwarded email) — existing logic
+  // -------------------------------------------------------------------------
   const domain = fromEmail.split('@')[1] ?? ''
   let autoFiledBusinessId: string | null = null
 
@@ -323,7 +483,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   if (autoFiledBusinessId) {
-    // Find matching contact
     let contactId: string | null = null
     const { data: contact } = await supabase
       .from('contacts')
@@ -334,8 +493,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .maybeSingle()
     contactId = contact?.id ?? null
 
-    // AI format
-    const rawForAI = buildRawForAI(payload, rawBody2)
+    const rawForAI = buildRawForAI(payload, strippedBody, 'received')
     const formatResult = await formatCorrespondence(rawForAI, false)
 
     let formattedText: string | null = null
@@ -361,12 +519,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       entryDate,
       formattingStatus,
       fromEmail,
+      direction: 'received',
     })
 
     return NextResponse.json({}, { status: 200 })
   }
 
-  // 9. No domain match → add to inbound_queue for manual triage
+  // No domain match → add to inbound_queue for manual triage
   await supabase.from('inbound_queue').insert({
     org_id: orgId,
     from_email: fromEmail,

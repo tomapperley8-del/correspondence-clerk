@@ -263,9 +263,10 @@ export default function SettingsPage() {
       <div className="bg-white border border-gray-200 p-6 mb-6">
         <h2 className="text-xl font-bold mb-2 text-gray-900">Email Forwarding</h2>
         <p className="text-sm text-gray-600 mb-5">
-          Forward emails to your unique address and they&rsquo;ll appear in your{' '}
+          One address handles both directions. Forward received emails to it, or BCC it on emails you send.
+          Either way they auto-file once a domain is recognised — or land in your{' '}
           <Link href="/inbox" className="underline" style={{ color: 'var(--brand-navy)' }}>Inbox</Link>{' '}
-          for filing. Once you file an email from a domain, future emails from that domain auto-file.
+          for manual filing.
         </p>
 
         {inboundToken ? (
@@ -297,17 +298,27 @@ export default function SettingsPage() {
                   className="px-4 py-3 text-sm font-semibold cursor-pointer select-none"
                   style={{ color: 'var(--brand-dark)' }}
                 >
-                  Set up Gmail forwarding
+                  Capturing received emails (forwarding rule)
                 </summary>
-                <ol className="px-4 pb-4 pt-2 space-y-2 text-sm text-gray-700 list-decimal list-inside">
-                  <li>Open Gmail &rarr; Settings (gear icon) &rarr; <strong>See all settings</strong></li>
-                  <li>Go to <strong>Forwarding and POP/IMAP</strong> &rarr; <strong>Add a forwarding address</strong></li>
-                  <li>Paste your address above and confirm the verification email Gmail sends you</li>
-                  <li>
-                    Optional: create a Gmail filter (<strong>Filters and Blocked Addresses</strong> tab) to only
-                    forward emails from specific senders or domains
-                  </li>
-                </ol>
+                <div className="px-4 pb-4 pt-2 space-y-4 text-sm text-gray-700">
+                  <p>Set up a forwarding rule in your email client so incoming emails are automatically forwarded to your address above. They&rsquo;ll be filed as <strong>received</strong>.</p>
+                  <div>
+                    <p className="font-semibold mb-1">Gmail</p>
+                    <ol className="space-y-1 list-decimal list-inside">
+                      <li>Settings (gear icon) &rarr; <strong>See all settings</strong> &rarr; <strong>Forwarding and POP/IMAP</strong></li>
+                      <li>Add a forwarding address and confirm the verification email</li>
+                      <li>Optional: use <strong>Filters</strong> to forward only emails from specific senders or domains</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <p className="font-semibold mb-1">Outlook</p>
+                    <ol className="space-y-1 list-decimal list-inside">
+                      <li>Settings (gear icon) &rarr; <strong>Mail</strong> &rarr; <strong>Forwarding</strong></li>
+                      <li>Toggle <strong>Enable forwarding</strong> on and paste your address</li>
+                      <li>Alternative: use <strong>Rules</strong> to forward only from specific contacts</li>
+                    </ol>
+                  </div>
+                </div>
               </details>
 
               <details className="border border-gray-200 rounded">
@@ -315,17 +326,31 @@ export default function SettingsPage() {
                   className="px-4 py-3 text-sm font-semibold cursor-pointer select-none"
                   style={{ color: 'var(--brand-dark)' }}
                 >
-                  Set up Outlook forwarding
+                  Capturing sent emails (BCC)
                 </summary>
-                <ol className="px-4 pb-4 pt-2 space-y-2 text-sm text-gray-700 list-decimal list-inside">
-                  <li>Open Outlook &rarr; Settings (gear icon) &rarr; <strong>Mail</strong> &rarr; <strong>Forwarding</strong></li>
-                  <li>Toggle <strong>Enable forwarding</strong> on and paste your address above</li>
-                  <li>Click <strong>Save</strong> — all new incoming emails will forward automatically</li>
-                  <li>
-                    Alternative: use <strong>Rules</strong> to forward only emails from specific contacts
-                    (Mail &rarr; Rules &rarr; Add new rule)
-                  </li>
-                </ol>
+                <div className="px-4 pb-4 pt-2 space-y-3 text-sm text-gray-700">
+                  <p>
+                    When sending an email, add your address to the <strong>BCC</strong> field.
+                    The system detects it was a sent email and files it as <strong>sent</strong>, matching the business from the recipients rather than the sender.
+                  </p>
+                  <p>
+                    Most email clients let you set a default BCC address so this happens automatically on every email you send.
+                  </p>
+                  <div>
+                    <p className="font-semibold mb-1">Gmail — always BCC yourself</p>
+                    <ol className="space-y-1 list-decimal list-inside">
+                      <li>Install the <strong>Boomerang</strong> or <strong>Mixmax</strong> extension, which both support a default BCC</li>
+                      <li>Or use a Gmail filter with &ldquo;from:me&rdquo; to forward sent mail to your address</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <p className="font-semibold mb-1">Outlook — always BCC yourself</p>
+                    <ol className="space-y-1 list-decimal list-inside">
+                      <li>File &rarr; Options &rarr; <strong>Mail</strong> &rarr; <strong>Send messages</strong></li>
+                      <li>Tick <strong>Automatically Bcc</strong> and paste your address</li>
+                    </ol>
+                  </div>
+                </div>
               </details>
             </div>
 

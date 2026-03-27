@@ -54,22 +54,48 @@ app/actions/
   search.ts              Full-text search (tsvector + GIN)
   import-mastersheet.ts  CSV import with duplicate merging
   export-google-docs.ts  Google Docs export via MCP
+  organizations.ts       Org CRUD + getNavData() (single round-trip for nav state)
+  membership-types.ts    Per-org configurable membership types
 
 app/
-  dashboard/page.tsx           Business list with search/filters/sort
-  businesses/[id]/page.tsx     Letter file view (two-section: Recent + Archive)
-  new-entry/page.tsx           Add correspondence (forced filing + AI formatting)
+  dashboard/page.tsx           Business list with search/filters/sort + onboarding checklist
+  businesses/[id]/page.tsx     Letter file view + sub-components in _components/
+  businesses/[id]/_components/ CorrespondenceEntry, EditForm, ThreadAssignPanel, AllEntriesView,
+                               ThreadsView, FilterBar, DuplicatesWarningBanner, ContactsList
+  new-entry/page.tsx           Add correspondence (forced filing + AI formatting + draft autosave)
+  actions/page.tsx             Priority list + needs-reply + gone-quiet + flagged + reminders
+  daily-briefing/page.tsx      Full-page inline ChatPanel
   search/page.tsx              Full-text search results
-  settings/page.tsx            User settings + Tools (bookmarklet link)
+  import/gmail/page.tsx        Gmail bulk import wizard
+  import/outlook/page.tsx      Outlook bulk import wizard
+  inbox/page.tsx               Inbound email queue triage
+  onboarding/                  4-step flow (create-org → describe-business → first-business → new-entry)
+  settings/page.tsx            User settings + Tools + membership types
   install-bookmarklet/page.tsx Bookmarklet installer (public)
   admin/import/page.tsx        Mastersheet import UI
+
+app/api/
+  inbound-email/route.ts       Postmark webhook → verify → match domain → AI format → auto-file or queue
+  import/[provider]/scan       OAuth email scan (headers only, returns scanId)
+  import/[provider]/execute    Chunked import (150/req, auto-loops client-side)
+  chat/route.ts                Daily Briefing AI endpoint (uses org business_description + industry)
 
 lib/ai/
   formatter.ts             Anthropic structured outputs
   thread-detection.ts      Email chain heuristics
   types.ts                 AI response contracts
 
+lib/
+  inbound/utils.ts             isPersonalDomain, stripQuotedContent
+  email-import/execute-chunk.ts  Shared Gmail+Outlook chunked import logic
+  toast.ts                     Toast emitter (CustomEvent — call toast.success/error/info())
+  supabase/service-role.ts     createServiceRoleClient() for cron/session-less contexts
+
 components/
+  CommandSearch.tsx        Cmd+K global overlay (sessionStorage cache 5min TTL, keyboard nav)
+  Navigation.tsx           App nav + actions badge + Daily Briefing button
+  ChatPanel.tsx            Daily Briefing AI panel (inline=true or slide-out overlay)
+  Toast.tsx                Toast container (singleton in layout.tsx)
   BusinessSelector.tsx     Search dropdown + Add New
   ContactSelector.tsx      Scoped to business, shows details
   AddBusinessModal.tsx     Inline add, auto-select
@@ -77,55 +103,49 @@ components/
   EditBusinessButton.tsx   Edit modal + delete
   EditContactButton.tsx    Edit contact modal
   ExportToGoogleDocsButton.tsx  Export button
+  import/ReviewWizard.tsx  Editable business/contact review before bulk import execute
 
-lib/marketing/
-  companies-house.ts       UK Companies House API client
-  google-places.ts         Google Places API client
-  smartlead.ts             Cold email API client
-  email-generator.ts       AI-generated cold emails
-  prospect-scorer.ts       Lead scoring algorithm
-  sequence-runner.ts       Email sequence automation
-  review-collector.ts      Review request automation
-  content-generator.ts     AI social content generator
-  linkedin.ts              LinkedIn API client
-  twitter.ts               Twitter API client
-  blog-generator.ts        AI blog post generator
-  industry-data.ts         Programmatic SEO data
-
-app/for/[industry]/page.tsx   Programmatic industry landing pages
-app/(public)/tools/           Free tools (email cleaner, letter templates)
-app/api/marketing/cron/       Automated marketing cron jobs
-
-components/marketing/
-  AIChatbot.tsx            Lead capture chatbot
+lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feature Status #19)
 ```
+
+### Key Patterns
+
+- **Server actions**: always auth check + org_id check first → `revalidatePath` after mutations
+- **Supabase client**: `createClient()` from `@/lib/supabase/server` (server actions/routes); `createServiceRoleClient()` for cron or session-less contexts
+- **Design tokens**: NEVER raw hex. Use token classes: `bg-brand-navy`, `text-brand-dark`, `bg-brand-olive`, `bg-brand-paper`, `hover:bg-brand-navy-hover`. CSS vars for inline styles: `var(--link-blue)`, `var(--header-bg)`, `var(--main-bg)`
+- **Duplicate detection**: `content_hash` (SHA256) — groups by hash, excludes dismissed pairs from `duplicate_dismissals`
+- **Thread split**: AI splits → ContactMatchPreviewModal (user reviews contacts) → createFormattedCorrespondence; use `isThreadSplitResponse()` type guard
+- **contact_id nullable**: Note type entries have no contact — guard before accessing contact fields
+- **Toast**: `import { toast } from '@/lib/toast'` then `toast.success('message')` — works anywhere client-side
 
 ### Database Tables
 
-- **businesses** - name, category, status, membership_type (club_card/advertiser/former_club_card/former_advertiser), address, email, phone, notes, contract fields, last_contacted_at
-- **contacts** - business_id, name, emails[], phones[], role, notes (unique per business+email)
-- **correspondence** - business_id, contact_id, cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, edited_at
-- **duplicate_dismissals** - business_id, entry_id_1, entry_id_2, dismissed_by, dismissed_at (tracks user-dismissed duplicate pairs)
-- **user_profiles** - id (references auth.users), organization_id, display_name, role (member/admin)
-- **marketing_prospects** - Companies House data, SIC codes, score, status
-- **marketing_leads** - Lead capture from tools/chatbot, source, score
-- **referrals** - Referral codes, referrer/referee tracking
-- **email_sequence_templates** - Nurture sequence definitions
-- **email_sequence_enrollments** - Users in active sequences
-- **social_content** - Scheduled social media posts
-- **blog_posts** - Auto-generated blog content
-- **review_requests** - Review request tracking
-- **chatbot_conversations** - AI chatbot logs
+- **businesses** - name, category, status, membership_type (string, now configurable per org), address, email, phone, notes, contract fields, last_contacted_at
+- **contacts** - business_id, name, emails[], phones[], role, notes, is_active (unique per business+email)
+- **correspondence** - business_id, contact_id (nullable — Notes have no contact), cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, edited_at, content_hash
+- **duplicate_dismissals** - business_id, entry_id_1, entry_id_2, dismissed_by, dismissed_at
+- **organizations** - id, name, business_description, industry (used in Daily Briefing system prompt)
+- **org_membership_types** - id, org_id, label, value, sort_order, is_active (per-org configurable types)
+- **user_profiles** - id, organization_id, display_name, role (member/admin), google/microsoft OAuth tokens, inbound_email_token
+- **import_queue** - id, org_id, correspondence_id, status (pending/processing/done/failed), retry_count, error
+- **inbound_queue** - queued inbound emails awaiting manual filing
+- **domain_mappings** - org_id, domain, business_id (auto-filing for inbound email, populated on first manual file)
+- **marketing_prospects/leads/referrals/email_sequence_*/social_content/blog_posts/review_requests/chatbot_conversations** - marketing engine tables
 - **RLS:** All authenticated users can read/write (v1 policy)
 
 ## Design Rules
 
 - Very subtle rounded corners (2-4px) - barely perceptible softness for trustworthiness
 - Subtle shadows allowed (use CSS variables: `--shadow-sm`, `--shadow-md`, `--shadow-lg`)
-- British date format (DD/MM/YYYY)
-- All buttons have text labels
-- Warm color palette: off-white backgrounds (#FAFAF8), slate header (#1E293B), mature olive accents (#7C9A5E)
-- Blues: deep navy-slate (#2C4A6E) not bright tech-blue - more legal/financial trustworthiness
+- British date format (DD/MM/YYYY) via `formatDateGB()`
+- All buttons have text labels (no icon-only)
+- Warm palette — token classes only, never raw hex:
+  - `bg-brand-dark` / `text-brand-dark` = #1E293B (slate header)
+  - `bg-brand-navy` / `hover:bg-brand-navy-hover` = #2C4A6E (primary buttons/links)
+  - `bg-brand-olive` = #7C9A5E (accents, secondary actions)
+  - `bg-brand-paper` = #FAFAF8 (page background)
+  - `bg-brand-warm` = #F8F7F4 (card backgrounds)
+  - CSS vars for inline styles: `var(--link-blue)`, `var(--header-bg)`, `var(--main-bg)`
 - Fonts: Lora (serif) for h1/h2 headings, Inter (sans) for body text
 - Gentle transitions (0.2s ease-out on interactive elements)
 - Very soft borders: rgba(0,0,0,0.06) - confident, not cramped
@@ -175,43 +195,36 @@ User takes screenshot (Win+Shift+S) -> double-clicks "Save Screenshot for Claude
 
 ## Feature Status
 
-All features complete and deployed:
+All features complete and deployed (unless noted):
 
-1. Foundation + Auth (Supabase email/password)
-2. Database migrations (10 migrations, all run)
-3. Dashboard + Business pages (search, filters, sort, flexible date range filter)
-4. New Entry flow (forced filing, date required/time optional, direction for emails)
-5. AI Formatter (Anthropic structured outputs, 0 JSON errors, 8K token budget, graceful fallback)
-6. Manual Editing (correction layer, preserves originals, "Corrected" badge)
-7. Full-text Search (business name prioritization, tsvector + GIN)
-8. Mastersheet Import (CSV, duplicate merging, idempotent)
-9. Google Docs Export (MCP integration, print-ready)
-10. Outlook Bookmarklet (email import from Outlook Web, postMessage API)
-11. Gmail Bookmarklet (email import from Gmail, postMessage API)
-12. CC Contacts (optional additional contacts per correspondence entry)
-13. BCC Contacts (hidden recipients, tracked for search)
-14. Membership Type in Contract Details (club_card, advertiser, former_club_card, former_advertiser)
-15. Business Notes (in Business Details section)
-16. Flexible Date Range Filter (1m, 6m, 12m, custom range)
-17. Duplicate Detection (warning banner on business page, delete or dismiss duplicates)
-18. SaaS Foundation (feature flags, Stripe billing, landing page, pricing page, terms/privacy)
-19. Automated Marketing Engine (prospect discovery, cold email, social autopilot, programmatic SEO, blog automation, free tools, AI chatbot, referral system, review automation)
+1. Foundation + Auth (Supabase email/password, user roles member/admin)
+2. Dashboard + Business pages (search, filters, sort, flexible date range, DB pagination)
+3. New Entry flow (forced filing, date required/time optional, direction for emails, draft autosave)
+4. AI Formatter (Anthropic structured outputs, 8K token budget, graceful fallback)
+5. Manual Editing (correction layer, preserves originals, "Corrected" badge)
+6. Full-text Search (business name prioritization, tsvector + GIN)
+7. Mastersheet Import (CSV, duplicate merging, idempotent)
+8. Google Docs Export (MCP integration, print-ready)
+9. Outlook + Gmail Bookmarklets (email import via postMessage API)
+10. CC + BCC Contacts (tracked for search)
+11. Duplicate Detection (content_hash, warning banner, delete or dismiss)
+12. SaaS Foundation (feature flags, Stripe billing, landing page, pricing page, terms/privacy)
+13. Automated Marketing Engine (prospect discovery, cold email, social autopilot, programmatic SEO, blog, free tools, AI chatbot, referral system, review automation)
+14. Bulk Email Import Wizard (Gmail + Outlook OAuth, chunked execute, ReviewWizard)
+15. Daily Briefing (AI chat panel — inline page + slide-out overlay, org business context)
+16. Configurable Membership Types (per-org settings UI)
+17. Onboarding flow (4-step: org → describe business → first business+contact → first entry)
+18. Actions page (priority list, needs-reply, gone-quiet, flagged, reminders, keyboard shortcuts)
+19. Inbound Email Forwarding + BCC Capture — **live** (Postmark configured 27/03/2026, see MEMORY.md for full setup details)
 
 ## Recent Changes
 
-- **Feb 02, 2026 (PM):** Fully automated marketing engine complete. Added prospect discovery (Companies House + Google Places), cold email automation (Smartlead integration with AI-generated emails), social media autopilot (LinkedIn + Twitter), programmatic SEO (15+ industry landing pages at /for/[industry]), blog automation, free tools (email cleaner, letter templates), AI chatbot for lead capture, referral system, email nurture sequences, review request automation. Target ICP: freelance consultants, small agencies (2-5 people), independent accountants/bookkeepers. 8 Vercel cron jobs configured for full automation.
-
-- **Feb 02, 2026:** SaaS productization Phase 1 complete. Added feature flags system, Stripe billing integration (subscriptions, webhooks, billing portal), landing page with marketing components, pricing page, features page, terms of service, privacy policy. Updated middleware for trial expiry checks. Organization creation now sets up 14-day trial when billing enabled. Signup page now includes terms agreement checkbox.
-
-- **Jan 31, 2026 (PM):** Additional performance optimizations: added 500ms debounce to contact extraction (new-entry page), optimized getCorrespondenceByBusiness/getContactsByBusiness/getBusinessById/getContactById to select specific columns instead of SELECT *, added GIN index for cc_contact_ids and indexes for temporary_email_data (token, expires_at), optimized email import contact matching with query-side filter (eliminates loop over 100 contacts).
-- **Jan 31, 2026:** Performance optimizations: added 300ms debounce to thread detection (eliminates input lag), reduced AI max_tokens to 8192 (reduced latency), optimized getBusinesses to fetch only required columns (30-40% less data), combined contact delete queries (3x fewer round-trips), added GIN index for bcc_contact_ids, limited duplicate detection to recent 500 entries, added useMemo to dashboard filtering.
-- **Jan 30, 2026 (PM):** Added duplicate detection with warning banner on business page (uses content_hash). Users can delete newer entry or mark as "not duplicate". Added loading indicators across site (ConfirmDialog, modals, delete buttons show "Deleting...", "Saving..." etc.).
-- **Jan 30, 2026 (AM):** Pre-launch security fixes: removed unauthenticated /api/run-migration endpoint (CRITICAL), added user roles (member/admin) with admin-only protection on /admin/* routes and import actions, implemented SendGrid email delivery for invitations, added rate limiting to AI formatter (20/min), search (30/min), and email import (60/min) endpoints.
-- **Jan 29, 2026 (PM):** Added BCC contacts, membership_type in Contract Details (replaces is_club_card/is_advertiser checkboxes), business notes in Business Details, flexible date range filter (1m/6m/12m/custom). Fixed notes deletion (nullable schema), contact deletion now checks for linked correspondence and shows helpful error. Simplified help page.
-- **Jan 29, 2026 (AM):** Bug fixes (delete contact dialog, notes cursor jump, contact notes visibility, contact selection error). Added Gmail bookmarklet support, CC contacts feature, rewrote USER_GUIDE.md.
-- **Jan 28, 2026:** Lint cleanup - fixed 52 issues (54→27 errors, 36→11 warnings). Removed unused code, replaced `any` types, fixed JSX entities.
-- **Jan 26, 2026:** Bookmarklet race condition fix (href set before drag), API uses production URL, Settings > Tools section added
-- **Jan 22, 2026:** Eliminated AI JSON errors with Anthropic structured outputs, 100% test success rate
+- **Mar 27, 2026:** Inbound email + BCC capture live — Postmark configured (webhook, inbound domain `in.correspondenceclerk.com`, MX record in Vercel, env vars deployed). BCC detection uses `OriginalRecipient` field; sent emails matched from To/Cc recipients. Settings UI updated to explain both use cases. P8 complete — all border-2/blue-600 eliminated, replaced with brand tokens across 11 files. P5: Actions nav hidden until first entry. P6: describe-your-business onboarding step + dashboard completion checklist. P7: mobile Daily Briefing button + custom favicon (CC initials).
+- **Mar 26, 2026:** Security fix (org_id guard on /api/businesses). Bug fixes (call direction badge, note formatting, keyboard shortcuts). Cmd+K sessionStorage cache (5min TTL). Actions all-clear panel. Inbound email code complete + DB migrated.
+- **Mar 25, 2026:** Code audit — design token system (7 brand tokens, 200+ hex replacements). Business page refactor (2180→1200 lines, 8 sub-components). DB pagination (limit/offset, Load More, refreshCorrespondence helper). Actions priority list + direction badges + snippets.
+- **Mar 24, 2026:** Bulk email import (Gmail + Outlook OAuth, chunked execute, ReviewWizard). Unified Actions page. Daily Briefing page + ChatPanel (inline + slide-out). Landing page full rewrite. UX polish (toasts, Cmd+K, draft autosave, optimistic actions, new entries badge, jump to today).
+- **Mar 23, 2026:** Configurable membership types per org. Organisation profile (business_description + industry for AI context). 4-step onboarding flow.
+- **Feb 02, 2026:** Marketing engine + SaaS productization (Stripe billing, feature flags, landing page, pricing page).
 
 ## Known Issues
 
