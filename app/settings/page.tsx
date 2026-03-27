@@ -325,6 +325,17 @@ export default function SettingsPage() {
                 Your primary sign-in email is detected automatically.
               </p>
               <div className="flex flex-wrap gap-2 mb-3">
+                {/* Auth email — always present, cannot be removed */}
+                {userEmail && (
+                  <span
+                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm"
+                    style={{ background: 'rgba(44,74,110,0.08)', color: 'var(--brand-dark)' }}
+                  >
+                    {userEmail}
+                    <span className="text-gray-400">(primary)</span>
+                  </span>
+                )}
+                {/* Additional registered addresses */}
                 {ownEmailAddresses.map(email => (
                   <span
                     key={email}
@@ -341,9 +352,6 @@ export default function SettingsPage() {
                     </button>
                   </span>
                 ))}
-                {ownEmailAddresses.length === 0 && (
-                  <span className="text-xs text-gray-400">No extra addresses added yet.</span>
-                )}
               </div>
               <div className="flex gap-2">
                 <input
@@ -435,7 +443,7 @@ export default function SettingsPage() {
                 disabled={sendingTest}
                 className="px-4 py-2 text-sm font-medium text-white rounded transition-colors"
                 style={{
-                  backgroundColor: sendingTest ? 'rgba(0,0,0,0.2)' : 'var(--brand-navy)',
+                  backgroundColor: sendingTest ? 'rgba(0,0,0,0.2)' : '#2C4A6E',
                   cursor: sendingTest ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -463,9 +471,9 @@ export default function SettingsPage() {
           <button
             onClick={handleFormatAll}
             disabled={isFormatting}
-            className="px-4 py-2 text-sm font-semibold text-white transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-white rounded-sm transition-colors"
             style={{
-              backgroundColor: isFormatting ? 'rgba(0,0,0,0.2)' : 'var(--brand-navy)',
+              backgroundColor: isFormatting ? 'rgba(0,0,0,0.2)' : '#2C4A6E',
               cursor: isFormatting ? 'not-allowed' : 'pointer',
             }}
           >

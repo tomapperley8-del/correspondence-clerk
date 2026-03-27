@@ -373,6 +373,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const orgId: string = profile.organization_id
   const userId: string = profile.id
 
+  // Fetch the user's auth email so we can treat it as an own address
+  const { data: authUserData } = await supabase.auth.admin.getUserById(userId)
+  const authEmail = authUserData?.user?.email?.toLowerCase() ?? ''
+
   // 4. Rate limit
   const allowed = await checkOrgRateLimit(supabase, orgId)
   if (!allowed) {
@@ -407,9 +411,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let direction = detectDirection(payload, token)
   const fromEmail = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
 
-  // Override: if detected as 'received' but From is in the user's own email addresses,
-  // it's a forwarded sent email — treat as 'sent'
-  const ownEmails: string[] = (profile.own_email_addresses ?? []).map((e: string) => e.toLowerCase())
+  // Override: if detected as 'received' but From is in the user's own email addresses
+  // (auth email always counts, plus any extras they've registered), treat as 'sent'
+  const ownEmails: string[] = [
+    authEmail,
+    ...(profile.own_email_addresses ?? []).map((e: string) => e.toLowerCase()),
+  ].filter(Boolean)
   if (direction === 'received' && ownEmails.includes(fromEmail)) {
     direction = 'sent'
   }
