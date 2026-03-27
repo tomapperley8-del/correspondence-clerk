@@ -13,6 +13,7 @@ interface AddContactModalProps {
   onClose: () => void
   businessId: string
   onContactAdded: (contact: Contact) => void
+  initialEmail?: string
 }
 
 export function AddContactModal({
@@ -20,10 +21,11 @@ export function AddContactModal({
   onClose,
   businessId,
   onContactAdded,
+  initialEmail,
 }: AddContactModalProps) {
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
-  const [emails, setEmails] = useState<string[]>([''])
+  const [emails, setEmails] = useState<string[]>([initialEmail ?? ''])
   const [phones, setPhones] = useState<string[]>([''])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)

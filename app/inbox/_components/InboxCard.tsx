@@ -149,7 +149,7 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
               disabled={!selectedBusinessId || filing}
               className="px-4 py-2 text-sm font-medium text-white rounded-sm transition-colors"
               style={{
-                backgroundColor: selectedBusinessId && !filing ? 'var(--brand-navy)' : 'rgba(0,0,0,0.2)',
+                backgroundColor: selectedBusinessId && !filing ? '#2C4A6E' : 'rgba(0,0,0,0.2)',
                 cursor: selectedBusinessId && !filing ? 'pointer' : 'not-allowed',
               }}
             >
@@ -187,6 +187,7 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
           isOpen={showAddContact}
           onClose={() => setShowAddContact(false)}
           businessId={selectedBusinessId}
+          initialEmail={item.from_email}
           onContactAdded={(contact) => {
             setContacts((prev) => [...prev, contact])
             setSelectedContactId(contact.id)
