@@ -120,8 +120,8 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
   }
 
   const preview = cleanPreview(item.body_preview ?? '')
-  const fullBody = item.body_text ?? ''
-  const hasMoreBody = fullBody.length > (item.body_preview?.length ?? 0) + 20
+  const fullBody = cleanPreview(item.body_text ?? '')
+  const hasMoreBody = fullBody.length > preview.length + 20
 
   // Recipient label: for sent emails show who was emailed, for received show sender
   const senderLabel = isSent
@@ -173,38 +173,45 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
         </div>
 
         {/* Body preview / full body */}
-        {preview && !showFullBody && (
+        {!showFullBody && (
           <div className="mb-3">
-            <p className="text-sm italic line-clamp-2" style={{ color: 'rgba(0,0,0,0.55)' }}>
-              {preview}
-            </p>
-            {hasMoreBody && (
-              <button
-                onClick={() => setShowFullBody(true)}
-                className="text-xs mt-1"
-                style={{ color: 'var(--link-blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-              >
-                Show more
-              </button>
+            {preview && (
+              <p className="text-sm italic line-clamp-1 mb-1" style={{ color: 'rgba(0,0,0,0.55)' }}>
+                {preview}
+              </p>
             )}
+            <div className="flex items-center gap-2">
+              <p className="text-xs" style={{ color: 'rgba(0,0,0,0.35)' }}>
+                AI will format this when filed
+              </p>
+              {hasMoreBody && (
+                <button
+                  onClick={() => setShowFullBody(true)}
+                  className="text-xs"
+                  style={{ color: 'var(--link-blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  Show full email
+                </button>
+              )}
+            </div>
           </div>
         )}
         {showFullBody && fullBody && (
           <div className="mb-3">
-            <pre
-              className="text-sm whitespace-pre-wrap font-sans"
+            <p
+              className="text-sm whitespace-pre-wrap"
               style={{
                 color: 'rgba(0,0,0,0.7)',
                 background: 'rgba(0,0,0,0.02)',
                 border: '1px solid rgba(0,0,0,0.06)',
                 borderRadius: '4px',
                 padding: '10px 12px',
-                maxHeight: '300px',
+                maxHeight: '260px',
                 overflowY: 'auto',
               }}
             >
               {fullBody}
-            </pre>
+            </p>
             <button
               onClick={() => setShowFullBody(false)}
               className="text-xs mt-1"
