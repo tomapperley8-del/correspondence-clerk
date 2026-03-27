@@ -329,6 +329,7 @@ export async function updateFormattedText(
 
   const updateData: Record<string, unknown> = {
     formatted_text_current: formattedTextCurrent,
+    formatting_status: 'formatted',
     edited_at: new Date().toISOString(),
     edited_by: user.id,
   }

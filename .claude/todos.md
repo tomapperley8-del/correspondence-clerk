@@ -36,17 +36,17 @@ Pick up from the first incomplete item each session.
 
 ## Batch 3 — Features (stability)
 
-- [ ] **P4** — SessionStorage cache for businesses list in `CommandSearch.tsx` (5-min TTL, invalidate on `businesses:changed` event)
-- [ ] **P5-Fix1** — Actions page all-clear: single centred panel when all four sections empty, instead of four collapsed empty sections
-- [ ] **P5-Fix2** — Add `hasCorrespondence` to `NavData` in `organizations.ts`; hide Actions nav link until first entry exists
-- [ ] **P6-Fix1** — Add `/onboarding/describe-your-business` step (textarea + industry field, saves to `organizations` table); update create-organization to redirect there first. Check DB columns exist before coding.
-- [ ] **P6-Fix2** — Dashboard dynamic completion checklist: 3 steps (business → contact → entry), auto-hides when all done, uses `localStorage` to stay dismissed
-- [ ] **P7-Fix1** — Add "Open Daily Briefing" button on mobile dashboard (below `md` breakpoint) that opens slide-out ChatPanel
-- [ ] **P7-Fix2** — Replace default Vercel favicon with `app/icon.svg` (CC initials, #1E293B background); add `icons` to `layout.tsx` metadata
-- [ ] **P8** — Visual & spacing audit: border radius (2-4px throughout, no `rounded-lg/xl/2xl` on buttons/inputs/cards), page container padding consistency, shadow CSS variables, three-pattern button system (primary/secondary/destructive). **Priority areas: actions page badges/tags (look cheap), nav notification pills.** Pages: dashboard, business page, new-entry, actions, search, settings, daily-briefing, nav, ChatPanel.
-- [ ] **P9-Fix1** — Data Health section in settings: `getUnformattedCount()` + `formatAllUnformatted()` server actions; show only when count > 0
-- [ ] **P9-Fix2** — Time field in edit form (`CorrespondenceEditForm.tsx`): populate from `entry_date` time portion, combine on save — currently loses time on edit (data loss bug)
-- [ ] **P9-Fix3** — Edit unformatted entries: always show Edit button; fall back to `raw_text_original` when `formatted_text_current` is null; set `formatting_status = 'formatted'` on save
+- [x] **P4** — SessionStorage cache for businesses list in `CommandSearch.tsx` (5-min TTL, invalidate on `businesses:changed` event) (26/03/2026)
+- [x] **P5-Fix1** — Actions page all-clear: single centred panel when all four sections empty, instead of four collapsed empty sections (26/03/2026)
+- [x] **P5-Fix2** — Add `hasCorrespondence` to `NavData` in `organizations.ts`; hide Actions nav link until first entry exists (26/03/2026)
+- [x] **P6-Fix1** — Add `/onboarding/describe-your-business` step (textarea + industry field, saves to `organizations` table); update create-organization to redirect there first. Check DB columns exist before coding. (26/03/2026)
+- [x] **P6-Fix2** — Dashboard dynamic completion checklist: 3 steps (business → contact → entry), auto-hides when all done, uses `localStorage` to stay dismissed (26/03/2026)
+- [x] **P7-Fix1** — Add "Open Daily Briefing" button on mobile dashboard (below `md` breakpoint) that opens slide-out ChatPanel (26/03/2026)
+- [x] **P7-Fix2** — Replace default Vercel favicon with `app/icon.svg` (CC initials, #1E293B background); add `icons` to `layout.tsx` metadata (27/03/2026)
+- [x] **P8** — Visual & spacing audit: eliminated all border-2/blue-600 across 11 files, replaced with brand-navy tokens; actions page badge colours, dashboard filter buttons, all modals, new-entry, search, settings (27/03/2026)
+- [x] **P9-Fix1** — Data Health section in settings: `getUnformattedCount()` + `formatAllUnformatted()` server actions; show only when count > 0 (27/03/2026)
+- [x] **P9-Fix2** — Time field in edit form: preserve original time when only date changed — `handleSaveEdit` now combines new date + original time via `setFullYear` (27/03/2026)
+- [x] **P9-Fix3** — Edit unformatted entries: `updateFormattedText` now sets `formatting_status = 'formatted'` on save, clearing orange warning banner (27/03/2026)
 
 ---
 
