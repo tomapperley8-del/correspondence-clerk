@@ -108,11 +108,11 @@ export function EditBusinessButton({ business }: { business: Business }) {
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="edit-business-title" className="bg-white border-2 border-gray-800 p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="edit-business-title" className="bg-white border border-gray-200 shadow-[var(--shadow-lg)] p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
           <h2 id="edit-business-title" className="text-xl font-bold text-gray-900 mb-4">Edit Business</h2>
 
           {error && (
-            <div className="bg-red-50 border-2 border-red-600 p-3 mb-4" role="alert">
+            <div className="bg-red-50 border border-red-300 p-3 mb-4" role="alert">
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
@@ -129,7 +129,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
-                className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600"
+                className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
               />
             </div>
 
@@ -144,7 +144,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 placeholder="e.g., Food & Drink, Collaborator, Health & Wellness"
-                className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600"
+                className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
               />
             </div>
 
@@ -159,7 +159,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="Internal notes about this business..."
                 rows={4}
-                className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none resize-y"
+                className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none resize-y"
               />
             </div>
 
@@ -168,7 +168,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
               <Button
                 type="submit"
                 disabled={saving}
-                className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+                className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
@@ -184,7 +184,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
           </form>
 
           {/* Danger Zone - Delete Business */}
-          <div className="mt-6 pt-6 border-t-2 border-gray-300">
+          <div className="mt-6 pt-6 border-t border-gray-200">
             <h3 className="text-sm font-bold text-red-900 mb-2">Danger Zone</h3>
             <p className="text-xs text-gray-600 mb-3">
               Deleting this business will permanently remove all contacts and correspondence entries.
@@ -217,7 +217,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       {/* Final delete confirmation with typed input */}
       {showFinalDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-          <div ref={finalDeleteRef} role="alertdialog" aria-modal="true" aria-labelledby="final-delete-title" className="bg-white border-2 border-gray-800 p-6 max-w-md w-full mx-4">
+          <div ref={finalDeleteRef} role="alertdialog" aria-modal="true" aria-labelledby="final-delete-title" className="bg-white border border-gray-200 shadow-[var(--shadow-lg)] p-6 max-w-md w-full mx-4">
             <h3 id="final-delete-title" className="text-lg font-bold text-red-900 mb-2">Final Confirmation</h3>
             <p className="text-sm text-gray-700 mb-4">
               Type <strong>DELETE</strong> to confirm deletion of &quot;{business.name}&quot;:

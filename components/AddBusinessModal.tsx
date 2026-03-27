@@ -63,11 +63,11 @@ export function AddBusinessModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Add New Business" className="bg-white border-2 border-gray-800 w-full max-w-2xl p-6">
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Add New Business" className="bg-white border border-gray-200 w-full max-w-2xl p-6 shadow-[var(--shadow-lg)]">
         <h2 className="text-xl font-bold mb-6">Add New Business</h2>
 
         {error && (
-          <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6">
+          <div className="border border-red-300 bg-red-50 px-4 py-3 mb-6">
             <p className="text-red-800 text-sm">{error}</p>
           </div>
         )}
@@ -147,7 +147,7 @@ export function AddBusinessModal({
             <Button
               type="submit"
               disabled={isLoading}
-              className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
             >
               {isLoading ? 'Adding...' : 'Add Business'}
             </Button>

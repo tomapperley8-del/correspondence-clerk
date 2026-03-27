@@ -168,10 +168,10 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
   }) => (
     <button
       onClick={onClick}
-      className={`px-3 py-1 text-sm border-2 transition-colors ${
+      className={`px-3 py-1 text-sm border transition-colors ${
         active
-          ? 'bg-blue-600 text-white border-blue-600'
-          : 'bg-white text-gray-700 border-gray-300 hover:border-blue-600'
+          ? 'bg-brand-navy text-white border-brand-navy'
+          : 'bg-white text-gray-700 border-gray-300 hover:border-brand-navy'
       }`}
     >
       {children}
@@ -247,18 +247,16 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
 
       {/* Bookmarklet Installation Card — only show once there are businesses */}
       {!bookmarkletInstalled && businesses.length > 0 && (
-        <div className="bg-blue-50 border-2 border-blue-600 p-6 mb-6">
+        <div className="border border-brand-navy/20 bg-brand-navy/[0.03] p-5 mb-6 rounded-sm">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                📧 Import Emails
-              </h2>
-              <p className="text-gray-700 mb-4">
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Import Emails</h2>
+              <p className="text-sm text-gray-600 mb-4">
                 Install the Email Import Tool to import emails from Outlook or Gmail with one click.
               </p>
               <Link
                 href="/bookmarklet"
-                className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold hover:bg-blue-700 border-2 border-blue-600"
+                className="inline-block px-4 py-2 bg-brand-navy text-white text-sm font-medium hover:bg-brand-navy-hover transition-colors"
               >
                 Install Email Import Tool
               </Link>

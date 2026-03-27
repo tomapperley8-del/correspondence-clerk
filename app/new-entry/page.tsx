@@ -1009,7 +1009,7 @@ ${emailBody || ''}`
             return (
               <label
                 key={i}
-                className={`flex items-start gap-3 p-4 border-2 cursor-pointer ${checked ? 'border-blue-600 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'}`}
+                className={`flex items-start gap-3 p-4 border cursor-pointer ${checked ? 'border-brand-navy bg-brand-navy/[0.03]' : 'border-gray-200 bg-white hover:border-gray-400'}`}
               >
                 <input
                   type="checkbox"
@@ -1054,7 +1054,7 @@ ${emailBody || ''}`
               }
             }}
             disabled={selectedEmailIndices.size === 0}
-            className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-2 font-semibold"
+            className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-2 font-semibold"
           >
             Import Selected ({selectedEmailIndices.size})
           </Button>
@@ -1074,7 +1074,7 @@ ${emailBody || ''}`
       {/* Loading state for token-based email retrieval */}
       {isLoading && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white px-8 py-6 border-2 border-gray-900">
+          <div className="bg-white px-8 py-6 border border-gray-200 shadow-[var(--shadow-sm)]">
             <p className="text-lg font-semibold text-gray-900">Loading email data...</p>
           </div>
         </div>
@@ -1125,7 +1125,7 @@ ${emailBody || ''}`
 
       {/* Action Error Banner */}
       {actionError && (
-        <div role="alert" className="bg-red-50 border-2 border-red-600 p-4 mb-6">
+        <div role="alert" className="bg-red-50 border border-red-300 p-4 mb-6">
           <div className="flex justify-between items-start">
             <p className="text-sm text-red-900 font-semibold">{actionError}</p>
             <button
@@ -1141,7 +1141,7 @@ ${emailBody || ''}`
 
       {/* Action Warning Banner */}
       {actionWarning && (
-        <div role="status" className="bg-yellow-50 border-2 border-yellow-600 p-4 mb-6">
+        <div role="status" className="bg-yellow-50 border border-yellow-400 p-4 mb-6">
           <div className="flex justify-between items-start">
             <p className="text-sm text-yellow-900">{actionWarning}</p>
             <button
@@ -1156,11 +1156,11 @@ ${emailBody || ''}`
       )}
 
       {emailImported && (
-        <div className="mb-6 border-2 border-blue-600 bg-blue-50 px-4 py-3">
-          <p className="text-blue-900 font-semibold text-sm">
+        <div className="mb-6 border border-brand-navy/30 bg-brand-navy/[0.04] px-4 py-3">
+          <p className="text-brand-dark font-semibold text-sm">
             Email imported
           </p>
-          <p className="text-blue-700 text-sm mt-1">
+          <p className="text-brand-navy text-sm mt-1">
             Please verify business and contact selection, then save the entry.
           </p>
         </div>
@@ -1178,7 +1178,7 @@ ${emailBody || ''}`
 
         {/* Business Email Suggestion Prompt (Feature #1) */}
         {showBusinessEmailPrompt && suggestedBusinessEmail && (
-          <div className="bg-blue-50 border-2 border-blue-600 p-4">
+          <div className="bg-brand-navy/[0.04] border border-brand-navy/30 p-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-900 mb-2">
@@ -1193,7 +1193,7 @@ ${emailBody || ''}`
                   <Button
                     type="button"
                     onClick={handleAcceptBusinessEmail}
-                    className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm font-semibold"
+                    className="bg-brand-navy text-white hover:bg-brand-navy-hover px-4 py-2 text-sm font-semibold"
                   >
                     Yes, Add Email
                   </Button>
@@ -1246,7 +1246,7 @@ ${emailBody || ''}`
         )}
 
         {/* Entry Details Section */}
-        <div className="bg-gray-50 border-2 border-gray-300 p-6">
+        <div className="bg-gray-50 border border-gray-200 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Entry Details</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1324,7 +1324,7 @@ ${emailBody || ''}`
                   }
                   setErrors((prev) => ({ ...prev, direction: undefined }))
                 }}
-                className={`w-full px-3 py-2 border-2 ${errors.direction ? 'border-red-600' : 'border-gray-300'} focus:outline-none focus:border-blue-600`}
+                className={`w-full px-3 py-2 border ${errors.direction ? 'border-red-400' : 'border-gray-200'} focus:outline-none focus:border-brand-navy`}
               >
                 <option value="">Not specified</option>
                 <optgroup label="Email">
@@ -1376,7 +1376,7 @@ ${emailBody || ''}`
                   id="internalSender"
                   value={internalSender}
                   onChange={(e) => setInternalSender(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-300 focus:outline-none focus:border-blue-600"
+                  className="w-full px-3 py-2 border border-gray-200 focus:outline-none focus:border-brand-navy"
                 >
                   <option value="">Not specified</option>
                   {INTERNAL_SENDER_NAMES.map((name) => (
@@ -1405,9 +1405,9 @@ ${emailBody || ''}`
             id="rawText"
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
-            className={`w-full min-h-[300px] px-3 py-2 border-2 ${
-              errors.rawText ? 'border-red-600' : 'border-gray-300'
-            } focus:outline-none focus:border-blue-600 font-mono text-sm`}
+            className={`w-full min-h-[300px] px-3 py-2 border ${
+              errors.rawText ? 'border-red-400' : 'border-gray-200'
+            } focus:outline-none focus:border-brand-navy font-mono text-sm`}
             placeholder="Paste email or type call/meeting notes here..."
           />
           {errors.rawText && (
@@ -1416,7 +1416,7 @@ ${emailBody || ''}`
 
           {/* Contact Extraction Display */}
           {extractedContacts.length > 0 && selectedBusinessId && contactsAdded === 0 && (
-            <div className="mt-3 p-4 bg-yellow-50 border-2 border-yellow-300">
+            <div className="mt-3 p-4 bg-yellow-50 border border-yellow-200">
               <p className="text-sm text-yellow-900 mb-2">
                 <strong>Detected {extractedContacts.length} contact{extractedContacts.length !== 1 ? 's' : ''} in pasted text</strong>
               </p>
@@ -1432,7 +1432,7 @@ ${emailBody || ''}`
 
           {/* Contact Added Confirmation */}
           {contactsAdded > 0 && selectedBusinessId && (
-            <div className="mt-3 p-4 bg-green-50 border-2 border-green-300">
+            <div className="mt-3 p-4 bg-green-50 border border-green-200">
               <p className="text-sm text-green-900">
                 ✓ Added {contactsAdded} contact{contactsAdded !== 1 ? 's' : ''} to {businesses.find(b => b.id === selectedBusinessId)?.name}
               </p>
@@ -1441,13 +1441,13 @@ ${emailBody || ''}`
 
           {/* Thread Detection Display */}
           {threadDetection && threadDetection.looksLikeThread && (
-            <div className="mt-3 p-4 bg-blue-50 border-2 border-blue-600">
+            <div className="mt-3 p-4 bg-brand-navy/[0.04] border border-brand-navy/30">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className="font-semibold text-blue-900 mb-1">
+                  <p className="font-semibold text-brand-dark mb-1">
                     Email thread detected ({threadDetection.confidence} confidence)
                   </p>
-                  <p className="text-sm text-blue-800 mb-2">
+                  <p className="text-sm text-brand-navy mb-2">
                     This looks like it might contain multiple emails. Split into separate entries?
                   </p>
                   <label className="flex items-center cursor-pointer">
@@ -1468,7 +1468,7 @@ ${emailBody || ''}`
 
           {/* Formatting Error Display */}
           {formattingError && (
-            <div className="mt-3 p-4 bg-red-50 border-2 border-red-600">
+            <div className="mt-3 p-4 bg-red-50 border border-red-300">
               <h3 className="font-semibold text-red-900 mb-2">AI Formatting Failed</h3>
               <p className="text-sm text-red-800 mb-3">
                 {formattingError}
@@ -1499,7 +1499,7 @@ ${emailBody || ''}`
         </div>
 
         {/* Optional Fields */}
-        <div className="bg-gray-50 border-2 border-gray-300 p-6">
+        <div className="bg-gray-50 border border-gray-200 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Optional Details</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1527,7 +1527,7 @@ ${emailBody || ''}`
                 id="actionNeeded"
                 value={actionNeeded}
                 onChange={(e) => setActionNeeded(e.target.value as any)}
-                className="w-full px-3 py-2 border-2 border-gray-300 focus:outline-none focus:border-blue-600"
+                className="w-full px-3 py-2 border border-gray-200 focus:outline-none focus:border-brand-navy"
               >
                 <option value="none">None</option>
                 <option value="prospect">Prospect</option>
@@ -1561,7 +1561,7 @@ ${emailBody || ''}`
           <Button
             type="submit"
             disabled={isLoading || isFormatting}
-            className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+            className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
           >
             {isFormatting ? 'Formatting...' : isLoading ? 'Saving...' : 'Save Entry'}
           </Button>
@@ -1579,7 +1579,7 @@ ${emailBody || ''}`
       {/* AI Format Preview Panel */}
       {showPreview && previewData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white border-2 border-gray-800 p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-gray-200 shadow-[var(--shadow-lg)] p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Preview Formatted Entry</h2>
             <p className="text-sm text-gray-600 mb-4">
               Review the AI-formatted text below. You can save as-is, go back to edit, or retry formatting.
@@ -1594,7 +1594,7 @@ ${emailBody || ''}`
             )}
 
             {/* Preview Formatted Text */}
-            <div className="bg-gray-50 border-2 border-gray-300 p-4 mb-4 max-h-[50vh] overflow-y-auto">
+            <div className="bg-gray-50 border border-gray-200 p-4 mb-4 max-h-[50vh] overflow-y-auto">
               <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono">
                 {previewText || 'No formatted text available'}
               </pre>
@@ -1605,7 +1605,7 @@ ${emailBody || ''}`
               <Button
                 onClick={handleConfirmPreview}
                 disabled={isLoading}
-                className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+                className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
               >
                 {isLoading ? 'Saving...' : 'Save Entry'}
               </Button>

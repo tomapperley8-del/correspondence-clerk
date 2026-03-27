@@ -120,7 +120,7 @@ export function Navigation() {
 
   if (isLoading) {
     return (
-      <nav className="bg-brand-dark border-b-2 border-brand-dark">
+      <nav className="bg-brand-dark border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -137,7 +137,7 @@ export function Navigation() {
   }
 
   return (
-    <nav aria-label="Main navigation" className="bg-brand-dark border-b-2 border-brand-dark">
+    <nav aria-label="Main navigation" className="bg-brand-dark border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">

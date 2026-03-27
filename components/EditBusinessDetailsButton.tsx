@@ -74,11 +74,11 @@ export function EditBusinessDetailsButton({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white border-2 border-gray-300 p-6 max-w-lg w-full mx-4">
+      <div className="bg-white border border-gray-200 p-6 max-w-lg w-full mx-4">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Edit Business Details</h2>
 
         {error && (
-          <div className="bg-red-50 border-2 border-red-600 p-3 mb-4">
+          <div className="bg-red-50 border border-red-300 p-3 mb-4">
             <p className="text-sm text-red-800">{error}</p>
           </div>
         )}
@@ -94,7 +94,7 @@ export function EditBusinessDetailsButton({
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               placeholder="Business physical address"
-              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600"
+              className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
             />
           </div>
 
@@ -108,7 +108,7 @@ export function EditBusinessDetailsButton({
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="Business email contact"
-              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600"
+              className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
             />
           </div>
 
@@ -122,7 +122,7 @@ export function EditBusinessDetailsButton({
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               placeholder="Business phone number"
-              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600"
+              className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
             />
           </div>
 
@@ -136,7 +136,7 @@ export function EditBusinessDetailsButton({
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Internal notes about this business..."
               rows={4}
-              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none resize-y"
+              className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none resize-y"
             />
           </div>
 
@@ -145,7 +145,7 @@ export function EditBusinessDetailsButton({
             <Button
               type="submit"
               disabled={saving}
-              className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
             >
               {saving ? 'Saving...' : 'Save Details'}
             </Button>

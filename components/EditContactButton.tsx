@@ -104,11 +104,11 @@ export function EditContactButton({ contact }: { contact: Contact }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="edit-contact-title" className="bg-white border-2 border-gray-800 p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="edit-contact-title" className="bg-white border border-gray-200 shadow-[var(--shadow-lg)] p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <h2 id="edit-contact-title" className="text-xl font-bold text-gray-900 mb-4">Edit Contact</h2>
 
         {error && (
-          <div className="bg-red-50 border-2 border-red-600 p-3 mb-4">
+          <div className="bg-red-50 border border-red-300 p-3 mb-4">
             <p className="text-sm text-red-800">{error}</p>
           </div>
         )}
@@ -124,7 +124,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600"
+              className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
             />
           </div>
 
@@ -138,7 +138,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
               value={role}
               onChange={(e) => setRole(e.target.value)}
               placeholder="e.g., Owner, Manager, Director"
-              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600"
+              className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
             />
           </div>
 
@@ -233,14 +233,14 @@ export function EditContactButton({ contact }: { contact: Contact }) {
               <button
                 type="button"
                 onClick={() => setIsActive(true)}
-                className={`px-4 py-2 text-sm font-medium border-2 ${isActive ? 'bg-green-100 border-green-600 text-green-800' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'}`}
+                className={`px-4 py-2 text-sm font-medium border ${isActive ? 'bg-green-100 border-green-400 text-green-800' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'}`}
               >
                 Active
               </button>
               <button
                 type="button"
                 onClick={() => setIsActive(false)}
-                className={`px-4 py-2 text-sm font-medium border-2 ${!isActive ? 'bg-gray-200 border-gray-600 text-gray-800' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'}`}
+                className={`px-4 py-2 text-sm font-medium border ${!isActive ? 'bg-gray-200 border-gray-400 text-gray-800' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'}`}
               >
                 Has left
               </button>
@@ -261,7 +261,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
               placeholder="Internal notes about this contact..."
               rows={3}
               disabled={saving}
-              className="w-full px-3 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none resize-y"
+              className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none resize-y"
             />
           </div>
 
@@ -270,7 +270,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
             <Button
               type="submit"
               disabled={saving}
-              className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>

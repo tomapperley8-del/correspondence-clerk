@@ -57,11 +57,11 @@ const ACTION_LABELS: Record<string, string> = {
 }
 
 const ACTION_COLOURS: Record<string, string> = {
-  follow_up: 'bg-blue-50 border-blue-300 text-blue-800',
-  waiting_on_them: 'bg-yellow-50 border-yellow-400 text-yellow-800',
-  invoice: 'bg-orange-50 border-orange-400 text-orange-800',
-  renewal: 'bg-purple-50 border-purple-400 text-purple-800',
-  prospect: 'bg-green-50 border-green-400 text-green-800',
+  follow_up: 'bg-brand-navy/[0.07] border-brand-navy/25 text-brand-navy',
+  waiting_on_them: 'bg-amber-50 border-amber-300 text-amber-800',
+  invoice: 'bg-orange-50 border-orange-300 text-orange-800',
+  renewal: 'bg-brand-olive/10 border-brand-olive/40 text-[#5a7244]',
+  prospect: 'bg-emerald-50 border-emerald-300 text-emerald-800',
 }
 
 function daysAgo(dateStr: string): number {
@@ -305,7 +305,7 @@ type SectionProps = {
 
 function Section({ title, count, collapsed, onToggle, children }: SectionProps) {
   return (
-    <div className="border-2 border-gray-200 bg-white mb-4">
+    <div className="border border-gray-200 bg-white mb-4">
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
@@ -484,7 +484,7 @@ function ItemRow({
       tabIndex={0}
       onFocus={onFocus}
       onClick={onFocus}
-      className={`outline-none transition-colors ${focused ? 'bg-blue-50/40' : 'hover:bg-gray-50/60'} ${overdue ? 'border-l-2 border-red-400' : 'border-l-2 border-transparent'}`}
+      className={`outline-none transition-colors ${focused ? 'bg-brand-navy/[0.04]' : 'hover:bg-gray-50/60'} ${overdue ? 'border-l-2 border-red-400' : 'border-l-2 border-transparent'}`}
     >
       <div className="flex items-start gap-3 px-4 py-3">
         {/* Main content */}
