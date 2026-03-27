@@ -307,6 +307,65 @@ export async function createUnformattedCorrespondence(formData: {
 }
 
 /**
+ * Count unformatted correspondence entries for the current org
+ */
+export async function getUnformattedCount() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
+
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) return { error: 'No organization found' }
+
+  const { count, error } = await supabase
+    .from('correspondence')
+    .select('*', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .in('formatting_status', ['unformatted', 'failed'])
+
+  if (error) return { error: error.message }
+
+  return { data: count ?? 0 }
+}
+
+/**
+ * Format all unformatted entries for the current org (up to 50 at a time)
+ * Returns how many were successfully formatted
+ */
+export async function formatAllUnformatted() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
+
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) return { error: 'No organization found' }
+
+  const { data: entries, error } = await supabase
+    .from('correspondence')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .in('formatting_status', ['unformatted', 'failed'])
+    .limit(50)
+
+  if (error) return { error: error.message }
+  if (!entries || entries.length === 0) return { data: { formatted: 0, total: 0 } }
+
+  let formatted = 0
+  for (const entry of entries) {
+    const result = await retryFormatting(entry.id)
+    if (!result.error) formatted++
+  }
+
+  return { data: { formatted, total: entries.length } }
+}
+
+/**
  * Retry formatting for an unformatted entry
  * Per CLAUDE.md: "Format later" option for entries saved without formatting
  */
