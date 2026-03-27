@@ -43,7 +43,7 @@ export async function getInboundQueue(): Promise<{ data?: InboundQueueItem[]; er
 /**
  * File an inbound queue item: format via AI, save as correspondence, learn domain mapping
  */
-export async function fileInboundEmail(queueItemId: string, businessId: string): Promise<{ data?: unknown; error?: string }> {
+export async function fileInboundEmail(queueItemId: string, businessId: string, contactId?: string | null): Promise<{ data?: unknown; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
@@ -82,9 +82,9 @@ export async function fileInboundEmail(queueItemId: string, businessId: string):
     rawBody,
   ].join('\n')
 
-  // Find a matching contact within the selected business
-  let contactId: string | null = null
-  if (fromEmail) {
+  // Use explicitly passed contactId, or fall back to email-based lookup
+  let resolvedContactId: string | null = contactId ?? null
+  if (!resolvedContactId && fromEmail) {
     const normalised = fromEmail.toLowerCase()
     const { data: contact } = await supabase
       .from('contacts')
@@ -93,7 +93,7 @@ export async function fileInboundEmail(queueItemId: string, businessId: string):
       .contains('emails', [normalised])
       .limit(1)
       .maybeSingle()
-    contactId = contact?.id ?? null
+    resolvedContactId = contact?.id ?? null
   }
 
   // Compute content hash for dedup
@@ -123,7 +123,7 @@ export async function fileInboundEmail(queueItemId: string, businessId: string):
     .insert({
       organization_id: orgId,
       business_id: businessId,
-      contact_id: contactId,
+      contact_id: resolvedContactId,
       user_id: user.id,
       raw_text_original: rawForAI,
       formatted_text_original: formattedText,
