@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
 
 export type UserProfile = {
   id: string
@@ -110,6 +111,34 @@ export async function getDisplayNamesForUsers(userIds: string[]) {
   }
 
   return { data: data || [] }
+}
+
+/**
+ * Delete the current user's account and all their data.
+ * Requires the user to confirm by typing DELETE.
+ */
+export async function deleteAccount() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated' }
+  }
+
+  // Delete auth user via service role (cascades to user_profiles via FK)
+  const admin = createServiceRoleClient()
+  const { error } = await admin.auth.admin.deleteUser(user.id)
+
+  if (error) {
+    console.error('Error deleting account:', error)
+    return { error: error.message }
+  }
+
+  return { data: true }
 }
 
 /**

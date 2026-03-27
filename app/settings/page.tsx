@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getUserProfile, updateDisplayName, type UserProfile } from '@/app/actions/user-profile'
+import { getUserProfile, updateDisplayName, deleteAccount, type UserProfile } from '@/app/actions/user-profile'
 import { getInboundEmailToken } from '@/app/actions/inbound-email'
 import { getUnformattedCount, formatAllUnformatted } from '@/app/actions/ai-formatter'
 import { toast } from '@/lib/toast'
@@ -27,6 +27,9 @@ export default function SettingsPage() {
   const [sendingTest, setSendingTest] = useState(false)
   const [unformattedCount, setUnformattedCount] = useState<number>(0)
   const [isFormatting, setIsFormatting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     loadProfile()
@@ -114,6 +117,22 @@ export default function SettingsPage() {
       toast.error('Failed to send test email')
     }
     setSendingTest(false)
+  }
+
+  function handleExport(type: string) {
+    window.location.href = `/api/export?type=${type}`
+  }
+
+  async function handleDeleteAccount() {
+    setIsDeleting(true)
+    const result = await deleteAccount()
+    if (result.error) {
+      toast.error(`Could not delete account: ${result.error}`)
+      setIsDeleting(false)
+    } else {
+      await supabase.auth.signOut()
+      window.location.href = '/login?message=account-deleted'
+    }
   }
 
   async function handleFormatAll() {
@@ -378,6 +397,83 @@ export default function SettingsPage() {
             </Link>
           </div>
         </div>
+      </div>
+
+      {/* Data Export */}
+      <div className="bg-white border border-gray-200 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-2 text-gray-900">Export Your Data</h2>
+        <p className="text-sm text-gray-600 mb-5">
+          Download your data as CSV files. Each file contains all records for your organisation.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => handleExport('businesses')}
+            className="px-4 py-2 text-sm font-semibold border border-gray-300 hover:border-brand-navy transition-colors"
+            style={{ color: 'var(--brand-dark)' }}
+          >
+            Download Businesses
+          </button>
+          <button
+            onClick={() => handleExport('contacts')}
+            className="px-4 py-2 text-sm font-semibold border border-gray-300 hover:border-brand-navy transition-colors"
+            style={{ color: 'var(--brand-dark)' }}
+          >
+            Download Contacts
+          </button>
+          <button
+            onClick={() => handleExport('correspondence')}
+            className="px-4 py-2 text-sm font-semibold border border-gray-300 hover:border-brand-navy transition-colors"
+            style={{ color: 'var(--brand-dark)' }}
+          >
+            Download Correspondence
+          </button>
+        </div>
+      </div>
+
+      {/* Account Deletion */}
+      <div className="bg-white border border-red-200 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-2 text-red-800">Delete Account</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Permanently delete your account and all associated data. This cannot be undone.
+        </p>
+        {!showDeleteConfirm ? (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2 text-sm font-semibold border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
+          >
+            Delete my account
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-red-700">
+              Type <span className="font-mono">DELETE</span> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={e => setDeleteConfirmText(e.target.value)}
+              className="block w-full max-w-xs px-3 py-2 border border-red-300 text-sm focus:outline-none focus:border-red-500"
+              placeholder="DELETE"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {isDeleting ? 'Deleting…' : 'Confirm delete'}
+              </button>
+              <button
+                onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }}
+                className="px-4 py-2 text-sm font-semibold border border-gray-300 hover:border-gray-500 transition-colors"
+                style={{ color: 'var(--brand-dark)' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Back to Dashboard */}
