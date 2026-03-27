@@ -477,13 +477,23 @@ export default function BusinessDetailPage({
     setActionError(null)
 
     try {
-      // Convert edited date to ISO format if provided
-      const dateToSave = fields.date ? new Date(fields.date).toISOString() : null
-
       // Find the original entry to check if direction or contact changed
       const originalEntry = correspondence.find(e => e.id === entryId)
       const directionChanged = originalEntry && originalEntry.direction !== (fields.direction || null)
       const contactChanged = originalEntry && originalEntry.contact_id !== fields.contactId
+
+      // Preserve original time component when only date was changed
+      let dateToSave: string | null = null
+      if (fields.date) {
+        if (originalEntry?.entry_date) {
+          const orig = new Date(originalEntry.entry_date)
+          const [year, month, day] = fields.date.split('-').map(Number)
+          orig.setFullYear(year, month - 1, day)
+          dateToSave = orig.toISOString()
+        } else {
+          dateToSave = new Date(fields.date).toISOString()
+        }
+      }
 
       // Update formatted text, date, subject, and internal_sender
       const textResult = await updateFormattedText(entryId, fields.text, dateToSave, fields.subject || null, fields.internalSender || null, fields.actionNeeded || 'none', fields.dueAt || null)

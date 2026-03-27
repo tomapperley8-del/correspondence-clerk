@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getUserProfile, updateDisplayName, type UserProfile } from '@/app/actions/user-profile'
 import { getInboundEmailToken } from '@/app/actions/inbound-email'
+import { getUnformattedCount, formatAllUnformatted } from '@/app/actions/ai-formatter'
 import { toast } from '@/lib/toast'
 import { createClient } from '@/lib/supabase/client'
 
@@ -24,6 +25,8 @@ export default function SettingsPage() {
   const [inboundToken, setInboundToken] = useState<string | null>(null)
   const [lastEmailReceived, setLastEmailReceived] = useState<string | null>(null)
   const [sendingTest, setSendingTest] = useState(false)
+  const [unformattedCount, setUnformattedCount] = useState<number>(0)
+  const [isFormatting, setIsFormatting] = useState(false)
 
   useEffect(() => {
     loadProfile()
@@ -58,6 +61,12 @@ export default function SettingsPage() {
     if (tokenResult.data) {
       setInboundToken(tokenResult.data.token)
       setLastEmailReceived(tokenResult.data.lastReceivedAt)
+    }
+
+    // Load unformatted count
+    const countResult = await getUnformattedCount()
+    if (countResult.data !== undefined) {
+      setUnformattedCount(countResult.data)
     }
 
     setIsLoading(false)
@@ -105,6 +114,19 @@ export default function SettingsPage() {
       toast.error('Failed to send test email')
     }
     setSendingTest(false)
+  }
+
+  async function handleFormatAll() {
+    setIsFormatting(true)
+    const result = await formatAllUnformatted()
+    if (result.error) {
+      toast.error(`Formatting failed: ${result.error}`)
+    } else if (result.data) {
+      const { formatted, total } = result.data
+      toast.success(`Formatted ${formatted} of ${total} entries`)
+      setUnformattedCount(prev => Math.max(0, prev - formatted))
+    }
+    setIsFormatting(false)
   }
 
   function formatLastReceived(iso: string): string {
@@ -312,6 +334,27 @@ export default function SettingsPage() {
           <p className="text-sm text-gray-500">Loading your inbound address…</p>
         )}
       </div>
+
+      {/* Data Health — only shown when there are unformatted entries */}
+      {unformattedCount > 0 && (
+        <div className="bg-white border border-gray-200 p-6 mb-6">
+          <h2 className="text-xl font-bold mb-2 text-gray-900">Data Health</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            {unformattedCount} {unformattedCount === 1 ? 'entry' : 'entries'} saved without AI formatting. Format them now to improve readability.
+          </p>
+          <button
+            onClick={handleFormatAll}
+            disabled={isFormatting}
+            className="px-4 py-2 text-sm font-semibold text-white transition-colors"
+            style={{
+              backgroundColor: isFormatting ? 'rgba(0,0,0,0.2)' : 'var(--brand-navy)',
+              cursor: isFormatting ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isFormatting ? 'Formatting…' : `Format all ${unformattedCount} entries`}
+          </button>
+        </div>
+      )}
 
       {/* Tools Section */}
       <div className="bg-white border border-gray-200 p-6 mb-6">
