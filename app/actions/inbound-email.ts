@@ -15,6 +15,9 @@ export type InboundQueueItem = {
   from_name: string | null
   subject: string | null
   body_preview: string | null
+  body_text: string | null
+  direction: 'received' | 'sent'
+  to_emails: { name: string; email: string }[] | null
   received_at: string
 }
 
@@ -31,7 +34,7 @@ export async function getInboundQueue(): Promise<{ data?: InboundQueueItem[]; er
 
   const { data, error } = await supabase
     .from('inbound_queue')
-    .select('id, from_email, from_name, subject, body_preview, received_at')
+    .select('id, from_email, from_name, subject, body_preview, body_text, direction, to_emails, received_at')
     .eq('org_id', orgId)
     .eq('status', 'pending')
     .order('received_at', { ascending: false })
@@ -63,10 +66,11 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const payload = item.raw_payload as Record<string, any>
-  const fromEmail: string = payload.FromFull?.Email ?? payload.From ?? ''
+  const fromEmail: string = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
   const fromName: string = payload.FromFull?.Name ?? payload.FromName ?? fromEmail
   const emailDate: string = payload.Date ?? new Date().toISOString()
   const subject: string = payload.Subject ?? ''
+  const itemDirection: 'received' | 'sent' = item.direction ?? 'received'
 
   // Strip quoted content from body
   const rawBody = stripQuotedContent(
@@ -74,26 +78,36 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
   )
 
   // Build the synthetic email header format the AI formatter expects
+  // For sent emails, include To/Cc so the AI has full context
+  const toLine = payload.To ? `To: ${payload.To}` : ''
+  const ccLine = payload.Cc ? `Cc: ${payload.Cc}` : ''
   const rawForAI = [
     `From: ${fromName} <${fromEmail}>`,
+    ...(itemDirection === 'sent' ? [toLine, ccLine].filter(Boolean) : []),
     `Date: ${emailDate}`,
     `Subject: ${subject}`,
     '',
     rawBody,
   ].join('\n')
 
-  // Use explicitly passed contactId, or fall back to email-based lookup
+  // Resolve contact: use passed contactId, or fall back to email-based lookup
+  // For received: match from sender email
+  // For sent: match from first To/Cc recipient (if no contactId passed)
   let resolvedContactId: string | null = contactId ?? null
-  if (!resolvedContactId && fromEmail) {
-    const normalised = fromEmail.toLowerCase()
-    const { data: contact } = await supabase
-      .from('contacts')
-      .select('id')
-      .eq('business_id', businessId)
-      .contains('emails', [normalised])
-      .limit(1)
-      .maybeSingle()
-    resolvedContactId = contact?.id ?? null
+  if (!resolvedContactId) {
+    const emailToMatch = itemDirection === 'sent'
+      ? (payload.ToFull?.[0]?.Email ?? '').toLowerCase()
+      : fromEmail
+    if (emailToMatch) {
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('business_id', businessId)
+        .contains('emails', [emailToMatch])
+        .limit(1)
+        .maybeSingle()
+      resolvedContactId = contact?.id ?? null
+    }
   }
 
   // Compute content hash for dedup
@@ -131,12 +145,12 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
       entry_date: entryDate,
       subject: entrySubject,
       type: 'Email',
-      direction: 'received',
+      direction: itemDirection,
       action_needed: 'none',
       formatting_status: formattingStatus,
       content_hash: contentHash || null,
       ai_metadata: {
-        source: 'inbound_email',
+        source: itemDirection === 'sent' ? 'bcc_capture' : 'inbound_email',
         queue_item_id: queueItemId,
         from_email: fromEmail,
       },
@@ -153,7 +167,11 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
     .eq('id', businessId)
 
   // Learn domain mapping (skip personal domains)
-  const domain = fromEmail.split('@')[1]?.toLowerCase()
+  // For sent emails, learn from the recipient's domain (not the sender's own domain)
+  const domainSource = itemDirection === 'sent'
+    ? (payload.ToFull?.[0]?.Email ?? '').toLowerCase()
+    : fromEmail
+  const domain = domainSource.split('@')[1]?.toLowerCase()
   if (domain && !isPersonalDomain(domain)) {
     await supabase
       .from('domain_mappings')
@@ -196,6 +214,43 @@ export async function discardInboundEmail(queueItemId: string): Promise<{ data?:
 
   revalidatePath('/inbox')
   return { data: true }
+}
+
+/**
+ * Get the current user's registered own email addresses
+ */
+export async function getOwnEmailAddresses(): Promise<{ data: string[] | null; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: 'Unauthorized' }
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('own_email_addresses')
+    .eq('id', user.id)
+    .single()
+
+  return { data: (profile?.own_email_addresses as string[] | null) ?? [] }
+}
+
+/**
+ * Update the current user's registered own email addresses
+ */
+export async function updateOwnEmailAddresses(emails: string[]): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const normalised = emails.map(e => e.trim().toLowerCase()).filter(Boolean)
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ own_email_addresses: normalised })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  return {}
 }
 
 /**

@@ -364,7 +364,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('id, organization_id')
+    .select('id, organization_id, own_email_addresses')
     .eq('inbound_email_token', token)
     .maybeSingle()
 
@@ -390,10 +390,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (discardReason) {
     await supabase.from('inbound_queue').insert({
       org_id: orgId,
-      from_email: payload.FromFull?.Email ?? payload.From ?? '',
+      from_email: (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase(),
       from_name: payload.FromFull?.Name ?? payload.FromName ?? null,
       subject: payload.Subject ?? null,
       body_preview: null,
+      body_text: null,
+      to_emails: null,
+      direction: 'received',
       raw_payload: JSON.parse(rawBody),
       status: 'discarded',
     })
@@ -401,12 +404,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // 7. Detect direction
-  const direction = detectDirection(payload, token)
+  let direction = detectDirection(payload, token)
+  const fromEmail = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
 
-  // 8. Extract body
+  // Override: if detected as 'received' but From is in the user's own email addresses,
+  // it's a forwarded sent email — treat as 'sent'
+  const ownEmails: string[] = (profile.own_email_addresses ?? []).map((e: string) => e.toLowerCase())
+  if (direction === 'received' && ownEmails.includes(fromEmail)) {
+    direction = 'sent'
+  }
+
+  // 8. Extract body and recipients
   const strippedBody = stripQuotedContent(payload.StrippedTextReply || payload.TextBody || '')
   const bodyPreview = strippedBody.slice(0, 500)
-  const fromEmail = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
+
+  // All To+Cc recipients (excluding our own inbound address)
+  const toEmails: { name: string; email: string }[] = [
+    ...(payload.ToFull ?? []),
+    ...(payload.CcFull ?? []),
+  ]
+    .filter(r => r.Email && !r.Email.toLowerCase().includes('@in.correspondenceclerk.com'))
+    .map(r => ({ name: r.Name ?? '', email: r.Email.toLowerCase() }))
 
   // -------------------------------------------------------------------------
   // SENT path (BCCed email)
@@ -450,14 +468,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // No domain match → queue for manual triage
-    // Use primary recipient as the "from" for display purposes in the queue
-    const primaryRecipient = recipientEmails[0] ?? ''
     await supabase.from('inbound_queue').insert({
       org_id: orgId,
-      from_email: primaryRecipient || fromEmail,
-      from_name: null,
+      from_email: fromEmail,
+      from_name: payload.FromFull?.Name ?? payload.FromName ?? null,
       subject: payload.Subject ?? null,
       body_preview: bodyPreview || null,
+      body_text: strippedBody || null,
+      to_emails: toEmails.length > 0 ? toEmails : null,
+      direction: 'sent',
       raw_payload: JSON.parse(rawBody),
       status: 'pending',
     })
@@ -532,6 +551,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     from_name: payload.FromFull?.Name ?? payload.FromName ?? null,
     subject: payload.Subject ?? null,
     body_preview: bodyPreview || null,
+    body_text: strippedBody || null,
+    to_emails: null,
+    direction: 'received',
     raw_payload: JSON.parse(rawBody),
     status: 'pending',
   })
