@@ -43,14 +43,20 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
   const [contacts, setContacts] = useState<Contact[]>([])
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
+  const [selectedRecipientEmail, setSelectedRecipientEmail] = useState<string>(
+    item.to_emails?.[0]?.email ?? ''
+  )
   const [loadingContacts, setLoadingContacts] = useState(false)
   const [filing, setFiling] = useState(false)
   const [discarding, setDiscarding] = useState(false)
   const [visible, setVisible] = useState(true)
   const [showAddBusiness, setShowAddBusiness] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
+  const [showFullBody, setShowFullBody] = useState(false)
 
   if (!visible) return null
+
+  const isSent = item.direction === 'sent'
 
   const handleSelectBusiness = async (businessId: string) => {
     setSelectedBusinessId(businessId || null)
@@ -59,8 +65,32 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
     if (!businessId) return
     setLoadingContacts(true)
     const result = await getContactsByBusiness(businessId)
-    setContacts(result.data ?? [])
+    const loaded = result.data ?? []
+    setContacts(loaded)
     setLoadingContacts(false)
+
+    // Auto-match contact from sender (received) or current recipient (sent)
+    const emailToMatch = isSent ? selectedRecipientEmail : item.from_email
+    if (emailToMatch) {
+      const match = loaded.find(c =>
+        (c.emails as string[] | null)?.some(
+          e => e.toLowerCase() === emailToMatch.toLowerCase()
+        )
+      )
+      if (match) setSelectedContactId(match.id)
+    }
+  }
+
+  const handleRecipientChange = (email: string) => {
+    setSelectedRecipientEmail(email)
+    setSelectedContactId(null)
+    // Auto-match contact for the newly selected recipient
+    if (email && contacts.length > 0) {
+      const match = contacts.find(c =>
+        (c.emails as string[] | null)?.some(e => e.toLowerCase() === email.toLowerCase())
+      )
+      if (match) setSelectedContactId(match.id)
+    }
   }
 
   const handleFile = async () => {
@@ -90,6 +120,26 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
   }
 
   const preview = cleanPreview(item.body_preview ?? '')
+  const fullBody = item.body_text ?? ''
+  const hasMoreBody = fullBody.length > (item.body_preview?.length ?? 0) + 20
+
+  // Recipient label: for sent emails show who was emailed, for received show sender
+  const senderLabel = isSent
+    ? null
+    : (item.from_name && item.from_name !== item.from_email
+        ? `${item.from_name} <${item.from_email}>`
+        : item.from_email)
+
+  const directionBadgeStyle = {
+    display: 'inline-block',
+    fontSize: '10px',
+    fontWeight: 600,
+    letterSpacing: '0.06em',
+    padding: '2px 7px',
+    borderRadius: '3px',
+    background: isSent ? 'rgba(124,154,94,0.12)' : 'rgba(44,74,110,0.1)',
+    color: isSent ? '#7C9A5E' : '#2C4A6E',
+  }
 
   return (
     <>
@@ -99,13 +149,21 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-3">
-          <div className="min-w-0">
-            <p className="font-medium text-sm truncate" style={{ color: 'var(--brand-dark)' }}>
-              {item.from_name && item.from_name !== item.from_email
-                ? `${item.from_name} <${item.from_email}>`
-                : item.from_email}
-            </p>
-            <p className="text-sm font-semibold mt-0.5 truncate" style={{ color: 'var(--brand-dark)' }}>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span style={directionBadgeStyle}>{isSent ? 'SENT TO' : 'RECEIVED FROM'}</span>
+              {senderLabel && (
+                <p className="font-medium text-sm truncate" style={{ color: 'var(--brand-dark)' }}>
+                  {senderLabel}
+                </p>
+              )}
+              {isSent && item.to_emails && item.to_emails.length > 0 && (
+                <p className="font-medium text-sm truncate" style={{ color: 'var(--brand-dark)' }}>
+                  {item.to_emails.map(r => r.name && r.name !== r.email ? `${r.name} <${r.email}>` : r.email).join(', ')}
+                </p>
+              )}
+            </div>
+            <p className="text-sm font-semibold truncate" style={{ color: 'var(--brand-dark)' }}>
               {item.subject ?? '(No subject)'}
             </p>
           </div>
@@ -114,18 +172,76 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
           </p>
         </div>
 
-        {/* Body preview */}
-        {preview && (
-          <p
-            className="text-sm italic mb-4 line-clamp-2"
-            style={{ color: 'rgba(0,0,0,0.55)' }}
-          >
-            {preview}
-          </p>
+        {/* Body preview / full body */}
+        {preview && !showFullBody && (
+          <div className="mb-3">
+            <p className="text-sm italic line-clamp-2" style={{ color: 'rgba(0,0,0,0.55)' }}>
+              {preview}
+            </p>
+            {hasMoreBody && (
+              <button
+                onClick={() => setShowFullBody(true)}
+                className="text-xs mt-1"
+                style={{ color: 'var(--link-blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                Show more
+              </button>
+            )}
+          </div>
+        )}
+        {showFullBody && fullBody && (
+          <div className="mb-3">
+            <pre
+              className="text-sm whitespace-pre-wrap font-sans"
+              style={{
+                color: 'rgba(0,0,0,0.7)',
+                background: 'rgba(0,0,0,0.02)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                borderRadius: '4px',
+                padding: '10px 12px',
+                maxHeight: '300px',
+                overflowY: 'auto',
+              }}
+            >
+              {fullBody}
+            </pre>
+            <button
+              onClick={() => setShowFullBody(false)}
+              className="text-xs mt-1"
+              style={{ color: 'var(--link-blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              Show less
+            </button>
+          </div>
         )}
 
-        {/* Filing controls — stacked vertically */}
+        {/* Filing controls */}
         <div className="space-y-3">
+          {/* Recipient picker for sent emails */}
+          {isSent && item.to_emails && item.to_emails.length > 1 && (
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(0,0,0,0.5)' }}>
+                File against recipient
+              </label>
+              <select
+                value={selectedRecipientEmail}
+                onChange={e => handleRecipientChange(e.target.value)}
+                className="w-full text-sm rounded-sm px-3 py-2"
+                style={{
+                  border: '1px solid rgba(0,0,0,0.15)',
+                  color: 'var(--brand-dark)',
+                  background: 'white',
+                }}
+              >
+                {item.to_emails.map(r => (
+                  <option key={r.email} value={r.email}>
+                    {r.name && r.name !== r.email ? `${r.name} <${r.email}>` : r.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <BusinessSelector
             businesses={businesses}
             selectedBusinessId={selectedBusinessId}
@@ -187,7 +303,7 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
           isOpen={showAddContact}
           onClose={() => setShowAddContact(false)}
           businessId={selectedBusinessId}
-          initialEmail={item.from_email}
+          initialEmail={isSent ? selectedRecipientEmail : item.from_email}
           onContactAdded={(contact) => {
             setContacts((prev) => [...prev, contact])
             setSelectedContactId(contact.id)

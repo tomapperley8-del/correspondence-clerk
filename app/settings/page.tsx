@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getUserProfile, updateDisplayName, deleteAccount, type UserProfile } from '@/app/actions/user-profile'
-import { getInboundEmailToken } from '@/app/actions/inbound-email'
+import { getInboundEmailToken, getOwnEmailAddresses, updateOwnEmailAddresses } from '@/app/actions/inbound-email'
 import { getUnformattedCount, formatAllUnformatted } from '@/app/actions/ai-formatter'
 import { toast } from '@/lib/toast'
 import { createClient } from '@/lib/supabase/client'
@@ -30,6 +30,8 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
+  const [ownEmailAddresses, setOwnEmailAddresses] = useState<string[]>([])
+  const [newEmailInput, setNewEmailInput] = useState('')
 
   useEffect(() => {
     loadProfile()
@@ -64,6 +66,12 @@ export default function SettingsPage() {
     if (tokenResult.data) {
       setInboundToken(tokenResult.data.token)
       setLastEmailReceived(tokenResult.data.lastReceivedAt)
+    }
+
+    // Load own email addresses
+    const ownEmailsResult = await getOwnEmailAddresses()
+    if (ownEmailsResult.data) {
+      setOwnEmailAddresses(ownEmailsResult.data)
     }
 
     // Load unformatted count
@@ -146,6 +154,24 @@ export default function SettingsPage() {
       setUnformattedCount(prev => Math.max(0, prev - formatted))
     }
     setIsFormatting(false)
+  }
+
+  async function handleAddOwnEmail() {
+    const email = newEmailInput.trim().toLowerCase()
+    if (!email || ownEmailAddresses.includes(email)) return
+    if (!email.includes('@')) { toast.error('Enter a valid email address'); return }
+    const updated = [...ownEmailAddresses, email]
+    setOwnEmailAddresses(updated)
+    setNewEmailInput('')
+    const result = await updateOwnEmailAddresses(updated)
+    if (result.error) { toast.error(result.error); setOwnEmailAddresses(ownEmailAddresses) }
+  }
+
+  async function handleRemoveOwnEmail(email: string) {
+    const updated = ownEmailAddresses.filter(e => e !== email)
+    setOwnEmailAddresses(updated)
+    const result = await updateOwnEmailAddresses(updated)
+    if (result.error) { toast.error(result.error); setOwnEmailAddresses(ownEmailAddresses) }
   }
 
   function formatLastReceived(iso: string): string {
@@ -289,6 +315,54 @@ export default function SettingsPage() {
               >
                 Copy
               </button>
+            </div>
+
+            {/* My email addresses */}
+            <div className="mb-5 pb-5 border-b border-gray-100">
+              <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--brand-dark)' }}>My email addresses</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Emails arriving <em>from</em> these addresses are treated as sent (not received) — useful if you forward sent mail instead of BCC'ing.
+                Your primary sign-in email is detected automatically.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {ownEmailAddresses.map(email => (
+                  <span
+                    key={email}
+                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm"
+                    style={{ background: 'rgba(44,74,110,0.08)', color: 'var(--brand-dark)' }}
+                  >
+                    {email}
+                    <button
+                      onClick={() => handleRemoveOwnEmail(email)}
+                      className="text-gray-400 hover:text-gray-700 leading-none"
+                      aria-label={`Remove ${email}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {ownEmailAddresses.length === 0 && (
+                  <span className="text-xs text-gray-400">No extra addresses added yet.</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={newEmailInput}
+                  onChange={e => setNewEmailInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddOwnEmail())}
+                  placeholder="you@example.com"
+                  className="flex-1 text-sm px-3 py-1.5 rounded-sm"
+                  style={{ border: '1px solid rgba(0,0,0,0.15)', color: 'var(--brand-dark)' }}
+                />
+                <button
+                  onClick={handleAddOwnEmail}
+                  className="px-3 py-1.5 text-sm font-medium text-white rounded-sm"
+                  style={{ backgroundColor: '#2C4A6E' }}
+                >
+                  Add
+                </button>
+              </div>
             </div>
 
             {/* Setup instructions */}
