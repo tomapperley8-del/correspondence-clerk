@@ -28,6 +28,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'Correspondence Clerk',
   description: 'Know exactly what needs your attention today. An AI assistant that reads your business correspondence and tells you who to reply to, which contracts are expiring, and which follow-ups have gone cold.',
+  icons: { icon: '/icon.svg' },
 }
 
 export default function RootLayout({

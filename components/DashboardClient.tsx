@@ -8,6 +8,7 @@ import { AddBusinessButton } from '@/components/AddBusinessButton'
 import { Input } from '@/components/ui/input'
 import { formatDateGB } from '@/lib/utils'
 import { ChatPanel } from '@/components/ChatPanel'
+import { useChat } from '@/components/ChatContext'
 
 type FilterType = 'all' | 'prospect' | string
 type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
@@ -37,6 +38,8 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
 
   // Check if bookmarklet is installed
   const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
+
+  const { open: openChat } = useChat()
 
   // Onboarding checklist
   const hasBusiness = businesses.length > 0
@@ -183,6 +186,12 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <div className="flex items-center gap-3">
+          <button
+            onClick={openChat}
+            className="md:hidden px-3 py-1.5 text-sm font-medium text-white rounded-sm transition-colors bg-brand-navy hover:bg-brand-navy-hover"
+          >
+            Daily Briefing
+          </button>
           <Link href="/import" className="text-sm text-brand-navy hover:underline">
             Bulk import
           </Link>
