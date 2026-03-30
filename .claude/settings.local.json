@@ -100,7 +100,22 @@
       "Bash(NEXT_PUBLIC_APP_URL=\"https://correspondence-clerk.vercel.app\" TEST_USER_EMAIL=\"tomapperley8@gmail.com\" TEST_USER_PASSWORD=\"REDACTED\" npx tsx --env-file=.env.local scripts/test-import-flow.ts)",
       "mcp__claude_ai_Supabase__get_logs",
       "mcp__claude_ai_Vercel__get_deployment_build_logs",
-      "mcp__claude_ai_Vercel__deploy_to_vercel"
+      "mcp__claude_ai_Vercel__deploy_to_vercel",
+      "Bash(done)",
+      "Bash(sed -i \"s/item\\\\.urgent ? ''#2C4A6E'' : ''#7C9A5E''/item.urgent ? ''var\\(--link-blue\\)'' : ''var\\(--link-hover\\)''/g\" \"components/marketing/Hero.tsx\")",
+      "Bash(sed -i \"s/isHighlighted ? ''#1E293B'' : ''#FAFAF8''/isHighlighted ? ''var\\(--header-bg\\)'' : ''var\\(--main-bg\\)''/g;    s/isHighlighted ? ''#7C9A5E'' : ''#94a3b8''/isHighlighted ? ''var\\(--link-hover\\)'' : ''#94a3b8''/g;    s/isHighlighted ? ''#fff'' : ''#1E293B''/isHighlighted ? ''#fff'' : ''var\\(--header-bg\\)''/g;    s/isHighlighted ? ''#7C9A5E'' : ''#cbd5e1''/isHighlighted ? ''var\\(--link-hover\\)'' : ''#cbd5e1''/g;    s/isHighlighted ? ''#7C9A5E'' : ''#2C4A6E''/isHighlighted ? ''var\\(--link-hover\\)'' : ''var\\(--link-blue\\)''/g\" \"components/marketing/Pricing.tsx\")",
+      "Bash(sed -i \"s/3px solid #7C9A5E/3px solid var\\(--link-hover\\)/g\" \"components/marketing/WhoItsFor.tsx\")",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(sed -i \"s/bg-\\\\[#1E293B\\\\]/bg-brand-dark/g; s/text-\\\\[#1E293B\\\\]/text-brand-dark/g; s/border-\\\\[#1E293B\\\\]/border-brand-dark/g;      s/bg-\\\\[#2C4A6E\\\\]/bg-brand-navy/g; s/text-\\\\[#2C4A6E\\\\]/text-brand-navy/g; s/border-\\\\[#2C4A6E\\\\]/border-brand-navy/g;      s/hover:bg-\\\\[#243d5c\\\\]/hover:bg-brand-navy-hover/g; s/hover:bg-\\\\[#243D5C\\\\]/hover:bg-brand-navy-hover/g;      s/hover:bg-\\\\[#1E293B\\\\]/hover:bg-brand-dark/g;      s/bg-\\\\[#243d5c\\\\]/bg-brand-navy-hover/g; s/bg-\\\\[#243D5C\\\\]/bg-brand-navy-hover/g;      s/bg-\\\\[#7C9A5E\\\\]/bg-brand-olive/g; s/text-\\\\[#7C9A5E\\\\]/text-brand-olive/g; s/border-\\\\[#7C9A5E\\\\]/border-brand-olive/g;      s/hover:bg-\\\\[#7C9A5E\\\\]/hover:bg-brand-olive/g; s/hover:text-\\\\[#7C9A5E\\\\]/hover:text-brand-olive/g;      s/bg-\\\\[#FAFAF8\\\\]/bg-brand-paper/g; s/text-\\\\[#FAFAF8\\\\]/text-brand-paper/g;      s/focus:border-\\\\[#2C4A6E\\\\]/focus:border-brand-navy/g; s/focus:ring-\\\\[#2C4A6E\\\\]/focus:ring-brand-navy/g\" \"$f\")",
+      "Bash(sed -i \"s/backgroundColor: ''#1E293B''/backgroundColor: ''var\\(--header-bg\\)''/g;      s/backgroundColor: ''#FAFAF8''/backgroundColor: ''var\\(--main-bg\\)''/g;      s/backgroundColor: ''#2C4A6E''/backgroundColor: ''var\\(--link-blue\\)''/g;      s/backgroundColor: ''#7C9A5E''/backgroundColor: ''var\\(--link-hover\\)''/g;      s/color: ''#1E293B''/color: ''var\\(--header-bg\\)''/g;      s/color: ''#2C4A6E''/color: ''var\\(--link-blue\\)''/g;      s/color: ''#7C9A5E''/color: ''var\\(--link-hover\\)''/g\" \"$f\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\\\\app\\\\businesses\\\\[id]\\\\_components\")",
+      "Bash(cp \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\\\\.claude\\\\worktrees\\\\agent-ace663a7\\\\app\\\\businesses\\\\[id]\\\\_components\"/*.tsx \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\\\\app\\\\businesses\\\\[id]\\\\_components/\")",
+      "Bash(cp \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\\\\.claude\\\\worktrees\\\\agent-ace663a7\\\\app\\\\businesses\\\\[id]\\\\page.tsx\" \"C:\\\\Users\\\\Bridg\\\\Projects\\\\correspondence-clerk\\\\app\\\\businesses\\\\[id]\\\\page.tsx\")",
+      "WebFetch(domain:improvmx.com)",
+      "Bash(set -a)",
+      "Bash(source .env.local)",
+      "Bash(DOTENV_CONFIG_PATH=.env.local npx tsx scripts/run-migrations.ts)"
     ]
   }
 }

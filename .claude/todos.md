@@ -52,9 +52,9 @@ Pick up from the first incomplete item each session.
 
 ## Batch 4 — GDPR & Launch Requirements
 
-- [ ] **P10-F1** — Data export: `app/api/export/route.ts` returning CSV for businesses/contacts/correspondence; three download buttons in settings
-- [ ] **P10-F2** — Account deletion: "Delete Account" in settings (confirmation dialog, type DELETE, cascade delete, `auth.admin.deleteUser`, redirect to `/login?message=account-deleted`)
-- [ ] **P10-F3** — Custom 404: `app/not-found.tsx` (server component, brand-consistent, link back to dashboard)
+- [x] **P10-F1** — Data export: `app/api/export/route.ts` returning CSV for businesses/contacts/correspondence; three download buttons in settings (27/03/2026)
+- [x] **P10-F2** — Account deletion: "Delete Account" in settings (confirmation dialog, type DELETE, cascade delete, `auth.admin.deleteUser`, redirect to `/login?message=account-deleted`) (27/03/2026)
+- [x] **P10-F3** — Custom 404: `app/not-found.tsx` (brand-consistent, link back to dashboard) (27/03/2026)
 - [ ] **P11** — Pricing page: "Most Popular" badge on Pro card; monthly/annual toggle (annual = ×10, show "Save 17%" not "2 months"); all CTAs read "Start free trial — [Plan]"
 
 ---
@@ -69,7 +69,8 @@ Pick up from the first incomplete item each session.
 
 ## Batch 6 — Infrastructure & Marketing
 
-- [ ] **P15** — Inbound email forwarding: CODE IS COMPLETE. Blocked on Postmark account (needs `tom@correspondenceclerk.com` first). See MEMORY.md for exact remaining steps.
+- [x] **P15** — Inbound email forwarding: LIVE. Postmark configured, BCC capture live, inbox UI polished (27/03/2026)
+- [x] **P15b** — Inbox direction fix + UX overhaul: direction stored in queue, SENT/RECEIVED badge, expandable body, auto-match contact, own email addresses in settings (30/03/2026)
 - [ ] **P16** — Landing page FAQ: create `components/marketing/FAQ.tsx` as `<details>/<summary>` accordion (no dependencies); add above CTA in `app/(public)/page.tsx`. Hero mockup is already done.
 - [ ] **P17** — Sentry error monitoring: install `@sentry/nextjs`, create three config files, wrap `next.config.ts`, add `app/global-error.tsx`. **Needs Sentry account + DSN first** (free tier, 5k errors/month). Errors only — no replays, no performance tracing.
 
