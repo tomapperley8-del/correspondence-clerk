@@ -56,7 +56,7 @@ Pick up from the first incomplete item each session.
 - [x] **P10-F2** — Account deletion: "Delete Account" in settings (confirmation dialog, type DELETE, cascade delete, `auth.admin.deleteUser`, redirect to `/login?message=account-deleted`) (27/03/2026)
 - [x] **P10-F3** — Custom 404: `app/not-found.tsx` (brand-consistent, link back to dashboard) (27/03/2026)
 - [x] **P21** — Direction bug fix: merged `updateCorrespondenceDirection` into `updateFormattedText` (single DB call, deleted separate function). new-entry audited — navigates away on submit, no stale state. (30/03/2026)
-- [ ] **P22** — Old contracts expiry: pass `is_current` to `ContractStatusBadge`; when `false`, render a static "Historical" label instead of a countdown. Files: `components/ContractDetailsCard.tsx`, `components/ContractStatusBadge.tsx`.
+- [x] **P22** — Old contracts expiry: pass `is_current` to `ContractStatusBadge`; historical contracts now show a static "Historical" label instead of an "Expired N days ago" countdown. (30/03/2026)
 
 ---
 

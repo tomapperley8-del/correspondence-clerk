@@ -5,9 +5,10 @@ import { useMemo } from 'react'
 interface ContractStatusBadgeProps {
   startDate: string
   endDate: string
+  isCurrent?: boolean
 }
 
-export function ContractStatusBadge({ startDate, endDate }: ContractStatusBadgeProps) {
+export function ContractStatusBadge({ startDate, endDate, isCurrent = true }: ContractStatusBadgeProps) {
   const status = useMemo(() => {
     const start = new Date(startDate)
     const end = new Date(endDate)
@@ -66,6 +67,19 @@ export function ContractStatusBadge({ startDate, endDate }: ContractStatusBadgeP
   }
 
   const scheme = colors[status.colorScheme]
+
+  if (!isCurrent) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-gray-900">
+          {status.startFormatted} &rarr; {status.endFormatted}
+        </p>
+        <div className="inline-block px-3 py-1 border-2 border-gray-300 bg-gray-100">
+          <span className="text-sm font-semibold text-gray-500">Historical</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-2">
