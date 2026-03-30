@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
-import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceDirection, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, setCorrespondenceAction, type Correspondence } from '@/app/actions/correspondence'
+import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, setCorrespondenceAction, type Correspondence } from '@/app/actions/correspondence'
 import { getThreadsByBusiness, createThread, renameThread, deleteThread, assignCorrespondenceToThread, type ConversationThread } from '@/app/actions/threads'
 import { dismissDuplicatePair, dismissMultipleDuplicatePairs } from '@/app/actions/duplicate-dismissals'
 import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
@@ -495,27 +495,16 @@ export default function BusinessDetailPage({
         }
       }
 
-      // Update formatted text, date, subject, and internal_sender
-      const textResult = await updateFormattedText(entryId, fields.text, dateToSave, fields.subject || null, fields.internalSender || null, fields.actionNeeded || 'none', fields.dueAt || null)
+      // Update all fields in a single call
+      const directionValue = fields.direction === '' ? null : fields.direction as 'received' | 'sent' | null
+      const textResult = await updateFormattedText(entryId, fields.text, dateToSave, fields.subject || null, fields.internalSender || null, fields.actionNeeded || 'none', fields.dueAt || null, directionValue)
 
       if ('error' in textResult) {
         setActionError(`Error saving: ${textResult.error}`)
         return
       }
 
-      // Update direction if changed
       if (directionChanged) {
-        const directionResult = await updateCorrespondenceDirection(
-          entryId,
-          fields.direction === '' ? null : fields.direction as 'received' | 'sent'
-        )
-
-        if ('error' in directionResult) {
-          setActionError(`Error updating direction: ${directionResult.error}`)
-          return
-        }
-
-        // Trigger AI summary refresh if direction changed
         setSummaryRefreshTrigger(prev => prev + 1)
       }
 
