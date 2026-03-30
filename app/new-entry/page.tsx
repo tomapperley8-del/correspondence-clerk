@@ -82,6 +82,7 @@ function NewEntryPageContent() {
   const [contactMatches, setContactMatches] = useState<ContactMatchResult[]>([])
   const [showMatchPreview, setShowMatchPreview] = useState(false)
   const [pendingAiResponse, setPendingAiResponse] = useState<AIFormatterResponse | null>(null)
+  const [quotedContent, setQuotedContent] = useState<string | undefined>(undefined)
 
   // Duplicate detection state
   const [duplicateEntry, setDuplicateEntry] = useState<Correspondence | null>(null)
@@ -817,10 +818,12 @@ ${emailBody || ''}`
       // Store the matches and AI response for preview
       setContactMatches(matches)
       setPendingAiResponse(formatResult.data)
+      setQuotedContent(formatResult.quotedContent)
       setShowMatchPreview(true)
       setIsLoading(false)
     } else {
       // Single entry - show preview before saving
+      setQuotedContent(formatResult.quotedContent)
       setPreviewData(formatResult.data)
       // Extract formatted text for preview display
       setPreviewText(data.formatted_text || data.entries?.[0]?.formatted_text || '')
@@ -856,6 +859,7 @@ ${emailBody || ''}`
         email_source: emailSourceMetadata || undefined,
         thread_participants: threadParticipants || undefined,
         internal_sender: internalSender || undefined,
+        quoted_content: quotedContent,
       },
       previewData
     )
@@ -920,6 +924,7 @@ ${emailBody || ''}`
         email_source: emailSourceMetadata || undefined,
         thread_participants: threadParticipants || undefined,
         internal_sender: internalSender || undefined,
+        quoted_content: quotedContent,
       },
       filteredAiResponse,
       filteredMatches // Pass the filtered contact matches

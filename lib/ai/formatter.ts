@@ -5,6 +5,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { stripQuotedContent } from '@/lib/inbound/utils';
 import {
   AIFormatterResponse,
   FormattingResult,
@@ -361,6 +362,18 @@ export async function formatCorrespondence(
   try {
     const client = getAnthropicClient();
 
+    // Strip quoted/replied content before sending to AI
+    const cleanText = stripQuotedContent(rawText)
+
+    // Capture what was stripped for metadata (primarily "---Original Message---" blocks)
+    let quotedContent: string | undefined
+    if (cleanText !== rawText.trim()) {
+      const originalMsgMatch = rawText.match(/(-{3,}\s*original\s+message\s*-{3,}[\s\S]*)/i)
+      const onWroteMatch = rawText.match(/(on\s+.{5,80}\s+wrote:[\s\S]*)/i)
+      const fromSentToMatch = rawText.match(/(^from:\s.+\nsent:\s.+\nto:.+(?:\nsubject:.+)?[\s\S]*)/im)
+      quotedContent = (originalMsgMatch?.[0] || onWroteMatch?.[0] || fromSentToMatch?.[0])?.trim()
+    }
+
     const userPrompt = shouldSplit
       ? `YOU MUST SPLIT THIS CORRESPONDENCE INTO SEPARATE INDIVIDUAL EMAILS.
 
@@ -431,7 +444,7 @@ RULES:
 7. Order chronologically (oldest first)
 
 Text to process:
-${rawText}`
+${cleanText}`
       : `Format this correspondence entry.
 
 Return JSON with this EXACT structure:
@@ -471,7 +484,7 @@ If entry_type_guess is "Email":
 - Start formatted_text from the first line AFTER the headers
 
 Text to process:
-${rawText}`;
+${cleanText}`;
 
     const response = await client.beta.messages.create({
       model: 'claude-sonnet-4-5',
@@ -532,6 +545,7 @@ ${rawText}`;
     return {
       success: true,
       data: validated,
+      quotedContent,
     };
   } catch (error) {
     // Log error for debugging (in production, use proper logging)
