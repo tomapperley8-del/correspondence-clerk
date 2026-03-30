@@ -287,7 +287,7 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
             {(contract.contract_start || contract.contract_end) && (
               <div className="mb-1">
                 {contract.contract_start && contract.contract_end ? (
-                  <ContractStatusBadge startDate={contract.contract_start} endDate={contract.contract_end} />
+                  <ContractStatusBadge startDate={contract.contract_start} endDate={contract.contract_end} isCurrent={contract.is_current} />
                 ) : (
                   <span className="text-sm text-gray-700">
                     {contract.contract_start ? `From ${formatDate(contract.contract_start)}` : `Until ${formatDate(contract.contract_end)}`}
