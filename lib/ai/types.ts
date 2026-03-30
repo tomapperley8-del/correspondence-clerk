@@ -7,6 +7,17 @@
 export type EntryType = 'Email' | 'Call' | 'Meeting';
 
 /**
+ * Inline action suggestion returned alongside formatted text
+ * Simpler than ActionSuggestion — detects from the current entry only (no history)
+ */
+export interface InlineActionSuggestion {
+  action_type: ActionType;
+  confidence: 'low' | 'medium' | 'high';
+  priority: 'low' | 'medium' | 'high';
+  suggested_due_date: string | null; // ISO 8601 date or null
+}
+
+/**
  * Single formatted entry from AI
  */
 export interface FormattedEntry {
@@ -20,6 +31,7 @@ export interface FormattedEntry {
     sender: string | null;
     recipient: string | null;
   };
+  action_suggestion?: InlineActionSuggestion | null;
 }
 
 /**
@@ -36,6 +48,7 @@ export interface SingleEntryResponse {
     sender: string | null;
     recipient: string | null;
   };
+  action_suggestion?: InlineActionSuggestion | null;
 }
 
 /**
