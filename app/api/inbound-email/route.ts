@@ -336,6 +336,15 @@ async function matchBusinessFromRecipients(
 }
 
 // ---------------------------------------------------------------------------
+// Structured logger — all events share the [inbound-email] prefix for easy
+// grepping in Vercel logs. Each entry includes a timestamp so individual
+// hops are traceable without relying on log-line ordering.
+// ---------------------------------------------------------------------------
+function log(event: string, data: Record<string, unknown> = {}) {
+  console.log(JSON.stringify({ t: new Date().toISOString(), event, ...data }))
+}
+
+// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -344,7 +353,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // 1. Verify signature
   const sig = request.headers.get('x-postmark-signature') ?? ''
   if (!verifyPostmarkSignature(rawBody, sig)) {
-    console.warn('[inbound-email] Signature mismatch — discarding')
+    log('[inbound-email] sig_mismatch')
     return NextResponse.json({}, { status: 200 })
   }
 
@@ -353,12 +362,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     payload = JSON.parse(rawBody)
   } catch {
+    log('[inbound-email] parse_error')
     return NextResponse.json({}, { status: 200 })
   }
 
   // 3. Extract token and look up user
   const token = extractToken(payload)
-  if (!token) return NextResponse.json({}, { status: 200 })
+  log('[inbound-email] received', {
+    from: payload.FromFull?.Email ?? payload.From ?? '',
+    subject: payload.Subject ?? '',
+    originalRecipient: payload.OriginalRecipient ?? '',
+    token: token ?? '(none)',
+  })
+
+  if (!token) {
+    log('[inbound-email] no_token')
+    return NextResponse.json({}, { status: 200 })
+  }
 
   const supabase = createServiceRoleClient()
 
@@ -368,7 +388,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     .eq('inbound_email_token', token)
     .maybeSingle()
 
-  if (!profile) return NextResponse.json({}, { status: 200 })
+  if (!profile) {
+    log('[inbound-email] unknown_token', { token })
+    return NextResponse.json({}, { status: 200 })
+  }
 
   const orgId: string = profile.organization_id
   const userId: string = profile.id
@@ -380,7 +403,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // 4. Rate limit
   const allowed = await checkOrgRateLimit(supabase, orgId)
   if (!allowed) {
-    console.warn(`[inbound-email] Rate limit hit for org ${orgId}`)
+    log('[inbound-email] rate_limited', { orgId })
     return NextResponse.json({}, { status: 200 })
   }
 
@@ -392,6 +415,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // 6. Spam filter (applies to both directions)
   const discardReason = shouldDiscard(payload, headers)
   if (discardReason) {
+    log('[inbound-email] discarded', { reason: discardReason, from: payload.FromFull?.Email ?? payload.From ?? '' })
     await supabase.from('inbound_queue').insert({
       org_id: orgId,
       from_email: (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase(),
@@ -421,6 +445,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     direction = 'sent'
   }
 
+  log('[inbound-email] direction_detected', { direction, fromEmail })
+
   // 8. Extract body and recipients
   const strippedBody = stripQuotedContent(payload.StrippedTextReply || payload.TextBody || '')
   const bodyPreview = strippedBody.slice(0, 500)
@@ -442,6 +468,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const match = await matchBusinessFromRecipients(supabase, orgId, recipientEmails)
 
     if (match) {
+      log('[inbound-email] auto_filed_sent', { businessId: match.businessId, matchedEmail: match.matchedEmail })
       const rawForAI = buildRawForAI(payload, strippedBody, 'sent')
       const formatResult = await formatCorrespondence(rawForAI, false)
 
@@ -457,6 +484,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         subject = ai.subject_guess || subject
         formattingStatus = 'formatted'
       }
+
+      log('[inbound-email] formatting_done', { formattingStatus, direction: 'sent' })
 
       await insertCorrespondenceServiceRole(supabase, {
         orgId, userId,
@@ -474,6 +503,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({}, { status: 200 })
     }
 
+    log('[inbound-email] queued_sent', { recipientDomains: recipientEmails.map(e => e.split('@')[1] ?? '') })
     // No domain match → queue for manual triage
     await supabase.from('inbound_queue').insert({
       org_id: orgId,
@@ -509,6 +539,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   if (autoFiledBusinessId) {
+    log('[inbound-email] auto_filed_received', { businessId: autoFiledBusinessId, domain })
     let contactId: string | null = null
     const { data: contact } = await supabase
       .from('contacts')
@@ -535,6 +566,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       formattingStatus = 'formatted'
     }
 
+    log('[inbound-email] formatting_done', { formattingStatus, direction: 'received' })
+
     await insertCorrespondenceServiceRole(supabase, {
       orgId, userId,
       businessId: autoFiledBusinessId,
@@ -551,6 +584,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({}, { status: 200 })
   }
 
+  log('[inbound-email] queued_received', { domain: domain || '(personal/unknown)' })
   // No domain match → add to inbound_queue for manual triage
   await supabase.from('inbound_queue').insert({
     org_id: orgId,
