@@ -1,5 +1,5 @@
 # Implementation Plan
-Last updated: 26/03/2026
+Last updated: 30/03/2026
 
 This is the single source of truth for what needs doing, in order.
 Pick up from the first incomplete item each session.
@@ -61,9 +61,9 @@ Pick up from the first incomplete item each session.
 
 ## Batch 5 — AI Cost & Quality
 
-- [ ] **P12** — Prompt caching: add `cache_control: { type: 'ephemeral' }` to static content in `app/api/chat/route.ts` (biggest win), `lib/ai/formatter.ts`, `ai-summary.ts`, `ai-action-detection.ts`. Use `anthropic.beta.promptCaching.messages.create`.
-- [ ] **P13** — Single combined AI call: merge formatter + action detection into one structured output per entry. Update `lib/ai/types.ts` schema, `lib/ai/formatter.ts`, `app/actions/ai-formatter.ts`, `app/new-entry/page.tsx`. Keep `ai-action-detection.ts` with deprecation comment (still used for re-classification).
-- [ ] **P14** — Quoted content stripping: wire existing `stripQuotedContent()` from `lib/inbound/utils.ts` into `lib/ai/formatter.ts` before building the prompt. Do NOT create a separate file — import from where it already lives. Store `quotedContent` in `ai_metadata`.
+- [x] **P12** — Prompt caching: `cache_control: { type: 'ephemeral' }` on system prompts in `lib/ai/formatter.ts` + `ai-action-detection.ts`. Chat route was already cached. ai-summary.ts skipped (no static system prompt). (30/03/2026)
+- [x] **P13** — Single combined AI call: merge formatter + action detection into one structured output per entry. `lib/ai/types.ts` + `lib/ai/formatter.ts` schema + prompts updated; `new-entry/page.tsx` pre-fills actionNeeded from medium/high confidence suggestions; `ai-action-detection.ts` kept with deprecation note. (30/03/2026)
+- [x] **P14** — Quoted content stripping: wire existing `stripQuotedContent()` from `lib/inbound/utils.ts` into `lib/ai/formatter.ts` before building the prompt. Do NOT create a separate file — import from where it already lives. Store `quotedContent` in `ai_metadata`. (30/03/2026)
 
 ---
 
@@ -73,19 +73,27 @@ Pick up from the first incomplete item each session.
 - [x] **P15b** — Inbox direction fix + UX overhaul: direction stored in queue, SENT/RECEIVED badge, expandable body, auto-match contact, own email addresses in settings (30/03/2026)
 - [ ] **P16** — Landing page FAQ: create `components/marketing/FAQ.tsx` as `<details>/<summary>` accordion (no dependencies); add above CTA in `app/(public)/page.tsx`. Hero mockup is already done.
 - [ ] **P17** — Sentry error monitoring: install `@sentry/nextjs`, create three config files, wrap `next.config.ts`, add `app/global-error.tsx`. **Needs Sentry account + DSN first** (free tier, 5k errors/month). Errors only — no replays, no performance tracing.
+- [ ] **P24** — Inbound email debug + logging: add structured logging to `app/api/inbound-email/route.ts` (log every receive event: timestamp, sender, token extracted, result); add "Send test email" button in settings; document correct Outlook forwarding rule setup (forward to `{token}@in.correspondenceclerk.com`). Use Postmark activity log to trace missing emails.
+- [ ] **P25** — Docs audit: read every file in `docs/`, update stale sections (inbound email, AI features, onboarding flow all changed significantly), fill gaps. No greenfield writes — update what exists.
 
 ---
 
 ## Batch 7 — New Features
 
-- [ ] **P18** — Business-contextual Daily Briefing: when on `/businesses/[id]`, pass `businessId` to chat API; filter context to that business's correspondence. Add "Ask about [Business Name]" chip or pre-fill. Minimum change to chat route — just an additional filter on context fetch.
-- [ ] **P19** — File uploads on business pages: Supabase Storage bucket, `business_files` table (id, business_id, org_id, filename, storage_path, parsed_text, file_type, created_at), upload UI on business page, PDF text extraction (`pdf-parse`), include parsed text in Daily Briefing context for that business. Add per-org storage cap (50MB).
+- [ ] **P26** *(was P18, expanded)* — AI Assistant rename + call prep: rename "Daily Briefing" → "AI Assistant" in nav and throughout. When opened from `/businesses/[id]`, pass `businessId` to chat API and auto-run a "Call prep" preset (full context: correspondence history, contract status, deal terms, contacts). Minimum chat route change — additional businessId filter. Files: `components/Navigation.tsx`, `components/ChatPanel.tsx`, `app/api/chat/route.ts`.
+- [ ] **P27** — AI preset templates: new `user_ai_presets` table (id, user_id, org_id, label, prompt_text, sort_order); replace ChatPanel freeform textarea with preset chip grid (suggested defaults: "Daily briefing", "What needs chasing", "Expiring contracts", "Call prep"); manage presets UI (edit/delete/add, cap 10 per user). Builds on P26.
+- [ ] **P19** — File uploads on business pages: Supabase Storage bucket, `business_files` table (id, business_id, org_id, filename, storage_path, parsed_text, file_type, created_at), upload UI on business page, PDF text extraction (`pdf-parse`), include parsed text in AI Assistant context for that business. Add per-org storage cap (50MB).
+- [ ] **P29** — Email import copy review: audit inbound forwarding setup page (`app/settings/page.tsx`), bulk Gmail/Outlook wizard (`app/import/gmail/page.tsx`, `app/import/outlook/page.tsx`), bookmarklet installer (`app/install-bookmarklet/page.tsx`), and onboarding step 5. Rewrite unclear copy, flag any feature changes needed to make each path obviously useful to a new user.
+- [ ] **P30** — In-app email sending: compose + reply modals on business page and correspondence entries; auto-log sent email as correspondence entry (direction='sent', no AI formatting — user wrote it). New: `app/actions/send-email.ts` (SendGrid send + createCorrespondence), `components/ComposeEmailModal.tsx`, `components/ReplyEmailModal.tsx`. Add "Compose email" button to business page header; "Reply" button to each correspondence entry. Uses existing `SENDGRID_API_KEY`.
 
 ---
 
 ## Batch 8 — Final Pass (do last)
 
-- [ ] **P20** — Friction audit: map click count for 5 common tasks (add entry, find business, check what needs doing, edit entry, check contact details). Find and eliminate unnecessary steps, confirmations, and navigation hops. No feature changes — UX tightening only.
+- [ ] **P21** — Direction bug fix: merge `updateCorrespondenceDirection` into `updateFormattedText` (eliminate separate call, fixes edit form revert). Audit new-entry form for post-submit state reset. Audit other forms for similar patterns (separate save calls, state re-initialising from stale props). Files: `app/businesses/[id]/page.tsx`, `app/actions/correspondence.ts`, `app/new-entry/page.tsx`, `app/businesses/[id]/_components/CorrespondenceEditForm.tsx`.
+- [ ] **P22** — Old contracts expiry: pass `is_current` to `ContractStatusBadge`; when `false`, render a static "Historical" label instead of a countdown. Files: `components/ContractDetailsCard.tsx`, `components/ContractStatusBadge.tsx`.
+- [ ] **P23** — Monthly billing flag: migration to add `billing_frequency ENUM('monthly','annual') DEFAULT 'annual'` to contracts table; add Monthly/Annual toggle to contract add/edit form; display frequency next to contract amount. File: `components/ContractDetailsCard.tsx`.
+- [ ] **P28** *(replaces P20)* — Full UX audit + fixes: walk every page as a new user (browser automation), document all issues (broken, confusing, disconnected features), then fix the most significant ones. Goes well beyond the old click-count audit.
 
 ---
 
