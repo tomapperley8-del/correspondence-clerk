@@ -55,6 +55,36 @@ const SINGLE_ENTRY_SCHEMA = {
         }
       },
       additionalProperties: false
+    },
+    action_suggestion: {
+      anyOf: [
+        {
+          type: 'object',
+          properties: {
+            action_type: {
+              type: 'string',
+              enum: ['prospect', 'follow_up', 'waiting_on_them', 'invoice', 'renewal']
+            },
+            confidence: {
+              type: 'string',
+              enum: ['low', 'medium', 'high']
+            },
+            priority: {
+              type: 'string',
+              enum: ['low', 'medium', 'high']
+            },
+            suggested_due_date: {
+              anyOf: [
+                { type: 'string' },
+                { type: 'null' }
+              ]
+            }
+          },
+          required: ['action_type', 'confidence', 'priority', 'suggested_due_date'],
+          additionalProperties: false
+        },
+        { type: 'null' }
+      ]
     }
   },
   required: ['subject_guess', 'entry_type_guess', 'entry_date_guess', 'formatted_text', 'warnings'],
@@ -108,6 +138,36 @@ const THREAD_SPLIT_SCHEMA = {
               }
             },
             additionalProperties: false
+          },
+          action_suggestion: {
+            anyOf: [
+              {
+                type: 'object',
+                properties: {
+                  action_type: {
+                    type: 'string',
+                    enum: ['prospect', 'follow_up', 'waiting_on_them', 'invoice', 'renewal']
+                  },
+                  confidence: {
+                    type: 'string',
+                    enum: ['low', 'medium', 'high']
+                  },
+                  priority: {
+                    type: 'string',
+                    enum: ['low', 'medium', 'high']
+                  },
+                  suggested_due_date: {
+                    anyOf: [
+                      { type: 'string' },
+                      { type: 'null' }
+                    ]
+                  }
+                },
+                required: ['action_type', 'confidence', 'priority', 'suggested_due_date'],
+                additionalProperties: false
+              },
+              { type: 'null' }
+            ]
           }
         },
         required: ['subject_guess', 'entry_type_guess', 'entry_date_guess', 'formatted_text', 'warnings'],
@@ -140,7 +200,7 @@ const getAnthropicClient = () => {
 /**
  * System prompt that enforces Hard Rules
  */
-const SYSTEM_PROMPT = `You are a formatting assistant for a correspondence filing system.
+const SYSTEM_PROMPT = `You are a formatting and action-detection assistant for a correspondence filing system.
 
 HARD RULES - YOU MUST FOLLOW THESE EXACTLY:
 1. PRESERVE USER WORDING EXACTLY - No rewriting, polishing, summarizing, or tone changes
@@ -155,6 +215,14 @@ Your job is to:
 - Guess the entry type (Email, Call, or Meeting)
 - Extract the date/time if mentioned in ISO 8601 format, or null if not found
 - Detect if this looks like an email thread and optionally split it
+- Detect any single pending action in the text (action_suggestion field)
+
+ACTION DETECTION RULES:
+- Only suggest an action if explicitly mentioned in the text — NEVER invent one
+- action_type must be one of: prospect, follow_up, waiting_on_them, invoice, renewal
+- Set confidence based on how explicit the trigger is: "I'll follow up next week" = high, vague hints = low
+- suggested_due_date: extract if mentioned (ISO 8601 date), otherwise null
+- If no clear action is present, set action_suggestion to null
 
 NEVER add content that wasn't in the original text.`;
 
@@ -327,7 +395,13 @@ Return JSON with this EXACT structure:
       "extracted_names": {
         "sender": "string or null",
         "recipient": "string or null"
-      }
+      },
+      "action_suggestion": {
+        "action_type": "follow_up" | "prospect" | "waiting_on_them" | "invoice" | "renewal",
+        "confidence": "low" | "medium" | "high",
+        "priority": "low" | "medium" | "high",
+        "suggested_due_date": "YYYY-MM-DD or null"
+      } or null
     }
   ],
   "warnings": []
@@ -371,7 +445,13 @@ Return JSON with this EXACT structure:
   "extracted_names": {
     "sender": "string or null",
     "recipient": "string or null"
-  } (optional - only for emails)
+  } (optional - only for emails),
+  "action_suggestion": {
+    "action_type": "follow_up" | "prospect" | "waiting_on_them" | "invoice" | "renewal",
+    "confidence": "low" | "medium" | "high",
+    "priority": "low" | "medium" | "high",
+    "suggested_due_date": "YYYY-MM-DD or null"
+  } or null (null if no pending action detected)
 }
 
 If entry_type_guess is "Email":

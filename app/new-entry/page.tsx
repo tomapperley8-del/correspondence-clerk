@@ -799,6 +799,16 @@ ${emailBody || ''}`
     }
 
     // AI formatting succeeded
+    // Pre-fill action if AI detected one with medium/high confidence (user can still override)
+    const data = formatResult.data as any
+    const actionHint = data.action_suggestion || data.entries?.[0]?.action_suggestion
+    if (actionHint && (actionHint.confidence === 'medium' || actionHint.confidence === 'high') && actionNeeded === 'none') {
+      setActionNeeded(actionHint.action_type)
+      if (actionHint.suggested_due_date && !dueAt) {
+        setDueAt(actionHint.suggested_due_date)
+      }
+    }
+
     // Check if it's a thread split with multiple entries
     if (isThreadSplitResponse(formatResult.data) && formatResult.data.entries.length > 1) {
       // Match each entry to a contact
@@ -813,7 +823,6 @@ ${emailBody || ''}`
       // Single entry - show preview before saving
       setPreviewData(formatResult.data)
       // Extract formatted text for preview display
-      const data = formatResult.data as any
       setPreviewText(data.formatted_text || data.entries?.[0]?.formatted_text || '')
       setShowPreview(true)
       setIsLoading(false)

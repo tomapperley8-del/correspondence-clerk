@@ -105,6 +105,10 @@ function validateActionDetectionResponse(data: unknown): ActionDetectionResponse
 /**
  * Analyze recent correspondence and detect pending actions
  * Returns suggested actions for manual user confirmation
+ *
+ * @deprecated For new entries, action detection is now included in the formatter response
+ * (lib/ai/formatter.ts → action_suggestion field). This function is kept for re-classification
+ * of existing entries from the business page (ActionSuggestions component).
  */
 export async function detectActions(businessId: string) {
   const supabase = await createClient()
