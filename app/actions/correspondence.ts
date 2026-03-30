@@ -311,7 +311,8 @@ export async function updateFormattedText(
   subject?: string | null,
   internalSender?: string | null,
   actionNeeded?: string | null,
-  dueAt?: string | null
+  dueAt?: string | null,
+  direction?: 'received' | 'sent' | null
 ) {
   const supabase = await createClient()
   const {
@@ -357,6 +358,10 @@ export async function updateFormattedText(
     updateData.due_at = dueAt || null
   }
 
+  if (direction !== undefined) {
+    updateData.direction = direction
+  }
+
   const { data, error } = await supabase
     .from('correspondence')
     .update(updateData)
@@ -377,44 +382,6 @@ export async function updateFormattedText(
   return { data }
 }
 
-/**
- * Update correspondence direction
- * Per user request: keep detection logic but allow manual correction
- */
-export async function updateCorrespondenceDirection(
-  correspondenceId: string,
-  direction: 'received' | 'sent' | null
-) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
-
-  try {
-    // Update direction and edited metadata
-    const { error: updateError } = await supabase
-      .from('correspondence')
-      .update({
-        direction: direction,
-        edited_at: new Date().toISOString(),
-        edited_by: user.id,
-      })
-      .eq('id', correspondenceId)
-
-    if (updateError) {
-      return { error: updateError.message }
-    }
-
-    return { success: true }
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err)
-    return { error: errorMessage }
-  }
-}
 
 /**
  * Delete a correspondence entry

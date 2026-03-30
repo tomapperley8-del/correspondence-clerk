@@ -55,7 +55,8 @@ Pick up from the first incomplete item each session.
 - [x] **P10-F1** — Data export: `app/api/export/route.ts` returning CSV for businesses/contacts/correspondence; three download buttons in settings (27/03/2026)
 - [x] **P10-F2** — Account deletion: "Delete Account" in settings (confirmation dialog, type DELETE, cascade delete, `auth.admin.deleteUser`, redirect to `/login?message=account-deleted`) (27/03/2026)
 - [x] **P10-F3** — Custom 404: `app/not-found.tsx` (brand-consistent, link back to dashboard) (27/03/2026)
-- [ ] **P11** — Pricing page: "Most Popular" badge on Pro card; monthly/annual toggle (annual = ×10, show "Save 17%" not "2 months"); all CTAs read "Start free trial — [Plan]"
+- [x] **P21** — Direction bug fix: merged `updateCorrespondenceDirection` into `updateFormattedText` (single DB call, deleted separate function). new-entry audited — navigates away on submit, no stale state. (30/03/2026)
+- [ ] **P22** — Old contracts expiry: pass `is_current` to `ContractStatusBadge`; when `false`, render a static "Historical" label instead of a countdown. Files: `components/ContractDetailsCard.tsx`, `components/ContractStatusBadge.tsx`.
 
 ---
 
@@ -72,7 +73,7 @@ Pick up from the first incomplete item each session.
 - [x] **P15** — Inbound email forwarding: LIVE. Postmark configured, BCC capture live, inbox UI polished (27/03/2026)
 - [x] **P15b** — Inbox direction fix + UX overhaul: direction stored in queue, SENT/RECEIVED badge, expandable body, auto-match contact, own email addresses in settings (30/03/2026)
 - [ ] **P16** — Landing page FAQ: create `components/marketing/FAQ.tsx` as `<details>/<summary>` accordion (no dependencies); add above CTA in `app/(public)/page.tsx`. Hero mockup is already done.
-- [ ] **P17** — Sentry error monitoring: install `@sentry/nextjs`, create three config files, wrap `next.config.ts`, add `app/global-error.tsx`. **Needs Sentry account + DSN first** (free tier, 5k errors/month). Errors only — no replays, no performance tracing.
+- [ ] **P17** — ⚠️ **Blocked — needs Sentry account + DSN first.** Sentry error monitoring: install `@sentry/nextjs`, create three config files, wrap `next.config.ts`, add `app/global-error.tsx`. Free tier: 5k errors/month. Errors only — no replays, no performance tracing.
 - [ ] **P24** — Inbound email debug + logging: add structured logging to `app/api/inbound-email/route.ts` (log every receive event: timestamp, sender, token extracted, result); add "Send test email" button in settings; document correct Outlook forwarding rule setup (forward to `{token}@in.correspondenceclerk.com`). Use Postmark activity log to trace missing emails.
 - [ ] **P25** — Docs audit: read every file in `docs/`, update stale sections (inbound email, AI features, onboarding flow all changed significantly), fill gaps. No greenfield writes — update what exists.
 
@@ -90,8 +91,7 @@ Pick up from the first incomplete item each session.
 
 ## Batch 8 — Final Pass (do last)
 
-- [ ] **P21** — Direction bug fix: merge `updateCorrespondenceDirection` into `updateFormattedText` (eliminate separate call, fixes edit form revert). Audit new-entry form for post-submit state reset. Audit other forms for similar patterns (separate save calls, state re-initialising from stale props). Files: `app/businesses/[id]/page.tsx`, `app/actions/correspondence.ts`, `app/new-entry/page.tsx`, `app/businesses/[id]/_components/CorrespondenceEditForm.tsx`.
-- [ ] **P22** — Old contracts expiry: pass `is_current` to `ContractStatusBadge`; when `false`, render a static "Historical" label instead of a countdown. Files: `components/ContractDetailsCard.tsx`, `components/ContractStatusBadge.tsx`.
+- [ ] **P11** — Pricing page: "Most Popular" badge on Pro card; monthly/annual toggle (annual = ×10, show "Save 17%" not "2 months"); all CTAs read "Start free trial — [Plan]" *(hold — pricing not finalised)*
 - [ ] **P23** — Monthly billing flag: migration to add `billing_frequency ENUM('monthly','annual') DEFAULT 'annual'` to contracts table; add Monthly/Annual toggle to contract add/edit form; display frequency next to contract amount. File: `components/ContractDetailsCard.tsx`.
 - [ ] **P28** *(replaces P20)* — Full UX audit + fixes: walk every page as a new user (browser automation), document all issues (broken, confusing, disconnected features), then fix the most significant ones. Goes well beyond the old click-count audit.
 
