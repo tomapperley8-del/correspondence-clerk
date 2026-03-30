@@ -398,7 +398,7 @@ ${rawText}`;
       max_tokens: 8192,
       temperature: 0,
       betas: ['structured-outputs-2025-11-13'],
-      system: SYSTEM_PROMPT,
+      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       messages: [
         {
           role: 'user',
