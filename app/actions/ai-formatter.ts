@@ -43,6 +43,7 @@ export async function formatCorrespondenceText(
 
   return {
     data: result.data,
+    quotedContent: result.quotedContent,
   }
 }
 
@@ -72,6 +73,7 @@ export async function createFormattedCorrespondence(
     email_source?: Record<string, unknown>
     thread_participants?: string
     internal_sender?: string
+    quoted_content?: string
   },
   aiResponse: AIFormatterResponse,
   contactMatches?: ContactMatchResult[]
@@ -137,6 +139,7 @@ export async function createFormattedCorrespondence(
                 }
               : { matched: false },
             ...(formData.email_source && { email_source: formData.email_source }),
+            ...(formData.quoted_content && { quoted_content: formData.quoted_content }),
           },
         }
       })
@@ -197,6 +200,7 @@ export async function createFormattedCorrespondence(
           warnings: aiResponse.warnings,
           split_from_thread: false,
           ...(formData.email_source && { email_source: formData.email_source }),
+          ...(formData.quoted_content && { quoted_content: formData.quoted_content }),
         },
       })
       .select()
@@ -439,6 +443,7 @@ export async function retryFormatting(correspondenceId: string) {
         warnings: aiData.warnings,
         retry_formatted: true,
         retry_attempted: new Date().toISOString(),
+        ...(formatResult.quotedContent && { quoted_content: formatResult.quotedContent }),
       },
     })
     .eq('id', correspondenceId)

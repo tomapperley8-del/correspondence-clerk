@@ -77,7 +77,7 @@ export function isThreadSplitResponse(
  * Result of formatting operation (success or failure)
  */
 export type FormattingResult =
-  | { success: true; data: AIFormatterResponse }
+  | { success: true; data: AIFormatterResponse; quotedContent?: string }
   | { success: false; error: string; shouldSaveUnformatted: true };
 
 /**
