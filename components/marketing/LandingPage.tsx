@@ -8,6 +8,7 @@ import { HowItWorks } from './HowItWorks'
 import { Pricing } from './Pricing'
 import { SocialProof } from './SocialProof'
 import { CTASection } from './CTASection'
+import { FAQ } from './FAQ'
 
 export function LandingPage() {
   return (
@@ -20,6 +21,7 @@ export function LandingPage() {
       <HowItWorks />
       <Pricing />
       <SocialProof />
+      <FAQ />
       <CTASection />
       <MarketingFooter />
     </div>
