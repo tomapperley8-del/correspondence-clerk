@@ -160,6 +160,8 @@ async function fetchOrgBusinessSummaries(orgId: string, supabase: SupabaseClient
 
 async function fetchActionsAndInbound(orgId: string, supabase: SupabaseClient) {
   const today = new Date().toISOString().split('T')[0]
+  // Items logged in the last 2 days are too fresh to surface as follow-up opportunities
+  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 3600000).toISOString()
 
   const [{ data: actionsDue }, { data: needsReply }, { data: inbound }] = await Promise.all([
     supabase.from('correspondence')
@@ -172,7 +174,8 @@ async function fetchActionsAndInbound(orgId: string, supabase: SupabaseClient) {
       .select('id, subject, business_id, entry_date, formatted_text_current')
       .eq('organization_id', orgId)
       .eq('direction', 'received')
-      .eq('action_needed', 'medium')
+      .in('action_needed', ['follow_up', 'waiting_on_them'])
+      .lt('entry_date', twoDaysAgo)
       .order('entry_date', { ascending: false })
       .limit(10),
     supabase.from('inbound_queue')
@@ -188,6 +191,7 @@ async function fetchActionsAndInbound(orgId: string, supabase: SupabaseClient) {
 
 async function fetchBuriedGoldCorrespondence(orgId: string, supabase: SupabaseClient) {
   const cutoff = new Date(Date.now() - 60 * 24 * 3600000).toISOString()
+  const recentCutoff = cutoff // same 60-day boundary: "recent" = within last 60 days
 
   const { data: correspondence } = await supabase
     .from('correspondence')
@@ -203,7 +207,33 @@ async function fetchBuriedGoldCorrespondence(orgId: string, supabase: SupabaseCl
     .eq('organization_id', orgId)
 
   const bizMap = new Map((businesses ?? []).map((b) => [b.id, b.name]))
-  return (correspondence ?? []).map((c) => ({ ...c, businessName: bizMap.get(c.business_id) ?? 'Unknown' }))
+  const entries = (correspondence ?? []).map((c) => ({ ...c, businessName: bizMap.get(c.business_id) ?? 'Unknown' }))
+
+  // Fetch recent activity for candidate businesses so Claude can tell if old items were followed up
+  const candidateIds = [...new Set(entries.map((e) => e.business_id))]
+  const recentActivity = new Map<string, { count: number; lastContact: string; subjects: string[] }>()
+
+  if (candidateIds.length > 0) {
+    const { data: recentCorr } = await supabase
+      .from('correspondence')
+      .select('business_id, subject, entry_date')
+      .eq('organization_id', orgId)
+      .in('business_id', candidateIds)
+      .gte('entry_date', recentCutoff)
+      .order('entry_date', { ascending: false })
+      .limit(300)
+
+    for (const r of recentCorr ?? []) {
+      if (!recentActivity.has(r.business_id)) {
+        recentActivity.set(r.business_id, { count: 0, lastContact: r.entry_date, subjects: [] })
+      }
+      const item = recentActivity.get(r.business_id)!
+      item.count++
+      if (item.subjects.length < 2) item.subjects.push(r.subject ?? 'untitled')
+    }
+  }
+
+  return { entries, recentActivity }
 }
 
 async function fetchContractData(orgId: string, supabase: SupabaseClient) {
@@ -255,12 +285,22 @@ function buildBriefingPrompt(
 ): { systemPrompt: string; userPrompt: string } {
   const orgName = org?.name ?? 'your organisation'
 
+  const bizNameMap = new Map(businesses.map((b) => [b.id, b.name]))
+
   const actionsText = actions.actionsDue.length
-    ? actions.actionsDue.map((a) => `- ${a.subject || 'Untitled'} (due ${formatDate(a.due_at)}) — ${a.action_needed}`).join('\n')
+    ? actions.actionsDue.map((a) => {
+        const biz = bizNameMap.get(a.business_id) ?? 'Unknown business'
+        const body = a.formatted_text_current ? ` — ${truncate(a.formatted_text_current, 300)}` : ''
+        return `- ${biz}: ${a.subject || 'Untitled'} (due ${formatDate(a.due_at)}, action: ${a.action_needed})${body}`
+      }).join('\n')
     : 'None overdue.'
 
   const repliesText = actions.needsReply.length
-    ? actions.needsReply.map((a) => `- ${a.subject || 'Untitled'} (${formatDate(a.entry_date)})`).join('\n')
+    ? actions.needsReply.map((a) => {
+        const biz = bizNameMap.get(a.business_id) ?? 'Unknown business'
+        const body = a.formatted_text_current ? ` — ${truncate(a.formatted_text_current, 300)}` : ''
+        return `- ${biz}: ${a.subject || 'Untitled'} (${formatDate(a.entry_date)})${body}`
+      }).join('\n')
     : 'None.'
 
   const inboundText = actions.inbound.length
@@ -293,7 +333,7 @@ function buildBriefingPrompt(
     : 'None.'
 
   return {
-    systemPrompt: `You are an AI assistant embedded in Correspondence Clerk for ${orgName}. Today is ${today}. You produce clear, actionable business briefings in British English. Use markdown formatting. Be concise and prioritise what genuinely needs attention. ${MEMBERSHIP_LEGEND}`,
+    systemPrompt: `You are an AI assistant embedded in Correspondence Clerk for ${orgName}. Today is ${today}. You produce clear, actionable business briefings in British English. Use markdown formatting. Be concise and prioritise what genuinely needs attention. Only include an item if you can recommend a specific next action based on the content provided — do not invent specifics not present in the data. If content is too vague to advise on, omit it. A focused, useful briefing is better than a complete one. ${MEMBERSHIP_LEGEND}`,
     userPrompt: `Generate a morning briefing for ${orgName}.
 
 ## Actions due today or overdue
@@ -477,10 +517,11 @@ ${reconnect || 'No businesses meet this criteria — great work staying in touch
 
 function buildBuriedGoldPrompt(
   org: Awaited<ReturnType<typeof fetchOrgContext>>,
-  oldEntries: Awaited<ReturnType<typeof fetchBuriedGoldCorrespondence>>,
+  data: Awaited<ReturnType<typeof fetchBuriedGoldCorrespondence>>,
   previous: Array<{ content: string; generated_at: string }>
 ): { systemPrompt: string; userPrompt: string } {
   const orgName = org?.name ?? 'your organisation'
+  const { entries: oldEntries, recentActivity } = data
 
   // Find old entries with flagged actions or keywords suggesting commitments
   const candidates: string[] = []
@@ -489,19 +530,23 @@ function buildBuriedGoldPrompt(
     const hasCommitmentKeyword = ['agreed', 'promised', 'will send', 'follow up', 'get back', 'let you know', 'chase', 'confirm'].some((kw) => text.includes(kw))
     const age = daysAgo(c.entry_date)
     if ((c.action_needed && c.action_needed !== 'none' && age > 60) || (hasCommitmentKeyword && age > 90)) {
-      candidates.push(`- ${c.businessName} (${formatDate(c.entry_date)}): "${truncate(c.formatted_text_current ?? c.subject ?? '', 200)}"`)
+      const recent = recentActivity.get(c.business_id)
+      const recentLine = recent
+        ? `  Recent activity: ${recent.count} entries since this (last ${formatDate(recent.lastContact)})${recent.subjects.length ? `. Latest: ${recent.subjects.map((s) => `"${s}"`).join(', ')}` : ''}`
+        : `  Recent activity: none since this entry`
+      candidates.push(`- ${c.businessName} (${formatDate(c.entry_date)}): "${truncate(c.formatted_text_current ?? c.subject ?? '', 200)}"\n${recentLine}`)
       if (candidates.length >= 40) break
     }
   }
 
   return {
-    systemPrompt: `You are an AI assistant for ${orgName}. Surface forgotten commitments and valuable context buried in old correspondence. British English, markdown. Be specific — name the business and what was agreed.`,
-    userPrompt: `Review the following older correspondence entries and identify anything that looks like a forgotten commitment, a promise that may not have been followed up, or important context that might have slipped through the cracks.
+    systemPrompt: `You are an AI assistant for ${orgName}. Surface forgotten commitments and valuable context buried in old correspondence. British English, markdown. Be specific — name the business and what was agreed. For each item, use the "Recent activity" line to judge whether the old commitment was likely addressed. If a business has been actively engaged since and the recent subjects look related, say it was likely resolved and suggest they verify. If there is no recent activity, flag it clearly. Say "worth checking" rather than "definitely missed" when uncertain.`,
+    userPrompt: `Review the following older correspondence entries. Each entry shows the old item and recent activity for that business so you can judge whether it was followed up.
 
 ## Old entries with potential commitments
 ${candidates.join('\n') || 'No flagged old entries found.'}
 
-Produce a list of: (1) Likely missed follow-ups, (2) Commitments that need checking, (3) Useful context to resurface. Be specific and actionable.${formatPreviousInsights(previous)}`,
+Produce a list of: (1) Likely missed follow-ups (no recent activity), (2) Commitments worth checking (recent activity but may not have addressed this), (3) Probably resolved (recent activity likely covered it — verify). Be specific and actionable.${formatPreviousInsights(previous)}`,
   }
 }
 
