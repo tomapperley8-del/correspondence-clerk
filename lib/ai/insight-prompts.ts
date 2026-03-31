@@ -777,9 +777,41 @@ export async function buildInsightPrompt(
 
     case 'custom': {
       if (!customPromptText) throw new Error('custom insight requires promptText')
-      return {
-        systemPrompt: `You are an AI assistant for ${orgName}. Answer the following question about the business data. Be specific, concise, and actionable. British English, markdown.`,
-        userPrompt: customPromptText + formatPreviousInsights(previousInsights),
+
+      // Inject rich context based on scope so custom prompts have real data to work with
+      if (businessId) {
+        // Business-scoped: full business context (same as Call Prep / Full Picture)
+        const data = await fetchBusinessInsightData(orgId, businessId, supabase)
+        const context = businessContextBlock(data.business, data.contacts, data.correspondence)
+        return {
+          systemPrompt: `You are an AI assistant for ${orgName}. You have full access to the business data below. Be specific, concise, and actionable. British English, markdown.`,
+          userPrompt: `${customPromptText}\n\n${context}${formatPreviousInsights(previousInsights)}`,
+        }
+      } else {
+        // Org-scoped: org overview (businesses list + basic stats)
+        const businesses = await fetchOrgBusinessSummaries(orgId, supabase, 3)
+        const orgProfile = [
+          org?.business_description && `Description: ${org.business_description}`,
+          org?.industry && `Industry: ${org.industry}`,
+          org?.value_proposition && `Value proposition: ${org.value_proposition}`,
+          org?.services_offered && `Services: ${org.services_offered}`,
+        ].filter(Boolean).join('\n')
+
+        const businessList = businesses.slice(0, 30).map((b) => {
+          const recent = b.recentCorrespondence[0]
+          return `- ${b.name} (${b.category ?? 'uncategorised'}, ${b.status ?? 'unknown'}) — last contact: ${b.last_contacted_at ? `${daysAgo(b.last_contacted_at)}d ago` : 'never'}${recent ? `, last entry: "${truncate(recent.subject ?? '', 60)}"` : ''}`
+        }).join('\n')
+
+        return {
+          systemPrompt: `You are an AI assistant for ${orgName}. You have access to the organisation's business portfolio data below. Be specific, concise, and actionable. British English, markdown.`,
+          userPrompt: `${customPromptText}
+
+## About ${orgName}
+${orgProfile || 'No profile set.'}
+
+## Business portfolio (${businesses.length} businesses)
+${businessList || 'No businesses found.'}${formatPreviousInsights(previousInsights)}`,
+        }
       }
     }
   }
