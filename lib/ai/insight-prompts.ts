@@ -245,6 +245,29 @@ function buildBriefingPrompt(
 
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
 
+  // Recent activity: businesses contacted in the last 14 days with their latest correspondence snippet
+  const recentActivity = businesses
+    .filter((b) => b.recentCorrespondence.length > 0 && daysAgo(b.recentCorrespondence[0].entry_date) <= 14)
+    .sort((a, b) => new Date(b.recentCorrespondence[0].entry_date).getTime() - new Date(a.recentCorrespondence[0].entry_date).getTime())
+    .slice(0, 15)
+
+  const recentActivityText = recentActivity.length
+    ? recentActivity.map((b) => {
+        const c = b.recentCorrespondence[0]
+        return `- ${b.name} (${formatDate(c.entry_date)}): ${truncate(c.formatted_text_current ?? c.subject ?? '', 150)}`
+      }).join('\n')
+    : 'No activity in the last 14 days.'
+
+  // Quiet businesses: active but not contacted in 30+ days
+  const quietBusinesses = businesses
+    .filter((b) => b.status?.toLowerCase() === 'active' && daysAgo(b.last_contacted_at) > 30)
+    .sort((a, b) => daysAgo(b.last_contacted_at) - daysAgo(a.last_contacted_at))
+    .slice(0, 10)
+
+  const quietText = quietBusinesses.length
+    ? quietBusinesses.map((b) => `- ${b.name} (${daysAgo(b.last_contacted_at) > 9000 ? 'never contacted' : `${daysAgo(b.last_contacted_at)}d ago`})`).join('\n')
+    : 'None.'
+
   return {
     systemPrompt: `You are an AI assistant embedded in Correspondence Clerk for ${orgName}. Today is ${today}. You produce clear, actionable business briefings in British English. Use markdown formatting. Be concise and prioritise what genuinely needs attention.`,
     userPrompt: `Generate a morning briefing for ${orgName}.
@@ -258,7 +281,13 @@ ${repliesText}
 ## Unread inbound emails in queue
 ${inboundText}
 
-## Business count
+## Recent activity (last 14 days)
+${recentActivityText}
+
+## Active businesses gone quiet (30+ days, no contact)
+${quietText}
+
+## Total businesses
 ${businesses.length} businesses in the system.
 
 Produce a briefing with three sections: (1) Urgent — what must be dealt with today, (2) On the radar — things to keep in mind this week, (3) All clear — anything worth noting is under control. Keep it scannable. No fluff.${formatPreviousInsights(previous)}`,
@@ -403,7 +432,7 @@ function buildReconnectListPrompt(
   const orgName = org?.name ?? 'your organisation'
 
   const reconnect = businesses
-    .filter((b) => daysAgo(b.last_contacted_at) >= 60 && b.status !== 'inactive')
+    .filter((b) => daysAgo(b.last_contacted_at) >= 60 && b.status?.toLowerCase() !== 'inactive')
     .sort((a, b) => daysAgo(a.last_contacted_at) - daysAgo(b.last_contacted_at))
     .slice(0, 25)
     .map((b) => {
@@ -458,8 +487,8 @@ function buildProspectingTargetsPrompt(
 ): { systemPrompt: string; userPrompt: string } {
   const orgName = org?.name ?? 'your organisation'
 
-  const activeBusinesses = businesses.filter((b) => b.status === 'active' && daysAgo(b.last_contacted_at) <= 90)
-  const dormant = businesses.filter((b) => (b.status === 'inactive' || daysAgo(b.last_contacted_at) > 90) && b.email)
+  const activeBusinesses = businesses.filter((b) => b.status?.toLowerCase() === 'active' && daysAgo(b.last_contacted_at) <= 90)
+  const dormant = businesses.filter((b) => (b.status?.toLowerCase() === 'inactive' || daysAgo(b.last_contacted_at) > 90) && b.email)
 
   const activeText = activeBusinesses.slice(0, 15).map((b) => `- ${b.name} (${b.category ?? 'unknown'}, ${b.membership_type ?? 'no membership'})`).join('\n')
   const dormantText = dormant.slice(0, 15).map((b) => `- ${b.name} (${b.category ?? 'unknown'}) — ${daysAgo(b.last_contacted_at) > 9000 ? 'never contacted' : `${daysAgo(b.last_contacted_at)}d ago`}`).join('\n')
