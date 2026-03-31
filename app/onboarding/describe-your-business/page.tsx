@@ -34,7 +34,7 @@ export default function DescribeYourBusinessPage() {
     setIsLoading(true)
     setError(null)
 
-    const result = await updateOrganizationProfile(description.trim(), industry)
+    const result = await updateOrganizationProfile({ description: description.trim(), industry })
     if (result.error) {
       setError(result.error)
       setIsLoading(false)
@@ -77,7 +77,7 @@ export default function DescribeYourBusinessPage() {
             Tell us about your work.
           </p>
           <p className="text-sm" style={{ color: '#94a3b8' }}>
-            Helps the Daily Briefing give you more relevant context.
+            Powers your Insights — the richer your profile, the smarter they get.
           </p>
         </div>
         <p className="text-xs" style={{ color: '#475569' }}>

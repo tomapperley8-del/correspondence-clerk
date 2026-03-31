@@ -28,6 +28,13 @@ import {
 } from '@/app/actions/membership-types'
 import { useRouter } from 'next/navigation'
 import { formatDateGB } from '@/lib/utils'
+import {
+  getUserPresets,
+  createUserPreset,
+  updateUserPreset,
+  deleteUserPreset,
+  type UserAIPreset,
+} from '@/app/actions/insights'
 
 
 type Member = {
@@ -56,6 +63,11 @@ function OrganizationSettingsContent() {
   const [organizationName, setOrganizationName] = useState('')
   const [businessDescription, setBusinessDescription] = useState('')
   const [industry, setIndustry] = useState('')
+  const [valueProposition, setValueProposition] = useState('')
+  const [idealCustomerProfile, setIdealCustomerProfile] = useState('')
+  const [servicesOffered, setServicesOffered] = useState('')
+  const [typicalDealValue, setTypicalDealValue] = useState('')
+  const [emailWritingStyle, setEmailWritingStyle] = useState('')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([])
@@ -71,6 +83,14 @@ function OrganizationSettingsContent() {
   const [linkCopied, setLinkCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [presets, setPresets] = useState<UserAIPreset[]>([])
+  const [newPresetLabel, setNewPresetLabel] = useState('')
+  const [newPresetPrompt, setNewPresetPrompt] = useState('')
+  const [newPresetScope, setNewPresetScope] = useState<'org' | 'business'>('org')
+  const [isAddingPreset, setIsAddingPreset] = useState(false)
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
+  const [editPresetLabel, setEditPresetLabel] = useState('')
+  const [editPresetPrompt, setEditPresetPrompt] = useState('')
 
   useEffect(() => {
     loadData()
@@ -91,6 +111,11 @@ function OrganizationSettingsContent() {
     setOrganizationName(orgResult.data.name)
     setBusinessDescription(orgResult.data.business_description ?? '')
     setIndustry(orgResult.data.industry ?? '')
+    setValueProposition(orgResult.data.value_proposition ?? '')
+    setIdealCustomerProfile(orgResult.data.ideal_customer_profile ?? '')
+    setServicesOffered(orgResult.data.services_offered ?? '')
+    setTypicalDealValue(orgResult.data.typical_deal_value ?? '')
+    setEmailWritingStyle(orgResult.data.email_writing_style ?? '')
 
     // Load membership types
     const typesResult = await getMembershipTypes()
@@ -110,7 +135,47 @@ function OrganizationSettingsContent() {
       )
     }
 
+    // Load AI presets
+    const presetsResult = await getUserPresets()
+    if (presetsResult.data) setPresets(presetsResult.data)
+
     setIsLoadingOrg(false)
+  }
+
+  async function handleAddPreset(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newPresetLabel.trim() || !newPresetPrompt.trim()) return
+    setIsAddingPreset(true)
+    const result = await createUserPreset(newPresetLabel, newPresetPrompt, newPresetScope)
+    if (result.error) {
+      setError(result.error)
+    } else if (result.data) {
+      setPresets((prev) => [...prev, result.data!])
+      setNewPresetLabel('')
+      setNewPresetPrompt('')
+      setNewPresetScope('org')
+    }
+    setIsAddingPreset(false)
+  }
+
+  async function handleSavePreset(id: string) {
+    if (!editPresetLabel.trim() || !editPresetPrompt.trim()) return
+    const result = await updateUserPreset(id, editPresetLabel, editPresetPrompt)
+    if (result.error) {
+      setError(result.error)
+    } else if (result.data) {
+      setPresets((prev) => prev.map((p) => (p.id === id ? result.data! : p)))
+      setEditingPresetId(null)
+    }
+  }
+
+  async function handleDeletePreset(id: string) {
+    const result = await deleteUserPreset(id)
+    if (result.error) {
+      setError(result.error)
+    } else {
+      setPresets((prev) => prev.filter((p) => p.id !== id))
+    }
   }
 
   async function handleUpdateName(e: React.FormEvent) {
@@ -142,7 +207,15 @@ function OrganizationSettingsContent() {
     setSuccess(null)
 
     setIsSavingProfile(true)
-    const result = await updateOrganizationProfile(businessDescription, industry)
+    const result = await updateOrganizationProfile({
+      description: businessDescription,
+      industry,
+      value_proposition: valueProposition,
+      ideal_customer_profile: idealCustomerProfile,
+      services_offered: servicesOffered,
+      typical_deal_value: typicalDealValue,
+      email_writing_style: emailWritingStyle,
+    })
 
     if (result.error) {
       setError(result.error)
@@ -325,13 +398,15 @@ function OrganizationSettingsContent() {
         </div>
       )}
 
-      {/* Business Profile */}
+      {/* AI Context Profile */}
       <div className="bg-white border-2 border-gray-800 p-6 mb-6">
-        <h2 className="text-xl font-bold mb-1 text-gray-900">Business Profile</h2>
-        <p className="text-sm text-gray-500 mb-4">Helps your AI assistant understand who it&apos;s working for.</p>
+        <h2 className="text-xl font-bold mb-1 text-gray-900">AI Context</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          The more you fill in here, the smarter your Insights become. Used across Briefings, Call Prep, Outreach Drafts, and more.
+        </p>
         <form onSubmit={handleSaveProfile} className="space-y-4">
           <div>
-            <Label htmlFor="businessDescription" className="block mb-2 font-semibold">
+            <Label htmlFor="businessDescription" className="block mb-2 font-semibold text-sm">
               What does your business do?
             </Label>
             <textarea
@@ -341,11 +416,11 @@ function OrganizationSettingsContent() {
               onChange={(e) => setBusinessDescription(e.target.value)}
               disabled={isSavingProfile}
               placeholder="e.g. We're a small agency managing client accounts and correspondence across a range of industries."
-              className="w-full border-2 border-gray-300 px-3 py-2 text-sm resize-none focus:outline-none focus:border-blue-600"
+              className="w-full border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-navy rounded-sm"
             />
           </div>
           <div>
-            <Label htmlFor="industry" className="block mb-2 font-semibold">
+            <Label htmlFor="industry" className="block mb-2 font-semibold text-sm">
               Industry
             </Label>
             <Input
@@ -358,12 +433,87 @@ function OrganizationSettingsContent() {
               className="w-full"
             />
           </div>
+          <div>
+            <Label htmlFor="valueProposition" className="block mb-1 font-semibold text-sm">
+              Your value proposition <span className="text-gray-400 font-normal">(optional)</span>
+            </Label>
+            <p className="text-xs text-gray-400 mb-2">Used in Prospecting Targets and Outreach Draft insights.</p>
+            <textarea
+              id="valueProposition"
+              rows={2}
+              value={valueProposition}
+              onChange={(e) => setValueProposition(e.target.value)}
+              disabled={isSavingProfile}
+              placeholder="e.g. We help independent retailers increase repeat custom through loyalty programmes."
+              className="w-full border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-navy rounded-sm"
+            />
+          </div>
+          <div>
+            <Label htmlFor="idealCustomerProfile" className="block mb-1 font-semibold text-sm">
+              Who is your ideal customer? <span className="text-gray-400 font-normal">(optional)</span>
+            </Label>
+            <p className="text-xs text-gray-400 mb-2">Used in Prospecting Targets.</p>
+            <textarea
+              id="idealCustomerProfile"
+              rows={2}
+              value={idealCustomerProfile}
+              onChange={(e) => setIdealCustomerProfile(e.target.value)}
+              disabled={isSavingProfile}
+              placeholder="e.g. Owner-managed businesses with 5–50 staff, typically in retail or hospitality."
+              className="w-full border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-navy rounded-sm"
+            />
+          </div>
+          <div>
+            <Label htmlFor="servicesOffered" className="block mb-1 font-semibold text-sm">
+              Products / services <span className="text-gray-400 font-normal">(optional)</span>
+            </Label>
+            <p className="text-xs text-gray-400 mb-2">Used in Call Prep and Outreach Draft insights.</p>
+            <textarea
+              id="servicesOffered"
+              rows={2}
+              value={servicesOffered}
+              onChange={(e) => setServicesOffered(e.target.value)}
+              disabled={isSavingProfile}
+              placeholder="e.g. Full membership, associate membership, event sponsorship, directory listings."
+              className="w-full border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-navy rounded-sm"
+            />
+          </div>
+          <div>
+            <Label htmlFor="typicalDealValue" className="block mb-1 font-semibold text-sm">
+              Typical deal / contract value <span className="text-gray-400 font-normal">(optional)</span>
+            </Label>
+            <p className="text-xs text-gray-400 mb-2">Helps the AI prioritise high-value opportunities.</p>
+            <Input
+              id="typicalDealValue"
+              type="text"
+              value={typicalDealValue}
+              onChange={(e) => setTypicalDealValue(e.target.value)}
+              disabled={isSavingProfile}
+              placeholder="e.g. £1,200/year membership, occasional £5k–£20k sponsorship deals"
+              className="w-full"
+            />
+          </div>
+          <div>
+            <Label htmlFor="emailWritingStyle" className="block mb-1 font-semibold text-sm">
+              How do you write emails? <span className="text-gray-400 font-normal">(optional)</span>
+            </Label>
+            <p className="text-xs text-gray-400 mb-2">Used in Outreach Draft — ensures generated emails sound like you.</p>
+            <textarea
+              id="emailWritingStyle"
+              rows={2}
+              value={emailWritingStyle}
+              onChange={(e) => setEmailWritingStyle(e.target.value)}
+              disabled={isSavingProfile}
+              placeholder="e.g. Friendly but professional. Short paragraphs. Never start with 'I hope this finds you well'."
+              className="w-full border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-navy rounded-sm"
+            />
+          </div>
           <Button
             type="submit"
             disabled={isSavingProfile}
-            className="bg-blue-600 text-white hover:bg-blue-700"
+            className="bg-brand-navy hover:bg-brand-navy-hover text-white"
           >
-            {isSavingProfile ? 'Saving...' : 'Save Profile'}
+            {isSavingProfile ? 'Saving...' : 'Save AI Context'}
           </Button>
         </form>
       </div>
@@ -488,6 +638,115 @@ function OrganizationSettingsContent() {
             {isSavingName ? 'Saving...' : 'Save Changes'}
           </Button>
         </form>
+      </div>
+
+      {/* AI Presets */}
+      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-1 text-gray-900">Custom Insights</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Add your own insight prompts — they appear in the Insights panel alongside the defaults. Max 5.
+        </p>
+
+        {presets.length > 0 && (
+          <div className="space-y-3 mb-6">
+            {presets.map((preset) => (
+              <div key={preset.id} className="border border-gray-200 rounded-sm p-3">
+                {editingPresetId === preset.id ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={editPresetLabel}
+                      onChange={(e) => setEditPresetLabel(e.target.value)}
+                      placeholder="Label"
+                      className="text-sm"
+                    />
+                    <textarea
+                      value={editPresetPrompt}
+                      onChange={(e) => setEditPresetPrompt(e.target.value)}
+                      rows={3}
+                      placeholder="Prompt text"
+                      className="w-full border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-navy rounded-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleSavePreset(preset.id)} className="bg-brand-navy text-white hover:bg-brand-navy-hover text-xs">Save</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingPresetId(null)} className="text-xs">Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-gray-900">{preset.label}</span>
+                        <span className="text-xs text-gray-400 border border-gray-200 px-1.5 py-0.5 rounded">{preset.scope}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{preset.prompt_text}</p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => { setEditingPresetId(preset.id); setEditPresetLabel(preset.label); setEditPresetPrompt(preset.prompt_text) }}
+                        className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeletePreset(preset.id)}
+                        className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {presets.length < 5 && (
+          <form onSubmit={handleAddPreset} className="space-y-3 border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-700">Add a custom insight</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="newPresetLabel" className="text-xs text-gray-600 mb-1 block">Label</Label>
+                <Input
+                  id="newPresetLabel"
+                  value={newPresetLabel}
+                  onChange={(e) => setNewPresetLabel(e.target.value)}
+                  placeholder="e.g. Renewal Prep"
+                  className="text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600 mb-1 block">Scope</Label>
+                <select
+                  value={newPresetScope}
+                  onChange={(e) => setNewPresetScope(e.target.value as 'org' | 'business')}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-sm bg-white focus:outline-none focus:border-brand-navy"
+                >
+                  <option value="org">Org-wide</option>
+                  <option value="business">Business-specific</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="newPresetPrompt" className="text-xs text-gray-600 mb-1 block">What should this insight do?</Label>
+              <textarea
+                id="newPresetPrompt"
+                rows={3}
+                value={newPresetPrompt}
+                onChange={(e) => setNewPresetPrompt(e.target.value)}
+                placeholder="e.g. Review all businesses with contracts expiring in the next 90 days and draft a renewal talking points list for each."
+                className="w-full border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-navy rounded-sm"
+              />
+            </div>
+            <Button type="submit" disabled={isAddingPreset || !newPresetLabel.trim() || !newPresetPrompt.trim()} className="bg-brand-navy hover:bg-brand-navy-hover text-white text-sm">
+              {isAddingPreset ? 'Adding…' : 'Add Insight'}
+            </Button>
+          </form>
+        )}
+
+        {presets.length >= 5 && (
+          <p className="text-xs text-gray-400">Maximum of 5 custom insights reached.</p>
+        )}
       </div>
 
       {/* Team Members */}

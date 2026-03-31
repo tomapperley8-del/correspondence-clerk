@@ -17,7 +17,7 @@ const audience = [
   {
     title: 'Small business owners',
     description:
-      'You wear every hat. Let the Daily Briefing tell you what actually needs your attention today.',
+      'You wear every hat. Let Insights tell you what actually needs your attention today — from who to call to which contracts are expiring.',
   },
 ]
 

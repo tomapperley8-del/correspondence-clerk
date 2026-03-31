@@ -7,10 +7,10 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import type { User } from '@supabase/supabase-js'
 import { getNavData } from '@/app/actions/organizations'
-import { useChat } from '@/components/ChatContext'
+import { useInsights } from '@/components/InsightsContext'
 
-function OutreachButton() {
-  const { isOpen, toggle } = useChat()
+function InsightsButton() {
+  const { isOpen, toggle } = useInsights()
   return (
     <button
       onClick={toggle}
@@ -20,7 +20,7 @@ function OutreachButton() {
           : 'text-white hover:bg-brand-olive/20'
       }`}
     >
-      Daily Briefing
+      Insights
     </button>
   )
 }
@@ -42,7 +42,7 @@ export function Navigation() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const { close: closeChat } = useChat()
+  const { close: closeInsights } = useInsights()
   const navFetchedAt = useRef(0)
 
   async function loadNavData() {
@@ -96,7 +96,7 @@ export function Navigation() {
       navFetchedAt.current = Date.now()
       loadNavData()
     }
-    if (pathname === '/daily-briefing') closeChat()
+    if (pathname === '/insights') closeInsights()
     setMobileOpen(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
@@ -233,7 +233,7 @@ export function Navigation() {
               >
                 Help
               </Link>
-              {pathname !== '/daily-briefing' && pathname !== '/dashboard' && <OutreachButton />}
+              {pathname !== '/insights' && pathname !== '/dashboard' && <InsightsButton />}
             </div>
           </div>
 

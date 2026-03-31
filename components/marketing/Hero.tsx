@@ -54,7 +54,7 @@ export function Hero() {
               <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#e2e8f0' }} />
               <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#e2e8f0' }} />
               <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#e2e8f0' }} />
-              <span className="ml-3 text-xs" style={{ color: '#94a3b8' }}>Daily Briefing</span>
+              <span className="ml-3 text-xs" style={{ color: '#94a3b8' }}>Insights</span>
             </div>
 
             {/* Chat input */}

@@ -3,11 +3,29 @@
  * General-purpose Claude with database access
  */
 
-export function generateChatSystemPrompt(orgName: string, orgDescription: string): string {
+export type OrgContext = {
+  name: string
+  description: string
+  value_proposition?: string | null
+  ideal_customer_profile?: string | null
+  services_offered?: string | null
+  typical_deal_value?: string | null
+  email_writing_style?: string | null
+}
+
+export function generateChatSystemPrompt(orgName: string, orgDescription: string, orgContext?: Partial<OrgContext>): string {
   const name = orgName || 'your organisation'
   const description = orgDescription || 'your business relationships'
 
-  return `You are Claude, made by Anthropic. You're embedded in Correspondence Clerk, a tool that the user uses to manage correspondence with businesses for ${name} (${description}).
+  const extraContext = [
+    orgContext?.value_proposition && `Value proposition: ${orgContext.value_proposition}`,
+    orgContext?.ideal_customer_profile && `Ideal customer: ${orgContext.ideal_customer_profile}`,
+    orgContext?.services_offered && `Services: ${orgContext.services_offered}`,
+    orgContext?.typical_deal_value && `Typical deal value: ${orgContext.typical_deal_value}`,
+    orgContext?.email_writing_style && `Writing style: ${orgContext.email_writing_style}`,
+  ].filter(Boolean).join('\n')
+
+  return `You are Claude, made by Anthropic. You're embedded in Correspondence Clerk, a tool that the user uses to manage correspondence with businesses for ${name} (${description}).${extraContext ? `\n\n## About ${name}\n${extraContext}` : ''}
 
 Your job is to help the user manage their businesses and correspondence — answering questions about their data, drafting emails, analysing trends, prioritising outreach, and anything else related to running ${name}'s business relationships. You have tools that let you query their database directly.
 

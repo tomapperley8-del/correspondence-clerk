@@ -1,9 +1,7 @@
-import { ChatPanel } from '@/components/ChatPanel'
+import { redirect } from 'next/navigation'
 
+// The Daily Briefing has been replaced by Insights.
+// Redirect any bookmarked links.
 export default function DailyBriefingPage() {
-  return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
-      <ChatPanel inline={true} />
-    </div>
-  )
+  redirect('/insights')
 }

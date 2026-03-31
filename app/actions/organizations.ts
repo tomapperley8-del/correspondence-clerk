@@ -62,6 +62,11 @@ export type Organization = {
   name: string
   business_description: string | null
   industry: string | null
+  value_proposition: string | null
+  ideal_customer_profile: string | null
+  services_offered: string | null
+  typical_deal_value: string | null
+  email_writing_style: string | null
   created_at: string
   updated_at: string
   created_by: string | null
@@ -99,6 +104,11 @@ export async function getCurrentOrganization() {
         name,
         business_description,
         industry,
+        value_proposition,
+        ideal_customer_profile,
+        services_offered,
+        typical_deal_value,
+        email_writing_style,
         created_at,
         updated_at,
         created_by
@@ -240,9 +250,17 @@ export async function updateOrganization(name: string) {
 }
 
 /**
- * Update organization business description and industry
+ * Update organization AI context profile fields
  */
-export async function updateOrganizationProfile(description: string, industry: string) {
+export async function updateOrganizationProfile(fields: {
+  description?: string
+  industry?: string
+  value_proposition?: string
+  ideal_customer_profile?: string
+  services_offered?: string
+  typical_deal_value?: string
+  email_writing_style?: string
+}) {
   const organizationId = await getCurrentUserOrganizationId()
 
   if (!organizationId) {
@@ -253,7 +271,15 @@ export async function updateOrganizationProfile(description: string, industry: s
 
   const { data, error } = await supabase
     .from('organizations')
-    .update({ business_description: description, industry: industry || null })
+    .update({
+      business_description: fields.description ?? null,
+      industry: fields.industry || null,
+      value_proposition: fields.value_proposition || null,
+      ideal_customer_profile: fields.ideal_customer_profile || null,
+      services_offered: fields.services_offered || null,
+      typical_deal_value: fields.typical_deal_value || null,
+      email_writing_style: fields.email_writing_style || null,
+    })
     .eq('id', organizationId)
     .select()
     .single()
@@ -263,6 +289,7 @@ export async function updateOrganizationProfile(description: string, industry: s
   }
 
   revalidatePath('/settings/organization')
+  revalidatePath('/onboarding/describe-your-business')
   return { data }
 }
 
