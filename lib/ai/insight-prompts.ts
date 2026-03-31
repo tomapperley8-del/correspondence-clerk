@@ -162,6 +162,26 @@ async function fetchActionsAndInbound(orgId: string, supabase: SupabaseClient) {
   return { actionsDue: actionsDue ?? [], needsReply: needsReply ?? [], inbound: inbound ?? [] }
 }
 
+async function fetchBuriedGoldCorrespondence(orgId: string, supabase: SupabaseClient) {
+  const cutoff = new Date(Date.now() - 60 * 24 * 3600000).toISOString()
+
+  const { data: correspondence } = await supabase
+    .from('correspondence')
+    .select('id, business_id, subject, formatted_text_current, action_needed, entry_date')
+    .eq('organization_id', orgId)
+    .lt('entry_date', cutoff)
+    .order('entry_date', { ascending: false })
+    .limit(400)
+
+  const { data: businesses } = await supabase
+    .from('businesses')
+    .select('id, name')
+    .eq('organization_id', orgId)
+
+  const bizMap = new Map((businesses ?? []).map((b) => [b.id, b.name]))
+  return (correspondence ?? []).map((c) => ({ ...c, businessName: bizMap.get(c.business_id) ?? 'Unknown' }))
+}
+
 async function fetchContractData(orgId: string, supabase: SupabaseClient) {
   const { data } = await supabase
     .from('businesses')
@@ -403,24 +423,21 @@ ${reconnect || 'No businesses meet this criteria — great work staying in touch
 
 function buildBuriedGoldPrompt(
   org: Awaited<ReturnType<typeof fetchOrgContext>>,
-  businesses: Awaited<ReturnType<typeof fetchOrgBusinessSummaries>>,
+  oldEntries: Awaited<ReturnType<typeof fetchBuriedGoldCorrespondence>>,
   previous: Array<{ content: string; generated_at: string }>
 ): { systemPrompt: string; userPrompt: string } {
   const orgName = org?.name ?? 'your organisation'
 
   // Find old entries with flagged actions or keywords suggesting commitments
   const candidates: string[] = []
-  for (const b of businesses) {
-    for (const c of b.recentCorrespondence) {
-      const text = (c.formatted_text_current ?? '').toLowerCase()
-      const hasCommitmentKeyword = ['agreed', 'promised', 'will send', 'follow up', 'get back', 'let you know', 'chase', 'confirm'].some((kw) => text.includes(kw))
-      const age = daysAgo(c.entry_date)
-      if ((c.action_needed && c.action_needed !== 'none' && age > 60) || (hasCommitmentKeyword && age > 90)) {
-        candidates.push(`- ${b.name} (${formatDate(c.entry_date)}): "${truncate(c.formatted_text_current ?? c.subject ?? '', 200)}"`)
-        if (candidates.length >= 40) break
-      }
+  for (const c of oldEntries) {
+    const text = (c.formatted_text_current ?? '').toLowerCase()
+    const hasCommitmentKeyword = ['agreed', 'promised', 'will send', 'follow up', 'get back', 'let you know', 'chase', 'confirm'].some((kw) => text.includes(kw))
+    const age = daysAgo(c.entry_date)
+    if ((c.action_needed && c.action_needed !== 'none' && age > 60) || (hasCommitmentKeyword && age > 90)) {
+      candidates.push(`- ${c.businessName} (${formatDate(c.entry_date)}): "${truncate(c.formatted_text_current ?? c.subject ?? '', 200)}"`)
+      if (candidates.length >= 40) break
     }
-    if (candidates.length >= 40) break
   }
 
   return {
@@ -738,8 +755,8 @@ export async function buildInsightPrompt(
     }
 
     case 'buried_gold': {
-      const businesses = await fetchOrgBusinessSummaries(orgId, supabase)
-      return buildBuriedGoldPrompt(org, businesses, previousInsights)
+      const oldEntries = await fetchBuriedGoldCorrespondence(orgId, supabase)
+      return buildBuriedGoldPrompt(org, oldEntries, previousInsights)
     }
 
     case 'prospecting_targets': {
