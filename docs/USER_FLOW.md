@@ -331,6 +331,76 @@ When user clicks "Save Entry" with split enabled:
 
 ---
 
+---
+
+## Onboarding Flow (New User)
+
+New users who sign up go through a 4-step flow before reaching the dashboard.
+
+### Step 1: Create Organisation (`/onboarding/create-organization`)
+- Enter organisation name
+- Creates `organizations` record and associates user profile
+- Redirect → Step 2
+
+### Step 2: Describe Your Business (`/onboarding/describe-business`)
+- Textarea: describe what the organisation does
+- Dropdown: select industry
+- Saves `business_description` + `industry` to `organizations` table (used in Daily Briefing AI context)
+- Redirect → Step 3
+
+### Step 3: Add First Business + Contact (`/onboarding/first-business`)
+- Add the first business and a contact person
+- Mirrors the business/contact add flow used elsewhere
+- Redirect → Step 4
+
+### Step 4: First Entry (`/new-entry`)
+- Standard new entry flow (see Primary User Flow above)
+- After saving, user lands on the dashboard with a completion checklist
+
+### Completion Checklist (Dashboard)
+- Three steps: add business → add contact → add entry
+- Auto-hides when all three complete
+- Persists dismissal in localStorage
+
+---
+
+## Inbound Email Flow
+
+### Forwarding Received Emails
+1. User sets up forwarding in their email client to `token@in.correspondenceclerk.com`
+2. Postmark receives the email → POST to `/api/inbound-email`
+3. Webhook extracts sender domain
+4. **Known domain** (in `domain_mappings`): auto-formats with AI and files to matched business
+5. **Unknown domain**: saves to `inbound_queue` with status "pending"
+6. User visits `/inbox` to triage queued emails:
+   - Sees SENT/RECEIVED badge, 1-line preview, expandable body
+   - Contact auto-matched from sender/recipient email
+   - Selects/confirms business and contact → saves as correspondence
+
+### BCC Capture (Sent Emails)
+1. User BCCs `token@in.correspondenceclerk.com` when sending
+2. Postmark receives → webhook checks `OriginalRecipient` header to detect BCC
+3. Direction set to "sent" based on auth email and `own_email_addresses` in user_profiles
+4. Same auto-file / queue logic as forwarding
+
+### Direction Detection Logic
+```
+Is sender the authenticated user OR in own_email_addresses?
+  → direction = 'sent'
+Is OriginalRecipient the inbound token address?
+  → direction = 'sent' (BCC capture)
+Otherwise:
+  → direction = 'received'
+```
+
+### Quoted Content Stripping
+- `stripQuotedContent()` from `lib/inbound/utils.ts` removes forwarded/quoted text
+- Original full body preserved in raw_text_original
+- Stripped content stored in ai_metadata.quotedContent
+- Only the clean text is sent to Anthropic for formatting
+
+---
+
 ## Success Metrics
 
 - **Time to save entry:** < 30 seconds (average)

@@ -72,10 +72,10 @@ Pick up from the first incomplete item each session.
 
 - [x] **P15** — Inbound email forwarding: LIVE. Postmark configured, BCC capture live, inbox UI polished (27/03/2026)
 - [x] **P15b** — Inbox direction fix + UX overhaul: direction stored in queue, SENT/RECEIVED badge, expandable body, auto-match contact, own email addresses in settings (30/03/2026)
-- [ ] **P16** — Landing page FAQ: create `components/marketing/FAQ.tsx` as `<details>/<summary>` accordion (no dependencies); add above CTA in `app/(public)/page.tsx`. Hero mockup is already done.
+- [x] **P16** — Landing page FAQ: `components/marketing/FAQ.tsx` — 6 questions, native `<details>/<summary>`, inserted above CTASection. (30/03/2026)
 - [ ] **P17** — ⚠️ **Blocked — needs Sentry account + DSN first.** Sentry error monitoring: install `@sentry/nextjs`, create three config files, wrap `next.config.ts`, add `app/global-error.tsx`. Free tier: 5k errors/month. Errors only — no replays, no performance tracing.
-- [ ] **P24** — Inbound email debug + logging: add structured logging to `app/api/inbound-email/route.ts` (log every receive event: timestamp, sender, token extracted, result); add "Send test email" button in settings; document correct Outlook forwarding rule setup (forward to `{token}@in.correspondenceclerk.com`). Use Postmark activity log to trace missing emails.
-- [ ] **P25** — Docs audit: read every file in `docs/`, update stale sections (inbound email, AI features, onboarding flow all changed significantly), fill gaps. No greenfield writes — update what exists.
+- [x] **P24** — Inbound email structured logging: JSON log lines at every decision point in webhook handler (received, discarded, direction, auto-filed, queued, formatting). Send test button + Outlook docs were already in place. (30/03/2026)
+- [x] **P25** — Docs audit: updated CURRENT_STATE.md (features 1-19, schema, file list, design rules), ARCHITECTURE.md (schema, modules, env vars), USER_GUIDE.md (inbound email, Actions, AI Assistant, bulk import), USER_FLOW.md (onboarding + inbound email flows). (30/03/2026)
 
 ---
 
