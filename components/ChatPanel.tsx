@@ -13,7 +13,8 @@ interface ChatPanelProps {
 }
 
 /**
- * Chat panel for the AI Daily Briefing Assistant.
+ * Chat panel for the AI assistant (freeform chat with tool-calling).
+ * Available at /daily-briefing. For structured one-shot summaries, see InsightsPanel.
  * Renders as slide-out overlay (default) or inline static panel (inline=true).
  * Smooth streaming via rAF render loop with mutable refs.
  */
@@ -241,7 +242,7 @@ export function ChatPanel({ inline = false, suggestedPrompt, businessCount }: Ch
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-brand-paper">
         <h2 className="font-[Lora,serif] text-lg font-semibold text-brand-dark">
-          Daily Briefing
+          AI Chat
         </h2>
         <div className="flex items-center gap-2">
           {messages.length > 0 && (

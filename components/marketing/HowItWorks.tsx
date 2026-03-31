@@ -15,7 +15,7 @@ const steps = [
     number: '03',
     title: 'Ask what needs doing',
     description:
-      'Open the Daily Briefing. Ask "what do I need to do today?" and get a clear, prioritised answer drawn from your actual history.',
+      'Open Insights. Run a Briefing, a Call Prep, or a Buried Gold report — and get a clear, specific answer drawn from your actual history.',
   },
 ]
 

@@ -1,8 +1,8 @@
 const features = [
   {
-    title: 'Daily Briefing',
+    title: 'AI Insights',
     description:
-      'Ask what needs doing today. Get a prioritised list of unreplied emails, expiring contracts, and cold follow-ups — drawn from your actual correspondence history.',
+      '16 pre-built intelligence reports — Briefing, Call Prep, Relationship Radar, Buried Gold, Outreach Draft, and more. One click. Cached. Each one draws from your real correspondence history.',
   },
   {
     title: 'One-click email import',

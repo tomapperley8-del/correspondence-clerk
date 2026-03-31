@@ -2,19 +2,19 @@ import Link from 'next/link'
 
 export const metadata = {
   title: 'Features - Correspondence Clerk',
-  description: 'AI-powered correspondence management: daily briefing assistant, one-click email import, automatic filing, and powerful search — for small businesses and VAs.',
+  description: 'AI-powered correspondence management: Insights reports, one-click email import, automatic filing, and powerful search — for small businesses and VAs.',
 }
 
 const features = [
   {
-    title: 'Daily Briefing',
+    title: 'AI Insights',
     description:
-      'Ask "what do I need to do today?" and get a prioritised breakdown of unreplied emails, expiring contracts, and stale follow-ups — with context from your actual correspondence history, not just counts.',
+      '16 pre-built intelligence reports drawn from your real correspondence history — plus custom presets you define yourself. One click, cached results, no prompting required.',
     details: [
-      'Understands your full correspondence history',
-      'Surfaces unreplied emails and cold follow-ups',
-      'Flags contracts expiring soon',
-      'Ask anything: "who haven\'t I spoken to in 3 months?"',
+      'Briefing, Relationship Radar, Pipeline Pulse, State of Play',
+      'Call Prep, Relationship Story, Outreach Draft, Risk Check',
+      'Buried Gold — surfaces forgotten commitments from old messages',
+      'Data Health — finds missing fields and incomplete records',
     ],
   },
   {

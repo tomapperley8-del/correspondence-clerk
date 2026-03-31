@@ -128,9 +128,9 @@ function EmailDraftCard({ content }: { content: string }) {
 
 /**
  * Lightweight markdown rendering — handles bold, lists, and line breaks.
- * No external library needed.
+ * No external library needed. Exported for use in InsightsPanel.
  */
-function MarkdownLite({ text }: { text: string }) {
+export function MarkdownLite({ text }: { text: string }) {
   if (!text.trim()) return null
 
   const lines = text.split('\n')

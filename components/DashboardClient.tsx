@@ -7,8 +7,8 @@ import type { MembershipType } from '@/app/actions/membership-types'
 import { AddBusinessButton } from '@/components/AddBusinessButton'
 import { Input } from '@/components/ui/input'
 import { formatDateGB } from '@/lib/utils'
-import { ChatPanel } from '@/components/ChatPanel'
-import { useChat } from '@/components/ChatContext'
+import { InsightsPanel } from '@/components/InsightsPanel'
+import { useInsights } from '@/components/InsightsContext'
 
 type FilterType = 'all' | 'prospect' | string
 type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
@@ -39,7 +39,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
   // Check if bookmarklet is installed
   const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
 
-  const { open: openChat } = useChat()
+  const { open: openInsights } = useInsights()
 
   // Onboarding checklist
   const hasBusiness = businesses.length > 0
@@ -187,10 +187,10 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <div className="flex items-center gap-3">
           <button
-            onClick={openChat}
+            onClick={() => openInsights()}
             className="md:hidden px-3 py-1.5 text-sm font-medium text-white rounded-sm transition-colors bg-brand-navy hover:bg-brand-navy-hover"
           >
-            Daily Briefing
+            Insights
           </button>
           <Link href="/import" className="text-sm text-brand-navy hover:underline">
             Bulk import
@@ -285,7 +285,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
             {[
               'Add your first business and contact',
               'Import an email (bookmarklet) or paste one in',
-              'Ask "what do I need to do today" in the Daily Briefing',
+              'Run your first Insight to see what needs attention',
             ].map((step, i) => (
               <li key={i} className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-7 h-7 rounded-full bg-brand-navy text-white text-sm font-semibold flex items-center justify-center mt-0.5">
@@ -630,9 +630,9 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
       )}
       </div>{/* end left column */}
 
-      {/* Right: inline Daily Briefing */}
+      {/* Right: inline Insights panel */}
       <div className="hidden md:flex flex-col w-[380px] shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-hidden">
-        <ChatPanel inline businessCount={businesses.length} />
+        <InsightsPanel inline />
       </div>
       </div>{/* end two-column flex */}
     </div>

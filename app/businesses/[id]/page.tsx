@@ -16,6 +16,7 @@ import { EditBusinessButton } from '@/components/EditBusinessButton'
 import { EditBusinessDetailsButton } from '@/components/EditBusinessDetailsButton'
 import { EditContactButton } from '@/components/EditContactButton'
 import { ExportDropdown } from '@/components/ExportDropdown'
+import { useInsights } from '@/components/InsightsContext'
 import { CorrespondenceSummary } from '@/components/CorrespondenceSummary'
 import { ActionSuggestions } from '@/components/ActionSuggestions'
 import { ContractDetailsCard } from '@/components/ContractDetailsCard'
@@ -41,6 +42,7 @@ export default function BusinessDetailPage({
   searchParams: Promise<{ saved?: string }>
 }) {
   const router = useRouter()
+  const { open: openInsights } = useInsights()
   const [id, setId] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
   const [business, setBusiness] = useState<Business | null>(null)
@@ -1019,6 +1021,12 @@ export default function BusinessDetailPage({
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Correspondence</h2>
           <div className="flex gap-3">
+            <button
+              onClick={() => openInsights(business.id, business.name)}
+              className="px-3 py-2 text-sm font-semibold border rounded-sm text-brand-navy border-brand-navy hover:bg-brand-navy hover:text-white transition-colors"
+            >
+              Insights
+            </button>
             <ExportDropdown businessId={business.id} />
             <Link href={`/new-entry?businessId=${business.id}`}>
               <Button className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold">

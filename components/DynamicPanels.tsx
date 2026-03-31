@@ -8,6 +8,11 @@ const ChatPanel = dynamic(
   { ssr: false }
 )
 
+const InsightsPanel = dynamic(
+  () => import('@/components/InsightsPanel').then((m) => ({ default: m.InsightsPanel })),
+  { ssr: false }
+)
+
 const CommandSearch = dynamic(
   () => import('@/components/CommandSearch').then((m) => ({ default: m.CommandSearch })),
   { ssr: false }
@@ -18,6 +23,7 @@ export function DynamicPanels() {
   return (
     <>
       {pathname !== '/daily-briefing' && <ChatPanel />}
+      {pathname !== '/insights' && <InsightsPanel />}
       <CommandSearch />
     </>
   )
