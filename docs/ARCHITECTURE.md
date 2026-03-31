@@ -4,12 +4,14 @@
 
 The Correspondence Clerk is a full-stack web application built on:
 - **Frontend:** Next.js 15 (React, App Router)
-- **UI:** Tailwind CSS + shadcn/ui (no rounded corners, no shadows)
+- **UI:** Tailwind CSS v4 + shadcn/ui (subtle 2-4px corners, soft shadows, warm palette via design tokens)
 - **Backend:** Next.js Server Actions
 - **Database:** Supabase (PostgreSQL)
 - **Auth:** Supabase Auth
-- **AI:** Anthropic Claude API (formatting + thread splitting)
+- **AI:** Anthropic Claude (claude-sonnet-4-5) — formatting, action detection, thread splitting, Daily Briefing chat, inbound email processing
 - **Export:** Google Docs via MCP
+- **Email:** Postmark (inbound webhook + forwarding)
+- **Deployment:** Vercel (auto-deploy from main)
 
 ## Database Schema
 
@@ -42,34 +44,41 @@ CREATE INDEX idx_businesses_last_contacted ON businesses(last_contacted_at);
 CREATE TABLE contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  org_id UUID NOT NULL REFERENCES organizations(id),
   name TEXT NOT NULL,
-  email TEXT,
-  normalized_email TEXT,
+  emails TEXT[] DEFAULT '{}',   -- array of email addresses
+  phones TEXT[] DEFAULT '{}',   -- array of phone numbers
   role TEXT,
-  phone TEXT,
+  notes TEXT,
+  is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-
-  CONSTRAINT unique_business_email
-    UNIQUE (business_id, normalized_email)
-    WHERE normalized_email IS NOT NULL
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_contacts_business_id ON contacts(business_id);
-CREATE INDEX idx_contacts_normalized_email ON contacts(normalized_email);
+CREATE INDEX idx_contacts_org_id ON contacts(org_id);
 ```
+
+> **Note:** contacts.emails and phones are arrays, not single values. Always use JSON.parse with try/catch when reading legacy data, and array spread when adding new values.
 
 #### `correspondence`
 
 ```sql
-CREATE TYPE entry_type AS ENUM ('Email', 'Call', 'Meeting');
+CREATE TYPE entry_type AS ENUM ('Email', 'Call', 'Meeting', 'Note');
 CREATE TYPE action_status AS ENUM ('none', 'prospect', 'follow_up', 'waiting_on_them', 'invoice', 'renewal');
+CREATE TYPE direction_type AS ENUM ('received', 'sent');
+CREATE TYPE formatting_status AS ENUM ('formatted', 'unformatted', 'failed');
 
 CREATE TABLE correspondence (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-  contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE RESTRICT,
+  contact_id UUID REFERENCES contacts(id) ON DELETE RESTRICT,  -- nullable: Notes have no contact
+  org_id UUID NOT NULL REFERENCES organizations(id),
   user_id UUID NOT NULL,
+
+  -- CC/BCC
+  cc_contact_ids UUID[] DEFAULT '{}',
+  bcc_contact_ids UUID[] DEFAULT '{}',
 
   -- Content versions
   raw_text_original TEXT NOT NULL,
@@ -80,9 +89,12 @@ CREATE TABLE correspondence (
   entry_date TIMESTAMPTZ,
   subject TEXT,
   type entry_type,
+  direction direction_type,           -- only for emails
+  formatting_status formatting_status DEFAULT 'unformatted',
   action_needed action_status DEFAULT 'none',
   due_at TIMESTAMPTZ,
   ai_metadata JSONB,
+  content_hash TEXT,                  -- SHA256 for duplicate detection
 
   -- Audit trail
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -107,6 +119,78 @@ CREATE INDEX idx_correspondence_due_at ON correspondence(due_at) WHERE due_at IS
 
 -- Full-text search index
 CREATE INDEX idx_correspondence_search_vector ON correspondence USING GIN(search_vector);
+```
+
+#### `organizations`
+
+```sql
+CREATE TABLE organizations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  business_description TEXT,  -- used in Daily Briefing system prompt
+  industry TEXT,               -- used in Daily Briefing system prompt
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+#### `user_profiles`
+
+```sql
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  organization_id UUID REFERENCES organizations(id),
+  display_name TEXT,
+  role TEXT DEFAULT 'member',  -- member | admin
+  google_access_token TEXT,
+  google_refresh_token TEXT,
+  microsoft_access_token TEXT,
+  microsoft_refresh_token TEXT,
+  inbound_email_token TEXT UNIQUE,   -- unique token for inbound forwarding address
+  own_email_addresses TEXT[] DEFAULT '{}'  -- for BCC/sent detection
+);
+```
+
+#### `inbound_queue`
+
+```sql
+CREATE TABLE inbound_queue (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID REFERENCES organizations(id),
+  from_email TEXT,
+  to_emails TEXT[],
+  subject TEXT,
+  body_text TEXT,
+  direction TEXT,  -- 'received' | 'sent'
+  status TEXT DEFAULT 'pending',  -- pending | filed | discarded
+  received_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+#### `domain_mappings`
+
+```sql
+CREATE TABLE domain_mappings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID REFERENCES organizations(id),
+  domain TEXT NOT NULL,
+  business_id UUID REFERENCES businesses(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(org_id, domain)
+);
+```
+
+#### `duplicate_dismissals`
+
+```sql
+CREATE TABLE duplicate_dismissals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID REFERENCES businesses(id),
+  entry_id_1 UUID REFERENCES correspondence(id),
+  entry_id_2 UUID REFERENCES correspondence(id),
+  dismissed_by UUID,
+  dismissed_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 ## Row Level Security (RLS) Policies
@@ -192,39 +276,23 @@ CREATE POLICY "Authenticated users can delete correspondence"
 **Purpose:** Handle all communication with Anthropic API
 
 **Files:**
-- `format-entry.ts` - Format single correspondence entry
-- `split-thread.ts` - Detect and split email threads
-- `validate-response.ts` - Validate AI JSON responses
-- `types.ts` - TypeScript types for AI contracts
+- `formatter.ts` — Main formatting function (single combined call: format + action detection)
+- `thread-detection.ts` — Client-side heuristics to detect email chains (< 100ms, no API call)
+- `types.ts` — TypeScript types for AI response contracts
 
-**Key Functions:**
-
-```typescript
-// Strict JSON output contract
-interface AIFormattedEntry {
-  subject_guess: string;
-  entry_type_guess: 'Email' | 'Call' | 'Meeting';
-  entry_date_guess: string | null; // ISO 8601
-  formatted_text: string;
-  warnings: string[];
-}
-
-interface AIThreadSplitResponse {
-  entries: AIFormattedEntry[];
-  warnings: string[];
-}
-
-// Main functions
-async function formatEntry(rawText: string): Promise<AIFormattedEntry>;
-async function splitThread(rawText: string): Promise<AIThreadSplitResponse>;
-function validateAIResponse(response: unknown): AIFormattedEntry | AIThreadSplitResponse;
-```
+**Key behaviour:**
+- Single Anthropic API call returns: subject, type, date, formatted_text, action_needed, urgency_level
+- Structured outputs (JSON schema enforcement — zero parse errors)
+- Prompt caching on system prompt (`cache_control: { type: 'ephemeral' }`)
+- `stripQuotedContent()` from `lib/inbound/utils.ts` applied before building prompt
+- Retry once on failure, then fall back to unformatted (never blocks saving)
+- `quotedContent` stored in `ai_metadata` when stripped
+- `isThreadSplitResponse()` type guard distinguishes single vs split responses
 
 **Error Handling:**
-- Timeout after 30 seconds
-- Validate JSON structure strictly
-- Return validation errors as warnings
-- Never throw - always return a result or mark as unformatted
+- Network error / invalid JSON → save as unformatted, show "Format later" button
+- Timeout → retry once, then unformatted
+- Never throw — always return a result
 
 ### 2. Export Module (`lib/export/`)
 
@@ -257,35 +325,28 @@ async function exportToGoogleDocs(options: ExportOptions): Promise<{ docId: stri
    - _Meta:_ Date | Type | Contact Name, Role (italic, 12pt)
    - Body text (formatted_text_current, 12pt)
 
-### 3. Data Access Layer (`lib/db/`)
+### 3. Server Actions (`app/actions/`)
 
-**Purpose:** Type-safe database operations
+**Purpose:** All data mutations and queries — Next.js Server Actions (no separate lib/db layer)
 
-**Files:**
-- `businesses.ts` - Business CRUD operations
-- `contacts.ts` - Contact CRUD operations
-- `correspondence.ts` - Correspondence CRUD + search
-- `types.ts` - Database types
+**Pattern:** Every action checks auth + org_id first, then calls `revalidatePath` after mutations.
 
-**Key Functions:**
+**Supabase clients:**
+- `createClient()` from `@/lib/supabase/server` — for server actions and route handlers
+- `createServiceRoleClient()` from `@/lib/supabase/service-role` — for cron jobs and session-less contexts (e.g. inbound webhook)
 
-```typescript
-// Business operations
-async function getBusinesses(filters?: BusinessFilters): Promise<Business[]>;
-async function getBusinessById(id: string): Promise<Business | null>;
-async function createBusiness(data: CreateBusinessInput): Promise<Business>;
-async function updateBusiness(id: string, data: UpdateBusinessInput): Promise<Business>;
-
-// Contact operations
-async function getContactsByBusiness(businessId: string): Promise<Contact[]>;
-async function createContact(data: CreateContactInput): Promise<Contact>;
-async function updateContact(id: string, data: UpdateContactInput): Promise<Contact>;
-
-// Correspondence operations
-async function getCorrespondenceByBusiness(businessId: string, options?: PaginationOptions): Promise<Correspondence[]>;
-async function createCorrespondence(data: CreateCorrespondenceInput): Promise<Correspondence>;
-async function updateCorrespondence(id: string, data: UpdateCorrespondenceInput): Promise<Correspondence>;
-async function searchCorrespondence(query: string): Promise<SearchResult[]>;
+**Key actions:**
+```
+businesses.ts           Business CRUD + delete
+contacts.ts             Contact CRUD + delete + update (emails/phones as arrays)
+correspondence.ts       Correspondence CRUD + manual edits + delete + duplicate detection
+ai-formatter.ts         AI formatting pipeline (format + action detection, fallback)
+search.ts               Full-text search (websearch type for robust query parsing)
+organizations.ts        getNavData() single round-trip; org profile update
+membership-types.ts     Per-org membership type CRUD
+duplicate-dismissals.ts Dismiss duplicate pairs
+export-google-docs.ts   Google Docs export via MCP
+import-mastersheet.ts   CSV import (idempotent, duplicate merging)
 ```
 
 ## Full-Text Search
@@ -411,10 +472,12 @@ export async function createCorrespondenceEntry(
 [Vercel Edge Network]
   ↓
 [Next.js App (Vercel Functions)]
+  ↓ ↓ ↓ ↓
+  ↓ ↓ ↓ [Anthropic API]
   ↓ ↓ ↓
-  ↓ ↓ [Anthropic API]
+  ↓ ↓ [Google Docs API (MCP)]
   ↓ ↓
-  ↓ [Google Docs API (MCP)]
+  ↓ [Postmark → /api/inbound-email]
   ↓
 [Supabase]
   ├─ PostgreSQL
@@ -425,20 +488,31 @@ export async function createCorrespondenceEntry(
 **Environment Variables:**
 
 ```bash
-# Supabase
+# Required
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-
-# Anthropic
 ANTHROPIC_API_KEY=
-
-# Google (for export)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-
-# App
 NEXT_PUBLIC_APP_URL=
+
+# Email (production)
+POSTMARK_SERVER_TOKEN=         # Inbound email webhook
+SENDGRID_API_KEY=              # Outbound email sending
+SENDGRID_FROM_EMAIL=
+
+# Feature flags (all false by default)
+FEATURE_BILLING_ENABLED=
+FEATURE_PUBLIC_SIGNUP=
+FEATURE_LANDING_PAGE=
+
+# Stripe (when FEATURE_BILLING_ENABLED=true)
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+# ... see CLAUDE.md for full Stripe env var list
+
+# Cron
+CRON_SECRET=
 ```
 
 ## Security Considerations

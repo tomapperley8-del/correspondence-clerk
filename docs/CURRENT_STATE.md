@@ -1,5 +1,5 @@
 # Correspondence Clerk - Current State Summary
-**Last Updated:** 2026-01-26
+**Last Updated:** 30/03/2026
 
 ## ✅ Completed Steps (1-8)
 
@@ -182,41 +182,73 @@ All migrations in `supabase/migrations/`:
 ## 🗄️ Database Schema Summary
 
 ### businesses
-- Core fields: name, category, status, is_club_card, is_advertiser
+- Core fields: name, category, status, membership_type (string, configurable per org), address, email, phone, notes, contract fields
 - Tracking: last_contacted_at, mastersheet_source_ids
-- Full-text search on name and category
+- Multi-tenant: org_id
 
 ### contacts
 - Links to business_id
-- Fields: name, email, role, phone
-- Normalized email for uniqueness
+- Fields: name, **emails[] (array), phones[] (array)**, role, notes, is_active
+- Unique per business + email combination
 
 ### correspondence
-- Links to business_id, contact_id, user_id
+- Links to business_id, contact_id (nullable — Notes have no contact), user_id, org_id
+- **CC/BCC:** cc_contact_ids (UUID[]), bcc_contact_ids (UUID[])
 - **Text preservation:** raw_text_original, formatted_text_original, formatted_text_current
-- **Metadata:** entry_date, subject, type (Email/Call/Meeting)
-- **NEW: direction** (received/sent) - only for emails
-- **NEW: formatting_status** (formatted/unformatted/failed) - tracks AI formatting
+- **Metadata:** entry_date, subject, type (Email/Call/Meeting), direction (received/sent/null)
+- **formatting_status:** formatted/unformatted/failed
 - **Actions:** action_needed, due_at
 - **Editing:** edited_at, edited_by
-- Full-text search on formatted and raw text
+- **Deduplication:** content_hash (SHA256)
+- Full-text search on formatted and raw text (tsvector + GIN)
+
+### organizations
+- id, name, business_description, industry
+- business_description + industry used in Daily Briefing AI system prompt
+
+### org_membership_types
+- Per-org configurable membership labels (replaces hardcoded Club Card / Advertiser flags)
+- Fields: id, org_id, label, value, sort_order, is_active
+
+### user_profiles
+- id, organization_id, display_name, role (member/admin)
+- google/microsoft OAuth tokens for bulk email import
+- inbound_email_token (unique token for inbound email forwarding address)
+- own_email_addresses TEXT[] (for BCC/sent detection)
+
+### import_queue
+- Chunked email import job queue
+- Fields: id, org_id, correspondence_id, status (pending/processing/done/failed), retry_count, error
+
+### inbound_queue
+- Queued inbound emails awaiting manual filing
+- Fields include: direction, to_emails, body_text, from_email, subject, received_at
+
+### domain_mappings
+- Auto-filing rules for inbound email
+- Fields: org_id, domain, business_id
+- Populated on first manual file; used for subsequent auto-filing
+
+### duplicate_dismissals
+- Tracks dismissed duplicate pairs so they don't reappear
+- Fields: business_id, entry_id_1, entry_id_2, dismissed_by, dismissed_at
 
 ## 🎨 Design Rules (Enforced Globally)
 
-From `app/globals.css`:
-```css
-* {
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-```
-
-- NO rounded corners anywhere
-- NO shadows
+- Very subtle rounded corners (2-4px) — barely perceptible softness
+- Subtle shadows allowed via CSS vars: `--shadow-sm`, `--shadow-md`, `--shadow-lg`
 - All buttons have text labels (no icon-only)
-- British date format: DD/MM/YYYY (`toLocaleDateString('en-GB')`)
-- System fonts for performance
-- Sharp borders, clean hierarchy
+- British date format: DD/MM/YYYY via `formatDateGB()`
+- Fonts: Lora (serif) for h1/h2 headings, Inter (sans) for body text
+- Gentle transitions: 0.2s ease-out on interactive elements
+- Warm palette — **design tokens only, never raw hex:**
+  - `bg-brand-dark` / `text-brand-dark` = #1E293B (slate header)
+  - `bg-brand-navy` / `hover:bg-brand-navy-hover` = #2C4A6E (primary buttons/links)
+  - `bg-brand-olive` = #7C9A5E (accents, secondary actions)
+  - `bg-brand-paper` = #FAFAF8 (page background)
+  - `bg-brand-warm` = #F8F7F4 (card backgrounds)
+  - CSS vars for inline styles: `var(--link-blue)`, `var(--header-bg)`, `var(--main-bg)`
+  - **⚠️ CSS vars (e.g. `var(--brand-navy)`) do NOT resolve in React inline styles — use hex directly**
 
 ## 📝 Key Implementation Details
 
@@ -246,47 +278,113 @@ From `app/globals.css`:
 ## 🔧 Server Actions
 
 ### `app/actions/businesses.ts`
-- `getBusinesses()` - Returns all businesses
-- `getBusinessById(id)` - Single business lookup
-- `createBusiness(data)` - Add new business
-- `updateBusiness(id, data)` - ✨ NEW: Update business details (name, category, status, flags)
+- Business CRUD + delete (all org-scoped)
 
 ### `app/actions/contacts.ts`
-- `getContactsByBusiness(businessId)` - Scoped to business
-- `createContact(data)` - Add new contact
+- Contact CRUD + delete + update (emails/phones as arrays)
 
 ### `app/actions/correspondence.ts`
-- `getCorrespondenceByBusiness(businessId, limit, offset)` - Paginated
-- `createCorrespondence(data)` - Includes direction field
-- `updateFormattedText(correspondenceId, formattedTextCurrent)` - ✨ NEW: Manual edits
-- Updates `businesses.last_contacted_at` on save
+- Correspondence CRUD + manual edits + delete + duplicate detection
+- `updateFormattedText` merges direction update in same call (single DB write)
 
 ### `app/actions/ai-formatter.ts`
-- `formatCorrespondenceText(rawText, shouldSplit)` - Calls Anthropic API for formatting
-- `createFormattedCorrespondence(formData, aiResponse)` - Saves with AI formatting
-- `createUnformattedCorrespondence(formData)` - Saves without formatting (fallback)
-- `retryFormatting(correspondenceId)` - Attempts to format unformatted entries
+- `formatCorrespondenceText(rawText, shouldSplit)` — single combined AI call (format + action detection)
+- `createFormattedCorrespondence` / `createUnformattedCorrespondence` / `retryFormatting`
+- Strips quoted/forwarded content before sending to AI (uses `stripQuotedContent` from `lib/inbound/utils.ts`)
+- Prompt caching enabled on system prompts
 
 ### `app/actions/search.ts`
-- `searchAll(query)` - Full-text search across businesses and correspondence
-- Returns unified SearchResult[] array with type, title, snippet
-- Prioritizes business name matches (rank 1) over correspondence keyword matches (rank 2)
+- `searchAll(query)` — full-text search, websearch type, business name prioritised
+
+### `app/actions/organizations.ts`
+- `getNavData()` — single round-trip for nav state (org + hasCorrespondence)
+- Org CRUD + business_description/industry update
+
+### `app/actions/membership-types.ts`
+- Per-org configurable membership type CRUD
 
 ### `app/actions/import-mastersheet.ts`
-- `importMastersheet()` - Imports businesses and contacts from Mastersheet.csv
-- Merges duplicate businesses (Club Card + Advertiser)
-- Creates contacts from Primary Contact and Other Contacts columns
-- Returns detailed import report with counts, warnings, and errors
+- CSV import with duplicate merging (idempotent)
 
-### `app/actions/export-google-docs.ts` ✨ NEW
-- `exportToGoogleDocs(businessId)` - Exports business correspondence to Google Docs
-- Fetches business, contacts, and correspondence
-- Builds formatted document content (cover page, contacts, chronological entries)
-- Returns content ready for MCP tool to create Google Doc
+### `app/actions/export-google-docs.ts`
+- Google Docs export via MCP
 
-## 🚀 All Steps Complete!
+### `app/actions/duplicate-dismissals.ts`
+- Dismiss duplicate pairs (stores in duplicate_dismissals)
 
-All 10 steps from the PRD build plan are now complete. The app is fully functional and **deployed to production**.
+## ✅ Features 11–19 (added since Jan 2026)
+
+### 11. CC + BCC Contacts
+- cc_contact_ids / bcc_contact_ids (UUID[]) stored on correspondence
+- Included in full-text search
+
+### 12. Duplicate Detection
+- content_hash (SHA256) groups entries by identical content
+- DuplicatesWarningBanner on business page
+- Dismiss pairs — stored in duplicate_dismissals table
+
+### 13. SaaS Foundation
+- Feature flags (FEATURE_BILLING_ENABLED, FEATURE_PUBLIC_SIGNUP, FEATURE_LANDING_PAGE, etc.)
+- Stripe billing integration (behind flag)
+- Landing page, pricing page, terms/privacy
+
+### 14. Automated Marketing Engine
+- Prospect discovery, cold email, social autopilot, programmatic SEO
+- Blog, free tools, AI chatbot, referral system, review automation
+- Tables: marketing_prospects, leads, referrals, email_sequence_*, social_content, blog_posts, etc.
+
+### 15. Bulk Email Import Wizard
+- Gmail + Outlook OAuth bulk import
+- Chunked execute (150 emails/request, auto-loops client-side)
+- ReviewWizard: editable business/contact review before execute
+- Pages: `/import/gmail`, `/import/outlook`
+
+### 16. Daily Briefing / AI Assistant
+- Full-page inline ChatPanel at `/daily-briefing`
+- Slide-out overlay triggered from nav
+- Uses org business_description + industry as system prompt context
+- Chat route: `app/api/chat/route.ts` (prompt caching enabled)
+
+### 17. Configurable Membership Types
+- Per-org: replaces hardcoded Club Card/Advertiser flags
+- Settings UI to add/edit/reorder/deactivate types
+- Table: org_membership_types
+
+### 18. Onboarding Flow (4 steps)
+- `/onboarding/create-organization` → `/onboarding/describe-business` → `/onboarding/first-business` → `/new-entry`
+- describe-business step saves business_description + industry to organizations table
+
+### 19. Inbound Email Forwarding + BCC Capture
+- Postmark webhook at `/api/inbound-email` (live since 27/03/2026)
+- Inbound domain: `in.correspondenceclerk.com`
+- Auto-files to known domain via domain_mappings; queues unknowns to inbound_queue
+- BCC capture: detect from OriginalRecipient header; sent emails matched from To/Cc
+- Direction stored on queue insert; auto-matched from sender/recipient email
+- Inbox UI at `/inbox` with SENT/RECEIVED badge, expandable body, contact auto-match
+- Settings: "My email addresses" section for BCC detection
+
+### 20. Actions Page
+- Priority list, needs-reply, gone-quiet, flagged, reminders sections
+- Keyboard shortcuts (j/k navigation, space to expand)
+- All-clear panel when all sections empty
+- Hidden from nav until first correspondence entry exists
+
+### Additional hardening
+- Cmd+K global search overlay (sessionStorage cache, 5min TTL)
+- Draft autosave in new-entry
+- DB pagination on business page (Load More)
+- Data Health section in settings (format all unformatted)
+- Structured logging in inbound webhook (JSON log lines at every decision point)
+- Prompt caching on all AI system prompts
+- Single combined AI call: format + action detection merged
+- Quoted content stripping before AI processing
+- Custom favicon (CC initials, #1E293B background)
+
+---
+
+## 🚀 Deployment
+
+Fully functional and **deployed to production**.
 
 ### 🌐 Live Deployment
 - **Production URL:** https://correspondence-clerk.vercel.app
@@ -372,78 +470,68 @@ All 10 steps from the PRD build plan are now complete. The app is fully function
 ```
 app/
   actions/
-    businesses.ts          # Business CRUD + updateBusiness + deleteBusiness
-    contacts.ts            # Contact CRUD + deleteContact + updateContact
-    correspondence.ts      # Correspondence CRUD + manual edits + deleteCorrespondence
-    ai-formatter.ts        # AI formatting + retry logic
-    search.ts              # Full-text search
-    import-mastersheet.ts  # CSV import with duplicate merging
-    export-google-docs.ts  # Google Docs export via MCP
-  dashboard/
-    page.tsx              # Search, filters, sort options
-  businesses/[id]/
-    page.tsx              # TWO-SECTION VIEW + Edit/Delete + Export button
-  new-entry/
-    page.tsx              # AI FORMATTING + thread detection + fallback
-  search/
-    page.tsx              # Search results page
-  admin/
-    import/
-      page.tsx            # Mastersheet import UI
-  install-bookmarklet/
-    page.tsx              # ✨ Public bookmarklet install page (fixed Jan 26)
-  bookmarklet/
-    page.tsx              # ✨ Dashboard-linked bookmarklet install page (fixed Jan 26)
+    businesses.ts           Business CRUD + delete
+    contacts.ts             Contact CRUD + delete + update
+    correspondence.ts       Correspondence CRUD + manual edits + delete + duplicate detection
+    duplicate-dismissals.ts Dismiss duplicate pairs
+    ai-formatter.ts         Anthropic API (structured outputs, retry, fallback, prompt caching)
+    search.ts               Full-text search (tsvector + GIN, websearch type)
+    import-mastersheet.ts   CSV import with duplicate merging
+    export-google-docs.ts   Google Docs export via MCP
+    organizations.ts        Org CRUD + getNavData() (single round-trip for nav state)
+    membership-types.ts     Per-org configurable membership types
+  dashboard/page.tsx        Business list with search/filters/sort + onboarding checklist
+  businesses/[id]/page.tsx  Letter file view + sub-components in _components/
+  businesses/[id]/_components/
+                            CorrespondenceEntry, EditForm, ThreadAssignPanel, AllEntriesView,
+                            ThreadsView, FilterBar, DuplicatesWarningBanner, ContactsList
+  new-entry/page.tsx        Add correspondence (forced filing + AI formatting + draft autosave)
+  actions/page.tsx          Priority list + needs-reply + gone-quiet + flagged + reminders
+  daily-briefing/page.tsx   Full-page inline ChatPanel
+  search/page.tsx           Full-text search results
+  import/gmail/page.tsx     Gmail bulk import wizard
+  import/outlook/page.tsx   Outlook bulk import wizard
+  inbox/page.tsx            Inbound email queue triage
+  onboarding/               4-step flow
+  settings/page.tsx         User settings + Tools + membership types
+  install-bookmarklet/page.tsx  Bookmarklet installer (public)
+  admin/import/page.tsx     Mastersheet import UI
   api/
-    businesses/route.ts   # GET all businesses
-    contacts/route.ts     # GET contacts by business
-    bookmarklet-code/route.ts # ✨ Bookmarklet code API endpoint
+    inbound-email/route.ts  Postmark webhook → verify → match domain → AI format → auto-file or queue
+    import/[provider]/scan  OAuth email scan (headers only, returns scanId)
+    import/[provider]/execute Chunked import (150/req, auto-loops client-side)
+    chat/route.ts           Daily Briefing AI endpoint
 
 components/
-  BusinessSelector.tsx        # Search dropdown + Add New
-  ContactSelector.tsx         # Scoped to business, shows details
-  AddBusinessModal.tsx        # Inline add, auto-select
-  AddContactModal.tsx         # Inline add, auto-select
-  EditBusinessButton.tsx      # Edit business modal + delete business
-  EditContactButton.tsx       # ✨ NEW: Edit contact modal
-  ExportToGoogleDocsButton.tsx # ✨ NEW: Export to Google Docs button
-  SuccessBanner.tsx           # Auto-dismiss success message
+  CommandSearch.tsx         Cmd+K global overlay (sessionStorage cache 5min TTL, keyboard nav)
+  Navigation.tsx            App nav + actions badge + Daily Briefing button
+  ChatPanel.tsx             Daily Briefing AI panel (inline=true or slide-out overlay)
+  Toast.tsx                 Toast container (singleton in layout.tsx)
+  BusinessSelector.tsx      Search dropdown + Add New
+  ContactSelector.tsx       Scoped to business, shows details
+  AddBusinessModal.tsx      Inline add, auto-select
+  AddContactModal.tsx       Inline add, auto-select
+  EditBusinessButton.tsx    Edit modal + delete
+  EditContactButton.tsx     Edit contact modal
+  ExportToGoogleDocsButton.tsx  Export button
+  import/ReviewWizard.tsx   Editable business/contact review before bulk import execute
 
 lib/
   ai/
-    formatter.ts          # ✨ NEW: Anthropic API integration
-    types.ts              # ✨ NEW: AI response type contracts
-    thread-detection.ts   # ✨ NEW: Email thread heuristics
-
-supabase/migrations/
-  20250115_001 - 006      # Migrations 1-6 (through direction field)
-  20250116_001            # ✨ NEW: formatting_status column
-
-CLAUDE.md                 # Full PRD + Hard Rules
-ARCHITECTURE.md           # Schema, RLS, search, modules
-USER_FLOW.md              # Forced filing flow
-GLOSSARY.md               # Mastersheet, Club Card, etc.
-MIGRATION_INSTRUCTIONS.md # ✨ NEW: Migration guide
-.env.local.example        # ✨ NEW: Environment template with ANTHROPIC_API_KEY
+    formatter.ts            Anthropic structured outputs (format + action detection, prompt caching)
+    thread-detection.ts     Email chain heuristics
+    types.ts                AI response contracts
+  inbound/utils.ts          isPersonalDomain, stripQuotedContent
+  email-import/execute-chunk.ts  Shared Gmail+Outlook chunked import logic
+  toast.ts                  Toast emitter (CustomEvent — toast.success/error/info())
+  supabase/service-role.ts  createServiceRoleClient() for cron/session-less contexts
 ```
 
-## 🎯 Current Position
+## 🎯 Current Position (30/03/2026)
 
-**All 10 steps from the PRD are complete!**
+All 19 features complete and deployed. Active development continues (see `.claude/todos.md`).
 
-The Correspondence Clerk is fully implemented with all core features:
-- Authentication and user management
-- Business and contact management with full CRUD operations
-- Forced filing correspondence entry system
-- AI-powered formatting with graceful fallback
-- Manual editing (correction layer)
-- Full-text search across businesses and correspondence
-- Mastersheet CSV import with duplicate merging
-- Dashboard with search, filters, and sorting
-- Google Docs export via MCP
-- Outlook Web integration via bookmarklet
-
-Ready for user testing and deployment!
+**Next priorities:** P26 (AI Assistant rename + call prep), P27 (AI preset templates), P28 (full UX audit).
 
 ## 💡 Key Decisions Made
 
@@ -462,36 +550,18 @@ Ready for user testing and deployment!
 
 ## 🐛 Known Issues
 
-None currently! Everything implemented is working as expected.
+- Google Docs export requires MCP setup with Google authentication (not yet user-tested)
+- ~27 lint errors remain (react-hooks false positives, docx library `any` types) — intentionally skipped
+- Sentry error monitoring blocked: needs Sentry account + DSN first (P17)
+- **⚠️ MICROSOFT_CLIENT_SECRET expires 19/09/2026** — rotate at portal.azure.com
 
-## 📝 Notes for Next Session
+## 🔐 Credentials
 
-- Migration 007 (formatting_status column) has been run in Supabase ✅
-- AI formatting integration complete with Anthropic API ✅
-- Thread detection using client-side heuristics ✅
-- Graceful fallback ensures AI outage never blocks workflow ✅
-- Manual editing (correction layer) complete ✅
-- Full-text search complete with business name prioritization ✅
-- Mastersheet import complete with duplicate merging ✅
-- Dashboard search and filters working ✅
-- Edit business functionality added ✅
-- Delete functionality for businesses, contacts, and correspondence ✅
-- Edit contact functionality added ✅
-- Google Docs export via MCP implemented ✅
-- ANTHROPIC_API_KEY is configured in .env.local ✅
-- Mastersheet.csv added to .gitignore ✅
-- **Outlook bookmarklet fixed (Jan 26, 2026):**
-  - href race condition resolved ✅
-  - API now always uses production URL (not preview deployment) ✅
-  - Self-contained postMessage bookmarklet (no external script) ✅
-  - Settings > Tools section added for returning users ✅
-  - User guide updated with bookmarklet instructions ✅
-- **All 10 steps complete!** ✅
-
-**User Testing Required:**
-- Test Google Docs export with actual MCP Google authentication
-- Verify document formatting in Google Docs meets print-ready requirements
-- Test with real-world data at scale
+- Postmark: `tom@correspondenceclerk.com` / `tapperley96`, server "My First Server"
+- Inbound email: `in.correspondenceclerk.com` (MX → inbound.postmarkapp.com, priority 10)
+- Google OAuth: Cloud project `decisive-talon-484209-i9`
+- Microsoft OAuth: Azure app "Correspondence Clerk"
+- Full details: `project_oauth_credentials.md` in project root
 
 ---
 
