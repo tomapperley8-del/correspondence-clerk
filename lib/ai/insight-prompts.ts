@@ -62,6 +62,30 @@ export const INSIGHT_METADATA: Record<
 // Shared helpers
 // ---------------------------------------------------------------------------
 
+/** Human-readable label for membership_type values */
+function membershipLabel(type: string | null | undefined): string {
+  switch (type) {
+    case 'club_card':        return 'Club Card member'
+    case 'advertiser':       return 'Advertiser'
+    case 'former_club_card': return 'Former Club Card member'
+    case 'former_advertiser':return 'Former Advertiser'
+    default:                 return 'No membership'
+  }
+}
+
+/** Currently paying / engaged */
+function isEngaged(type: string | null | undefined): boolean {
+  return type === 'club_card' || type === 'advertiser'
+}
+
+/** Previously engaged, now lapsed */
+function isLapsed(type: string | null | undefined): boolean {
+  return type === 'former_club_card' || type === 'former_advertiser'
+}
+
+/** Legend injected into prompts so Claude understands membership values */
+const MEMBERSHIP_LEGEND = `Membership types: club_card = active Club Card member, advertiser = active Advertiser, former_club_card / former_advertiser = lapsed, null/none = no current membership (prospect or never converted).`
+
 function formatDate(d: string | null | undefined): string {
   if (!d) return 'unknown date'
   const dt = new Date(d)
@@ -258,9 +282,9 @@ function buildBriefingPrompt(
       }).join('\n')
     : 'No activity in the last 14 days.'
 
-  // Quiet businesses: active but not contacted in 30+ days
+  // Quiet businesses: engaged (club card / advertiser) but not contacted in 30+ days
   const quietBusinesses = businesses
-    .filter((b) => b.status?.toLowerCase() === 'active' && daysAgo(b.last_contacted_at) > 30)
+    .filter((b) => isEngaged(b.membership_type) && daysAgo(b.last_contacted_at) > 30)
     .sort((a, b) => daysAgo(b.last_contacted_at) - daysAgo(a.last_contacted_at))
     .slice(0, 10)
 
@@ -269,7 +293,7 @@ function buildBriefingPrompt(
     : 'None.'
 
   return {
-    systemPrompt: `You are an AI assistant embedded in Correspondence Clerk for ${orgName}. Today is ${today}. You produce clear, actionable business briefings in British English. Use markdown formatting. Be concise and prioritise what genuinely needs attention.`,
+    systemPrompt: `You are an AI assistant embedded in Correspondence Clerk for ${orgName}. Today is ${today}. You produce clear, actionable business briefings in British English. Use markdown formatting. Be concise and prioritise what genuinely needs attention. ${MEMBERSHIP_LEGEND}`,
     userPrompt: `Generate a morning briefing for ${orgName}.
 
 ## Actions due today or overdue
@@ -311,12 +335,12 @@ function buildRelationshipRadarPrompt(
     .map((b) => {
       const days = daysAgo(b.last_contacted_at)
       const flags = b.recentCorrespondence.filter((c) => c.action_needed && c.action_needed !== 'none')
-      return `- ${b.name} (${b.category ?? b.status ?? 'unknown'}) — last contact: ${days > 9000 ? 'never' : `${days}d ago`}${flags.length ? `, ${flags.length} flagged action(s)` : ''}`
+      return `- ${b.name} (${b.category ?? 'uncategorised'}, ${membershipLabel(b.membership_type)}) — last contact: ${days > 9000 ? 'never' : `${days}d ago`}${flags.length ? `, ${flags.length} flagged action(s)` : ''}`
     })
     .join('\n')
 
   return {
-    systemPrompt: `You are an AI assistant for ${orgName}. Analyse relationship health across the business portfolio. Be direct — flag what needs attention. British English, markdown formatting.`,
+    systemPrompt: `You are an AI assistant for ${orgName}. Analyse relationship health across the business portfolio. Be direct — flag what needs attention. British English, markdown formatting. ${MEMBERSHIP_LEGEND}`,
     userPrompt: `Review the following businesses that may need attention. Identify the highest-risk relationships and explain why each is at risk. Group into: (1) High concern, (2) Worth watching, (3) Fine for now. Where relevant, suggest a specific action.
 
 ## Potentially at-risk businesses
@@ -379,17 +403,16 @@ function buildStateOfPlayPrompt(
     return acc
   }, {})
 
-  const byStatus = businesses.reduce<Record<string, number>>((acc, b) => {
-    const s = b.status ?? 'unknown'
-    acc[s] = (acc[s] ?? 0) + 1
-    return acc
-  }, {})
-
   const totalContractValue = contracts.reduce((sum, c) => sum + (c.contract_amount ?? 0), 0)
   const activeContracts = contracts.filter((c) => c.contract_end && new Date(c.contract_end) > new Date())
 
   const categoryText = Object.entries(byCategory).map(([k, v]) => `${k}: ${v}`).join(', ')
-  const statusText = Object.entries(byStatus).map(([k, v]) => `${k}: ${v}`).join(', ')
+
+  const membershipCounts = {
+    engaged:  businesses.filter((b) => isEngaged(b.membership_type)).length,
+    lapsed:   businesses.filter((b) => isLapsed(b.membership_type)).length,
+    noMembership: businesses.filter((b) => !b.membership_type).length,
+  }
 
   const activityBuckets = {
     active: businesses.filter((b) => daysAgo(b.last_contacted_at) <= 30).length,
@@ -399,13 +422,15 @@ function buildStateOfPlayPrompt(
   }
 
   return {
-    systemPrompt: `You are an AI analyst for ${orgName}. Provide an honest, strategic analysis of the business portfolio. British English, markdown. Be direct about what's working and what isn't.`,
+    systemPrompt: `You are an AI analyst for ${orgName}. Provide an honest, strategic analysis of the business portfolio. British English, markdown. Be direct about what's working and what isn't. ${MEMBERSHIP_LEGEND}`,
     userPrompt: `Analyse the full state of ${orgName}'s business relationships.
 
 ## Portfolio overview
 - Total businesses: ${businesses.length}
 - Categories: ${categoryText || 'none set'}
-- Status breakdown: ${statusText || 'none set'}
+- Club Card members / Advertisers (engaged): ${membershipCounts.engaged}
+- Former members / advertisers (lapsed): ${membershipCounts.lapsed}
+- No membership (prospects / unconverted): ${membershipCounts.noMembership}
 
 ## Contract values
 - Total tracked: £${totalContractValue.toLocaleString()}
@@ -432,18 +457,18 @@ function buildReconnectListPrompt(
   const orgName = org?.name ?? 'your organisation'
 
   const reconnect = businesses
-    .filter((b) => daysAgo(b.last_contacted_at) >= 60 && b.status?.toLowerCase() !== 'inactive')
+    .filter((b) => daysAgo(b.last_contacted_at) >= 60)
     .sort((a, b) => daysAgo(a.last_contacted_at) - daysAgo(b.last_contacted_at))
     .slice(0, 25)
     .map((b) => {
       const days = daysAgo(b.last_contacted_at)
       const lastEntry = b.recentCorrespondence[0]
-      return `- ${b.name} (${b.category ?? 'uncategorised'}) — ${days > 9000 ? 'never contacted' : `${days} days since last contact`}${lastEntry ? ` — last: "${truncate(lastEntry.subject ?? '', 60)}"` : ''}`
+      return `- ${b.name} (${b.category ?? 'uncategorised'}, ${membershipLabel(b.membership_type)}) — ${days > 9000 ? 'never contacted' : `${days} days since last contact`}${lastEntry ? ` — last: "${truncate(lastEntry.subject ?? '', 60)}"` : ''}`
     })
     .join('\n')
 
   return {
-    systemPrompt: `You are an AI assistant for ${orgName}. Identify the most valuable reconnection opportunities. British English, markdown.`,
+    systemPrompt: `You are an AI assistant for ${orgName}. Identify the most valuable reconnection opportunities. Prioritise Club Card members and Advertisers (currently engaged), then lapsed members, then prospects. British English, markdown. ${MEMBERSHIP_LEGEND}`,
     userPrompt: `The following businesses haven't been contacted in 60+ days. Identify the most worthwhile to reach out to, and briefly explain why each is a good candidate for reconnection. Group into priority tiers.
 
 ${reconnect || 'No businesses meet this criteria — great work staying in touch!'}${formatPreviousInsights(previous)}`,
@@ -487,14 +512,14 @@ function buildProspectingTargetsPrompt(
 ): { systemPrompt: string; userPrompt: string } {
   const orgName = org?.name ?? 'your organisation'
 
-  const activeBusinesses = businesses.filter((b) => b.status?.toLowerCase() === 'active' && daysAgo(b.last_contacted_at) <= 90)
-  const dormant = businesses.filter((b) => (b.status?.toLowerCase() === 'inactive' || daysAgo(b.last_contacted_at) > 90) && b.email)
+  const activeBusinesses = businesses.filter((b) => isEngaged(b.membership_type) && daysAgo(b.last_contacted_at) <= 90)
+  const dormant = businesses.filter((b) => (isLapsed(b.membership_type) || daysAgo(b.last_contacted_at) > 90) && b.email)
 
-  const activeText = activeBusinesses.slice(0, 15).map((b) => `- ${b.name} (${b.category ?? 'unknown'}, ${b.membership_type ?? 'no membership'})`).join('\n')
-  const dormantText = dormant.slice(0, 15).map((b) => `- ${b.name} (${b.category ?? 'unknown'}) — ${daysAgo(b.last_contacted_at) > 9000 ? 'never contacted' : `${daysAgo(b.last_contacted_at)}d ago`}`).join('\n')
+  const activeText = activeBusinesses.slice(0, 15).map((b) => `- ${b.name} (${b.category ?? 'unknown'}, ${membershipLabel(b.membership_type)})`).join('\n')
+  const dormantText = dormant.slice(0, 15).map((b) => `- ${b.name} (${b.category ?? 'unknown'}, ${membershipLabel(b.membership_type)}) — ${daysAgo(b.last_contacted_at) > 9000 ? 'never contacted' : `${daysAgo(b.last_contacted_at)}d ago`}`).join('\n')
 
   return {
-    systemPrompt: `You are an AI assistant for ${orgName}. Identify warm prospecting opportunities within the existing relationship network. British English, markdown.`,
+    systemPrompt: `You are an AI assistant for ${orgName}. Identify warm prospecting opportunities within the existing relationship network. British English, markdown. ${MEMBERSHIP_LEGEND}`,
     userPrompt: `Analyse the existing business relationships to identify warm prospecting opportunities.
 
 ## About ${orgName}
@@ -521,10 +546,9 @@ function buildDataHealthOrgPrompt(
   const orgName = org?.name ?? 'your organisation'
 
   const noEmail = businesses.filter((b) => !b.email)
-  const noPhone = businesses.filter((b) => !b.phone)  // note: contacts have phones, businesses have phone
   const noCorrespondence = businesses.filter((b) => b.recentCorrespondence.length === 0)
   const noCategory = businesses.filter((b) => !b.category)
-  const noStatus = businesses.filter((b) => !b.status)
+  const noMembership = businesses.filter((b) => !b.membership_type)
 
   const format = (list: typeof businesses) => list.slice(0, 10).map((b) => `- ${b.name}`).join('\n')
 
@@ -548,8 +572,8 @@ ${format(noCorrespondence) || 'None — great!'}
 ## Businesses with no category set (${noCategory.length})
 ${format(noCategory) || 'None — great!'}
 
-## Businesses with no status set (${noStatus.length})
-${format(noStatus) || 'None — great!'}
+## Businesses with no membership type set (${noMembership.length})
+${format(noMembership) || 'None — great!'}
 
 ## AI Context profile gaps
 ${profileFields || 'Profile is fully complete — great!'}
@@ -582,7 +606,7 @@ function businessContextBlock(
     : 'No contract on record.'
 
   return `## Business: ${business.name}
-Category: ${business.category ?? 'not set'} | Status: ${business.status ?? 'not set'} | Membership: ${business.membership_type ?? 'none'}
+Category: ${business.category ?? 'not set'} | Membership: ${membershipLabel(business.membership_type)}
 Email: ${business.email ?? 'not set'} | Phone: ${business.phone ?? 'not set'}
 Contract: ${contract}
 Last contacted: ${business.last_contacted_at ? `${daysAgo(business.last_contacted_at)} days ago` : 'unknown'}
@@ -845,7 +869,7 @@ export async function buildInsightPrompt(
 
         const businessList = businesses.slice(0, 30).map((b) => {
           const recent = b.recentCorrespondence[0]
-          return `- ${b.name} (${b.category ?? 'uncategorised'}, ${b.status ?? 'unknown'}) — last contact: ${b.last_contacted_at ? `${daysAgo(b.last_contacted_at)}d ago` : 'never'}${recent ? `, last entry: "${truncate(recent.subject ?? '', 60)}"` : ''}`
+          return `- ${b.name} (${b.category ?? 'uncategorised'}, ${membershipLabel(b.membership_type)}) — last contact: ${b.last_contacted_at ? `${daysAgo(b.last_contacted_at)}d ago` : 'never'}${recent ? `, last entry: "${truncate(recent.subject ?? '', 60)}"` : ''}`
         }).join('\n')
 
         return {
