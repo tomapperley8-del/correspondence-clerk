@@ -31,23 +31,21 @@ export const maxDuration = 30
 
 type EmailAddress = { address: string; name: string }
 
+// Forward Email sends a flat payload (fields from mailparser directly at top level)
 type ForwardEmailPayload = {
-  mail: {
-    from: { value: EmailAddress[]; text: string }
-    to: { value: EmailAddress[]; text: string }
-    cc?: { value: EmailAddress[]; text: string }
-    subject: string
-    text?: string
-    html?: string
-    date?: string
-    headers: Record<string, string | string[]>
-  }
+  from: { value: EmailAddress[]; text: string }
+  to: { value: EmailAddress[]; text: string }
+  cc?: { value: EmailAddress[]; text: string }
+  subject: string
+  text?: string
+  html?: string
+  date?: string
+  headers: Record<string, string | string[]>
+  recipients?: string[]
   session: {
     recipient: string
     sender: string
-    headers?: Record<string, string>
   }
-  headers?: Record<string, string>
 }
 
 // ---------------------------------------------------------------------------
@@ -76,8 +74,9 @@ function verifySignature(rawBody: string, signature: string): boolean {
 function extractToken(payload: ForwardEmailPayload): string | null {
   const candidates = [
     payload.session?.recipient ?? '',
-    payload.mail.to?.text ?? '',
-    payload.mail.cc?.text ?? '',
+    ...(payload.recipients ?? []),
+    payload.to?.text ?? '',
+    payload.cc?.text ?? '',
   ]
   for (const field of candidates) {
     const match = field.match(/([a-z0-9-]+)@correspondenceclerk\.com/i)
@@ -93,8 +92,8 @@ function extractToken(payload: ForwardEmailPayload): string | null {
 // ---------------------------------------------------------------------------
 function detectDirection(payload: ForwardEmailPayload, token: string): 'received' | 'sent' {
   const pattern = new RegExp(`${token}@correspondenceclerk\\.com`, 'i')
-  const inTo = pattern.test(payload.mail.to?.text ?? '')
-  const inCc = pattern.test(payload.mail.cc?.text ?? '')
+  const inTo = pattern.test(payload.to?.text ?? '')
+  const inCc = pattern.test(payload.cc?.text ?? '')
   return inTo || inCc ? 'received' : 'sent'
 }
 
@@ -103,8 +102,8 @@ function detectDirection(payload: ForwardEmailPayload, token: string): 'received
 // ---------------------------------------------------------------------------
 function extractRecipientEmails(payload: ForwardEmailPayload): string[] {
   const all: EmailAddress[] = [
-    ...(payload.mail.to?.value ?? []),
-    ...(payload.mail.cc?.value ?? []),
+    ...(payload.to?.value ?? []),
+    ...(payload.cc?.value ?? []),
   ]
   return all
     .map(r => r.address?.toLowerCase() ?? '')
@@ -117,28 +116,9 @@ function extractRecipientEmails(payload: ForwardEmailPayload): string[] {
 // ---------------------------------------------------------------------------
 function buildHeadersMap(payload: ForwardEmailPayload): Map<string, string> {
   const map = new Map<string, string>()
-
-  // session.headers is a flat string→string map
-  for (const [k, v] of Object.entries(payload.session?.headers ?? {})) {
-    map.set(k.toLowerCase(), v)
-  }
-
-  // mail.headers may have string or string[] values
-  for (const [k, v] of Object.entries(payload.mail.headers ?? {})) {
-    const key = k.toLowerCase()
-    if (!map.has(key)) {
-      map.set(key, Array.isArray(v) ? v[0] : v)
-    }
-  }
-
-  // Also check top-level headers if present
   for (const [k, v] of Object.entries(payload.headers ?? {})) {
-    const key = k.toLowerCase()
-    if (!map.has(key)) {
-      map.set(key, v)
-    }
+    map.set(k.toLowerCase(), Array.isArray(v) ? v[0] : v)
   }
-
   return map
 }
 
@@ -147,9 +127,9 @@ function buildHeadersMap(payload: ForwardEmailPayload): Map<string, string> {
 // Returns a discard reason string if the email should be silently dropped.
 // ---------------------------------------------------------------------------
 function shouldDiscard(payload: ForwardEmailPayload, headers: Map<string, string>): string | null {
-  const from = (payload.mail.from?.value?.[0]?.address ?? '').toLowerCase()
-  const subject = (payload.mail.subject ?? '').toLowerCase()
-  const body = (payload.mail.text ?? '').replace(/\s+/g, ' ').trim()
+  const from = (payload.from?.value?.[0]?.address ?? '').toLowerCase()
+  const subject = (payload.subject ?? '').toLowerCase()
+  const body = (payload.text ?? '').replace(/\s+/g, ' ').trim()
 
   // No-reply senders
   if (/^(no.?reply|noreply|do.?not.?reply|mailer.?daemon|postmaster|bounce)@/i.test(from)) {
@@ -237,14 +217,14 @@ async function checkOrgRateLimit(
 // Build raw text for AI formatter
 // ---------------------------------------------------------------------------
 function buildRawForAI(payload: ForwardEmailPayload, strippedBody: string, direction: 'received' | 'sent'): string {
-  const fromName = payload.mail.from?.value?.[0]?.name ?? ''
-  const fromEmail = payload.mail.from?.value?.[0]?.address ?? ''
-  const date = payload.mail.date ?? new Date().toISOString()
-  const subject = payload.mail.subject ?? ''
+  const fromName = payload.from?.value?.[0]?.name ?? ''
+  const fromEmail = payload.from?.value?.[0]?.address ?? ''
+  const date = payload.date ?? new Date().toISOString()
+  const subject = payload.subject ?? ''
 
   if (direction === 'sent') {
-    const toLine = payload.mail.to?.text ? `To: ${payload.mail.to.text}` : ''
-    const ccLine = payload.mail.cc?.text ? `Cc: ${payload.mail.cc.text}` : ''
+    const toLine = payload.to?.text ? `To: ${payload.to.text}` : ''
+    const ccLine = payload.cc?.text ? `Cc: ${payload.cc.text}` : ''
     return [
       `From: ${fromName} <${fromEmail}>`,
       toLine,
@@ -406,21 +386,17 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({}, { status: 200 })
   }
 
-  // Log raw body snippet + top-level keys to diagnose Forward Email payload structure
-  log('[inbound-email] raw_body_sample', { sample: rawBody.slice(0, 300) })
-
-  // Forward Email wraps the parsed email under `mail`; guard defensively
   const payload: ForwardEmailPayload = raw
-  if (!payload.mail) {
-    log('[inbound-email] no_mail_field', { rawKeys: Object.keys(raw ?? {}).join(',') })
+  if (!payload.from && !payload.session) {
+    log('[inbound-email] unexpected_payload', { keys: Object.keys(raw ?? {}).join(',') })
     return NextResponse.json({}, { status: 200 })
   }
 
   // 3. Extract token and look up user
   const token = extractToken(payload)
   log('[inbound-email] received', {
-    from: payload.mail.from?.value?.[0]?.address ?? '',
-    subject: payload.mail.subject ?? '',
+    from: payload.from?.value?.[0]?.address ?? '',
+    subject: payload.subject ?? '',
     sessionRecipient: payload.session?.recipient ?? '',
     token: token ?? '(none)',
   })
@@ -461,8 +437,8 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   const headers = buildHeadersMap(payload)
 
   // 6. Spam filter (applies to both directions)
-  const fromEmail = (payload.mail.from?.value?.[0]?.address ?? '').toLowerCase()
-  const fromName = payload.mail.from?.value?.[0]?.name ?? ''
+  const fromEmail = (payload.from?.value?.[0]?.address ?? '').toLowerCase()
+  const fromName = payload.from?.value?.[0]?.name ?? ''
 
   // fromSelf bypass: own-address emails skip the spam filter entirely
   // (handles BCC'd sent emails that would otherwise look like newsletters)
@@ -479,7 +455,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       org_id: orgId,
       from_email: fromEmail,
       from_name: fromName || null,
-      subject: payload.mail.subject ?? null,
+      subject: payload.subject ?? null,
       body_preview: null,
       body_text: null,
       to_emails: null,
@@ -502,13 +478,13 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   log('[inbound-email] direction_detected', { direction, fromEmail })
 
   // 8. Extract body and recipients
-  const strippedBody = stripQuotedContent(payload.mail.text ?? '')
+  const strippedBody = stripQuotedContent(payload.text ?? '')
   const bodyPreview = strippedBody.slice(0, 500)
 
   // All To+Cc recipients (excluding our own inbound address)
   const toEmails: { name: string; email: string }[] = [
-    ...(payload.mail.to?.value ?? []),
-    ...(payload.mail.cc?.value ?? []),
+    ...(payload.to?.value ?? []),
+    ...(payload.cc?.value ?? []),
   ]
     .filter(r => r.address && !r.address.toLowerCase().includes('@correspondenceclerk.com'))
     .map(r => ({ name: r.name ?? '', email: r.address.toLowerCase() }))
@@ -527,8 +503,8 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       const formatResult = await formatCorrespondence(rawForAI, false)
 
       let formattedText: string | null = null
-      let entryDate = payload.mail.date ?? new Date().toISOString()
-      let subject = payload.mail.subject || '(No subject)'
+      let entryDate = payload.date ?? new Date().toISOString()
+      let subject = payload.subject || '(No subject)'
       let formattingStatus = 'unformatted'
 
       if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
@@ -563,7 +539,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       org_id: orgId,
       from_email: fromEmail,
       from_name: fromName || null,
-      subject: payload.mail.subject ?? null,
+      subject: payload.subject ?? null,
       body_preview: bodyPreview || null,
       body_text: strippedBody || null,
       to_emails: toEmails.length > 0 ? toEmails : null,
@@ -608,8 +584,8 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     const formatResult = await formatCorrespondence(rawForAI, false)
 
     let formattedText: string | null = null
-    let entryDate = payload.mail.date ?? new Date().toISOString()
-    let subject = payload.mail.subject || '(No subject)'
+    let entryDate = payload.date ?? new Date().toISOString()
+    let subject = payload.subject || '(No subject)'
     let formattingStatus = 'unformatted'
 
     if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
@@ -644,7 +620,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     org_id: orgId,
     from_email: fromEmail,
     from_name: fromName || null,
-    subject: payload.mail.subject ?? null,
+    subject: payload.subject ?? null,
     body_preview: bodyPreview || null,
     body_text: strippedBody || null,
     to_emails: null,
