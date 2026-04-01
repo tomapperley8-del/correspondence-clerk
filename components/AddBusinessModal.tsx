@@ -12,14 +12,16 @@ interface AddBusinessModalProps {
   isOpen: boolean
   onClose: () => void
   onBusinessAdded: (business: Business) => void
+  initialName?: string
 }
 
 export function AddBusinessModal({
   isOpen,
   onClose,
   onBusinessAdded,
+  initialName,
 }: AddBusinessModalProps) {
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName ?? '')
   const [category, setCategory] = useState('')
   const [status, setStatus] = useState('')
   const [isClubCard, setIsClubCard] = useState(false)

@@ -216,6 +216,115 @@ export async function discardInboundEmail(queueItemId: string): Promise<{ data?:
   return { data: true }
 }
 
+export type AutoFiledItem = {
+  id: string
+  subject: string | null
+  direction: 'received' | 'sent'
+  entry_date: string
+  business_id: string
+  business_name: string
+}
+
+export type DiscardedQueueItem = {
+  id: string
+  from_email: string
+  from_name: string | null
+  subject: string | null
+  received_at: string
+}
+
+/**
+ * Recent correspondence auto-filed by the webhook (domain match, no user action needed)
+ */
+export async function getAutoFiledRecent(): Promise<{ data?: AutoFiledItem[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data, error } = await supabase
+    .from('correspondence')
+    .select('id, subject, direction, entry_date, business_id, businesses(name)')
+    .eq('organization_id', orgId)
+    .filter('ai_metadata->>source', 'in', '("webhook_inbound","webhook_bcc")')
+    .order('entry_date', { ascending: false })
+    .limit(20)
+
+  if (error) return { error: error.message }
+
+  const items: AutoFiledItem[] = (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    subject: row.subject as string | null,
+    direction: row.direction as 'received' | 'sent',
+    entry_date: row.entry_date as string,
+    business_id: row.business_id as string,
+    business_name: (row.businesses as { name: string } | null)?.name ?? 'Unknown',
+  }))
+
+  return { data: items }
+}
+
+/**
+ * Discarded items for the current org (spam-filtered by webhook)
+ */
+export async function getDiscardedQueue(): Promise<{ data?: DiscardedQueueItem[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data, error } = await supabase
+    .from('inbound_queue')
+    .select('id, from_email, from_name, subject, received_at')
+    .eq('org_id', orgId)
+    .eq('status', 'discarded')
+    .order('received_at', { ascending: false })
+    .limit(30)
+
+  return error ? { error: error.message } : { data: data as DiscardedQueueItem[] }
+}
+
+/**
+ * Rescue a discarded item — move it back to pending so it appears in the inbox
+ */
+export async function rescueDiscardedEmail(queueItemId: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data: item } = await supabase
+    .from('inbound_queue')
+    .select('raw_payload')
+    .eq('id', queueItemId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (!item) return { error: 'Item not found' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload = item.raw_payload as Record<string, any>
+  const rawBody = stripQuotedContent(payload.StrippedTextReply || payload.TextBody || '')
+  const bodyPreview = rawBody.slice(0, 500) || null
+
+  const { error } = await supabase
+    .from('inbound_queue')
+    .update({ status: 'pending', body_preview: bodyPreview, body_text: rawBody || null })
+    .eq('id', queueItemId)
+    .eq('org_id', orgId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/inbox')
+  return {}
+}
+
 /**
  * Get the current user's registered own email addresses
  */
