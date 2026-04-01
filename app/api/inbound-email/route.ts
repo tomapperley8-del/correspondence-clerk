@@ -128,9 +128,13 @@ function shouldDiscard(payload: PostmarkPayload, headers: Map<string, string>): 
     return 'no-reply sender'
   }
 
-  // Mailing list headers (definitive newsletter signal)
+  // Mailing list headers — only discard when combined with a newsletter-y subject.
+  // Many legitimate one-off emails (invoices, contact forms, advertising enquiries) are
+  // sent via platforms that add these headers automatically; we only want to drop genuine
+  // mass-mail where the subject also signals it's a newsletter/promo.
   if (headers.has('list-unsubscribe') || headers.has('list-id')) {
-    return 'mailing list header'
+    const newsletterSubject = /\b(newsletter|unsubscribe|weekly digest|roundup|voucher|promo|discount|coupon|deals|offers|sale|subscribe)\b/i.test(subject)
+    if (newsletterSubject) return 'mailing list header + newsletter subject'
   }
 
   // Auto-submitted header
@@ -283,7 +287,7 @@ async function insertCorrespondenceServiceRole(
     formatting_status: opts.formattingStatus,
     content_hash: contentHash || null,
     ai_metadata: {
-      source: opts.direction === 'sent' ? 'bcc_capture' : 'inbound_email',
+      source: opts.direction === 'sent' ? 'webhook_bcc' : 'webhook_inbound',
       from_email: opts.fromEmail,
     },
   })

@@ -18,6 +18,23 @@ interface Props {
   businesses: Business[]
 }
 
+// Derive a human-readable business name from an email address domain.
+// e.g. 'info@sipsmith.co.uk' → 'Sipsmith', 'hello@my-company.com' → 'My Company'
+function domainToBusinessName(email: string): string {
+  const domain = email.split('@')[1] ?? ''
+  if (!domain) return ''
+  // Strip leading www.
+  let base = domain.replace(/^www\./i, '')
+  // Strip known TLDs (order matters — multi-part first)
+  base = base.replace(/\.(co\.uk|org\.uk|me\.uk|net\.uk|gov\.uk|ac\.uk|ltd\.uk|plc\.uk)$/i, '')
+  base = base.replace(/\.(com|org|net|io|co|uk|de|fr|es|it|nl|au|ca|us|info|biz|app|dev)$/i, '')
+  // Replace separators with spaces and title-case
+  return base
+    .replace(/[-_.]/g, ' ')
+    .replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .trim()
+}
+
 function formatDate(iso: string): string {
   const d = new Date(iso)
   const day = String(d.getDate()).padStart(2, '0')
@@ -57,6 +74,7 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
   if (!visible) return null
 
   const isSent = item.direction === 'sent'
+  const suggestedBusinessName = !isSent ? domainToBusinessName(item.from_email) : ''
 
   const handleSelectBusiness = async (businessId: string) => {
     setSelectedBusinessId(businessId || null)
@@ -249,6 +267,18 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
             </div>
           )}
 
+          {!selectedBusinessId && suggestedBusinessName && (
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(0,0,0,0.45)' }}>
+              <span>Suggested:</span>
+              <button
+                onClick={() => setShowAddBusiness(true)}
+                style={{ color: 'var(--link-blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+              >
+                + Add {suggestedBusinessName} as new business
+              </button>
+            </div>
+          )}
+
           <BusinessSelector
             businesses={businesses}
             selectedBusinessId={selectedBusinessId}
@@ -298,6 +328,7 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
       <AddBusinessModal
         isOpen={showAddBusiness}
         onClose={() => setShowAddBusiness(false)}
+        initialName={suggestedBusinessName || undefined}
         onBusinessAdded={(business) => {
           setBusinesses((prev) => [...prev, business])
           setShowAddBusiness(false)
