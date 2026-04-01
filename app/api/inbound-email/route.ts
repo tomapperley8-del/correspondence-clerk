@@ -377,6 +377,16 @@ function log(event: string, data: Record<string, unknown> = {}) {
 // Main handler
 // ---------------------------------------------------------------------------
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Outer try-catch: ALWAYS return 200 — a 500 causes Forward Email to retry indefinitely
+  try {
+    return await handleInbound(request)
+  } catch (err) {
+    log('[inbound-email] unhandled_error', { error: String(err) })
+    return NextResponse.json({}, { status: 200 })
+  }
+}
+
+async function handleInbound(request: NextRequest): Promise<NextResponse> {
   const rawBody = await request.text()
 
   // 1. Verify signature
@@ -387,11 +397,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // 2. Parse payload
-  let payload: ForwardEmailPayload
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let raw: any
   try {
-    payload = JSON.parse(rawBody)
+    raw = JSON.parse(rawBody)
   } catch {
     log('[inbound-email] parse_error')
+    return NextResponse.json({}, { status: 200 })
+  }
+
+  // Log the top-level keys so we can confirm the payload shape from Forward Email
+  log('[inbound-email] payload_shape', { keys: Object.keys(raw ?? {}) })
+
+  // Forward Email wraps the parsed email under `mail`; guard defensively
+  const payload: ForwardEmailPayload = raw
+  if (!payload.mail) {
+    log('[inbound-email] no_mail_field', { rawKeys: Object.keys(raw ?? {}) })
     return NextResponse.json({}, { status: 200 })
   }
 
