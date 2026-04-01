@@ -143,9 +143,11 @@ function shouldDiscard(payload: PostmarkPayload, headers: Map<string, string>): 
     return 'auto-submitted'
   }
 
-  // Promotional subject keywords
-  if (/\b(unsubscribe|newsletter|marketing|promotion|promotional)\b/i.test(subject)) {
-    return 'promotional subject'
+  // Only "unsubscribe" in the subject alone is a reliable standalone signal
+  // (it almost never appears in genuine correspondence). Other keywords like
+  // "newsletter" or "marketing" are too common in legitimate business emails.
+  if (/\bunsubscribe\b/i.test(subject)) {
+    return 'unsubscribe subject'
   }
 
   // Body too short to be useful
