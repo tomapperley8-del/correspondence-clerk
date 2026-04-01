@@ -33,7 +33,7 @@ export async function POST(_request: NextRequest): Promise<NextResponse> {
     )
   }
 
-  const toAddress = `${token}@in.correspondenceclerk.com`
+  const toAddress = `${token}@correspondenceclerk.com`
 
   try {
     const res = await fetch('https://api.postmarkapp.com/email', {

@@ -13,7 +13,7 @@ export default function EmailForwardingOnboardingPage() {
   useEffect(() => {
     getInboundEmailToken().then((result) => {
       if (result.data?.token) {
-        setInboundAddress(`${result.data.token}@in.correspondenceclerk.com`)
+        setInboundAddress(`${result.data.token}@correspondenceclerk.com`)
       }
     })
   }, [])
