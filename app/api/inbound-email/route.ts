@@ -491,13 +491,13 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   }
 
   // 7. Detect direction
-  let direction = detectDirection(payload, token)
-
-  // Override: if detected as 'received' but From is in the user's own email addresses,
-  // treat as 'sent' (handles auto-forwarded sent emails)
-  if (direction === 'received' && fromSelf) {
-    direction = 'sent'
-  }
+  // detectDirection checks if the token appears in mail.to/cc:
+  //   - Forwarded received email: Outlook sets To = token address → 'received'
+  //   - BCCed sent email: To shows real recipient, token only in session.recipient → 'sent'
+  // Do NOT override based on fromSelf here — forwarded received emails also come
+  // "from" the user's own address (Outlook is the forwarder), and overriding would
+  // incorrectly mark them as sent.
+  const direction = detectDirection(payload, token)
 
   log('[inbound-email] direction_detected', { direction, fromEmail })
 
