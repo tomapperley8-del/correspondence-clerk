@@ -406,13 +406,13 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({}, { status: 200 })
   }
 
-  // Log the top-level keys so we can confirm the payload shape from Forward Email
-  log('[inbound-email] payload_shape', { keys: Object.keys(raw ?? {}) })
+  // Log raw body snippet + top-level keys to diagnose Forward Email payload structure
+  log('[inbound-email] raw_body_sample', { sample: rawBody.slice(0, 300) })
 
   // Forward Email wraps the parsed email under `mail`; guard defensively
   const payload: ForwardEmailPayload = raw
   if (!payload.mail) {
-    log('[inbound-email] no_mail_field', { rawKeys: Object.keys(raw ?? {}) })
+    log('[inbound-email] no_mail_field', { rawKeys: Object.keys(raw ?? {}).join(',') })
     return NextResponse.json({}, { status: 200 })
   }
 
