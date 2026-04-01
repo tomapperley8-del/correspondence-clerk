@@ -66,21 +66,34 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const payload = item.raw_payload as Record<string, any>
-  const fromEmail: string = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
-  const fromName: string = payload.FromFull?.Name ?? payload.FromName ?? fromEmail
-  const emailDate: string = payload.Date ?? new Date().toISOString()
-  const subject: string = payload.Subject ?? ''
+
+  // Support both Forward Email payload format (payload.mail.*) and legacy Postmark format
+  const fromEmail: string = (
+    payload.mail?.from?.value?.[0]?.address ??
+    payload.FromFull?.Email ??
+    payload.From ?? ''
+  ).toLowerCase()
+  const fromName: string =
+    payload.mail?.from?.value?.[0]?.name ??
+    payload.FromFull?.Name ??
+    payload.FromName ??
+    fromEmail
+  const emailDate: string =
+    payload.mail?.date ?? payload.Date ?? new Date().toISOString()
+  const subject: string = payload.mail?.subject ?? payload.Subject ?? ''
   const itemDirection: 'received' | 'sent' = item.direction ?? 'received'
 
   // Strip quoted content from body
   const rawBody = stripQuotedContent(
-    payload.StrippedTextReply || payload.TextBody || ''
+    payload.mail?.text || payload.StrippedTextReply || payload.TextBody || ''
   )
 
   // Build the synthetic email header format the AI formatter expects
   // For sent emails, include To/Cc so the AI has full context
-  const toLine = payload.To ? `To: ${payload.To}` : ''
-  const ccLine = payload.Cc ? `Cc: ${payload.Cc}` : ''
+  const toText = payload.mail?.to?.text ?? payload.To ?? ''
+  const ccText = payload.mail?.cc?.text ?? payload.Cc ?? ''
+  const toLine = toText ? `To: ${toText}` : ''
+  const ccLine = ccText ? `Cc: ${ccText}` : ''
   const rawForAI = [
     `From: ${fromName} <${fromEmail}>`,
     ...(itemDirection === 'sent' ? [toLine, ccLine].filter(Boolean) : []),
@@ -96,7 +109,7 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
   let resolvedContactId: string | null = contactId ?? null
   if (!resolvedContactId) {
     const emailToMatch = itemDirection === 'sent'
-      ? (payload.ToFull?.[0]?.Email ?? '').toLowerCase()
+      ? (payload.mail?.to?.value?.[0]?.address ?? payload.ToFull?.[0]?.Email ?? '').toLowerCase()
       : fromEmail
     if (emailToMatch) {
       const { data: contact } = await supabase
@@ -169,7 +182,7 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
   // Learn domain mapping (skip personal domains)
   // For sent emails, learn from the recipient's domain (not the sender's own domain)
   const domainSource = itemDirection === 'sent'
-    ? (payload.ToFull?.[0]?.Email ?? '').toLowerCase()
+    ? (payload.mail?.to?.value?.[0]?.address ?? payload.ToFull?.[0]?.Email ?? '').toLowerCase()
     : fromEmail
   const domain = domainSource.split('@')[1]?.toLowerCase()
   if (domain && !isPersonalDomain(domain)) {
@@ -310,7 +323,7 @@ export async function rescueDiscardedEmail(queueItemId: string): Promise<{ error
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const payload = item.raw_payload as Record<string, any>
-  const rawBody = stripQuotedContent(payload.StrippedTextReply || payload.TextBody || '')
+  const rawBody = stripQuotedContent(payload.mail?.text || payload.StrippedTextReply || payload.TextBody || '')
   const bodyPreview = rawBody.slice(0, 500) || null
 
   const { error } = await supabase

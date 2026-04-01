@@ -303,11 +303,11 @@ export default function SettingsPage() {
                 className="flex-1 text-sm px-3 py-2 rounded bg-gray-50 border border-gray-200 select-all"
                 style={{ fontFamily: 'monospace', color: 'var(--brand-dark)' }}
               >
-                {inboundToken}@in.correspondenceclerk.com
+                {inboundToken}@correspondenceclerk.com
               </code>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`${inboundToken}@in.correspondenceclerk.com`)
+                  navigator.clipboard.writeText(`${inboundToken}@correspondenceclerk.com`)
                   toast.success('Address copied')
                 }}
                 className="px-3 py-2 text-sm font-medium rounded border border-gray-300 hover:border-gray-500 transition-colors whitespace-nowrap"

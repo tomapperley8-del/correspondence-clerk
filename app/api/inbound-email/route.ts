@@ -1,13 +1,13 @@
 /**
- * Postmark inbound email webhook
+ * Forward Email inbound webhook
  *
- * Postmark POSTs parsed email JSON to this endpoint when an email arrives at
- * {token}@in.correspondenceclerk.com
+ * Forward Email POSTs parsed email JSON to this endpoint when an email arrives at
+ * {token}@correspondenceclerk.com
  *
- * ALWAYS returns 200 — any other status causes Postmark to retry.
+ * ALWAYS returns 200 — any other status causes Forward Email to retry.
  *
  * Flow:
- *  1. Verify Postmark signature
+ *  1. Verify HMAC-SHA256 signature (X-Webhook-Signature header)
  *  2. Extract token → look up user
  *  3. Rate limit check (per org)
  *  4. Spam/junk filter
@@ -16,8 +16,8 @@
  *  7. Domain match → auto-file OR save to inbound_queue
  *
  * Direction detection:
- *  - Forwarded (received): user's token address appears in the To/Cc headers
- *  - BCCed (sent): token only appears in OriginalRecipient — To shows real recipients
+ *  - Forwarded (received): token address appears in mail.to/cc headers
+ *  - BCCed (sent): token only in session.recipient — To shows real recipients
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -29,41 +29,39 @@ import { isPersonalDomain, stripQuotedContent } from '@/lib/inbound/utils'
 
 export const maxDuration = 30
 
-type PostmarkHeader = { Name: string; Value: string }
-type PostmarkEmailAddress = { Email: string; Name: string; MailboxHash?: string }
+type EmailAddress = { address: string; name: string }
 
-type PostmarkPayload = {
-  From: string
-  FromName: string
-  FromFull: { Email: string; Name: string }
-  To: string
-  ToFull: PostmarkEmailAddress[]
-  Cc: string
-  CcFull: PostmarkEmailAddress[]
-  Bcc: string
-  BccFull: PostmarkEmailAddress[]
-  OriginalRecipient: string
-  Subject: string
-  TextBody: string
-  HtmlBody: string
-  StrippedTextReply: string
-  Date: string
-  Headers: PostmarkHeader[]
-  MessageID: string
+type ForwardEmailPayload = {
+  mail: {
+    from: { value: EmailAddress[]; text: string }
+    to: { value: EmailAddress[]; text: string }
+    cc?: { value: EmailAddress[]; text: string }
+    subject: string
+    text?: string
+    html?: string
+    date?: string
+    headers: Record<string, string | string[]>
+  }
+  session: {
+    recipient: string
+    sender: string
+    headers?: Record<string, string>
+  }
+  headers?: Record<string, string>
 }
 
 // ---------------------------------------------------------------------------
-// Signature verification
+// Signature verification (HMAC-SHA256)
 // ---------------------------------------------------------------------------
-function verifyPostmarkSignature(rawBody: string, signature: string): boolean {
-  const secret = process.env.POSTMARK_WEBHOOK_TOKEN
+function verifySignature(rawBody: string, signature: string): boolean {
+  const secret = process.env.FORWARD_EMAIL_WEBHOOK_SECRET
   if (!secret) return true // not configured → allow all (dev mode)
   if (!signature) return false
 
   const expected = crypto
     .createHmac('sha256', secret)
     .update(rawBody)
-    .digest('base64')
+    .digest('hex')
 
   try {
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))
@@ -73,17 +71,16 @@ function verifyPostmarkSignature(rawBody: string, signature: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Token extraction — checks OriginalRecipient, To, Cc, Bcc in order
+// Token extraction — checks session.recipient first (most reliable), then To/Cc
 // ---------------------------------------------------------------------------
-function extractToken(payload: PostmarkPayload): string | null {
+function extractToken(payload: ForwardEmailPayload): string | null {
   const candidates = [
-    payload.OriginalRecipient ?? '',
-    payload.To ?? '',
-    payload.Cc ?? '',
-    payload.Bcc ?? '',
+    payload.session?.recipient ?? '',
+    payload.mail.to?.text ?? '',
+    payload.mail.cc?.text ?? '',
   ]
   for (const field of candidates) {
-    const match = field.match(/([a-z0-9-]+)@in\.correspondenceclerk\.com/i)
+    const match = field.match(/([a-z0-9-]+)@correspondenceclerk\.com/i)
     if (match) return match[1].toLowerCase()
   }
   return null
@@ -91,37 +88,68 @@ function extractToken(payload: PostmarkPayload): string | null {
 
 // ---------------------------------------------------------------------------
 // Direction detection
-// BCCed (sent): token is in OriginalRecipient but NOT in To/Cc headers.
-// Forwarded (received): token appears in To or Cc headers.
+// BCCed (sent): token is in session.recipient but NOT in mail.to/cc text.
+// Forwarded (received): token appears in mail.to or mail.cc text.
 // ---------------------------------------------------------------------------
-function detectDirection(payload: PostmarkPayload, token: string): 'received' | 'sent' {
-  const pattern = new RegExp(`${token}@in\\.correspondenceclerk\\.com`, 'i')
-  const inTo = pattern.test(payload.To ?? '')
-  const inCc = pattern.test(payload.Cc ?? '')
+function detectDirection(payload: ForwardEmailPayload, token: string): 'received' | 'sent' {
+  const pattern = new RegExp(`${token}@correspondenceclerk\\.com`, 'i')
+  const inTo = pattern.test(payload.mail.to?.text ?? '')
+  const inCc = pattern.test(payload.mail.cc?.text ?? '')
   return inTo || inCc ? 'received' : 'sent'
 }
 
 // ---------------------------------------------------------------------------
 // Extract recipient emails from To + Cc, excluding our own inbound address
 // ---------------------------------------------------------------------------
-function extractRecipientEmails(payload: PostmarkPayload): string[] {
-  const all: PostmarkEmailAddress[] = [
-    ...(payload.ToFull ?? []),
-    ...(payload.CcFull ?? []),
+function extractRecipientEmails(payload: ForwardEmailPayload): string[] {
+  const all: EmailAddress[] = [
+    ...(payload.mail.to?.value ?? []),
+    ...(payload.mail.cc?.value ?? []),
   ]
   return all
-    .map(r => r.Email?.toLowerCase() ?? '')
-    .filter(e => e && !e.includes('@in.correspondenceclerk.com'))
+    .map(r => r.address?.toLowerCase() ?? '')
+    .filter(e => e && !e.includes('@correspondenceclerk.com'))
+}
+
+// ---------------------------------------------------------------------------
+// Build a flat headers map for spam filter checks.
+// Forward Email provides headers in both mail.headers and session.headers.
+// ---------------------------------------------------------------------------
+function buildHeadersMap(payload: ForwardEmailPayload): Map<string, string> {
+  const map = new Map<string, string>()
+
+  // session.headers is a flat string→string map
+  for (const [k, v] of Object.entries(payload.session?.headers ?? {})) {
+    map.set(k.toLowerCase(), v)
+  }
+
+  // mail.headers may have string or string[] values
+  for (const [k, v] of Object.entries(payload.mail.headers ?? {})) {
+    const key = k.toLowerCase()
+    if (!map.has(key)) {
+      map.set(key, Array.isArray(v) ? v[0] : v)
+    }
+  }
+
+  // Also check top-level headers if present
+  for (const [k, v] of Object.entries(payload.headers ?? {})) {
+    const key = k.toLowerCase()
+    if (!map.has(key)) {
+      map.set(key, v)
+    }
+  }
+
+  return map
 }
 
 // ---------------------------------------------------------------------------
 // Spam / junk filter
 // Returns a discard reason string if the email should be silently dropped.
 // ---------------------------------------------------------------------------
-function shouldDiscard(payload: PostmarkPayload, headers: Map<string, string>): string | null {
-  const from = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
-  const subject = (payload.Subject ?? '').toLowerCase()
-  const body = (payload.StrippedTextReply || payload.TextBody || '').replace(/\s+/g, ' ').trim()
+function shouldDiscard(payload: ForwardEmailPayload, headers: Map<string, string>): string | null {
+  const from = (payload.mail.from?.value?.[0]?.address ?? '').toLowerCase()
+  const subject = (payload.mail.subject ?? '').toLowerCase()
+  const body = (payload.mail.text ?? '').replace(/\s+/g, ' ').trim()
 
   // No-reply senders
   if (/^(no.?reply|noreply|do.?not.?reply|mailer.?daemon|postmaster|bounce)@/i.test(from)) {
@@ -143,9 +171,7 @@ function shouldDiscard(payload: PostmarkPayload, headers: Map<string, string>): 
     return 'auto-submitted'
   }
 
-  // Only "unsubscribe" in the subject alone is a reliable standalone signal
-  // (it almost never appears in genuine correspondence). Other keywords like
-  // "newsletter" or "marketing" are too common in legitimate business emails.
+  // "Unsubscribe" in subject alone is a reliable standalone signal
   if (/\bunsubscribe\b/i.test(subject)) {
     return 'unsubscribe subject'
   }
@@ -210,20 +236,21 @@ async function checkOrgRateLimit(
 // ---------------------------------------------------------------------------
 // Build raw text for AI formatter
 // ---------------------------------------------------------------------------
-function buildRawForAI(payload: PostmarkPayload, strippedBody: string, direction: 'received' | 'sent'): string {
-  const fromName = payload.FromFull?.Name ?? payload.FromName ?? ''
-  const fromEmail = payload.FromFull?.Email ?? payload.From ?? ''
+function buildRawForAI(payload: ForwardEmailPayload, strippedBody: string, direction: 'received' | 'sent'): string {
+  const fromName = payload.mail.from?.value?.[0]?.name ?? ''
+  const fromEmail = payload.mail.from?.value?.[0]?.address ?? ''
+  const date = payload.mail.date ?? new Date().toISOString()
+  const subject = payload.mail.subject ?? ''
 
   if (direction === 'sent') {
-    // For sent emails, show recipients in the header block
-    const toLine = payload.To ? `To: ${payload.To}` : ''
-    const ccLine = payload.Cc ? `Cc: ${payload.Cc}` : ''
+    const toLine = payload.mail.to?.text ? `To: ${payload.mail.to.text}` : ''
+    const ccLine = payload.mail.cc?.text ? `Cc: ${payload.mail.cc.text}` : ''
     return [
       `From: ${fromName} <${fromEmail}>`,
       toLine,
       ccLine,
-      `Date: ${payload.Date}`,
-      `Subject: ${payload.Subject ?? ''}`,
+      `Date: ${date}`,
+      `Subject: ${subject}`,
       '',
       strippedBody,
     ].filter(Boolean).join('\n')
@@ -231,8 +258,8 @@ function buildRawForAI(payload: PostmarkPayload, strippedBody: string, direction
 
   return [
     `From: ${fromName} <${fromEmail}>`,
-    `Date: ${payload.Date}`,
-    `Subject: ${payload.Subject ?? ''}`,
+    `Date: ${date}`,
+    `Subject: ${subject}`,
     '',
     strippedBody,
   ].join('\n')
@@ -313,7 +340,6 @@ async function matchBusinessFromRecipients(
     const domain = email.split('@')[1] ?? ''
     if (!domain || isPersonalDomain(domain)) continue
 
-    // Check domain_mappings first (fastest)
     const { data: mapping } = await supabase
       .from('domain_mappings')
       .select('business_id')
@@ -322,7 +348,6 @@ async function matchBusinessFromRecipients(
       .maybeSingle()
 
     if (mapping?.business_id) {
-      // Find matching contact by exact email
       const { data: contact } = await supabase
         .from('contacts')
         .select('id')
@@ -342,9 +367,7 @@ async function matchBusinessFromRecipients(
 }
 
 // ---------------------------------------------------------------------------
-// Structured logger — all events share the [inbound-email] prefix for easy
-// grepping in Vercel logs. Each entry includes a timestamp so individual
-// hops are traceable without relying on log-line ordering.
+// Structured logger
 // ---------------------------------------------------------------------------
 function log(event: string, data: Record<string, unknown> = {}) {
   console.log(JSON.stringify({ t: new Date().toISOString(), event, ...data }))
@@ -357,14 +380,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const rawBody = await request.text()
 
   // 1. Verify signature
-  const sig = request.headers.get('x-postmark-signature') ?? ''
-  if (!verifyPostmarkSignature(rawBody, sig)) {
+  const sig = request.headers.get('x-webhook-signature') ?? ''
+  if (!verifySignature(rawBody, sig)) {
     log('[inbound-email] sig_mismatch')
     return NextResponse.json({}, { status: 200 })
   }
 
   // 2. Parse payload
-  let payload: PostmarkPayload
+  let payload: ForwardEmailPayload
   try {
     payload = JSON.parse(rawBody)
   } catch {
@@ -375,9 +398,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // 3. Extract token and look up user
   const token = extractToken(payload)
   log('[inbound-email] received', {
-    from: payload.FromFull?.Email ?? payload.From ?? '',
-    subject: payload.Subject ?? '',
-    originalRecipient: payload.OriginalRecipient ?? '',
+    from: payload.mail.from?.value?.[0]?.address ?? '',
+    subject: payload.mail.subject ?? '',
+    sessionRecipient: payload.session?.recipient ?? '',
     token: token ?? '(none)',
   })
 
@@ -413,20 +436,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({}, { status: 200 })
   }
 
-  // 5. Parse headers into map
-  const headers = new Map<string, string>(
-    (payload.Headers ?? []).map((h: PostmarkHeader) => [h.Name.toLowerCase(), h.Value])
-  )
+  // 5. Build headers map
+  const headers = buildHeadersMap(payload)
 
   // 6. Spam filter (applies to both directions)
-  const discardReason = shouldDiscard(payload, headers)
+  const fromEmail = (payload.mail.from?.value?.[0]?.address ?? '').toLowerCase()
+  const fromName = payload.mail.from?.value?.[0]?.name ?? ''
+
+  // fromSelf bypass: own-address emails skip the spam filter entirely
+  // (handles BCC'd sent emails that would otherwise look like newsletters)
+  const ownEmails: string[] = [
+    authEmail,
+    ...(profile.own_email_addresses ?? []).map((e: string) => e.toLowerCase()),
+  ].filter(Boolean)
+  const fromSelf = ownEmails.includes(fromEmail)
+
+  const discardReason = fromSelf ? null : shouldDiscard(payload, headers)
   if (discardReason) {
-    log('[inbound-email] discarded', { reason: discardReason, from: payload.FromFull?.Email ?? payload.From ?? '' })
+    log('[inbound-email] discarded', { reason: discardReason, from: fromEmail })
     await supabase.from('inbound_queue').insert({
       org_id: orgId,
-      from_email: (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase(),
-      from_name: payload.FromFull?.Name ?? payload.FromName ?? null,
-      subject: payload.Subject ?? null,
+      from_email: fromEmail,
+      from_name: fromName || null,
+      subject: payload.mail.subject ?? null,
       body_preview: null,
       body_text: null,
       to_emails: null,
@@ -439,31 +471,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // 7. Detect direction
   let direction = detectDirection(payload, token)
-  const fromEmail = (payload.FromFull?.Email ?? payload.From ?? '').toLowerCase()
 
-  // Override: if detected as 'received' but From is in the user's own email addresses
-  // (auth email always counts, plus any extras they've registered), treat as 'sent'
-  const ownEmails: string[] = [
-    authEmail,
-    ...(profile.own_email_addresses ?? []).map((e: string) => e.toLowerCase()),
-  ].filter(Boolean)
-  if (direction === 'received' && ownEmails.includes(fromEmail)) {
+  // Override: if detected as 'received' but From is in the user's own email addresses,
+  // treat as 'sent' (handles auto-forwarded sent emails)
+  if (direction === 'received' && fromSelf) {
     direction = 'sent'
   }
 
   log('[inbound-email] direction_detected', { direction, fromEmail })
 
   // 8. Extract body and recipients
-  const strippedBody = stripQuotedContent(payload.StrippedTextReply || payload.TextBody || '')
+  const strippedBody = stripQuotedContent(payload.mail.text ?? '')
   const bodyPreview = strippedBody.slice(0, 500)
 
   // All To+Cc recipients (excluding our own inbound address)
   const toEmails: { name: string; email: string }[] = [
-    ...(payload.ToFull ?? []),
-    ...(payload.CcFull ?? []),
+    ...(payload.mail.to?.value ?? []),
+    ...(payload.mail.cc?.value ?? []),
   ]
-    .filter(r => r.Email && !r.Email.toLowerCase().includes('@in.correspondenceclerk.com'))
-    .map(r => ({ name: r.Name ?? '', email: r.Email.toLowerCase() }))
+    .filter(r => r.address && !r.address.toLowerCase().includes('@correspondenceclerk.com'))
+    .map(r => ({ name: r.name ?? '', email: r.address.toLowerCase() }))
 
   // -------------------------------------------------------------------------
   // SENT path (BCCed email)
@@ -479,8 +506,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const formatResult = await formatCorrespondence(rawForAI, false)
 
       let formattedText: string | null = null
-      let entryDate = payload.Date ?? new Date().toISOString()
-      let subject = payload.Subject || '(No subject)'
+      let entryDate = payload.mail.date ?? new Date().toISOString()
+      let subject = payload.mail.subject || '(No subject)'
       let formattingStatus = 'unformatted'
 
       if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
@@ -514,8 +541,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await supabase.from('inbound_queue').insert({
       org_id: orgId,
       from_email: fromEmail,
-      from_name: payload.FromFull?.Name ?? payload.FromName ?? null,
-      subject: payload.Subject ?? null,
+      from_name: fromName || null,
+      subject: payload.mail.subject ?? null,
       body_preview: bodyPreview || null,
       body_text: strippedBody || null,
       to_emails: toEmails.length > 0 ? toEmails : null,
@@ -528,7 +555,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // -------------------------------------------------------------------------
-  // RECEIVED path (forwarded email) — existing logic
+  // RECEIVED path (forwarded email)
   // -------------------------------------------------------------------------
   const domain = fromEmail.split('@')[1] ?? ''
   let autoFiledBusinessId: string | null = null
@@ -560,8 +587,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const formatResult = await formatCorrespondence(rawForAI, false)
 
     let formattedText: string | null = null
-    let entryDate = payload.Date ?? new Date().toISOString()
-    let subject = payload.Subject || '(No subject)'
+    let entryDate = payload.mail.date ?? new Date().toISOString()
+    let subject = payload.mail.subject || '(No subject)'
     let formattingStatus = 'unformatted'
 
     if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
@@ -595,8 +622,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   await supabase.from('inbound_queue').insert({
     org_id: orgId,
     from_email: fromEmail,
-    from_name: payload.FromFull?.Name ?? payload.FromName ?? null,
-    subject: payload.Subject ?? null,
+    from_name: fromName || null,
+    subject: payload.mail.subject ?? null,
     body_preview: bodyPreview || null,
     body_text: strippedBody || null,
     to_emails: null,
