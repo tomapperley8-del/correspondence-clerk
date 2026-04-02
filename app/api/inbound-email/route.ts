@@ -145,12 +145,6 @@ function shouldDiscard(payload: ForwardEmailPayload, headers: Map<string, string
     if (newsletterSubject) return 'mailing list header + newsletter subject'
   }
 
-  // Auto-submitted header
-  const autoSubmitted = headers.get('auto-submitted')
-  if (autoSubmitted && autoSubmitted.toLowerCase() !== 'no') {
-    return 'auto-submitted'
-  }
-
   // "Unsubscribe" in subject alone is a reliable standalone signal
   if (/\bunsubscribe\b/i.test(subject)) {
     return 'unsubscribe subject'
@@ -366,13 +360,22 @@ async function matchBusinessFromEmail(
 
 // ---------------------------------------------------------------------------
 // Match a business from a list of email addresses (used for sent/BCC path)
-// Returns { businessId, contactId } for the first recognisable domain, or null.
+// Returns { businessId, contactId } for the first match found, or null.
+// Priority: exact email match (works for any domain) → domain mapping.
 // ---------------------------------------------------------------------------
 async function matchBusinessFromRecipients(
   supabase: ReturnType<typeof createServiceRoleClient>,
   orgId: string,
   recipientEmails: string[]
 ): Promise<{ businessId: string; contactId: string | null; matchedEmail: string } | null> {
+  // 1. Exact email match against contacts.emails[] or businesses.email
+  //    Handles personal-domain contacts (gmail, hotmail, etc.)
+  for (const email of recipientEmails) {
+    const match = await matchBusinessFromEmail(supabase, orgId, email)
+    if (match) return { ...match, matchedEmail: email }
+  }
+
+  // 2. Domain mapping fallback (skips personal domains)
   for (const email of recipientEmails) {
     const domain = email.split('@')[1] ?? ''
     if (!domain || isPersonalDomain(domain)) continue
