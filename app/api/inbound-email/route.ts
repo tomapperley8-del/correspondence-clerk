@@ -557,7 +557,10 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   const domain = fromEmail.split('@')[1] ?? ''
   let autoFiledBusinessId: string | null = null
 
-  if (domain && !isPersonalDomain(domain)) {
+  // Skip domain auto-filing when the email is from the user's own address.
+  // Forwarded emails always show the forwarder's address as From — auto-filing
+  // on that domain would match everything to the user's own business.
+  if (domain && !isPersonalDomain(domain) && !fromSelf) {
     const { data: mapping } = await supabase
       .from('domain_mappings')
       .select('business_id')
