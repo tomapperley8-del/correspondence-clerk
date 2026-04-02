@@ -6,7 +6,7 @@ import { BusinessSelector } from '@/components/BusinessSelector'
 import { ContactSelector } from '@/components/ContactSelector'
 import { AddBusinessModal } from '@/components/AddBusinessModal'
 import { AddContactModal } from '@/components/AddContactModal'
-import { fileInboundEmail, discardInboundEmail, findEmailMatch } from '@/app/actions/inbound-email'
+import { fileInboundEmail, discardInboundEmail, findEmailMatch, blockSenderEmail } from '@/app/actions/inbound-email'
 import { getContactsByBusiness } from '@/app/actions/contacts'
 import { isPersonalDomain } from '@/lib/inbound/utils'
 import { toast } from '@/lib/toast'
@@ -67,6 +67,7 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
   const [loadingContacts, setLoadingContacts] = useState(false)
   const [filing, setFiling] = useState(false)
   const [discarding, setDiscarding] = useState(false)
+  const [blocking, setBlocking] = useState(false)
   const [visible, setVisible] = useState(true)
   const [showAddBusiness, setShowAddBusiness] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
@@ -164,6 +165,21 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
     if (result.error) {
       toast.error(`Failed to discard: ${result.error}`)
     } else {
+      setVisible(false)
+      router.refresh()
+    }
+  }
+
+  const handleBlock = async () => {
+    const senderEmail = isSent ? (item.to_emails?.[0]?.email ?? '') : item.from_email
+    if (!senderEmail) return
+    setBlocking(true)
+    const result = await blockSenderEmail(senderEmail)
+    setBlocking(false)
+    if (result.error) {
+      toast.error(`Failed to block: ${result.error}`)
+    } else {
+      toast.success(`${senderEmail} blocked — future emails will be discarded`)
       setVisible(false)
       router.refresh()
     }
@@ -353,6 +369,21 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
             >
               {discarding ? 'Discarding…' : 'Discard'}
             </button>
+
+            {!isSent && (
+              <button
+                onClick={handleBlock}
+                disabled={blocking}
+                className="px-4 py-2 text-sm font-medium rounded-sm transition-colors"
+                style={{
+                  color: blocking ? 'rgba(0,0,0,0.3)' : 'rgba(180,0,0,0.6)',
+                  border: '1px solid rgba(180,0,0,0.2)',
+                  cursor: blocking ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {blocking ? 'Blocking…' : 'Block sender'}
+              </button>
+            )}
           </div>
         </div>
       </div>

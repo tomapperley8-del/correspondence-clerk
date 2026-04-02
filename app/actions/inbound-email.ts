@@ -433,6 +433,40 @@ export async function findEmailMatch(email: string): Promise<{
 }
 
 /**
+ * Block a sender email address — all future emails from this address will be
+ * silently discarded at the webhook. Also discards any pending queue items from
+ * this address right now.
+ */
+export async function blockSenderEmail(email: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const normalised = email.trim().toLowerCase()
+
+  // Upsert block rule
+  const { error } = await supabase
+    .from('blocked_senders')
+    .upsert({ org_id: orgId, email: normalised }, { onConflict: 'org_id,email' })
+
+  if (error) return { error: error.message }
+
+  // Discard all pending queue items from this address
+  await supabase
+    .from('inbound_queue')
+    .update({ status: 'discarded' })
+    .eq('org_id', orgId)
+    .eq('from_email', normalised)
+    .eq('status', 'pending')
+
+  revalidatePath('/inbox')
+  return {}
+}
+
+/**
  * Get the current user's registered own email addresses
  */
 export async function getOwnEmailAddresses(): Promise<{ data: string[] | null; error?: string }> {

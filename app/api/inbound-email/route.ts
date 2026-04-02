@@ -525,6 +525,21 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // 6b. Blocked sender check
+  if (!fromSelf) {
+    const { data: blocked } = await supabase
+      .from('blocked_senders')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('email', effectiveFromEmail)
+      .maybeSingle()
+
+    if (blocked) {
+      log('[inbound-email] discarded', { reason: 'blocked sender', from: effectiveFromEmail })
+      return NextResponse.json({}, { status: 200 })
+    }
+  }
+
   const discardReason = fromSelf ? null : shouldDiscard(payload, headers)
   if (discardReason) {
     log('[inbound-email] discarded', { reason: discardReason, from: fromEmail })
