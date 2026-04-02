@@ -75,7 +75,7 @@ app/
   admin/import/page.tsx        Mastersheet import UI
 
 app/api/
-  inbound-email/route.ts       Postmark webhook → verify → match domain → AI format → auto-file or queue
+  inbound-email/route.ts       Forward Email webhook → verify → spam filter → block check → match → AI format → auto-file or queue
   import/[provider]/scan       OAuth email scan (headers only, returns scanId)
   import/[provider]/execute    Chunked import (150/req, auto-loops client-side)
   chat/route.ts                Daily Briefing AI endpoint (uses org business_description + industry)
@@ -160,8 +160,8 @@ Required in `.env.local`:
 - `NEXT_PUBLIC_APP_URL`
 
 Optional (for production email):
-- `SENDGRID_API_KEY` - SendGrid API key for sending invitation emails
-- `SENDGRID_FROM_EMAIL` - Sender email address (default: noreply@correspondenceclerk.com)
+- `RESEND_API_KEY` - Resend API key for sending emails (invitations, daily briefing)
+- `RESEND_FROM_EMAIL` - Sender email address (default: noreply@correspondenceclerk.com)
 
 Feature flags (all false by default):
 - `FEATURE_BILLING_ENABLED` - Enable Stripe billing integration
@@ -215,11 +215,15 @@ All features complete and deployed (unless noted):
 16. Configurable Membership Types (per-org settings UI)
 17. Onboarding flow (4-step: org → describe business → first business+contact → first entry)
 18. Actions page (priority list, needs-reply, gone-quiet, flagged, reminders, keyboard shortcuts)
-19. Inbound Email Forwarding + BCC Capture — **live** (Postmark configured 27/03/2026, see MEMORY.md for full setup details)
+19. Inbound Email Forwarding + BCC Capture — **live** (Forward Email $3/month, migrated from Postmark. Flat payload format — see project_forward_email_migration.md)
+20. Daily Briefing Email — **live** (Resend cron at 8am, opt-out toggle in Settings, smart cache reuse)
 
 ## Recent Changes
 
-- **Mar 27, 2026:** Inbound email + BCC capture live — Postmark configured (webhook, inbound domain `in.correspondenceclerk.com`, MX record in Vercel, env vars deployed). BCC detection uses `OriginalRecipient` field; sent emails matched from To/Cc recipients. Settings UI updated to explain both use cases. P8 complete — all border-2/blue-600 eliminated, replaced with brand tokens across 11 files. P5: Actions nav hidden until first entry. P6: describe-your-business onboarding step + dashboard completion checklist. P7: mobile Daily Briefing button + custom favicon (CC initials).
+- **Apr 02, 2026:** P31 — daily briefing email via Resend cron (8am, smart cache, opt-out toggle in settings). Replaced SendGrid with Resend across all email sending. Domain verified on Resend (eu-west-1).
+- **Apr 02, 2026:** Inbox UX pass — auto-file on definite contact match, block sender (new `blocked_senders` table), fix sent path for personal-domain contacts, remove over-aggressive auto-submitted spam rule, auto-filed section open by default with Edit links. Migrated inbound from Postmark → Forward Email ($3/month Enhanced Protection, no per-email limits).
+- **Apr 01, 2026:** Insights feature — replaced Daily Briefing chatbot with 16 structured cached AI summaries + 5 custom presets. Org profile expanded (5 AI context fields). 3 bug fixes: Buried Gold dedicated fetcher, Briefing context enriched (recent activity + quiet businesses), status field replaced with membership_type logic throughout.
+- **Mar 27, 2026:** P8 complete — all border-2/blue-600 eliminated, replaced with brand tokens across 11 files. P5: Actions nav hidden until first entry. P6: describe-your-business onboarding step + dashboard completion checklist. P7: mobile Daily Briefing button + custom favicon (CC initials). Inbound email DB migrated + inbox UI polished.
 - **Mar 26, 2026:** Security fix (org_id guard on /api/businesses). Bug fixes (call direction badge, note formatting, keyboard shortcuts). Cmd+K sessionStorage cache (5min TTL). Actions all-clear panel. Inbound email code complete + DB migrated.
 - **Mar 25, 2026:** Code audit — design token system (7 brand tokens, 200+ hex replacements). Business page refactor (2180→1200 lines, 8 sub-components). DB pagination (limit/offset, Load More, refreshCorrespondence helper). Actions priority list + direction badges + snippets.
 - **Mar 24, 2026:** Bulk email import (Gmail + Outlook OAuth, chunked execute, ReviewWizard). Unified Actions page. Daily Briefing page + ChatPanel (inline + slide-out). Landing page full rewrite. UX polish (toasts, Cmd+K, draft autosave, optimistic actions, new entries badge, jump to today).
