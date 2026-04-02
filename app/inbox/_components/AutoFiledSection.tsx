@@ -14,7 +14,7 @@ function formatDateGB(iso: string): string {
 }
 
 export default function AutoFiledSection({ items }: Props) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
 
   if (items.length === 0) return null
 
@@ -66,6 +66,13 @@ export default function AutoFiledSection({ items }: Props) {
               </Link>
               <span className="truncate flex-1">{item.subject ?? '(No subject)'}</span>
               <span className="flex-shrink-0">{formatDateGB(item.entry_date)}</span>
+              <Link
+                href={`/businesses/${item.business_id}#entry-${item.id}`}
+                className="flex-shrink-0 hover:underline"
+                style={{ color: 'var(--link-blue)' }}
+              >
+                Edit
+              </Link>
             </div>
           ))}
         </div>
