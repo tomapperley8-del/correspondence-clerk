@@ -25,7 +25,7 @@ import crypto from 'crypto'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { formatCorrespondence } from '@/lib/ai/formatter'
 import { isThreadSplitResponse } from '@/lib/ai/types'
-import { isPersonalDomain, stripQuotedContent } from '@/lib/inbound/utils'
+import { isPersonalDomain, stripQuotedContent, extractForwardedSender } from '@/lib/inbound/utils'
 
 export const maxDuration = 30
 
@@ -216,11 +216,18 @@ async function checkOrgRateLimit(
 // ---------------------------------------------------------------------------
 // Build raw text for AI formatter
 // ---------------------------------------------------------------------------
-function buildRawForAI(payload: ForwardEmailPayload, strippedBody: string, direction: 'received' | 'sent'): string {
-  const fromName = payload.from?.value?.[0]?.name ?? ''
-  const fromEmail = payload.from?.value?.[0]?.address ?? ''
+function buildRawForAI(
+  payload: ForwardEmailPayload,
+  strippedBody: string,
+  direction: 'received' | 'sent',
+  fromOverride?: { email: string; name: string }
+): string {
+  const fromName = fromOverride?.name ?? payload.from?.value?.[0]?.name ?? ''
+  const fromEmail = fromOverride?.email ?? payload.from?.value?.[0]?.address ?? ''
   const date = payload.date ?? new Date().toISOString()
-  const subject = payload.subject ?? ''
+  // Strip "FW:" prefix added by Outlook when forwarding
+  const rawSubject = payload.subject ?? ''
+  const subject = fromOverride ? rawSubject.replace(/^Fw?:\s*/i, '') : rawSubject
 
   if (direction === 'sent') {
     const toLine = payload.to?.text ? `To: ${payload.to.text}` : ''
@@ -448,6 +455,23 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   ].filter(Boolean)
   const fromSelf = ownEmails.includes(fromEmail)
 
+  // For forwarded received emails (fromSelf=true), the outer SMTP From is the Outlook
+  // forwarder's address. Extract the original sender buried in the forwarded body.
+  // Must run on payload.text (raw body) BEFORE stripQuotedContent removes the block.
+  // For BCC sent emails that are also fromSelf, extractForwardedSender returns null
+  // (no forwarding block) → effectiveFromEmail stays as fromEmail. Safe.
+  let effectiveFromEmail = fromEmail
+  let effectiveFromName = fromName
+
+  if (fromSelf) {
+    const forwardedSender = extractForwardedSender(payload.text ?? '')
+    if (forwardedSender) {
+      effectiveFromEmail = forwardedSender.email
+      effectiveFromName = forwardedSender.name
+      log('[inbound-email] forwarded_sender_extracted', { original: fromEmail, extracted: effectiveFromEmail })
+    }
+  }
+
   const discardReason = fromSelf ? null : shouldDiscard(payload, headers)
   if (discardReason) {
     log('[inbound-email] discarded', { reason: discardReason, from: fromEmail })
@@ -554,36 +578,41 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   // -------------------------------------------------------------------------
   // RECEIVED path (forwarded email)
   // -------------------------------------------------------------------------
-  const domain = fromEmail.split('@')[1] ?? ''
+  // Use effectiveFromEmail (original sender if forwarded, otherwise the outer From).
+  // Skip auto-filing only if the effective sender is still one of our own addresses
+  // (i.e. extraction failed and we fell back to the forwarder's address).
+  const effectiveDomain = effectiveFromEmail.split('@')[1] ?? ''
   let autoFiledBusinessId: string | null = null
 
-  // Skip domain auto-filing when the email is from the user's own address.
-  // Forwarded emails always show the forwarder's address as From — auto-filing
-  // on that domain would match everything to the user's own business.
-  if (domain && !isPersonalDomain(domain) && !fromSelf) {
+  if (effectiveDomain && !isPersonalDomain(effectiveDomain) && !ownEmails.includes(effectiveFromEmail)) {
     const { data: mapping } = await supabase
       .from('domain_mappings')
       .select('business_id')
       .eq('org_id', orgId)
-      .eq('domain', domain)
+      .eq('domain', effectiveDomain)
       .maybeSingle()
 
     autoFiledBusinessId = mapping?.business_id ?? null
   }
 
   if (autoFiledBusinessId) {
-    log('[inbound-email] auto_filed_received', { businessId: autoFiledBusinessId, domain })
+    log('[inbound-email] auto_filed_received', { businessId: autoFiledBusinessId, domain: effectiveDomain })
     let contactId: string | null = null
     const { data: contact } = await supabase
       .from('contacts')
       .select('id')
       .eq('business_id', autoFiledBusinessId)
-      .contains('emails', [fromEmail])
+      .contains('emails', [effectiveFromEmail])
       .limit(1)
       .maybeSingle()
     contactId = contact?.id ?? null
 
-    const rawForAI = buildRawForAI(payload, strippedBody, 'received')
+    const rawForAI = buildRawForAI(
+      payload,
+      strippedBody,
+      'received',
+      effectiveFromEmail !== fromEmail ? { email: effectiveFromEmail, name: effectiveFromName } : undefined
+    )
     const formatResult = await formatCorrespondence(rawForAI, false)
 
     let formattedText: string | null = null
@@ -610,19 +639,19 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       subject,
       entryDate,
       formattingStatus,
-      fromEmail,
+      fromEmail: effectiveFromEmail,
       direction: 'received',
     })
 
     return NextResponse.json({}, { status: 200 })
   }
 
-  log('[inbound-email] queued_received', { domain: domain || '(personal/unknown)' })
+  log('[inbound-email] queued_received', { domain: effectiveDomain || '(personal/unknown)' })
   // No domain match → add to inbound_queue for manual triage
   await supabase.from('inbound_queue').insert({
     org_id: orgId,
-    from_email: fromEmail,
-    from_name: fromName || null,
+    from_email: effectiveFromEmail,   // original sender if extracted, otherwise forwarder
+    from_name: effectiveFromName || null,
     subject: payload.subject ?? null,
     body_preview: bodyPreview || null,
     body_text: strippedBody || null,
