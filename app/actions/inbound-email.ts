@@ -67,31 +67,48 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const payload = item.raw_payload as Record<string, any>
 
-  // Support both Forward Email payload format (payload.mail.*) and legacy Postmark format
+  // Support Forward Email flat payload (payload.X) and legacy Postmark format (payload.mail.X / payload.X)
   const fromEmail: string = (
-    payload.mail?.from?.value?.[0]?.address ??
-    payload.FromFull?.Email ??
+    payload.from?.value?.[0]?.address ??        // Forward Email flat
+    payload.mail?.from?.value?.[0]?.address ??  // defensive fallback
+    payload.FromFull?.Email ??                  // Postmark legacy
     payload.From ?? ''
   ).toLowerCase()
   const fromName: string =
+    payload.from?.value?.[0]?.name ??
     payload.mail?.from?.value?.[0]?.name ??
     payload.FromFull?.Name ??
     payload.FromName ??
     fromEmail
   const emailDate: string =
-    payload.mail?.date ?? payload.Date ?? new Date().toISOString()
-  const subject: string = payload.mail?.subject ?? payload.Subject ?? ''
+    payload.date ??
+    payload.mail?.date ??
+    payload.Date ??
+    new Date().toISOString()
+  const subject: string =
+    payload.subject ??
+    payload.mail?.subject ??
+    payload.Subject ?? ''
   const itemDirection: 'received' | 'sent' = item.direction ?? 'received'
 
   // Strip quoted content from body
   const rawBody = stripQuotedContent(
-    payload.mail?.text || payload.StrippedTextReply || payload.TextBody || ''
+    payload.text ||              // Forward Email flat
+    payload.mail?.text ||        // defensive fallback
+    payload.StrippedTextReply || // Postmark legacy
+    payload.TextBody || ''
   )
 
   // Build the synthetic email header format the AI formatter expects
   // For sent emails, include To/Cc so the AI has full context
-  const toText = payload.mail?.to?.text ?? payload.To ?? ''
-  const ccText = payload.mail?.cc?.text ?? payload.Cc ?? ''
+  const toText =
+    payload.to?.text ??
+    payload.mail?.to?.text ??
+    payload.To ?? ''
+  const ccText =
+    payload.cc?.text ??
+    payload.mail?.cc?.text ??
+    payload.Cc ?? ''
   const toLine = toText ? `To: ${toText}` : ''
   const ccLine = ccText ? `Cc: ${ccText}` : ''
   const rawForAI = [
@@ -109,8 +126,12 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
   let resolvedContactId: string | null = contactId ?? null
   if (!resolvedContactId) {
     const emailToMatch = itemDirection === 'sent'
-      ? (payload.mail?.to?.value?.[0]?.address ?? payload.ToFull?.[0]?.Email ?? '').toLowerCase()
-      : fromEmail
+      ? (
+          payload.to?.value?.[0]?.address ??
+          payload.mail?.to?.value?.[0]?.address ??
+          payload.ToFull?.[0]?.Email ?? ''
+        ).toLowerCase()
+      : (item.from_email as string)  // use stored value — resolved to original sender by webhook
     if (emailToMatch) {
       const { data: contact } = await supabase
         .from('contacts')
@@ -181,9 +202,15 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
 
   // Learn domain mapping (skip personal domains)
   // For sent emails, learn from the recipient's domain (not the sender's own domain)
+  // For received emails, use item.from_email — already resolved to the original sender
+  // by the webhook (not the Outlook forwarder's address)
   const domainSource = itemDirection === 'sent'
-    ? (payload.mail?.to?.value?.[0]?.address ?? payload.ToFull?.[0]?.Email ?? '').toLowerCase()
-    : fromEmail
+    ? (
+        payload.to?.value?.[0]?.address ??
+        payload.mail?.to?.value?.[0]?.address ??
+        payload.ToFull?.[0]?.Email ?? ''
+      ).toLowerCase()
+    : (item.from_email as string)
   const domain = domainSource.split('@')[1]?.toLowerCase()
   if (domain && !isPersonalDomain(domain)) {
     await supabase
@@ -323,7 +350,12 @@ export async function rescueDiscardedEmail(queueItemId: string): Promise<{ error
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const payload = item.raw_payload as Record<string, any>
-  const rawBody = stripQuotedContent(payload.mail?.text || payload.StrippedTextReply || payload.TextBody || '')
+  const rawBody = stripQuotedContent(
+    payload.text ||              // Forward Email flat
+    payload.mail?.text ||        // defensive fallback
+    payload.StrippedTextReply || // Postmark legacy
+    payload.TextBody || ''
+  )
   const bodyPreview = rawBody.slice(0, 500) || null
 
   const { error } = await supabase
