@@ -74,15 +74,28 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
 
   const isSent = item.direction === 'sent'
 
-  // On mount: look up the sender/recipient email against contacts + businesses
-  // and auto-select if found. Handles personal-domain senders (e.g. hotmail contacts)
-  // and businesses with a matching email field — not just domain_mappings.
+  // On mount: look up the sender/recipient email against contacts + businesses.
+  // - Definite contact match (contactId non-null) → auto-file immediately, no user action needed.
+  // - Business-only match → pre-select the business so user just hits "File it".
   useEffect(() => {
     const emailToLookup = isSent ? (item.to_emails?.[0]?.email ?? '') : item.from_email
     if (!emailToLookup) return
 
-    findEmailMatch(emailToLookup).then(match => {
-      if (match) handleSelectBusiness(match.businessId)
+    findEmailMatch(emailToLookup).then(async match => {
+      if (!match) return
+
+      if (match.contactId) {
+        const result = await fileInboundEmail(item.id, match.businessId, match.contactId)
+        if (!result.error) {
+          toast.success(`Auto-filed to ${match.businessName}`)
+          setVisible(false)
+          router.refresh()
+          return
+        }
+        // Filing failed — fall through to pre-select so user can retry manually
+      }
+
+      handleSelectBusiness(match.businessId)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -286,14 +299,14 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
             </div>
           )}
 
-          {!selectedBusinessId && suggestedBusinessName && (
+          {!selectedBusinessId && (
             <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(0,0,0,0.45)' }}>
-              <span>Suggested:</span>
+              {suggestedBusinessName && <span>Suggested:</span>}
               <button
                 onClick={() => setShowAddBusiness(true)}
                 style={{ color: 'var(--link-blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
               >
-                + Add {suggestedBusinessName} as new business
+                {suggestedBusinessName ? `+ Add ${suggestedBusinessName} as new business` : '+ Add new business'}
               </button>
             </div>
           )}
