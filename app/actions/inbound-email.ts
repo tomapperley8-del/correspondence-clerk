@@ -371,6 +371,68 @@ export async function rescueDiscardedEmail(queueItemId: string): Promise<{ error
 }
 
 /**
+ * Look up an email address against contacts.emails[] and businesses.email.
+ * Returns the best match for pre-selecting business + contact in InboxCard.
+ * Checks contacts first (more specific), then business email field.
+ */
+export async function findEmailMatch(email: string): Promise<{
+  businessId: string
+  businessName: string
+  contactId: string | null
+  contactName: string | null
+} | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return null
+
+  const normalised = email.toLowerCase().trim()
+  if (!normalised) return null
+
+  // 1. Check contacts.emails[] — gives us business + contact in one shot.
+  // Fetch matching contacts (any org), then cross-check business org_id.
+  const { data: contactMatches } = await supabase
+    .from('contacts')
+    .select('id, name, business_id')
+    .contains('emails', [normalised])
+    .eq('is_active', true)
+    .limit(5)
+
+  if (contactMatches && contactMatches.length > 0) {
+    const businessIds = [...new Set(contactMatches.map(c => c.business_id))]
+    const { data: biz } = await supabase
+      .from('businesses')
+      .select('id, name')
+      .in('id', businessIds)
+      .eq('organization_id', orgId)
+      .limit(1)
+      .maybeSingle()
+
+    if (biz) {
+      const contact = contactMatches.find(c => c.business_id === biz.id)!
+      return { businessId: biz.id, businessName: biz.name, contactId: contact.id, contactName: contact.name }
+    }
+  }
+
+  // 2. Check businesses.email field
+  const { data: bizMatch } = await supabase
+    .from('businesses')
+    .select('id, name')
+    .eq('email', normalised)
+    .eq('organization_id', orgId)
+    .limit(1)
+    .maybeSingle()
+
+  if (bizMatch) {
+    return { businessId: bizMatch.id, businessName: bizMatch.name, contactId: null, contactName: null }
+  }
+
+  return null
+}
+
+/**
  * Get the current user's registered own email addresses
  */
 export async function getOwnEmailAddresses(): Promise<{ data: string[] | null; error?: string }> {
