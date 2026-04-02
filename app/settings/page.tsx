@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getUserProfile, updateDisplayName, deleteAccount, type UserProfile } from '@/app/actions/user-profile'
+import { Checkbox } from '@/components/ui/checkbox'
+import { getUserProfile, updateDisplayName, updateBriefingEmailOptOut, deleteAccount, type UserProfile } from '@/app/actions/user-profile'
 import { getInboundEmailToken, getOwnEmailAddresses, updateOwnEmailAddresses } from '@/app/actions/inbound-email'
 import { getUnformattedCount, formatAllUnformatted } from '@/app/actions/ai-formatter'
 import { toast } from '@/lib/toast'
@@ -32,6 +33,8 @@ export default function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [ownEmailAddresses, setOwnEmailAddresses] = useState<string[]>([])
   const [newEmailInput, setNewEmailInput] = useState('')
+  const [briefingOptOut, setBriefingOptOut] = useState(false)
+  const [isSavingBriefing, setIsSavingBriefing] = useState(false)
 
   useEffect(() => {
     loadProfile()
@@ -60,6 +63,7 @@ export default function SettingsPage() {
 
     setProfile(result.data)
     setDisplayName(result.data.display_name || '')
+    setBriefingOptOut(result.data.briefing_email_opt_out ?? false)
 
     // Load inbound email token
     const tokenResult = await getInboundEmailToken()
@@ -109,6 +113,18 @@ export default function SettingsPage() {
     }
 
     setIsSaving(false)
+  }
+
+  async function handleBriefingToggle(checked: boolean) {
+    setIsSavingBriefing(true)
+    const newOptOut = !checked
+    setBriefingOptOut(newOptOut)
+    const result = await updateBriefingEmailOptOut(newOptOut)
+    if (result.error) {
+      toast.error('Could not update briefing preference')
+      setBriefingOptOut(!newOptOut) // revert
+    }
+    setIsSavingBriefing(false)
   }
 
   async function handleSendTest() {
@@ -283,6 +299,27 @@ export default function SettingsPage() {
             {isSaving ? 'Saving...' : 'Save Display Name'}
           </Button>
         </form>
+      </div>
+
+      {/* Daily Briefing Email */}
+      <div className="bg-white border border-gray-200 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-4 text-gray-900">Daily Briefing Email</h2>
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="briefingOptIn"
+            checked={!briefingOptOut}
+            onCheckedChange={(c) => handleBriefingToggle(c as boolean)}
+            disabled={isSavingBriefing}
+          />
+          <div>
+            <Label htmlFor="briefingOptIn" className="font-semibold cursor-pointer">
+              Send me a morning briefing email
+            </Label>
+            <p className="text-sm text-gray-500 mt-1">
+              Delivered at 8am each day with your priorities from Insights.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Email Forwarding */}

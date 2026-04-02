@@ -7,6 +7,7 @@ export type UserProfile = {
   id: string
   organization_id: string
   display_name: string | null
+  briefing_email_opt_out: boolean
   created_at: string
   updated_at: string
 }
@@ -139,6 +140,38 @@ export async function deleteAccount() {
   }
 
   return { data: true }
+}
+
+/**
+ * Update the current user's briefing email opt-out preference
+ */
+export async function updateBriefingEmailOptOut(
+  optOut: boolean
+): Promise<{ data?: UserProfile; error?: string }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated' }
+  }
+
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ briefing_email_opt_out: optOut })
+    .eq('id', user.id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating briefing opt-out:', error)
+    return { error: error.message }
+  }
+
+  return { data: data as UserProfile }
 }
 
 /**
