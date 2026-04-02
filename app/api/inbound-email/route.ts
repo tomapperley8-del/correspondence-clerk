@@ -315,6 +315,56 @@ async function insertCorrespondenceServiceRole(
 }
 
 // ---------------------------------------------------------------------------
+// Match a business by exact email address — checks contacts.emails[] then
+// businesses.email. Used for received path before domain matching, so even
+// personal-domain senders (e.g. a contact's hotmail) auto-file correctly.
+// ---------------------------------------------------------------------------
+async function matchBusinessFromEmail(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  orgId: string,
+  email: string
+): Promise<{ businessId: string; contactId: string | null } | null> {
+  if (!email) return null
+
+  // 1. Check contacts.emails[]
+  const { data: contactMatches } = await supabase
+    .from('contacts')
+    .select('id, business_id')
+    .contains('emails', [email])
+    .eq('is_active', true)
+    .limit(5)
+
+  if (contactMatches && contactMatches.length > 0) {
+    const businessIds = [...new Set(contactMatches.map(c => c.business_id))]
+    const { data: biz } = await supabase
+      .from('businesses')
+      .select('id')
+      .in('id', businessIds)
+      .eq('organization_id', orgId)
+      .limit(1)
+      .maybeSingle()
+
+    if (biz) {
+      const contact = contactMatches.find(c => c.business_id === biz.id)!
+      return { businessId: biz.id, contactId: contact.id }
+    }
+  }
+
+  // 2. Check businesses.email field
+  const { data: biz } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('email', email)
+    .eq('organization_id', orgId)
+    .limit(1)
+    .maybeSingle()
+
+  if (biz) return { businessId: biz.id, contactId: null }
+
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Match a business from a list of email addresses (used for sent/BCC path)
 // Returns { businessId, contactId } for the first recognisable domain, or null.
 // ---------------------------------------------------------------------------
@@ -583,29 +633,45 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   // (i.e. extraction failed and we fell back to the forwarder's address).
   const effectiveDomain = effectiveFromEmail.split('@')[1] ?? ''
   let autoFiledBusinessId: string | null = null
+  let autoFiledContactId: string | null = null
 
-  if (effectiveDomain && !isPersonalDomain(effectiveDomain) && !ownEmails.includes(effectiveFromEmail)) {
-    const { data: mapping } = await supabase
-      .from('domain_mappings')
-      .select('business_id')
-      .eq('org_id', orgId)
-      .eq('domain', effectiveDomain)
-      .maybeSingle()
+  if (!ownEmails.includes(effectiveFromEmail)) {
+    // 1. Try exact email match (contacts.emails[] or businesses.email)
+    //    Works for any sender, including personal-domain contacts.
+    const emailMatch = await matchBusinessFromEmail(supabase, orgId, effectiveFromEmail)
+    if (emailMatch) {
+      autoFiledBusinessId = emailMatch.businessId
+      autoFiledContactId = emailMatch.contactId
+      log('[inbound-email] auto_filed_received_email_match', { businessId: autoFiledBusinessId, email: effectiveFromEmail })
+    }
 
-    autoFiledBusinessId = mapping?.business_id ?? null
+    // 2. Fall back to domain mapping (for business senders not yet in contacts)
+    if (!autoFiledBusinessId && effectiveDomain && !isPersonalDomain(effectiveDomain)) {
+      const { data: mapping } = await supabase
+        .from('domain_mappings')
+        .select('business_id')
+        .eq('org_id', orgId)
+        .eq('domain', effectiveDomain)
+        .maybeSingle()
+
+      autoFiledBusinessId = mapping?.business_id ?? null
+    }
   }
 
   if (autoFiledBusinessId) {
     log('[inbound-email] auto_filed_received', { businessId: autoFiledBusinessId, domain: effectiveDomain })
-    let contactId: string | null = null
-    const { data: contact } = await supabase
-      .from('contacts')
-      .select('id')
-      .eq('business_id', autoFiledBusinessId)
-      .contains('emails', [effectiveFromEmail])
-      .limit(1)
-      .maybeSingle()
-    contactId = contact?.id ?? null
+    // Use email-match contact if available; otherwise try to match by email within the business
+    let contactId: string | null = autoFiledContactId
+    if (!contactId) {
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('business_id', autoFiledBusinessId)
+        .contains('emails', [effectiveFromEmail])
+        .limit(1)
+        .maybeSingle()
+      contactId = contact?.id ?? null
+    }
 
     const rawForAI = buildRawForAI(
       payload,

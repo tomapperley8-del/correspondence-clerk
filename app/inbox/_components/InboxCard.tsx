@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { BusinessSelector } from '@/components/BusinessSelector'
 import { ContactSelector } from '@/components/ContactSelector'
 import { AddBusinessModal } from '@/components/AddBusinessModal'
 import { AddContactModal } from '@/components/AddContactModal'
-import { fileInboundEmail, discardInboundEmail } from '@/app/actions/inbound-email'
+import { fileInboundEmail, discardInboundEmail, findEmailMatch } from '@/app/actions/inbound-email'
 import { getContactsByBusiness } from '@/app/actions/contacts'
+import { isPersonalDomain } from '@/lib/inbound/utils'
 import { toast } from '@/lib/toast'
 import type { InboundQueueItem } from '@/app/actions/inbound-email'
 import type { Business } from '@/app/actions/businesses'
@@ -71,10 +72,28 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
   const [showAddContact, setShowAddContact] = useState(false)
   const [showFullBody, setShowFullBody] = useState(false)
 
+  const isSent = item.direction === 'sent'
+
+  // On mount: look up the sender/recipient email against contacts + businesses
+  // and auto-select if found. Handles personal-domain senders (e.g. hotmail contacts)
+  // and businesses with a matching email field — not just domain_mappings.
+  useEffect(() => {
+    const emailToLookup = isSent ? (item.to_emails?.[0]?.email ?? '') : item.from_email
+    if (!emailToLookup) return
+
+    findEmailMatch(emailToLookup).then(match => {
+      if (match) handleSelectBusiness(match.businessId)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   if (!visible) return null
 
-  const isSent = item.direction === 'sent'
-  const suggestedBusinessName = !isSent ? domainToBusinessName(item.from_email) : ''
+  // Suppress "Add X as new business" suggestion for personal email domains (gmail, hotmail, etc.)
+  const fromDomain = item.from_email.split('@')[1] ?? ''
+  const suggestedBusinessName = !isSent && !isPersonalDomain(fromDomain)
+    ? domainToBusinessName(item.from_email)
+    : ''
 
   const handleSelectBusiness = async (businessId: string) => {
     setSelectedBusinessId(businessId || null)
