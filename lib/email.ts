@@ -1,20 +1,14 @@
 /**
  * Email service for sending invitations
- * Uses SendGrid in production, console.log in development
+ * Uses Resend in production, console.log in development
  */
 
-import sgMail from '@sendgrid/mail'
+import { Resend } from 'resend'
 
-const sendGridApiKey = process.env.SENDGRID_API_KEY
-if (sendGridApiKey) {
-  sgMail.setApiKey(sendGridApiKey)
-}
+const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@correspondenceclerk.com'
 
 /**
  * Send an invitation email to a user
- * @param email - The email address to send to
- * @param token - The invitation token
- * @param organizationName - Name of the organization inviting the user
  */
 export async function sendInvitationEmail(
   email: string,
@@ -24,35 +18,22 @@ export async function sendInvitationEmail(
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const invitationUrl = `${baseUrl}/invite/accept?token=${token}`
 
-  // Development mode or missing API key: console log only
-  if (!sendGridApiKey || process.env.NODE_ENV === 'development') {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
     console.log('='.repeat(80))
     console.log('INVITATION EMAIL (dev mode)')
     console.log('='.repeat(80))
     console.log(`To: ${email}`)
-    console.log(`From: ${organizationName}`)
     console.log(`Subject: You've been invited to join ${organizationName} on Correspondence Clerk`)
-    console.log('')
-    console.log('Message:')
-    console.log(`You've been invited to join ${organizationName} on Correspondence Clerk.`)
-    console.log('')
-    console.log('Click the link below to accept the invitation and create your account:')
-    console.log(invitationUrl)
-    console.log('')
-    console.log('This invitation will expire in 7 days.')
+    console.log(`Link: ${invitationUrl}`)
     console.log('='.repeat(80))
     return
   }
 
-  // Production: send via SendGrid
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@correspondenceclerk.com'
-
-  await sgMail.send({
+  const resend = new Resend(apiKey)
+  await resend.emails.send({
+    from: `Correspondence Clerk <${fromEmail}>`,
     to: email,
-    from: {
-      email: fromEmail,
-      name: 'Correspondence Clerk',
-    },
     subject: `You've been invited to join ${organizationName}`,
     text: `You've been invited to join ${organizationName} on Correspondence Clerk.\n\nClick the link below to accept the invitation and create your account:\n${invitationUrl}\n\nThis invitation will expire in 7 days.`,
     html: `

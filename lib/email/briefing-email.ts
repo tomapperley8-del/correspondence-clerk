@@ -1,6 +1,6 @@
-import sgMail from '@sendgrid/mail'
+import { Resend } from 'resend'
 
-const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@correspondenceclerk.com'
+const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@correspondenceclerk.com'
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 export function countUrgentItems(content: string): number {
@@ -76,12 +76,18 @@ export async function sendBriefingEmail(
 
   const text = `Morning ${name},\n\n${content}\n\nOpen Insights: ${insightsUrl}\n\nManage preferences: ${baseUrl}/settings`
 
-  const apiKey = process.env.SENDGRID_API_KEY
+  const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
     console.log('[briefing-email] Dev mode — would send to:', email, '\nSubject:', subject, '\n\n', text)
     return
   }
 
-  sgMail.setApiKey(apiKey)
-  await sgMail.send({ to: email, from: { email: fromEmail, name: 'Correspondence Clerk' }, subject, html, text })
+  const resend = new Resend(apiKey)
+  await resend.emails.send({
+    from: `Correspondence Clerk <${fromEmail}>`,
+    to: email,
+    subject,
+    html,
+    text,
+  })
 }
