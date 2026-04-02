@@ -4,7 +4,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import sgMail from '@sendgrid/mail'
+import { Resend } from 'resend'
 
 let supabaseClient: SupabaseClient | null = null
 
@@ -18,10 +18,7 @@ function getSupabase(): SupabaseClient {
   return supabaseClient
 }
 
-const sendGridApiKey = process.env.SENDGRID_API_KEY
-if (sendGridApiKey) {
-  sgMail.setApiKey(sendGridApiKey)
-}
+const resendApiKey = process.env.RESEND_API_KEY
 
 interface QualifiedUser {
   user_id: string
@@ -118,7 +115,7 @@ export async function sendReviewRequest(
   user: QualifiedUser,
   platform: 'g2' | 'capterra' | 'trustpilot' | 'google' = 'g2'
 ): Promise<boolean> {
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@correspondenceclerk.com'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@correspondenceclerk.com'
 
   // Review URLs (update these with actual URLs when available)
   const reviewUrls: Record<string, string> = {
@@ -145,7 +142,7 @@ Tom
 P.S. If there's anything we could do better, reply to this email instead - I read every response.`
 
   // Development mode
-  if (!sendGridApiKey || process.env.NODE_ENV === 'development') {
+  if (!resendApiKey || process.env.NODE_ENV === 'development') {
     console.log('='.repeat(80))
     console.log('REVIEW REQUEST EMAIL (dev mode)')
     console.log('='.repeat(80))
@@ -161,12 +158,10 @@ P.S. If there's anything we could do better, reply to this email instead - I rea
   }
 
   try {
-    await sgMail.send({
+    const resend = new Resend(resendApiKey)
+    await resend.emails.send({
+      from: `Tom at Correspondence Clerk <${fromEmail}>`,
       to: user.email,
-      from: {
-        email: fromEmail,
-        name: 'Tom at Correspondence Clerk',
-      },
       subject,
       text: body,
     })
@@ -174,7 +169,7 @@ P.S. If there's anything we could do better, reply to this email instead - I rea
     await recordReviewRequest(user, platform)
     return true
   } catch (error) {
-    console.error('SendGrid error:', error)
+    console.error('Resend error:', error)
     return false
   }
 }

@@ -4,7 +4,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import sgMail from '@sendgrid/mail'
+import { Resend } from 'resend'
 
 let supabaseClient: SupabaseClient | null = null
 
@@ -18,11 +18,7 @@ function getSupabase(): SupabaseClient {
   return supabaseClient
 }
 
-// Initialize SendGrid
-const sendGridApiKey = process.env.SENDGRID_API_KEY
-if (sendGridApiKey) {
-  sgMail.setApiKey(sendGridApiKey)
-}
+const resendApiKey = process.env.RESEND_API_KEY
 
 interface Enrollment {
   id: string
@@ -242,17 +238,17 @@ async function sendNextEmail(enrollment: Enrollment): Promise<boolean> {
 }
 
 /**
- * Send an email via SendGrid
+ * Send an email via Resend
  */
 async function sendEmail(
   to: string,
   subject: string,
   body: string
 ): Promise<boolean> {
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@correspondenceclerk.com'
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@correspondenceclerk.com'
 
   // Development mode
-  if (!sendGridApiKey || process.env.NODE_ENV === 'development') {
+  if (!resendApiKey || process.env.NODE_ENV === 'development') {
     console.log('='.repeat(80))
     console.log('SEQUENCE EMAIL (dev mode)')
     console.log('='.repeat(80))
@@ -265,19 +261,17 @@ async function sendEmail(
   }
 
   try {
-    await sgMail.send({
+    const resend = new Resend(resendApiKey)
+    await resend.emails.send({
+      from: `Correspondence Clerk <${fromEmail}>`,
       to,
-      from: {
-        email: fromEmail,
-        name: 'Correspondence Clerk',
-      },
       subject,
       text: body,
       html: body.replace(/\n/g, '<br>'),
     })
     return true
   } catch (error) {
-    console.error('SendGrid error:', error)
+    console.error('Resend error:', error)
     return false
   }
 }
