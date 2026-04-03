@@ -164,8 +164,8 @@ export async function createContact(formData: {
 
   // Use new emails/phones arrays if provided, otherwise fall back to single values
   const emailsArray = formData.emails && formData.emails.length > 0
-    ? formData.emails.map(e => e.trim()).filter(e => e)
-    : formData.email ? [formData.email.trim()] : []
+    ? formData.emails.map(e => e.trim().toLowerCase()).filter(e => e)
+    : formData.email ? [formData.email.trim().toLowerCase()] : []
 
   const phonesArray = formData.phones && formData.phones.length > 0
     ? formData.phones.map(p => p.trim()).filter(p => p)
@@ -242,16 +242,16 @@ export async function updateContact(
 
   // Handle emails array
   if (formData.emails !== undefined) {
-    const emailsArray = formData.emails.map(e => e.trim()).filter(e => e)
+    const emailsArray = formData.emails.map(e => e.trim().toLowerCase()).filter(e => e)
     updateData.emails = JSON.stringify(emailsArray)
     // Update backward compatibility fields
     updateData.email = emailsArray[0] || null
-    updateData.normalized_email = emailsArray[0] ? emailsArray[0].toLowerCase().trim() : null
+    updateData.normalized_email = emailsArray[0] || null
   } else if (formData.email !== undefined) {
     // Fallback for old single email interface
-    updateData.email = formData.email?.trim() || null
+    updateData.email = formData.email?.trim().toLowerCase() || null
     updateData.normalized_email = formData.email ? formData.email.toLowerCase().trim() : null
-    updateData.emails = formData.email ? JSON.stringify([formData.email.trim()]) : JSON.stringify([])
+    updateData.emails = formData.email ? JSON.stringify([formData.email.trim().toLowerCase()]) : JSON.stringify([])
   }
 
   // Handle phones array
