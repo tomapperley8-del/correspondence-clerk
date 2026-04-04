@@ -81,7 +81,8 @@ app/api/
   chat/route.ts                Daily Briefing AI endpoint (uses org business_description + industry)
 
 lib/ai/
-  formatter.ts             Anthropic structured outputs
+  models.ts                Centralised AI model constants (PREMIUM=Sonnet, ECONOMY=Haiku)
+  formatter.ts             Anthropic structured outputs + regex fast-path
   thread-detection.ts      Email chain heuristics
   types.ts                 AI response contracts
 
@@ -200,7 +201,7 @@ All features complete and deployed (unless noted):
 1. Foundation + Auth (Supabase email/password, user roles member/admin)
 2. Dashboard + Business pages (search, filters, sort, flexible date range, DB pagination)
 3. New Entry flow (forced filing, date required/time optional, direction for emails, draft autosave)
-4. AI Formatter (Anthropic structured outputs, 8K token budget, graceful fallback)
+4. AI Formatter (Anthropic structured outputs, Haiku model, 4K token budget, regex fast-path for short emails, graceful fallback)
 5. Manual Editing (correction layer, preserves originals, "Corrected" badge)
 6. Full-text Search (business name prioritization, tsvector + GIN)
 7. Mastersheet Import (CSV, duplicate merging, idempotent)
@@ -217,9 +218,11 @@ All features complete and deployed (unless noted):
 18. Actions page (priority list, needs-reply, gone-quiet, flagged, reminders, keyboard shortcuts)
 19. Inbound Email Forwarding + BCC Capture — **live** (Forward Email $3/month, migrated from Postmark. Flat payload format — see project_forward_email_migration.md)
 20. Daily Briefing Email — **live** (Resend cron at 8am, opt-out toggle in Settings, smart cache reuse)
+21. API Cost Reduction — **live** (model tiering: Haiku for 9/11 call sites, Sonnet for Chat + strategic Insights only. Centralised in `lib/ai/models.ts`. Cache TTLs doubled. Prompt caching added to 6 endpoints. Regex bypass for trivial emails.)
 
 ## Recent Changes
 
+- **Apr 04, 2026:** API cost reduction — 9/11 AI call sites switched to claude-haiku-4-5 (3x cheaper). Centralised model constants in `lib/ai/models.ts`. Token budgets reduced (formatter 8K→4K, chat 16K→8K). Insight cache TTLs doubled (org 48h, biz 12h). Prompt caching added to 6 endpoints. Regex bypass skips AI for short structured emails.
 - **Apr 02, 2026:** P31 — daily briefing email via Resend cron (8am, smart cache, opt-out toggle in settings). Replaced SendGrid with Resend across all email sending. Domain verified on Resend (eu-west-1).
 - **Apr 02, 2026:** Inbox UX pass — auto-file on definite contact match, block sender (new `blocked_senders` table), fix sent path for personal-domain contacts, remove over-aggressive auto-submitted spam rule, auto-filed section open by default with Edit links. Migrated inbound from Postmark → Forward Email ($3/month Enhanced Protection, no per-email limits).
 - **Apr 01, 2026:** Insights feature — replaced Daily Briefing chatbot with 16 structured cached AI summaries + 5 custom presets. Org profile expanded (5 AI context fields). 3 bug fixes: Buried Gold dedicated fetcher, Briefing context enriched (recent activity + quiet businesses), status field replaced with membership_type logic throughout.
