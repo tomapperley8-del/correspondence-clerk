@@ -3,10 +3,10 @@
  * Creates SEO-optimized blog posts automatically
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { getAnthropicClient } from '@/lib/ai/client'
 
-const anthropic = new Anthropic()
+const anthropic = getAnthropicClient()
 
 let supabaseClient: SupabaseClient | null = null
 

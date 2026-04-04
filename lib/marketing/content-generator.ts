@@ -3,9 +3,9 @@
  * Creates daily posts for LinkedIn and Twitter
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { getAnthropicClient } from '@/lib/ai/client'
 
-const anthropic = new Anthropic()
+const anthropic = getAnthropicClient()
 
 export type ContentType = 'tip' | 'feature' | 'story' | 'news' | 'promo'
 export type Platform = 'linkedin' | 'twitter' | 'both'

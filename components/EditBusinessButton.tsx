@@ -7,6 +7,7 @@ import { updateBusiness, deleteBusiness, type Business } from '@/app/actions/bus
 import { useRouter } from 'next/navigation'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
+import { appEvents } from '@/lib/events'
 
 export function EditBusinessButton({ business }: { business: Business }) {
   const router = useRouter()
@@ -57,7 +58,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       setError(result.error || 'An error occurred')
       setSaving(false)
     } else {
-      window.dispatchEvent(new CustomEvent('businesses:changed'))
+      appEvents.businessesChanged()
       setSaving(false)
       setIsOpen(false)
       window.location.reload()
@@ -89,7 +90,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       setError(result.error || 'An error occurred')
       setSaving(false)
     } else {
-      window.dispatchEvent(new CustomEvent('businesses:changed'))
+      appEvents.businessesChanged()
       router.push('/dashboard')
     }
   }

@@ -1,18 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-
-// Helper to parse JSONB fields from Supabase
-function parseContactArrayFields(contact: Record<string, unknown>) {
-  return {
-    ...contact,
-    emails: typeof contact.emails === 'string'
-      ? JSON.parse(contact.emails)
-      : (Array.isArray(contact.emails) ? contact.emails : []),
-    phones: typeof contact.phones === 'string'
-      ? JSON.parse(contact.phones)
-      : (Array.isArray(contact.phones) ? contact.phones : []),
-  }
-}
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { parseContactArrayFields } from '@/lib/validation'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -22,6 +11,11 @@ export async function GET(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) {
+    return NextResponse.json({ error: 'No organisation found' }, { status: 403 })
   }
 
   const { searchParams } = new URL(request.url)
@@ -34,6 +28,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from('contacts')
       .select('*')
+      .eq('organization_id', orgId)
       .or(`email.ilike.${normalizedEmail},normalized_email.ilike.${normalizedEmail}`)
       .limit(1)
 
@@ -58,6 +53,7 @@ export async function GET(request: Request) {
     .from('contacts')
     .select('*')
     .eq('business_id', businessId)
+    .eq('organization_id', orgId)
     .order('name')
 
   if (error) {

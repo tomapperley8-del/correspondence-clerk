@@ -3,13 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCorrespondenceByBusiness } from './correspondence'
 import { getBusinessById } from './businesses'
-import Anthropic from '@anthropic-ai/sdk'
-
-let _anthropic: Anthropic | null = null
-function getAnthropicClient(): Anthropic {
-  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  return _anthropic
-}
+import { getAnthropicClient } from '@/lib/ai/client'
 
 export type AISummaryResult = {
   summary: string

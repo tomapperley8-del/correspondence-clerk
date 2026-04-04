@@ -6,6 +6,7 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { getAnthropicClient } from '@/lib/ai/client'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { generateChatSystemPrompt } from '@/lib/ai/chat-system-prompt'
@@ -77,11 +78,14 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+        const anthropic = getAnthropicClient()
         let currentMessages = [...messages]
         let continueLoop = true
+        let iterations = 0
+        const MAX_TOOL_ITERATIONS = 10
 
-        while (continueLoop) {
+        while (continueLoop && iterations < MAX_TOOL_ITERATIONS) {
+          iterations++
           // Stream from Anthropic
           // Cache system prompt and tools — they're identical every call
           const tools = CHAT_TOOL_DEFINITIONS.map((tool, i, arr) =>
@@ -223,6 +227,11 @@ export async function POST(request: NextRequest) {
             // No more tool calls, we're done
             continueLoop = false
           }
+        }
+
+        if (iterations >= MAX_TOOL_ITERATIONS) {
+          console.error('Chat API: max tool iterations reached', { iterations })
+          send('error', { message: 'Too many tool iterations — stopping.' })
         }
 
         send('done', {})

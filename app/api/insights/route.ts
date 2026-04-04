@@ -10,8 +10,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { getAnthropicClient } from '@/lib/ai/client'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { buildInsightPrompt, INSIGHT_METADATA, type InsightType } from '@/lib/ai/insight-prompts'
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
   // Call Claude — no tools, no streaming, one-shot
   let content: string
   try {
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const anthropic = getAnthropicClient()
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 2048,

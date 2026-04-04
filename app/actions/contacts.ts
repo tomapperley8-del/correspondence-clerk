@@ -4,16 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { z } from 'zod'
+import { parseJsonArray } from '@/lib/validation'
 
 const emailSchema = z.string().email('Invalid email format').max(254)
-
-function parseJsonArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value as string[]
-  if (typeof value === 'string') {
-    try { return JSON.parse(value) } catch { return [] }
-  }
-  return []
-}
 
 const createContactSchema = z.object({
   business_id: z.string().uuid('Invalid business ID'),
@@ -76,11 +69,15 @@ export async function getContactsByBusiness(businessId: string) {
     return { error: 'Unauthorized' }
   }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
     .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, is_active, organization_id, created_at, updated_at')
     .eq('business_id', businessId)
+    .eq('organization_id', orgId)
     .order('is_active', { ascending: false }) // active contacts first
     .order('name', { ascending: true })
 
@@ -109,11 +106,15 @@ export async function getContactById(id: string) {
     return { error: 'Unauthorized' }
   }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
     .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, is_active, organization_id, created_at, updated_at')
     .eq('id', id)
+    .eq('organization_id', orgId)
     .single()
 
   if (error) {
@@ -318,11 +319,15 @@ export async function deleteContact(id: string) {
     return { error: 'Unauthorized' }
   }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   // Get contact details before deleting
   const { data: contact } = await supabase
     .from('contacts')
     .select('business_id, name')
     .eq('id', id)
+    .eq('organization_id', orgId)
     .single()
 
   if (!contact) {
@@ -347,7 +352,7 @@ export async function deleteContact(id: string) {
     }
   }
 
-  const { error } = await supabase.from('contacts').delete().eq('id', id)
+  const { error } = await supabase.from('contacts').delete().eq('id', id).eq('organization_id', orgId)
 
   if (error) {
     return { error: error.message }

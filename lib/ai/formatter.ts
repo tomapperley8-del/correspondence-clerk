@@ -4,8 +4,8 @@
  * Per CLAUDE.md: PRESERVE USER WORDING EXACTLY, STRICT JSON ONLY, FAIL GRACEFULLY
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { stripQuotedContent } from '@/lib/inbound/utils';
+import { getAnthropicClient } from './client';
 import {
   AIFormatterResponse,
   FormattingResult,
@@ -183,20 +183,6 @@ const THREAD_SPLIT_SCHEMA = {
   required: ['entries', 'warnings'],
   additionalProperties: false
 } as const;
-
-/**
- * Initialize Anthropic client
- * API key must be in ANTHROPIC_API_KEY environment variable
- */
-const getAnthropicClient = () => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      'ANTHROPIC_API_KEY not found in environment variables. AI formatting will not work.'
-    );
-  }
-  return new Anthropic({ apiKey });
-};
 
 /**
  * System prompt that enforces Hard Rules

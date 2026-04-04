@@ -2,12 +2,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getCorrespondenceByBusiness } from './correspondence'
-import Anthropic from '@anthropic-ai/sdk'
+import { getAnthropicClient } from '@/lib/ai/client'
 import { ActionDetectionResponse, ActionSuggestion } from '@/lib/ai/types'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 const SYSTEM_PROMPT = `You are an action detection assistant for a correspondence management system.
 
@@ -120,6 +117,21 @@ export async function detectActions(businessId: string) {
     return { error: 'Unauthorized' }
   }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  // Verify business belongs to user's org before proceeding
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+    .single()
+
+  if (!business) {
+    return { error: 'Business not found' }
+  }
+
   try {
     // Get last 12 months of correspondence
     const twelveMonthsAgo = new Date()
@@ -169,7 +181,7 @@ ${truncatedText}`
       .join('\n\n---\n\n')
 
     // Call Anthropic API for action detection
-    const message = await anthropic.messages.create({
+    const message = await getAnthropicClient().messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 500,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],

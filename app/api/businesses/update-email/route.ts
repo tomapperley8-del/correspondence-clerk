@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { isValidEmail } from '@/lib/validation'
 
 /**
  * API route to update a business's email address
@@ -30,8 +32,13 @@ export async function PATCH(request: Request) {
       )
     }
 
+    const orgId = await getCurrentUserOrganizationId()
+    if (!orgId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 })
+    }
+
     // Basic email validation
-    if (!email.includes('@') || !email.includes('.')) {
+    if (!isValidEmail(email)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
         { status: 400 }
@@ -43,6 +50,7 @@ export async function PATCH(request: Request) {
       .from('businesses')
       .update({ email })
       .eq('id', businessId)
+      .eq('organization_id', orgId)
       .select()
       .single()
 

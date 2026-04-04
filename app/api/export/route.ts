@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireOrgIdForRoute } from '@/lib/auth-helpers'
 
 function toCSV(rows: Record<string, unknown>[]): string {
   if (!rows.length) return ''
@@ -17,22 +18,11 @@ function toCSV(rows: Record<string, unknown>[]): string {
 }
 
 export async function GET(req: NextRequest) {
+  const authResult = await requireOrgIdForRoute()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('organization_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.organization_id) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 403 })
-  }
-
-  const orgId = profile.organization_id
   const type = req.nextUrl.searchParams.get('type')
 
   let csv = ''
