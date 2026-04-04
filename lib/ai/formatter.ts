@@ -6,6 +6,7 @@
 
 import { stripQuotedContent } from '@/lib/inbound/utils';
 import { getAnthropicClient } from './client';
+import { AI_MODELS } from './models';
 import {
   AIFormatterResponse,
   FormattingResult,
@@ -335,6 +336,71 @@ function validateSingleEntry(entry: unknown, context: string): void {
 }
 
 /**
+ * Attempt deterministic extraction for short, well-structured emails.
+ * Returns a SingleEntryResponse if the email matches known patterns, or null if AI is needed.
+ * This avoids an API call for trivially simple emails (confirmations, short replies, etc.)
+ */
+function tryDeterministicExtraction(text: string): SingleEntryResponse | null {
+  const stripped = text.trim()
+  // Only attempt for short emails (under 600 chars after stripping)
+  if (stripped.length > 600) return null
+
+  // Must have recognisable email headers
+  const fromMatch = stripped.match(/^From:\s*(.+?)(?:\s*<(.+?)>)?$/im)
+  const subjectMatch = stripped.match(/^Subject:\s*(.+)$/im)
+  const dateMatch = stripped.match(/^(?:Sent|Date):\s*(.+)$/im)
+  const toMatch = stripped.match(/^To:\s*(.+?)(?:\s*<(.+?)>)?$/im)
+
+  // Need at least subject + date to proceed
+  if (!subjectMatch || !dateMatch) return null
+
+  // Parse the date
+  let parsedDate: string | null = null
+  const dateStr = dateMatch[1].trim()
+  // Try DD/MM/YYYY, DD-MM-YYYY, DD Month YYYY patterns
+  const britishDate = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/)
+  if (britishDate) {
+    const [, day, month, year] = britishDate
+    const d = new Date(Number(year), Number(month) - 1, Number(day))
+    if (!isNaN(d.getTime())) parsedDate = d.toISOString().split('T')[0]
+  }
+  if (!parsedDate) {
+    // Try native Date parsing as fallback
+    const d = new Date(dateStr)
+    if (!isNaN(d.getTime())) parsedDate = d.toISOString().split('T')[0]
+  }
+  if (!parsedDate) return null // Can't parse date — let AI handle it
+
+  // Extract body: everything after the last header line
+  const headerPattern = /^(?:From|To|Cc|Bcc|Sent|Date|Subject):\s*.+$/gim
+  let lastHeaderEnd = 0
+  let match
+  while ((match = headerPattern.exec(stripped)) !== null) {
+    lastHeaderEnd = match.index + match[0].length
+  }
+  const body = stripped.substring(lastHeaderEnd).trim()
+  if (!body || body.length < 5) return null // No meaningful body
+
+  // Determine direction from From: header
+  const senderName = fromMatch?.[1]?.trim().replace(/["']/g, '') || null
+  const recipientName = toMatch?.[1]?.trim().replace(/["']/g, '') || null
+
+  return {
+    subject_guess: subjectMatch[1].trim().substring(0, 90),
+    entry_type_guess: 'Email',
+    entry_date_guess: parsedDate,
+    direction_guess: null, // Let the caller determine direction from context
+    formatted_text: body,
+    warnings: [],
+    extracted_names: {
+      sender: senderName,
+      recipient: recipientName,
+    },
+    action_suggestion: null,
+  }
+}
+
+/**
  * Format correspondence using Anthropic API
  *
  * @param rawText - The raw text to format
@@ -358,6 +424,18 @@ export async function formatCorrespondence(
       const onWroteMatch = rawText.match(/(on\s+.{5,80}\s+wrote:[\s\S]*)/i)
       const fromSentToMatch = rawText.match(/(^from:\s.+\nsent:\s.+\nto:.+(?:\nsubject:.+)?[\s\S]*)/im)
       quotedContent = (originalMsgMatch?.[0] || onWroteMatch?.[0] || fromSentToMatch?.[0])?.trim()
+    }
+
+    // Fast path: skip AI for short, well-structured emails with clear headers
+    if (!shouldSplit) {
+      const deterministicResult = tryDeterministicExtraction(cleanText)
+      if (deterministicResult) {
+        return {
+          success: true,
+          data: deterministicResult,
+          quotedContent,
+        }
+      }
     }
 
     const userPrompt = shouldSplit
@@ -473,8 +551,8 @@ Text to process:
 ${cleanText}`;
 
     const response = await client.beta.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 8192,
+      model: AI_MODELS.ECONOMY,
+      max_tokens: 4096,
       temperature: 0,
       betas: ['structured-outputs-2025-11-13'],
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],

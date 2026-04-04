@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCorrespondenceByBusiness } from './correspondence'
 import { getBusinessById } from './businesses'
 import { getAnthropicClient } from '@/lib/ai/client'
+import { AI_MODELS } from '@/lib/ai/models'
 
 export type AISummaryResult = {
   summary: string
@@ -81,8 +82,9 @@ export async function generateCorrespondenceSummary(businessId: string) {
 
       // Generate contract-only summary
       const contractOnlyMessage = await getAnthropicClient().messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: AI_MODELS.ECONOMY,
         max_tokens: 150,
+        system: [{ type: 'text' as const, text: 'You summarise correspondence between a business and a client. Be concise and factual. Return ONLY summary text, no JSON, no formatting.', cache_control: { type: 'ephemeral' as const } }],
         messages: [
           {
             role: 'user',
@@ -131,22 +133,14 @@ Provide a brief 1-2 sentence summary noting the lack of recent correspondence an
 
     // Single combined AI call
     const message = await getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: AI_MODELS.ECONOMY,
       max_tokens: 300,
+      system: [{ type: 'text' as const, text: 'You summarise correspondence between a business and a client. Provide a VERY BRIEF summary in 1-2 sentences. Focus on: main topics, current relationship status, pending actions. Be aware of dates and use temporal language. Do not invent information. If contract info is provided, only mention it if notable (expiring soon, recently started, or expired). Return ONLY the summary text, no JSON, no formatting, no preamble.', cache_control: { type: 'ephemeral' as const } }],
       messages: [
         {
           role: 'user',
-          content: `You are summarizing correspondence between a business and a client. Today's date is ${todayFormatted}.
-
-Based on the following correspondence entries from the last 12 months, provide a VERY BRIEF summary in 1-2 sentences. Focus on: the main topics discussed, current relationship status, and any pending actions or important developments.
+          content: `Today's date is ${todayFormatted}.
 ${contractContext}
-
-IMPORTANT:
-- Be aware of dates and use temporal language to indicate recency
-- Do not invent information. Only summarize what is actually in the correspondence
-- Be concise and factual
-- If contract info is provided, only mention it if it is notable (expiring soon, recently started, or expired). Do not repeat contract dates verbatim.
-- Return ONLY the summary text, no JSON, no formatting, no preamble
 
 Correspondence:
 ${correspondenceText}`,

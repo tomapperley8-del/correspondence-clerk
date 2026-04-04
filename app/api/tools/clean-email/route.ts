@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAnthropicClient } from '@/lib/ai/client'
+import { AI_MODELS } from '@/lib/ai/models'
 
 const anthropic = getAnthropicClient()
 
@@ -42,18 +43,12 @@ export async function POST(request: NextRequest) {
 }
 
 async function cleanEmail(text: string): Promise<string> {
-  const prompt = `Clean up this email text. Remove unnecessary quoted text, fix formatting, but preserve the actual content and wording exactly. Don't summarise or rewrite - just clean up the formatting.
-
-EMAIL TEXT:
-${text}
-
-Return ONLY the cleaned email text, nothing else.`
-
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
-      max_tokens: 4000,
-      messages: [{ role: 'user', content: prompt }],
+      model: AI_MODELS.ECONOMY,
+      max_tokens: 2000,
+      system: [{ type: 'text' as const, text: 'Clean up email text. Remove unnecessary quoted text, fix formatting, but preserve actual content and wording exactly. Return ONLY the cleaned email text.', cache_control: { type: 'ephemeral' as const } }],
+      messages: [{ role: 'user', content: text }],
     })
 
     const content = message.content[0]

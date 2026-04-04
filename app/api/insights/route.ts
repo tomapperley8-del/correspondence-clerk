@@ -15,6 +15,7 @@ import { getAnthropicClient } from '@/lib/ai/client'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { buildInsightPrompt, INSIGHT_METADATA, type InsightType } from '@/lib/ai/insight-prompts'
+import { AI_MODELS } from '@/lib/ai/models'
 
 export const maxDuration = 60
 
@@ -122,12 +123,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to build insight prompt' }, { status: 500 })
   }
 
+  // Formulaic insights use Haiku (cheaper); strategic insights use Sonnet
+  const HAIKU_INSIGHTS = new Set(['data_health_org', 'data_health_biz', 'reconnect_list', 'prospecting_targets'])
+  const insightModel = HAIKU_INSIGHTS.has(dispatchType) ? AI_MODELS.ECONOMY : AI_MODELS.PREMIUM
+
   // Call Claude — no tools, no streaming, one-shot
   let content: string
   try {
     const anthropic = getAnthropicClient()
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: insightModel,
       max_tokens: 2048,
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: userPrompt }],

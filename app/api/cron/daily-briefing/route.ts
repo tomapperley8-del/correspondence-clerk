@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getAnthropicClient } from '@/lib/ai/client'
+import { AI_MODELS } from '@/lib/ai/models'
 import { buildInsightPrompt } from '@/lib/ai/insight-prompts'
 import { sendBriefingEmail } from '@/lib/email/briefing-email'
 
@@ -103,7 +104,7 @@ async function generateAndCache(
 
   const anthropic = getAnthropicClient()
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: AI_MODELS.ECONOMY,
     max_tokens: 2048,
     system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userPrompt }],

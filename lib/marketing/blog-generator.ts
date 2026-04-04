@@ -5,6 +5,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { getAnthropicClient } from '@/lib/ai/client'
+import { AI_MODELS } from '@/lib/ai/models'
 
 const anthropic = getAnthropicClient()
 
@@ -120,8 +121,9 @@ Return ONLY valid JSON:
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
-      max_tokens: 4000,
+      model: AI_MODELS.ECONOMY,
+      max_tokens: 3000,
+      system: [{ type: 'text' as const, text: 'You write blog posts for Correspondence Clerk, a UK SaaS tool for organising correspondence. British English, professional but accessible, 800-1200 words, practical advice, mention Correspondence Clerk naturally. Return ONLY valid JSON with title, excerpt, content (markdown), metaDescription, metaKeywords fields.', cache_control: { type: 'ephemeral' as const } }],
       messages: [{ role: 'user', content: prompt }],
     })
 
