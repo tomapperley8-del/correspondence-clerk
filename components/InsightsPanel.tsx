@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useInsights } from '@/components/InsightsContext'
 import { MarkdownLite } from '@/components/ChatMessage'
 import { getInsightCacheStatus, getUserPresets, type CacheStatus, type UserAIPreset } from '@/app/actions/insights'
 import { INSIGHT_METADATA, type InsightType } from '@/lib/ai/insight-prompts'
+import { toast } from '@/lib/toast'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -47,6 +49,49 @@ function formatAge(generatedAt: string | null): string {
 }
 
 // ---------------------------------------------------------------------------
+// Insight action buttons (per insight type)
+// ---------------------------------------------------------------------------
+
+type InsightAction = { label: string; onClick: () => void }
+
+function getInsightActions(
+  insightType: string,
+  businessId: string | null,
+  router: ReturnType<typeof useRouter>,
+  content: string | null,
+): InsightAction[] {
+  switch (insightType) {
+    case 'call_prep':
+      if (!businessId) return []
+      return [{ label: 'Log this call', onClick: () => router.push(`/new-entry?businessId=${businessId}&type=Call`) }]
+    case 'what_did_we_agree':
+      if (!businessId) return []
+      return [{ label: 'View actions', onClick: () => router.push(`/businesses/${businessId}?tab=actions`) }]
+    case 'briefing':
+      return [{ label: 'View Actions', onClick: () => router.push('/actions') }]
+    case 'reconnect_list':
+      return [{ label: 'View Reconnect List', onClick: () => router.push('/actions') }]
+    case 'outreach_draft':
+      if (!content) return []
+      return [{
+        label: 'Copy to clipboard',
+        onClick: () => {
+          navigator.clipboard.writeText(content)
+            .then(() => toast.success('Copied to clipboard'))
+            .catch(() => toast.error('Failed to copy'))
+        },
+      }]
+    case 'relationship_radar':
+      return [{ label: 'View Actions', onClick: () => router.push('/actions') }]
+    case 'next_best_action':
+      if (!businessId) return []
+      return [{ label: 'Log this action', onClick: () => router.push(`/new-entry?businessId=${businessId}&type=Note`) }]
+    default:
+      return []
+  }
+}
+
+// ---------------------------------------------------------------------------
 // InsightCard
 // ---------------------------------------------------------------------------
 
@@ -67,6 +112,7 @@ function InsightCard({
   onExpand: (type: string | null) => void
   isExpanded: boolean
 }) {
+  const router = useRouter()
   const dispatchType = insightType.startsWith('custom_') ? 'custom' : insightType as InsightType
   const meta = INSIGHT_METADATA[dispatchType]
   const label = meta?.label ?? 'Custom'
@@ -111,6 +157,23 @@ function InsightCard({
         <div className="text-sm text-gray-700 leading-relaxed">
           <MarkdownLite text={cardState.content!} />
         </div>
+        {(() => {
+          const actions = getInsightActions(insightType, businessId, router, cardState.content)
+          if (actions.length === 0) return null
+          return (
+            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
+              {actions.map((action) => (
+                <button
+                  key={action.label}
+                  onClick={action.onClick}
+                  className="text-xs font-medium px-3 py-1.5 rounded-sm bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )
+        })()}
       </div>
     )
   }

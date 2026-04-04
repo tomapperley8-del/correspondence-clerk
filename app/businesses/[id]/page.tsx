@@ -28,6 +28,7 @@ import { getActiveMembershipTypes, type MembershipType } from '@/app/actions/mem
 import { formatDateGB, formatDateTimeGB } from '@/lib/utils'
 import { toast } from '@/lib/toast'
 import { ContactsList } from './_components/ContactsList'
+import { BusinessFiles } from './_components/BusinessFiles'
 import { DuplicatesWarningBanner } from './_components/DuplicatesWarningBanner'
 import { CorrespondenceFilterBar } from './_components/CorrespondenceFilterBar'
 import { AllEntriesView } from './_components/AllEntriesView'
@@ -1015,6 +1016,9 @@ export default function BusinessDetailPage({
         business={business}
         onDeleteContact={handleDeleteContact}
       />
+
+      {/* Files Section */}
+      <BusinessFiles businessId={business.id} />
 
       {/* Letter File / Correspondence */}
       <div className="bg-white border-2 border-gray-300 p-6">

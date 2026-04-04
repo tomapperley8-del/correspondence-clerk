@@ -56,12 +56,14 @@ app/actions/
   export-google-docs.ts  Google Docs export via MCP
   organizations.ts       Org CRUD + getNavData() (single round-trip for nav state)
   membership-types.ts    Per-org configurable membership types
+  files.ts               File upload/delete/download (Supabase Storage)
 
 app/
   dashboard/page.tsx           Business list with search/filters/sort + onboarding checklist
   businesses/[id]/page.tsx     Letter file view + sub-components in _components/
   businesses/[id]/_components/ CorrespondenceEntry, EditForm, ThreadAssignPanel, AllEntriesView,
-                               ThreadsView, FilterBar, DuplicatesWarningBanner, ContactsList
+                               ThreadsView, FilterBar, DuplicatesWarningBanner, ContactsList,
+                               BusinessFiles
   new-entry/page.tsx           Add correspondence (forced filing + AI formatting + draft autosave)
   actions/page.tsx             Priority list + needs-reply + gone-quiet + flagged + reminders
   daily-briefing/page.tsx      Full-page inline ChatPanel
@@ -131,6 +133,7 @@ lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feat
 - **import_queue** - id, org_id, correspondence_id, status (pending/processing/done/failed), retry_count, error
 - **inbound_queue** - queued inbound emails awaiting manual filing
 - **domain_mappings** - org_id, domain, business_id (auto-filing for inbound email, populated on first manual file)
+- **business_files** - id, business_id, organization_id, user_id, filename, storage_path, file_type, file_size_bytes, parsed_text, created_at (Supabase Storage bucket: `business-files`)
 - **marketing_prospects/leads/referrals/email_sequence_*/social_content/blog_posts/review_requests/chatbot_conversations** - marketing engine tables
 - **RLS:** All authenticated users can read/write (v1 policy)
 
@@ -219,10 +222,12 @@ All features complete and deployed (unless noted):
 19. Inbound Email Forwarding + BCC Capture — **live** (Forward Email $3/month, migrated from Postmark. Flat payload format — see project_forward_email_migration.md)
 20. Daily Briefing Email — **live** (Resend cron at 8am, opt-out toggle in Settings, smart cache reuse)
 21. API Cost Reduction — **live** (model tiering: Haiku for 9/11 call sites, Sonnet for Chat + strategic Insights only. Centralised in `lib/ai/models.ts`. Cache TTLs doubled. Prompt caching added to 6 endpoints. Regex bypass for trivial emails.)
+22. Actionable Insight Buttons — contextual actions on 7 insight types (Log call, Copy draft, View Actions, etc.)
+23. File Uploads — **pending deploy** (Supabase Storage, 10MB/file, 50MB/org cap, upload/download/delete on business pages. Needs migration + bucket creation.)
 
 ## Recent Changes
 
-- **Apr 04, 2026:** API cost reduction — 9/11 AI call sites switched to claude-haiku-4-5 (3x cheaper). Centralised model constants in `lib/ai/models.ts`. Token budgets reduced (formatter 8K→4K, chat 16K→8K). Insight cache TTLs doubled (org 48h, biz 12h). Prompt caching added to 6 endpoints. Regex bypass skips AI for short structured emails.
+- **Apr 04, 2026:** P32 + P19 — Actionable insight buttons (7 types with contextual actions in expanded cards). File uploads on business pages (Supabase Storage, server actions, BusinessFiles component, 50MB org cap). API cost reduction — 9/11 AI call sites switched to claude-haiku-4-5 (3x cheaper). Centralised model constants in `lib/ai/models.ts`. Token budgets reduced (formatter 8K→4K, chat 16K→8K). Insight cache TTLs doubled (org 48h, biz 12h). Prompt caching added to 6 endpoints. Regex bypass skips AI for short structured emails.
 - **Apr 02, 2026:** P31 — daily briefing email via Resend cron (8am, smart cache, opt-out toggle in settings). Replaced SendGrid with Resend across all email sending. Domain verified on Resend (eu-west-1).
 - **Apr 02, 2026:** Inbox UX pass — auto-file on definite contact match, block sender (new `blocked_senders` table), fix sent path for personal-domain contacts, remove over-aggressive auto-submitted spam rule, auto-filed section open by default with Edit links. Migrated inbound from Postmark → Forward Email ($3/month Enhanced Protection, no per-email limits).
 - **Apr 01, 2026:** Insights feature — replaced Daily Briefing chatbot with 16 structured cached AI summaries + 5 custom presets. Org profile expanded (5 AI context fields). 3 bug fixes: Buried Gold dedicated fetcher, Briefing context enriched (recent activity + quiet businesses), status field replaced with membership_type logic throughout.
