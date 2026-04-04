@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { getAnthropicClient } from '@/lib/ai/client'
+import { AI_MODELS } from '@/lib/ai/models'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { generateChatSystemPrompt } from '@/lib/ai/chat-system-prompt'
@@ -95,8 +96,8 @@ export async function POST(request: NextRequest) {
           )
 
           const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-5-20250929',
-            max_tokens: 16384,
+            model: AI_MODELS.PREMIUM,
+            max_tokens: 8192,
             system: [
               {
                 type: 'text',

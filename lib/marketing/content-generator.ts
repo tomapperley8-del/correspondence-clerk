@@ -4,6 +4,7 @@
  */
 
 import { getAnthropicClient } from '@/lib/ai/client'
+import { AI_MODELS } from '@/lib/ai/models'
 
 const anthropic = getAnthropicClient()
 
@@ -122,8 +123,9 @@ Return ONLY valid JSON:
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
+      model: AI_MODELS.ECONOMY,
       max_tokens: 500,
+      system: [{ type: 'text' as const, text: 'You are a social media manager for Correspondence Clerk, a UK SaaS tool that helps businesses organise their correspondence. Brand voice: professional but approachable, British English, no hype, practical and helpful, understated humour welcome. Return ONLY valid JSON with "content" and "hashtags" (max 4) fields.', cache_control: { type: 'ephemeral' as const } }],
       messages: [{ role: 'user', content: prompt }],
     })
 

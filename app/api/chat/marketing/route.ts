@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { getAnthropicClient } from '@/lib/ai/client'
+import { AI_MODELS } from '@/lib/ai/models'
 
 let supabaseClient: SupabaseClient | null = null
 
@@ -86,9 +87,9 @@ export async function POST(request: NextRequest) {
 
     // Generate response
     const response = await getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-5-20250514',
+      model: AI_MODELS.ECONOMY,
       max_tokens: 500,
-      system: SYSTEM_PROMPT,
+      system: [{ type: 'text' as const, text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' as const } }],
       messages,
     })
 

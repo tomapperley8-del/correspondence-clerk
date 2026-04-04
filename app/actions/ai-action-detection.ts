@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCorrespondenceByBusiness } from './correspondence'
 import { getAnthropicClient } from '@/lib/ai/client'
+import { AI_MODELS } from '@/lib/ai/models'
 import { ActionDetectionResponse, ActionSuggestion } from '@/lib/ai/types'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
@@ -182,7 +183,7 @@ ${truncatedText}`
 
     // Call Anthropic API for action detection
     const message = await getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: AI_MODELS.ECONOMY,
       max_tokens: 500,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       messages: [
