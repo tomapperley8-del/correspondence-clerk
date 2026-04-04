@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 /**
  * API route to update business contract details
@@ -28,6 +29,11 @@ export async function PATCH(request: Request) {
         { error: 'businessId is required' },
         { status: 400 }
       )
+    }
+
+    const orgId = await getCurrentUserOrganizationId()
+    if (!orgId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 })
     }
 
     // Validate dates if provided
@@ -66,6 +72,7 @@ export async function PATCH(request: Request) {
       .from('businesses')
       .update(updateData)
       .eq('id', businessId)
+      .eq('organization_id', orgId)
       .select()
       .single()
 

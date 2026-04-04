@@ -53,7 +53,10 @@ type ForwardEmailPayload = {
 // ---------------------------------------------------------------------------
 function verifySignature(rawBody: string, signature: string): boolean {
   const secret = process.env.FORWARD_EMAIL_WEBHOOK_SECRET
-  if (!secret) return true // not configured → allow all (dev mode)
+  if (!secret) {
+    console.warn('FORWARD_EMAIL_WEBHOOK_SECRET not set — skipping signature verification (dev mode)')
+    return true
+  }
   if (!signature) return false
 
   const expected = crypto

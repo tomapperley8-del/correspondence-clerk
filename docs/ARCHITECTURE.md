@@ -10,7 +10,7 @@ The Correspondence Clerk is a full-stack web application built on:
 - **Auth:** Supabase Auth
 - **AI:** Anthropic Claude (claude-sonnet-4-5) — formatting, action detection, thread splitting, Daily Briefing chat, inbound email processing
 - **Export:** Google Docs via MCP
-- **Email:** Postmark (inbound webhook + forwarding)
+- **Email:** Forward Email (inbound webhook, $3/month Enhanced Protection) + Resend (outbound)
 - **Deployment:** Vercel (auto-deploy from main)
 
 ## Database Schema
@@ -477,7 +477,7 @@ export async function createCorrespondenceEntry(
   ↓ ↓ ↓
   ↓ ↓ [Google Docs API (MCP)]
   ↓ ↓
-  ↓ [Postmark → /api/inbound-email]
+  ↓ [Forward Email → /api/inbound-email]
   ↓
 [Supabase]
   ├─ PostgreSQL

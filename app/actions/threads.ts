@@ -17,10 +17,14 @@ export async function getThreadsByBusiness(businessId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   const { data, error } = await supabase
     .from('conversation_threads')
     .select('*')
     .eq('business_id', businessId)
+    .eq('organization_id', orgId)
     .order('created_at', { ascending: true })
 
   if (error) return { error: error.message }
@@ -56,10 +60,14 @@ export async function renameThread(threadId: string, businessId: string, name: s
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   const { data, error } = await supabase
     .from('conversation_threads')
     .update({ name: name.trim() })
     .eq('id', threadId)
+    .eq('organization_id', orgId)
     .select()
     .single()
 
@@ -73,11 +81,15 @@ export async function deleteThread(threadId: string, businessId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   // thread_id on correspondence will be set to NULL automatically (ON DELETE SET NULL)
   const { error } = await supabase
     .from('conversation_threads')
     .delete()
     .eq('id', threadId)
+    .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
   revalidatePath(`/businesses/${businessId}`)
@@ -89,10 +101,14 @@ export async function assignCorrespondenceToThread(correspondenceId: string, thr
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   const { error } = await supabase
     .from('correspondence')
     .update({ thread_id: threadId })
     .eq('id', correspondenceId)
+    .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
   revalidatePath(`/businesses/${businessId}`)

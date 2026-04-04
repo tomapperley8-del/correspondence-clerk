@@ -5,10 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-
-const anthropic = new Anthropic()
+import { getAnthropicClient } from '@/lib/ai/client'
 
 let supabaseClient: SupabaseClient | null = null
 
@@ -87,7 +85,7 @@ export async function POST(request: NextRequest) {
     messages.push({ role: 'user', content: message })
 
     // Generate response
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model: 'claude-sonnet-4-5-20250514',
       max_tokens: 500,
       system: SYSTEM_PROMPT,

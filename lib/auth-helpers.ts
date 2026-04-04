@@ -4,6 +4,7 @@
  */
 
 import { cache } from 'react'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 /**
@@ -77,6 +78,45 @@ export async function getCurrentUserProfile() {
   }
 
   return profile
+}
+
+/**
+ * Require org_id for server actions — returns orgId or error result.
+ * Use this at the top of server actions instead of the 3-line pattern.
+ */
+export async function requireOrgId(): Promise<{ orgId: string } | { error: string }> {
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) {
+    return { error: 'No organisation found' }
+  }
+  return { orgId }
+}
+
+/**
+ * Require auth + org_id for API routes — returns orgId or a ready-made NextResponse.
+ * Usage: const result = await requireOrgIdForRoute()
+ *        if (result instanceof NextResponse) return result
+ *        const { orgId } = result
+ */
+export async function requireOrgIdForRoute(): Promise<{ orgId: string } | NextResponse> {
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  }
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.organization_id) {
+    return NextResponse.json({ error: 'No organisation found' }, { status: 403 })
+  }
+
+  return { orgId: profile.organization_id }
 }
 
 /**

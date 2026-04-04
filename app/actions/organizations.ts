@@ -72,14 +72,6 @@ export type Organization = {
   created_by: string | null
 }
 
-export type UserProfile = {
-  id: string
-  organization_id: string
-  display_name: string | null
-  created_at: string
-  updated_at: string
-}
-
 /**
  * Get the current user's organization
  */

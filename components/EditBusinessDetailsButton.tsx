@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { updateBusiness, type Business } from '@/app/actions/businesses'
+import { appEvents } from '@/lib/events'
 
 export function EditBusinessDetailsButton({
   business,
@@ -39,7 +40,7 @@ export function EditBusinessDetailsButton({
       setError(result.error || 'An error occurred')
       setSaving(false)
     } else {
-      window.dispatchEvent(new CustomEvent('businesses:changed'))
+      appEvents.businessesChanged()
       setSaving(false)
       setIsOpen(false)
       if (onUpdate) {

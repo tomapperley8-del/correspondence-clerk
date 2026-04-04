@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { checkRateLimit, rateLimitError } from '@/lib/rate-limit'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 const searchQuerySchema = z.string().min(2, 'Search query must be at least 2 characters')
 
@@ -74,10 +75,14 @@ export async function searchAll(query: string, filters?: SearchFilters) {
     return { error: parsed.error.issues[0].message }
   }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   // Search businesses by name (prioritized)
   const { data: businesses, error: businessError } = await supabase
     .from('businesses')
     .select('id, name, category, status')
+    .eq('organization_id', orgId)
     .ilike('name', `%${query}%`)
     .order('name')
     .limit(10)
@@ -104,6 +109,7 @@ export async function searchAll(query: string, filters?: SearchFilters) {
       contacts!inner(name)
     `
     )
+    .eq('organization_id', orgId)
     .textSearch('search_vector', query.trim(), { type: 'websearch' })
 
   // Apply filters

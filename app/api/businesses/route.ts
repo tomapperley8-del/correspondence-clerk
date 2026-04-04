@@ -1,30 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireOrgIdForRoute } from '@/lib/auth-helpers'
 
 export async function GET() {
+  const result = await requireOrgIdForRoute()
+  if (result instanceof NextResponse) return result
+  const { orgId } = result
+
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('organization_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.organization_id) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 403 })
-  }
-
   const { data, error } = await supabase
     .from('businesses')
     .select('*')
-    .eq('organization_id', profile.organization_id)
+    .eq('organization_id', orgId)
     .order('name')
 
   if (error) {

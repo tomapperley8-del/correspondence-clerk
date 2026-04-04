@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createBusiness } from '@/app/actions/businesses'
 import { useRouter } from 'next/navigation'
+import { appEvents } from '@/lib/events'
 
 export function AddBusinessButton() {
   const [isOpen, setIsOpen] = useState(false)
@@ -42,7 +43,7 @@ export function AddBusinessButton() {
       setIsClubCard(false)
       setIsAdvertiser(false)
       setIsLoading(false)
-      window.dispatchEvent(new CustomEvent('businesses:changed'))
+      appEvents.businessesChanged()
       router.refresh()
     }
   }

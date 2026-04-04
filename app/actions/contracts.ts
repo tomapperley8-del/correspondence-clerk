@@ -25,10 +25,14 @@ export async function getContractsByBusiness(businessId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   const { data, error } = await supabase
     .from('contracts')
     .select('*')
     .eq('business_id', businessId)
+    .eq('organization_id', orgId)
     .order('is_current', { ascending: false })
     .order('contract_start', { ascending: false, nullsFirst: false })
 
@@ -89,10 +93,14 @@ export async function updateContract(contractId: string, businessId: string, fie
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   const { data, error } = await supabase
     .from('contracts')
     .update({ ...fields, updated_at: new Date().toISOString() })
     .eq('id', contractId)
+    .eq('organization_id', orgId)
     .select()
     .single()
 
@@ -106,10 +114,14 @@ export async function deleteContract(contractId: string, businessId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
   const { error } = await supabase
     .from('contracts')
     .delete()
     .eq('id', contractId)
+    .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
   revalidatePath(`/businesses/${businessId}`)

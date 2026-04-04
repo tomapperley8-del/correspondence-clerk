@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { isValidEmail } from '@/lib/validation'
 
 /**
  * API route to update contact details (role, emails, phones)
@@ -30,10 +32,15 @@ export async function PATCH(request: Request) {
       )
     }
 
+    const orgId = await getCurrentUserOrganizationId()
+    if (!orgId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 })
+    }
+
     // Validate emails if provided
     if (emails && Array.isArray(emails)) {
       for (const email of emails) {
-        if (email && (!email.includes('@') || !email.includes('.'))) {
+        if (email && !isValidEmail(email)) {
           return NextResponse.json(
             { error: `Invalid email format: ${email}` },
             { status: 400 }
@@ -66,6 +73,7 @@ export async function PATCH(request: Request) {
       .from('contacts')
       .update(updateData)
       .eq('id', contactId)
+      .eq('organization_id', orgId)
       .select()
       .single()
 

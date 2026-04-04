@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { createBusiness } from '@/app/actions/businesses'
 import type { Business } from '@/app/actions/businesses'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
+import { appEvents } from '@/lib/events'
 
 interface AddBusinessModalProps {
   isOpen: boolean
@@ -53,7 +54,7 @@ export function AddBusinessModal({
       setIsClubCard(false)
       setIsAdvertiser(false)
       setIsLoading(false)
-      window.dispatchEvent(new CustomEvent('businesses:changed'))
+      appEvents.businessesChanged()
       onBusinessAdded(result.data)
       onClose()
     }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { getAnthropicClient } from '@/lib/ai/client'
 import { buildInsightPrompt } from '@/lib/ai/insight-prompts'
 import { sendBriefingEmail } from '@/lib/email/briefing-email'
 
@@ -101,7 +101,7 @@ async function generateAndCache(
     previous
   )
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const anthropic = getAnthropicClient()
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-5-20250929',
     max_tokens: 2048,

@@ -3,10 +3,10 @@
  * Scores leads from 0-100 based on fit for Correspondence Clerk
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import { TARGET_SIC_CODES, SicCode } from './companies-house'
+import { getAnthropicClient } from '@/lib/ai/client'
 
-const anthropic = new Anthropic()
+const anthropic = getAnthropicClient()
 
 export interface ProspectData {
   company_name: string

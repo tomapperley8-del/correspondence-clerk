@@ -1,5 +1,5 @@
 # Implementation Plan
-Last updated: 30/03/2026
+Last updated: 04/04/2026
 
 This is the single source of truth for what needs doing, in order.
 Pick up from the first incomplete item each session.
@@ -74,7 +74,7 @@ Pick up from the first incomplete item each session.
 - [x] **P15b** — Inbox direction fix + UX overhaul: direction stored in queue, SENT/RECEIVED badge, expandable body, auto-match contact, own email addresses in settings (30/03/2026)
 - [x] **P15c** — Inbox UX pass: auto-file on definite contact match, block sender, fix sent path for personal-domain contacts, remove over-aggressive auto-submitted spam rule, auto-filed section open by default with Edit links (02/04/2026)
 - [x] **P16** — Landing page FAQ: `components/marketing/FAQ.tsx` — 6 questions, native `<details>/<summary>`, inserted above CTASection. (30/03/2026)
-- [ ] **P17** — ⚠️ **Blocked — needs Sentry account + DSN first.** Sentry error monitoring: install `@sentry/nextjs`, create three config files, wrap `next.config.ts`, add `app/global-error.tsx`. Free tier: 5k errors/month. Errors only — no replays, no performance tracing.
+- [x] **P17** — ~~Sentry monitoring~~ **Dropped** — not worth it at current scale. Revisit when 10+ orgs. (04/04/2026)
 - [x] **P24** — Inbound email structured logging: JSON log lines at every decision point in webhook handler (received, discarded, direction, auto-filed, queued, formatting). Send test button + Outlook docs were already in place. (30/03/2026)
 - [x] **P25** — Docs audit: updated CURRENT_STATE.md (features 1-19, schema, file list, design rules), ARCHITECTURE.md (schema, modules, env vars), USER_GUIDE.md (inbound email, Actions, AI Assistant, bulk import), USER_FLOW.md (onboarding + inbound email flows). (30/03/2026)
 
@@ -106,6 +106,7 @@ Pick up from the first incomplete item each session.
 
 ## Done
 
+- [x] **Spring Clean** — Security (org_id guards on 9 files), shared utilities (result types, validation, events, auth helpers), AI consolidation (shared client across 10+ files, max-iteration guard), consistency sweep (API routes, error shapes, custom events), auto-generated DB types, memory restructure, doc updates (04/04/2026)
 - [x] Inbound email webhook code + inbox UI + domain mappings (26/03/2026)
 - [x] Business page performance — CorrespondenceEditForm state isolation + React.memo on 8 sub-components (26/03/2026)
 - [x] Business page refactor — 8 sub-components extracted, page.tsx 2,180 → 1,200 lines (25/03/2026)
