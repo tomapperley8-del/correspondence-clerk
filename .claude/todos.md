@@ -75,6 +75,7 @@ Pick up from the first incomplete item each session.
 - [x] **P15c** — Inbox UX pass: auto-file on definite contact match, block sender, fix sent path for personal-domain contacts, remove over-aggressive auto-submitted spam rule, auto-filed section open by default with Edit links (02/04/2026)
 - [x] **P16** — Landing page FAQ: `components/marketing/FAQ.tsx` — 6 questions, native `<details>/<summary>`, inserted above CTASection. (30/03/2026)
 - [x] **P17** — ~~Sentry monitoring~~ **Dropped** — not worth it at current scale. Revisit when 10+ orgs. (04/04/2026)
+- [x] **P35** — API cost reduction: 9/11 call sites switched to Haiku, centralised model constants in `lib/ai/models.ts`, token budgets reduced (formatter 8K→4K, chat 16K→8K), insight cache TTLs doubled (org 48h, biz 12h), prompt caching added to 6 endpoints, regex bypass for trivial emails. Expected ~5-10x savings. (04/04/2026)
 - [x] **P24** — Inbound email structured logging: JSON log lines at every decision point in webhook handler (received, discarded, direction, auto-filed, queued, formatting). Send test button + Outlook docs were already in place. (30/03/2026)
 - [x] **P25** — Docs audit: updated CURRENT_STATE.md (features 1-19, schema, file list, design rules), ARCHITECTURE.md (schema, modules, env vars), USER_GUIDE.md (inbound email, Actions, AI Assistant, bulk import), USER_FLOW.md (onboarding + inbound email flows). (30/03/2026)
 
