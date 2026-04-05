@@ -223,10 +223,12 @@ All features complete and deployed (unless noted):
 20. Daily Briefing Email — **live** (Resend cron at 8am, opt-out toggle in Settings, smart cache reuse)
 21. API Cost Reduction — **live** (model tiering: Haiku for 9/11 call sites, Sonnet for Chat + strategic Insights only. Centralised in `lib/ai/models.ts`. Cache TTLs doubled. Prompt caching added to 6 endpoints. Regex bypass for trivial emails.)
 22. Actionable Insight Buttons — contextual actions on 7 insight types (Log call, Copy draft, View Actions, etc.)
-23. File Uploads — **pending deploy** (Supabase Storage, 10MB/file, 50MB/org cap, upload/download/delete on business pages. Needs migration + bucket creation.)
+23. File Uploads — **live** (Supabase Storage, 10MB/file, 50MB/org cap, upload/download/delete on business pages.)
+24. UX Audit — **live** (P28: modal save mechanics, consistency pass, toast dismiss, onboarding steps, empty states, design token sweep across 25+ files)
 
 ## Recent Changes
 
+- **Apr 05, 2026:** P28 — Full UX audit: replaced `window.location.reload()` with `router.refresh()` in edit modals, success toasts on all modals, standardised modal styling (errors, buttons, autofocus, close buttons), toast dismiss button, onboarding step numbering fix (5→4), filtered empty state on business page, duplicate detection explainer, Ctrl+K hint in nav, design token sweep (60+ raw blue-600 → brand-navy across 25+ files).
 - **Apr 04, 2026:** P32 + P19 — Actionable insight buttons (7 types with contextual actions in expanded cards). File uploads on business pages (Supabase Storage, server actions, BusinessFiles component, 50MB org cap). API cost reduction — 9/11 AI call sites switched to claude-haiku-4-5 (3x cheaper). Centralised model constants in `lib/ai/models.ts`. Token budgets reduced (formatter 8K→4K, chat 16K→8K). Insight cache TTLs doubled (org 48h, biz 12h). Prompt caching added to 6 endpoints. Regex bypass skips AI for short structured emails.
 - **Apr 02, 2026:** P31 — daily briefing email via Resend cron (8am, smart cache, opt-out toggle in settings). Replaced SendGrid with Resend across all email sending. Domain verified on Resend (eu-west-1).
 - **Apr 02, 2026:** Inbox UX pass — auto-file on definite contact match, block sender (new `blocked_senders` table), fix sent path for personal-domain contacts, remove over-aggressive auto-submitted spam rule, auto-filed section open by default with Edit links. Migrated inbound from Postmark → Forward Email ($3/month Enhanced Protection, no per-email limits).
