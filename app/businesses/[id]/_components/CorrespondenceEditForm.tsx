@@ -82,7 +82,7 @@ export function CorrespondenceEditForm({
           value={editedSubject}
           onChange={(e) => setEditedSubject(e.target.value)}
           placeholder="Enter subject..."
-          className="w-full px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
+          className="w-full px-3 py-2 border-2 border-gray-300 text-sm focus:border-brand-navy focus:outline-none"
         />
       </div>
 
@@ -94,7 +94,7 @@ export function CorrespondenceEditForm({
         <select
           value={editedDirection}
           onChange={(e) => setEditedDirection(e.target.value as 'received' | 'sent' | '')}
-          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
         >
           <option value="">-- Unknown Direction --</option>
           <option value="received">Received</option>
@@ -110,7 +110,7 @@ export function CorrespondenceEditForm({
         <select
           value={editedInternalSender}
           onChange={(e) => setEditedInternalSender(e.target.value)}
-          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
         >
           <option value="">-- Not specified --</option>
           <option value="Bridget">Bridget</option>
@@ -129,7 +129,7 @@ export function CorrespondenceEditForm({
         <select
           value={editedContactId}
           onChange={(e) => setEditedContactId(e.target.value)}
-          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
         >
           {contacts.map((contact) => (
             <option key={contact.id} value={contact.id}>
@@ -148,7 +148,7 @@ export function CorrespondenceEditForm({
           type="date"
           value={editedDate}
           onChange={(e) => setEditedDate(e.target.value)}
-          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
+          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-brand-navy focus:outline-none"
         />
       </div>
 
@@ -160,7 +160,7 @@ export function CorrespondenceEditForm({
         <select
           value={editedActionNeeded}
           onChange={(e) => setEditedActionNeeded(e.target.value)}
-          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
         >
           <option value="none">None</option>
           <option value="follow_up">Follow-up</option>
@@ -181,7 +181,7 @@ export function CorrespondenceEditForm({
             type="date"
             value={editedDueAt}
             onChange={(e) => setEditedDueAt(e.target.value)}
-            className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
+            className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-brand-navy focus:outline-none"
           />
         </div>
       )}
@@ -190,14 +190,14 @@ export function CorrespondenceEditForm({
       <textarea
         value={editedText}
         onChange={(e) => setEditedText(e.target.value)}
-        className="w-full min-h-[200px] px-3 py-2 border-2 border-gray-300 text-sm font-mono focus:border-blue-600 focus:outline-none"
+        className="w-full min-h-[200px] px-3 py-2 border-2 border-gray-300 text-sm font-mono focus:border-brand-navy focus:outline-none"
       />
 
       <div className="flex gap-2 mt-3">
         <Button
           onClick={handleSave}
           disabled={savingEdit}
-          className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm font-semibold"
+          className="bg-brand-navy text-white hover:bg-brand-navy-hover px-4 py-2 text-sm font-semibold"
         >
           {savingEdit ? 'Saving...' : 'Save Changes'}
         </Button>

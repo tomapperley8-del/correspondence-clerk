@@ -995,14 +995,14 @@ export default function BusinessDetailPage({
           placeholder="Search correspondence..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-2 border-2 border-gray-300 focus:border-blue-600 focus:outline-none"
+          className="w-full px-4 py-2 border-2 border-gray-300 focus:border-brand-navy focus:outline-none"
         />
         {searchQuery && (
           <p className="text-sm text-gray-600 mt-2">
             Showing {filteredCorrespondence.matchedIds.size} matching entries
             <button
               onClick={() => setSearchQuery('')}
-              className="ml-2 text-blue-600 hover:underline"
+              className="ml-2 text-brand-navy hover:underline"
             >
               Clear search
             </button>
@@ -1033,7 +1033,7 @@ export default function BusinessDetailPage({
             </button>
             <ExportDropdown businessId={business.id} />
             <Link href={`/new-entry?businessId=${business.id}`}>
-              <Button className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold">
+              <Button className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold">
                 New Entry
               </Button>
             </Link>

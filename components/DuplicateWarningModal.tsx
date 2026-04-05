@@ -88,7 +88,7 @@ export function DuplicateWarningModal({
           <div className="flex gap-3">
             <Button
               onClick={handleViewExisting}
-              className="flex-1 bg-blue-600 text-white hover:bg-blue-700 px-4 py-3 font-semibold disabled:opacity-50"
+              className="flex-1 bg-brand-navy text-white hover:bg-brand-navy-hover px-4 py-3 font-semibold disabled:opacity-50"
               disabled={isSaving}
             >
               View Existing Entry

@@ -63,7 +63,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 onClick={() => setDateRange('1m')}
                 className={`px-3 py-1 text-sm font-medium ${
                   dateRange === '1m'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-navy text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -74,7 +74,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 onClick={() => setDateRange('6m')}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   dateRange === '6m'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-navy text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -85,7 +85,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 onClick={() => setDateRange('12m')}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   dateRange === '12m'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-navy text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -96,7 +96,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 onClick={() => setDateRange('custom')}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   dateRange === 'custom'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-navy text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -116,7 +116,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                   type="date"
                   value={customDateFrom}
                   onChange={(e) => setCustomDateFrom(e.target.value)}
-                  className="px-2 py-1 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
+                  className="px-2 py-1 border-2 border-gray-300 text-sm focus:border-brand-navy focus:outline-none"
                 />
               </div>
               <div>
@@ -127,7 +127,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                   type="date"
                   value={customDateTo}
                   onChange={(e) => setCustomDateTo(e.target.value)}
-                  className="px-2 py-1 border-2 border-gray-300 text-sm focus:border-blue-600 focus:outline-none"
+                  className="px-2 py-1 border-2 border-gray-300 text-sm focus:border-brand-navy focus:outline-none"
                 />
               </div>
             </div>
@@ -144,7 +144,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 onClick={() => setSortOrder('oldest')}
                 className={`px-3 py-1 text-sm font-medium ${
                   sortOrder === 'oldest'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-navy text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -155,7 +155,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 onClick={() => setSortOrder('newest')}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   sortOrder === 'newest'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-navy text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -172,7 +172,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
             <select
               value={contactFilter}
               onChange={(e) => setContactFilter(e.target.value)}
-              className="px-3 py-1 border-2 border-gray-300 bg-white text-sm focus:border-blue-600 focus:outline-none"
+              className="px-3 py-1 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
             >
               <option value="all">All Contacts</option>
               {contacts.map((contact) => (
@@ -194,7 +194,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 onClick={() => setDirectionFilter('all')}
                 className={`px-3 py-1 text-sm font-medium ${
                   directionFilter === 'all'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-navy text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -205,7 +205,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 onClick={() => setDirectionFilter('received')}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   directionFilter === 'received'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-navy text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -216,7 +216,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 onClick={() => setDirectionFilter('sent')}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   directionFilter === 'sent'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-brand-navy text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -242,7 +242,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 setCustomDateFrom('')
                 setCustomDateTo('')
               }}
-              className="text-blue-600 hover:text-blue-800 hover:underline"
+              className="text-brand-navy hover:text-brand-dark hover:underline"
             >
               Reset to default view
             </button>

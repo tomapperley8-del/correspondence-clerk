@@ -48,7 +48,7 @@ export function AddContactButton({ businessId }: { businessId: string }) {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+        className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
       >
         Add Contact
       </Button>
@@ -132,7 +132,7 @@ export function AddContactButton({ businessId }: { businessId: string }) {
             <Button
               type="submit"
               disabled={isLoading}
-              className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
             >
               {isLoading ? 'Adding...' : 'Add Contact'}
             </Button>

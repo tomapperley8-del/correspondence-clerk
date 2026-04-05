@@ -271,7 +271,7 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
                   <button
                     type="button"
                     onClick={() => onToggleExpand(entry.id)}
-                    className="mt-1 text-xs text-blue-600 hover:underline"
+                    className="mt-1 text-xs text-brand-navy hover:underline"
                   >
                     {isExpanded ? 'Show less' : 'Show more'}
                   </button>

@@ -53,7 +53,7 @@ export function ConfirmDialog({
             className={
               destructive
                 ? 'bg-red-600 text-white hover:bg-red-700 border-2 border-red-600 disabled:opacity-50'
-                : 'bg-blue-600 text-white hover:bg-blue-700 border-2 border-blue-600 disabled:opacity-50'
+                : 'bg-brand-navy text-white hover:bg-brand-navy-hover border-2 border-brand-navy disabled:opacity-50'
             }
           >
             {isLoading ? (loadingLabel || 'Loading...') : confirmLabel}

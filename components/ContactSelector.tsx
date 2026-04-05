@@ -159,7 +159,7 @@ function ContactSelectorComponent({
                       setIsOpen(false)
                       onAddNew()
                     }}
-                    className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2"
+                    className="bg-brand-navy text-white hover:bg-brand-navy-hover px-4 py-2"
                   >
                     Add New Contact
                   </Button>
@@ -199,7 +199,7 @@ function ContactSelectorComponent({
                       setIsOpen(false)
                       onAddNew()
                     }}
-                    className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 text-blue-600 font-semibold"
+                    className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 text-brand-navy font-semibold"
                   >
                     + Add New Contact
                   </button>
@@ -217,7 +217,7 @@ function ContactSelectorComponent({
         </div>
       ) : isEditing ? (
         /* Feature #1: Inline Edit Mode */
-        <div className="border-2 border-blue-600 bg-blue-50 px-4 py-3">
+        <div className="border-2 border-brand-navy bg-blue-50 px-4 py-3">
           <h3 className="font-semibold text-gray-900 mb-3">
             Edit Details for {selectedContact.name}
           </h3>
@@ -318,7 +318,7 @@ function ContactSelectorComponent({
               type="button"
               onClick={handleSaveEdit}
               disabled={isSaving}
-              className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 text-sm font-semibold"
+              className="bg-brand-navy text-white hover:bg-brand-navy-hover px-4 py-2 text-sm font-semibold"
             >
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
@@ -356,7 +356,7 @@ function ContactSelectorComponent({
                         <a
                           key={idx}
                           href={`mailto:${email}`}
-                          className="text-blue-600 hover:text-blue-800 hover:underline block"
+                          className="text-brand-navy hover:text-brand-dark hover:underline block"
                         >
                           {email}
                         </a>
@@ -369,7 +369,7 @@ function ContactSelectorComponent({
                         <a
                           key={idx}
                           href={`tel:${phone}`}
-                          className="text-blue-600 hover:text-blue-800 hover:underline block"
+                          className="text-brand-navy hover:text-brand-dark hover:underline block"
                         >
                           {phone}
                         </a>

@@ -52,7 +52,7 @@ export function AddBusinessButton() {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+        className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
       >
         Add Business
       </Button>
@@ -145,7 +145,7 @@ export function AddBusinessButton() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
             >
               {isLoading ? 'Adding...' : 'Add Business'}
             </Button>

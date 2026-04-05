@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 import { appEvents } from '@/lib/events'
+import { toast } from '@/lib/toast'
 
 export function EditBusinessButton({ business }: { business: Business }) {
   const router = useRouter()
@@ -61,7 +62,8 @@ export function EditBusinessButton({ business }: { business: Business }) {
       appEvents.businessesChanged()
       setSaving(false)
       setIsOpen(false)
-      window.location.reload()
+      toast.success('Business updated')
+      router.refresh()
     }
   }
 
@@ -110,7 +112,10 @@ export function EditBusinessButton({ business }: { business: Business }) {
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="edit-business-title" className="bg-white border border-gray-200 shadow-[var(--shadow-lg)] p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-          <h2 id="edit-business-title" className="text-xl font-bold text-gray-900 mb-4">Edit Business</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 id="edit-business-title" className="text-xl font-bold text-gray-900">Edit Business</h2>
+            <button type="button" onClick={handleCancel} className="text-gray-400 hover:text-gray-600 text-sm font-medium">Close</button>
+          </div>
 
           {error && (
             <div className="bg-red-50 border border-red-300 p-3 mb-4" role="alert">

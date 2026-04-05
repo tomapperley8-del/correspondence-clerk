@@ -41,7 +41,7 @@ export default function ImportClient() {
       <div className="mb-6">
         <Link
           href="/dashboard"
-          className="text-blue-600 hover:text-blue-800 hover:underline text-sm mb-2 inline-block"
+          className="text-brand-navy hover:text-brand-dark hover:underline text-sm mb-2 inline-block"
         >
           &larr; Back to Dashboard
         </Link>
@@ -51,7 +51,7 @@ export default function ImportClient() {
       </div>
 
       {/* Import Instructions */}
-      <div className="bg-blue-50 border-2 border-blue-600 p-6 mb-6">
+      <div className="bg-blue-50 border-2 border-brand-navy p-6 mb-6">
         <h2 className="font-bold text-gray-900 mb-3">Before You Import</h2>
         <ul className="list-disc list-inside space-y-2 text-sm text-gray-800">
           <li>
@@ -79,7 +79,7 @@ export default function ImportClient() {
         <Button
           onClick={handleImport}
           disabled={importing}
-          className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+          className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
         >
           {importing ? 'Importing...' : 'Import Mastersheet'}
         </Button>
@@ -109,7 +109,7 @@ export default function ImportClient() {
               <div className="text-sm text-gray-600">Businesses Created</div>
             </div>
             <div className="border-2 border-gray-300 p-4">
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold text-brand-navy">
                 {report.businessesUpdated}
               </div>
               <div className="text-sm text-gray-600">Businesses Updated</div>

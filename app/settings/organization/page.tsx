@@ -358,19 +358,19 @@ function OrganizationSettingsContent() {
       <div className="flex gap-2 mb-6 pb-6 border-b-2 border-gray-300">
         <Link
           href="/settings"
-          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-blue-600"
+          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-brand-navy"
         >
           User Profile
         </Link>
         <Link
           href="/settings/organization"
-          className="px-4 py-2 bg-blue-600 text-white font-semibold border-2 border-blue-600"
+          className="px-4 py-2 bg-brand-navy text-white font-semibold border-2 border-brand-navy"
         >
           Organization
         </Link>
         <Link
           href="/settings/billing"
-          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-blue-600"
+          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-brand-navy"
         >
           Billing
         </Link>
@@ -390,9 +390,9 @@ function OrganizationSettingsContent() {
 
       {/* Welcome banner — only for new users who haven't saved their profile yet */}
       {isWelcome && !profileSaved && (
-        <div className="border-2 border-blue-600 bg-blue-50 px-4 py-3 mb-6">
-          <p className="text-blue-900 font-semibold">Welcome to Correspondence Clerk!</p>
-          <p className="text-blue-800 text-sm mt-1">
+        <div className="border-2 border-brand-navy bg-blue-50 px-4 py-3 mb-6">
+          <p className="text-brand-dark font-semibold">Welcome to Correspondence Clerk!</p>
+          <p className="text-brand-dark text-sm mt-1">
             Tell us about your business so your assistant knows who it&apos;s working for.
           </p>
         </div>
@@ -604,7 +604,7 @@ function OrganizationSettingsContent() {
           <Button
             type="submit"
             disabled={isAddingType || !newTypeLabel.trim()}
-            className="bg-blue-600 text-white hover:bg-blue-700 shrink-0"
+            className="bg-brand-navy text-white hover:bg-brand-navy-hover shrink-0"
           >
             {isAddingType ? 'Adding...' : 'Add Type'}
           </Button>
@@ -633,7 +633,7 @@ function OrganizationSettingsContent() {
           <Button
             type="submit"
             disabled={isSavingName || organizationName === organization?.name}
-            className="bg-blue-600 text-white hover:bg-blue-700"
+            className="bg-brand-navy text-white hover:bg-brand-navy-hover"
           >
             {isSavingName ? 'Saving...' : 'Save Changes'}
           </Button>
@@ -805,7 +805,7 @@ function OrganizationSettingsContent() {
         <Button
           onClick={handleGenerateLink}
           disabled={isGeneratingLink}
-          className="bg-blue-600 text-white hover:bg-blue-700"
+          className="bg-brand-navy text-white hover:bg-brand-navy-hover"
         >
           {isGeneratingLink ? 'Generating...' : 'Generate Invite Link'}
         </Button>
