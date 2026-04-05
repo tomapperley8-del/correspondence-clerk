@@ -218,7 +218,7 @@ export const AllEntriesView = React.memo(function AllEntriesView({
                 type="button"
                 onClick={loadMore}
                 disabled={isLoadingMore}
-                className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold disabled:opacity-50"
+                className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-brand-navy hover:bg-blue-50 font-semibold disabled:opacity-50"
               >
                 {isLoadingMore ? 'Loading…' : `Load More (${remainingInDB} remaining)`}
               </button>
@@ -235,7 +235,7 @@ export const AllEntriesView = React.memo(function AllEntriesView({
         <div>
           <button
             onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
-            className="w-full flex justify-between items-center font-bold text-gray-900 mb-4 text-lg hover:text-blue-600"
+            className="w-full flex justify-between items-center font-bold text-gray-900 mb-4 text-lg hover:text-brand-navy"
           >
             <span>Archive ({filteredCorrespondence.archive.length}{remainingInDB > 0 ? '+' : ''} {dateRange === 'custom' ? 'other' : 'older'} entries)</span>
             <span>{isArchiveExpanded ? '▼' : '▶'}</span>
@@ -263,7 +263,7 @@ export const AllEntriesView = React.memo(function AllEntriesView({
                     type="button"
                     onClick={loadMore}
                     disabled={isLoadingMore}
-                    className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-blue-600 hover:bg-blue-50 font-semibold disabled:opacity-50"
+                    className="px-6 py-3 border-2 border-gray-300 bg-white text-gray-700 hover:border-brand-navy hover:bg-blue-50 font-semibold disabled:opacity-50"
                   >
                     {isLoadingMore ? 'Loading…' : `Load More (${remainingInDB} remaining)`}
                   </button>
@@ -276,6 +276,17 @@ export const AllEntriesView = React.memo(function AllEntriesView({
           )}
         </div>
       )}
+
+      {/* Empty state when filters hide all entries */}
+      {filteredCorrespondence.pinned.length === 0 &&
+        filteredCorrespondence.recent.length === 0 &&
+        filteredCorrespondence.archive.length === 0 &&
+        correspondence.length > 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-sm">No entries match your current filters.</p>
+            <p className="text-gray-400 text-xs mt-1">Try adjusting the date range, contact, or search terms.</p>
+          </div>
+        )}
     </>
   )
 })

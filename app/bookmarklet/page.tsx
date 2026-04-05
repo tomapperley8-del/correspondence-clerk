@@ -66,7 +66,7 @@ export default function BookmarkletPage() {
       <div className="mb-6">
         <Link
           href="/dashboard"
-          className="text-blue-600 hover:text-blue-800 hover:underline"
+          className="text-brand-navy hover:text-brand-dark hover:underline"
         >
           &larr; Back to Dashboard
         </Link>
@@ -80,8 +80,8 @@ export default function BookmarkletPage() {
           onClick={() => setProvider('outlook')}
           className={`px-6 py-3 font-semibold border-2 ${
             provider === 'outlook'
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-600'
+              ? 'bg-brand-navy text-white border-brand-navy'
+              : 'bg-white text-gray-700 border-gray-300 hover:border-brand-navy'
           }`}
         >
           Outlook
@@ -90,8 +90,8 @@ export default function BookmarkletPage() {
           onClick={() => setProvider('gmail')}
           className={`px-6 py-3 font-semibold border-2 border-l-0 ${
             provider === 'gmail'
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-600'
+              ? 'bg-brand-navy text-white border-brand-navy'
+              : 'bg-white text-gray-700 border-gray-300 hover:border-brand-navy'
           }`}
         >
           Gmail
@@ -131,7 +131,7 @@ export default function BookmarkletPage() {
                 <a
                   ref={bookmarkletLinkRef}
                   className={isReady
-                    ? "inline-block px-4 py-2 bg-blue-600 text-white font-semibold hover:bg-blue-700 cursor-move"
+                    ? "inline-block px-4 py-2 bg-brand-navy text-white font-semibold hover:bg-brand-navy-hover cursor-move"
                     : "hidden"
                   }
                   onClick={(e) => e.preventDefault()}
@@ -154,7 +154,7 @@ export default function BookmarkletPage() {
               pre-filled
             </li>
           </ol>
-          <div className="bg-blue-50 border-2 border-blue-600 p-4 mt-4">
+          <div className="bg-blue-50 border-2 border-brand-navy p-4 mt-4">
             <p className="text-sm text-gray-700">
               <strong>Tip:</strong> If you cannot drag the button, try Method 2
               below.
@@ -285,7 +285,7 @@ export default function BookmarkletPage() {
         <h2 className="text-xl font-semibold mb-4">How It Works</h2>
         <div className="space-y-4 text-gray-700">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white flex items-center justify-center font-bold">
+            <div className="flex-shrink-0 w-8 h-8 bg-brand-navy text-white flex items-center justify-center font-bold">
               1
             </div>
             <div>
@@ -298,7 +298,7 @@ export default function BookmarkletPage() {
           </div>
 
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white flex items-center justify-center font-bold">
+            <div className="flex-shrink-0 w-8 h-8 bg-brand-navy text-white flex items-center justify-center font-bold">
               2
             </div>
             <div>
@@ -313,7 +313,7 @@ export default function BookmarkletPage() {
           </div>
 
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white flex items-center justify-center font-bold">
+            <div className="flex-shrink-0 w-8 h-8 bg-brand-navy text-white flex items-center justify-center font-bold">
               3
             </div>
             <div>

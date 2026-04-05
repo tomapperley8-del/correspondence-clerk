@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { createContact } from '@/app/actions/contacts'
 import type { Contact } from '@/app/actions/contacts'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
+import { toast } from '@/lib/toast'
 
 interface AddContactModalProps {
   isOpen: boolean
@@ -85,6 +86,7 @@ export function AddContactModal({
       setEmails([''])
       setPhones([''])
       setIsLoading(false)
+      toast.success('Contact added')
       onContactAdded(result.data)
       onClose()
     }
@@ -96,11 +98,14 @@ export function AddContactModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Add New Contact" className="bg-white border-2 border-gray-800 w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold mb-6">Add New Contact</h2>
+      <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Add New Contact" className="bg-white border border-gray-200 shadow-[var(--shadow-lg)] w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold">Add New Contact</h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm font-medium">Close</button>
+        </div>
 
         {error && (
-          <div className="border-2 border-red-600 bg-red-50 px-4 py-3 mb-6">
+          <div className="border border-red-300 bg-red-50 px-4 py-3 mb-6" role="alert">
             <p className="text-red-800 text-sm">{error}</p>
           </div>
         )}
@@ -217,7 +222,7 @@ export function AddContactModal({
             <Button
               type="submit"
               disabled={isLoading}
-              className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+              className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
             >
               {isLoading ? 'Adding...' : 'Add Contact'}
             </Button>

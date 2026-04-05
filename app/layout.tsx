@@ -49,7 +49,7 @@ export default function RootLayout({
           <InsightsProvider>
           <a
             href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:font-semibold"
+            className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-brand-navy focus:text-white focus:px-4 focus:py-2 focus:font-semibold"
           >
             Skip to main content
           </a>

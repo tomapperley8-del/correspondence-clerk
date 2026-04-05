@@ -43,10 +43,9 @@ export default function EmailForwardingOnboardingPage() {
             <span className="inline-block w-6 h-1 rounded-full bg-white opacity-30" />
             <span className="inline-block w-6 h-1 rounded-full bg-white opacity-30" />
             <span className="inline-block w-6 h-1 rounded-full bg-white opacity-30" />
-            <span className="inline-block w-6 h-1 rounded-full bg-white opacity-30" />
             <span className="inline-block w-6 h-1 rounded-full bg-white opacity-90" />
           </div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#94a3b8' }}>Step 5 of 5</p>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#94a3b8' }}>Step 4 of 4</p>
           <p
             className="text-2xl font-semibold text-white leading-snug mb-3"
             style={{ fontFamily: 'Lora, Georgia, serif' }}

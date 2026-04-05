@@ -173,7 +173,7 @@ export function ContactMatchPreviewModal({
                       <select
                         value={match.contactId || defaultContactId}
                         onChange={(e) => handleContactChange(index, e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-gray-300 focus:outline-none focus:border-blue-600 text-sm"
+                        className="w-full px-3 py-2 border-2 border-gray-300 focus:outline-none focus:border-brand-navy text-sm"
                       >
                         {!match.contactId && (
                           <option value={defaultContactId}>
@@ -219,7 +219,7 @@ export function ContactMatchPreviewModal({
             </Button>
             <Button
               onClick={handleConfirm}
-              className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-2 font-semibold disabled:opacity-50"
+              className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-2 font-semibold disabled:opacity-50"
               disabled={isLoading || selectedCount === 0}
             >
               {isLoading ? 'Saving...' : `Save ${selectedCount} Email${selectedCount !== 1 ? 's' : ''}`}

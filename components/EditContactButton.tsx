@@ -4,9 +4,12 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { updateContact, type Contact } from '@/app/actions/contacts'
+import { useRouter } from 'next/navigation'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
+import { toast } from '@/lib/toast'
 
 export function EditContactButton({ contact }: { contact: Contact }) {
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -87,7 +90,8 @@ export function EditContactButton({ contact }: { contact: Contact }) {
     } else {
       setSaving(false)
       setIsOpen(false)
-      window.location.reload() // Refresh to show updated data
+      toast.success('Contact updated')
+      router.refresh()
     }
   }
 
@@ -105,10 +109,13 @@ export function EditContactButton({ contact }: { contact: Contact }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="edit-contact-title" className="bg-white border border-gray-200 shadow-[var(--shadow-lg)] p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <h2 id="edit-contact-title" className="text-xl font-bold text-gray-900 mb-4">Edit Contact</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 id="edit-contact-title" className="text-xl font-bold text-gray-900">Edit Contact</h2>
+          <button type="button" onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 text-sm font-medium">Close</button>
+        </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-300 p-3 mb-4">
+          <div className="bg-red-50 border border-red-300 p-3 mb-4" role="alert">
             <p className="text-sm text-red-800">{error}</p>
           </div>
         )}

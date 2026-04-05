@@ -42,7 +42,7 @@ export const ContactsList = React.memo(function ContactsList({ contacts, busines
                         <p key={index} className="text-sm text-gray-600 flex items-center">
                           <a
                             href={`mailto:${email}`}
-                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                            className="text-brand-navy hover:text-brand-dark hover:underline"
                           >
                             {email}
                           </a>
@@ -57,7 +57,7 @@ export const ContactsList = React.memo(function ContactsList({ contacts, busines
                         <p key={index} className="text-sm text-gray-600 flex items-center">
                           <a
                             href={`tel:${phone}`}
-                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                            className="text-brand-navy hover:text-brand-dark hover:underline"
                           >
                             {phone}
                           </a>

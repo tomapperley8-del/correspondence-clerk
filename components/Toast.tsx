@@ -32,10 +32,8 @@ export function ToastContainer() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-          role="button"
-          aria-label="Dismiss notification"
-          className={`px-4 py-3 text-sm font-medium shadow-lg border-2 pointer-events-auto transition-all duration-200 cursor-pointer ${
+          role="status"
+          className={`px-4 py-3 text-sm font-medium shadow-lg border-2 pointer-events-auto transition-all duration-200 ${
             t.variant === 'success'
               ? 'bg-brand-olive text-white border-[#5a7340]'
               : t.variant === 'error'
@@ -43,7 +41,15 @@ export function ToastContainer() {
               : 'bg-brand-dark text-white border-brand-navy'
           }`}
         >
-          {t.message}
+          <div className="flex items-center justify-between gap-3">
+            <span>{t.message}</span>
+            <button
+              onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+              className="text-white/70 hover:text-white text-xs font-medium shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       ))}
     </div>

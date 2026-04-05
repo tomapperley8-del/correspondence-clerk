@@ -93,7 +93,7 @@ export default function ImportGoogleDocsClient() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Link
         href="/dashboard"
-        className="text-blue-600 hover:text-blue-800 hover:underline text-sm mb-4 inline-block"
+        className="text-brand-navy hover:text-brand-dark hover:underline text-sm mb-4 inline-block"
       >
         &larr; Back to Dashboard
       </Link>
@@ -125,14 +125,14 @@ export default function ImportGoogleDocsClient() {
         <Button
           onClick={handleImport}
           disabled={importing}
-          className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold"
+          className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold"
         >
           {importing ? 'Importing...' : 'Start Import'}
         </Button>
       </div>
 
       {progress && (
-        <div className="bg-blue-50 border-2 border-blue-600 p-4 mb-6">
+        <div className="bg-blue-50 border-2 border-brand-navy p-4 mb-6">
           <p className="text-sm text-blue-900">{progress}</p>
         </div>
       )}

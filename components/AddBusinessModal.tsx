@@ -8,6 +8,7 @@ import { createBusiness } from '@/app/actions/businesses'
 import type { Business } from '@/app/actions/businesses'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 import { appEvents } from '@/lib/events'
+import { toast } from '@/lib/toast'
 
 interface AddBusinessModalProps {
   isOpen: boolean
@@ -55,6 +56,7 @@ export function AddBusinessModal({
       setIsAdvertiser(false)
       setIsLoading(false)
       appEvents.businessesChanged()
+      toast.success('Business added')
       onBusinessAdded(result.data)
       onClose()
     }
@@ -67,10 +69,13 @@ export function AddBusinessModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div ref={modalRef} role="dialog" aria-modal="true" aria-label="Add New Business" className="bg-white border border-gray-200 w-full max-w-2xl p-6 shadow-[var(--shadow-lg)]">
-        <h2 className="text-xl font-bold mb-6">Add New Business</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold">Add New Business</h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm font-medium">Close</button>
+        </div>
 
         {error && (
-          <div className="border border-red-300 bg-red-50 px-4 py-3 mb-6">
+          <div className="border border-red-300 bg-red-50 px-4 py-3 mb-6" role="alert">
             <p className="text-red-800 text-sm">{error}</p>
           </div>
         )}

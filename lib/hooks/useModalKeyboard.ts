@@ -75,9 +75,12 @@ export function useModalKeyboard(
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown)
 
-      // Auto-focus first focusable element in modal (only once per open)
+      // Auto-focus first input field in modal, falling back to first focusable element (only once per open)
       if (autoFocus && modalRef.current && !hasAutoFocused.current) {
-        const firstFocusable = modalRef.current.querySelector<HTMLElement>(
+        const firstInput = modalRef.current.querySelector<HTMLElement>(
+          'input:not([type="hidden"]):not([type="checkbox"]), select, textarea'
+        )
+        const firstFocusable = firstInput || modalRef.current.querySelector<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         )
         if (firstFocusable) {

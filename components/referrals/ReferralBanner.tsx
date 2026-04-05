@@ -63,7 +63,7 @@ export function ReferralBanner() {
         </div>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-sm text-blue-600 hover:text-blue-800"
+          className="text-sm text-brand-navy hover:text-brand-dark"
         >
           {expanded ? 'Hide' : 'Show Details'}
         </button>

@@ -95,6 +95,9 @@ export const DuplicatesWarningBanner = React.memo(function DuplicatesWarningBann
           </div>
         )}
       </div>
+      <p className="text-xs text-orange-700 mt-1 mb-3">
+        These entries have identical content. This usually happens when an email is forwarded more than once. You can delete the duplicate or dismiss the warning if both are intentional.
+      </p>
       {duplicates.map((dup) => (
         <div key={dup.hash} className="border-t border-orange-300 pt-3 mt-3 first:border-t-0 first:pt-0 first:mt-0">
           <div className="flex items-start gap-2">

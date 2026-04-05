@@ -73,7 +73,7 @@ function BusinessSelectorComponent({
                       setIsOpen(false)
                       onAddNew()
                     }}
-                    className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2"
+                    className="bg-brand-navy text-white hover:bg-brand-navy-hover px-4 py-2"
                   >
                     Add New Business
                   </Button>
@@ -101,7 +101,7 @@ function BusinessSelectorComponent({
                       setIsOpen(false)
                       onAddNew()
                     }}
-                    className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 text-blue-600 font-semibold"
+                    className="w-full text-left px-4 py-3 bg-gray-100 hover:bg-gray-200 text-brand-navy font-semibold"
                   >
                     + Add New Business
                   </button>

@@ -327,7 +327,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
                 placeholder="Search businesses..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-gray-300 focus:border-blue-600"
+                className="w-full px-4 py-2 border-2 border-gray-300 focus:border-brand-navy"
               />
             </div>
 
@@ -370,7 +370,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-3 py-2 border-2 border-gray-300 bg-white focus:border-blue-600 focus:outline-none"
+                  className="px-3 py-2 border-2 border-gray-300 bg-white focus:border-brand-navy focus:outline-none"
                 >
                   <option value="all">All Categories</option>
                   {categories.map((cat) => (
@@ -390,7 +390,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortType)}
-                className="px-3 py-2 border-2 border-gray-300 bg-white focus:border-blue-600 focus:outline-none"
+                className="px-3 py-2 border-2 border-gray-300 bg-white focus:border-brand-navy focus:outline-none"
               >
                 <option value="recent">Most Recently Contacted</option>
                 <option value="oldest">Least Recently Contacted</option>
@@ -410,7 +410,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
                   onClick={() => setViewMode('grid')}
                   className={`px-3 py-1 text-sm font-medium ${
                     viewMode === 'grid'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-brand-navy text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-100'
                   }`}
                   aria-label="Grid view"
@@ -421,7 +421,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
                   onClick={() => setViewMode('list')}
                   className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                     viewMode === 'list'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-brand-navy text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-100'
                   }`}
                   aria-label="List view"
@@ -451,7 +451,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
                     localStorage.setItem(`last_visited_${business.id}`, new Date().toISOString())
                     setHasNewEntries((prev) => { const next = new Set(prev); next.delete(business.id); return next })
                   }}
-                  className="relative bg-white border-2 border-gray-300 p-6 hover:border-blue-600 hover:bg-blue-50 transition-colors duration-150"
+                  className="relative bg-white border-2 border-gray-300 p-6 hover:border-brand-navy hover:bg-blue-50 transition-colors duration-150"
                 >
                   {hasNewEntries.has(business.id) && (
                     <span className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-green-500" title="New activity" />
@@ -524,7 +524,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
                       <td className="px-4 py-3">
                         <Link
                           href={`/businesses/${business.id}`}
-                          className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
+                          className="text-brand-navy hover:text-brand-dark hover:underline font-semibold"
                         >
                           {business.name}
                         </Link>
@@ -598,7 +598,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
                         onClick={() => setCurrentPage(pageNum)}
                         className={`px-4 py-2 border-2 ${
                           currentPage === pageNum
-                            ? 'bg-blue-600 text-white border-blue-600'
+                            ? 'bg-brand-navy text-white border-brand-navy'
                             : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                         }`}
                       >

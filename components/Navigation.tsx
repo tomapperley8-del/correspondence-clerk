@@ -174,13 +174,16 @@ export function Navigation() {
 
               <Link
                 href="/search"
-                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
+                className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/search'
                     ? 'text-white bg-brand-olive'
                     : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
                 Search
+                <kbd className="hidden lg:inline-block text-[10px] px-1.5 py-0.5 bg-white/10 rounded text-white/60 font-mono">
+                  Ctrl+K
+                </kbd>
               </Link>
 
               <Link

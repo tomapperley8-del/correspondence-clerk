@@ -75,7 +75,7 @@ export function ExportToGoogleDocsButton({ businessId }: { businessId: string })
             href={docUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            className="text-sm text-brand-navy hover:text-brand-dark hover:underline"
           >
             Open in Google Docs →
           </a>

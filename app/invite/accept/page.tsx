@@ -87,7 +87,7 @@ function AcceptInvitePageContent() {
             </h1>
             <p className="text-gray-700 mb-6">{error}</p>
             <Link href="/login">
-              <Button className="bg-blue-600 text-white hover:bg-blue-700">
+              <Button className="bg-brand-navy text-white hover:bg-brand-navy-hover">
                 Go to Login
               </Button>
             </Link>
@@ -130,7 +130,7 @@ function AcceptInvitePageContent() {
 
           <div className="space-y-3">
             <Link href={`/signup?invitation_token=${token}`} className="block">
-              <Button className="w-full bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 font-semibold">
+              <Button className="w-full bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold">
                 Create Account
               </Button>
             </Link>

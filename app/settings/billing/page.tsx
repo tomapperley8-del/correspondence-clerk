@@ -141,19 +141,19 @@ function BillingPageContent() {
       <div className="flex gap-2 mb-6 pb-6 border-b-2 border-gray-300">
         <Link
           href="/settings"
-          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-blue-600"
+          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-brand-navy"
         >
           User Profile
         </Link>
         <Link
           href="/settings/organization"
-          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-blue-600"
+          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-brand-navy"
         >
           Organization
         </Link>
         <Link
           href="/settings/billing"
-          className="px-4 py-2 bg-blue-600 text-white font-semibold border-2 border-blue-600"
+          className="px-4 py-2 bg-brand-navy text-white font-semibold border-2 border-brand-navy"
         >
           Billing
         </Link>
@@ -235,7 +235,7 @@ function BillingPageContent() {
               <div className="grid md:grid-cols-2 gap-4">
                 {/* Pro Plan */}
                 {billingInfo.plan === 'trial' && (
-                  <div className="border-2 border-blue-600 p-4">
+                  <div className="border-2 border-brand-navy p-4">
                     <h3 className="text-lg font-bold text-gray-900">{PLANS.pro.name}</h3>
                     <p className="text-3xl font-bold text-gray-900 mt-2">
                       ${PLANS.pro.priceMonthly}<span className="text-sm text-gray-600">/month</span>
@@ -251,7 +251,7 @@ function BillingPageContent() {
                     <Button
                       onClick={() => handleUpgrade('pro')}
                       disabled={isUpgrading}
-                      className="w-full mt-4 bg-blue-600 text-white hover:bg-blue-700"
+                      className="w-full mt-4 bg-brand-navy text-white hover:bg-brand-navy-hover"
                     >
                       {isUpgrading ? 'Processing...' : 'Upgrade to Pro'}
                     </Button>
