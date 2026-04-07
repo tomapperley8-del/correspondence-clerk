@@ -251,12 +251,17 @@ async function fetchContractData(orgId: string, supabase: SupabaseClient) {
 // ---------------------------------------------------------------------------
 
 async function fetchBusinessInsightData(orgId: string, businessId: string, supabase: SupabaseClient) {
-  const [{ data: business }, { data: contacts }, { data: correspondence }] = await Promise.all([
-    supabase.from('businesses')
-      .select('id, name, category, status, membership_type, email, phone, address, notes, contract_start, contract_end, contract_amount, last_contacted_at')
-      .eq('id', businessId)
-      .eq('organization_id', orgId)
-      .single(),
+  // First fetch business to check if relationship_memory exists (determines correspondence limit)
+  const { data: business } = await supabase.from('businesses')
+    .select('id, name, category, status, membership_type, email, phone, address, notes, contract_start, contract_end, contract_amount, last_contacted_at, relationship_memory, relationship_memory_updated_at')
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+    .single()
+
+  // When memory exists, we need fewer entries — the memory carries the relationship arc
+  const corrLimit = business?.relationship_memory ? 30 : 50
+
+  const [{ data: contacts }, { data: correspondence }] = await Promise.all([
     supabase.from('contacts')
       .select('id, name, role, emails, phones, notes, is_active')
       .eq('business_id', businessId)
@@ -267,7 +272,7 @@ async function fetchBusinessInsightData(orgId: string, businessId: string, supab
       .eq('business_id', businessId)
       .eq('organization_id', orgId)
       .order('entry_date', { ascending: true })
-      .limit(50),
+      .limit(corrLimit),
   ])
 
   return { business, contacts: contacts ?? [], correspondence: correspondence ?? [] }
@@ -631,7 +636,7 @@ Summarise the data quality issues, prioritise the most impactful ones to fix, an
 // Prompt builders — business-specific
 // ---------------------------------------------------------------------------
 
-function businessContextBlock(
+export function businessContextBlock(
   business: Awaited<ReturnType<typeof fetchBusinessInsightData>>['business'],
   contacts: Awaited<ReturnType<typeof fetchBusinessInsightData>>['contacts'],
   correspondence: Awaited<ReturnType<typeof fetchBusinessInsightData>>['correspondence']
@@ -650,13 +655,17 @@ function businessContextBlock(
     ? `${formatDate(business.contract_start)} – ${formatDate(business.contract_end)}, £${business.contract_amount?.toLocaleString() ?? 'unknown'}${daysUntil(business.contract_end) < 0 ? ' [EXPIRED]' : daysUntil(business.contract_end) <= 60 ? ` [EXPIRING in ${daysUntil(business.contract_end)} days]` : ''}`
     : 'No contract on record.'
 
+  const memorySection = business.relationship_memory
+    ? `\n## Relationship memory (AI-distilled summary)\n${business.relationship_memory}\n`
+    : ''
+
   return `## Business: ${business.name}
 Category: ${business.category ?? 'not set'} | Membership: ${membershipLabel(business.membership_type)}
 Email: ${business.email ?? 'not set'} | Phone: ${business.phone ?? 'not set'}
 Contract: ${contract}
 Last contacted: ${business.last_contacted_at ? `${daysAgo(business.last_contacted_at)} days ago` : 'unknown'}
 ${business.notes ? `Notes: ${truncate(business.notes, 300)}` : ''}
-
+${memorySection}
 ## Contacts
 ${contactsText}
 
@@ -816,7 +825,7 @@ export async function buildInsightPrompt(
   supabase: SupabaseClient,
   previousInsights: Array<{ content: string; generated_at: string }>,
   customPromptText?: string
-): Promise<{ systemPrompt: string; userPrompt: string }> {
+): Promise<{ systemPrompt: string; userPrompt: string; businessContext?: string }> {
   const org = await fetchOrgContext(orgId, supabase)
   const orgName = org?.name ?? 'your organisation'
 
@@ -877,17 +886,19 @@ export async function buildInsightPrompt(
     case 'data_health_biz': {
       if (!businessId) throw new Error(`${type} requires a businessId`)
       const data = await fetchBusinessInsightData(orgId, businessId, supabase)
+      const bizContext = businessContextBlock(data.business, data.contacts, data.correspondence)
+      let result: { systemPrompt: string; userPrompt: string }
       switch (type) {
-        case 'call_prep':          return buildCallPrepPrompt(org, data, previousInsights)
-        case 'relationship_story': return buildRelationshipStoryPrompt(org, data, previousInsights)
-        case 'outreach_draft':     return buildOutreachDraftPrompt(org, data, previousInsights)
-        case 'what_did_we_agree':  return buildWhatDidWeAgreePrompt(org, data, previousInsights)
-        case 'next_best_action':   return buildNextBestActionPrompt(org, data, previousInsights)
-        case 'risk_check':         return buildRiskCheckPrompt(org, data, previousInsights)
-        case 'full_picture':       return buildFullPicturePrompt(org, data, previousInsights)
-        case 'data_health_biz':    return buildDataHealthBizPrompt(org, data, previousInsights)
+        case 'call_prep':          result = buildCallPrepPrompt(org, data, previousInsights); break
+        case 'relationship_story': result = buildRelationshipStoryPrompt(org, data, previousInsights); break
+        case 'outreach_draft':     result = buildOutreachDraftPrompt(org, data, previousInsights); break
+        case 'what_did_we_agree':  result = buildWhatDidWeAgreePrompt(org, data, previousInsights); break
+        case 'next_best_action':   result = buildNextBestActionPrompt(org, data, previousInsights); break
+        case 'risk_check':         result = buildRiskCheckPrompt(org, data, previousInsights); break
+        case 'full_picture':       result = buildFullPicturePrompt(org, data, previousInsights); break
+        case 'data_health_biz':    result = buildDataHealthBizPrompt(org, data, previousInsights); break
       }
-      break
+      return { ...result, businessContext: bizContext }
     }
 
     case 'custom': {
@@ -901,6 +912,7 @@ export async function buildInsightPrompt(
         return {
           systemPrompt: `You are an AI assistant for ${orgName}. You have full access to the business data below. Be specific, concise, and actionable. British English, markdown.`,
           userPrompt: `${customPromptText}\n\n${context}${formatPreviousInsights(previousInsights)}`,
+          businessContext: context,
         }
       } else {
         // Org-scoped: org overview (businesses list + basic stats)

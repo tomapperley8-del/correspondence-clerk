@@ -85,6 +85,7 @@ app/api/
 lib/ai/
   models.ts                Centralised AI model constants (PREMIUM=Sonnet, ECONOMY=Haiku)
   formatter.ts             Anthropic structured outputs + regex fast-path
+  relationship-memory.ts   Post-insight Haiku call to distil 3-sentence relationship memory
   thread-detection.ts      Email chain heuristics
   types.ts                 AI response contracts
 
@@ -123,7 +124,7 @@ lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feat
 
 ### Database Tables
 
-- **businesses** - name, category, status, membership_type (string, now configurable per org), address, email, phone, notes, contract fields, last_contacted_at
+- **businesses** - name, category, status, membership_type (string, now configurable per org), address, email, phone, notes, contract fields, last_contacted_at, relationship_memory (AI-distilled 3-sentence summary), relationship_memory_updated_at
 - **contacts** - business_id, name, emails[], phones[], role, notes, is_active (unique per business+email)
 - **correspondence** - business_id, contact_id (nullable — Notes have no contact), cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, edited_at, content_hash
 - **duplicate_dismissals** - business_id, entry_id_1, entry_id_2, dismissed_by, dismissed_at
@@ -227,9 +228,11 @@ All features complete and deployed (unless noted):
 23. File Uploads — **live** (Supabase Storage, 10MB/file, 50MB/org cap, upload/download/delete on business pages.)
 24. UX Audit — **live** (P28: modal save mechanics, consistency pass, toast dismiss, onboarding steps, empty states, design token sweep across 25+ files)
 25. Insight History — **live** (P33: `insight_history` table, "View history" in expanded InsightCard, timeline of past snapshots, click to view previous versions)
+26. Relationship Memory — **live** (P34: Haiku distils 3-sentence summary per business after each insight, stored in `businesses.relationship_memory`. Reduces correspondence context 50→30 entries. Fire-and-forget.)
 
 ## Recent Changes
 
+- **Apr 07, 2026:** P34 — Relationship memory: after each business-specific insight generation, Haiku distils a 3-sentence relationship summary (`businesses.relationship_memory`). Injected into all business insight prompts as context. Correspondence limit reduced from 50→30 when memory exists. Fire-and-forget (doesn't block response). Migration: `20260407_002_add_relationship_memory.sql`. New: `lib/ai/relationship-memory.ts`.
 - **Apr 07, 2026:** P33 — Insight history: new `insight_history` table archives every generated insight. "View history" button in expanded InsightCard shows timeline of past snapshots with content preview. Click any entry to view that version's content, "Back to current" to return. Migration: `20260407_001_add_insight_history.sql`.
 - **Apr 05, 2026:** P28 — Full UX audit: replaced `window.location.reload()` with `router.refresh()` in edit modals, success toasts on all modals, standardised modal styling (errors, buttons, autofocus, close buttons), toast dismiss button, onboarding step numbering fix (5→4), filtered empty state on business page, duplicate detection explainer, Ctrl+K hint in nav, design token sweep (60+ raw blue-600 → brand-navy across 25+ files).
 - **Apr 04, 2026:** P32 + P19 — Actionable insight buttons (7 types with contextual actions in expanded cards). File uploads on business pages (Supabase Storage, server actions, BusinessFiles component, 50MB org cap). API cost reduction — 9/11 AI call sites switched to claude-haiku-4-5 (3x cheaper). Centralised model constants in `lib/ai/models.ts`. Token budgets reduced (formatter 8K→4K, chat 16K→8K). Insight cache TTLs doubled (org 48h, biz 12h). Prompt caching added to 6 endpoints. Regex bypass skips AI for short structured emails.
