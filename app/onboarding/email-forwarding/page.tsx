@@ -105,9 +105,9 @@ export default function EmailForwardingOnboardingPage() {
               className="p-4 rounded-sm"
               style={{ border: '1px solid rgba(0,0,0,0.08)', backgroundColor: 'var(--brand-warm)' }}
             >
-              <p className="text-sm font-semibold text-gray-800 mb-1">Capturing received emails</p>
+              <p className="text-sm font-semibold text-gray-800 mb-1">Emails you receive</p>
               <p className="text-sm text-gray-600">
-                Set up a forwarding rule in Gmail or Outlook to forward incoming emails to your address above. They&rsquo;ll be filed as <strong>received</strong> and auto-matched to businesses you&rsquo;ve already added.
+                Set up a forwarding rule in Gmail or Outlook to forward incoming emails to your address above. They&rsquo;ll be saved automatically and matched to businesses you&rsquo;ve already added.
               </p>
             </div>
 
@@ -115,9 +115,9 @@ export default function EmailForwardingOnboardingPage() {
               className="p-4 rounded-sm"
               style={{ border: '1px solid rgba(0,0,0,0.08)', backgroundColor: 'var(--brand-warm)' }}
             >
-              <p className="text-sm font-semibold text-gray-800 mb-1">Capturing sent emails</p>
+              <p className="text-sm font-semibold text-gray-800 mb-1">Emails you send</p>
               <p className="text-sm text-gray-600">
-                BCC your address on emails you send. The system detects it was a sent email and files it as <strong>sent</strong>, matching the business from the recipients automatically.
+                BCC your address when sending emails. We detect it&rsquo;s a sent email and save it as <strong>outgoing</strong>, matched to the right business automatically.
               </p>
             </div>
           </div>

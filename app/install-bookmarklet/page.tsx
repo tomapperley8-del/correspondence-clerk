@@ -41,8 +41,8 @@ export default function InstallBookmarkletPage() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="bg-black text-white text-center py-16">
-        <h1 className="text-4xl md:text-5xl font-bold mb-3">📧 Email → Correspondence Clerk</h1>
-        <p className="text-xl md:text-2xl text-[#98bf64] font-medium">File emails in one click</p>
+        <h1 className="text-4xl md:text-5xl font-bold mb-3">Email to Correspondence Clerk</h1>
+        <p className="text-xl md:text-2xl text-[#98bf64] font-medium">Save any email to your records in one click</p>
       </header>
 
       <div className="max-w-4xl mx-auto px-5 py-12">
@@ -151,7 +151,7 @@ export default function InstallBookmarkletPage() {
               },
               {
                 title: "That's it!",
-                content: 'You can now click this bookmark whenever you\'re viewing an email in Outlook Web'
+                content: 'You can now click this bookmark whenever you\'re viewing an email. Open any email first, then click it.'
               }
             ].map((step, index) => (
               <li key={index} className="relative pl-20 py-5 bg-[#f5f5f5] border-l-4 border-[#98bf64]">
@@ -182,7 +182,7 @@ export default function InstallBookmarkletPage() {
                   : 'View any email in Gmail (mail.google.com)'
               },
               { icon: '📌', title: 'Click Bookmark', description: 'Click the bookmarklet you just installed in your bookmarks bar' },
-              { icon: '✅', title: 'File It', description: 'Correspondence Clerk opens with the email pre-filled, ready to save' }
+              { icon: '✅', title: 'Save It', description: 'Correspondence Clerk opens with the email pre-filled, ready to save' }
             ].map((step, index) => (
               <div key={index} className="bg-[#f5f5f5] p-8 text-center border-t-4 border-[#98bf64]">
                 <div className="text-5xl mb-4">{step.icon}</div>
@@ -251,7 +251,7 @@ export default function InstallBookmarkletPage() {
         <div className="bg-brand-paper border border-brand-navy rounded p-5 mb-8 flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-brand-dark">Want to import months of past emails at once?</p>
-            <p className="text-xs text-gray-500 mt-0.5">Bulk import scans your inbox and lets you review everything before saving.</p>
+            <p className="text-xs text-gray-500 mt-0.5">Bulk import scans your inbox, groups emails by business, and lets you review before anything is saved.</p>
           </div>
           <a
             href="/import"

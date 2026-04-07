@@ -128,14 +128,14 @@ export default function OutlookImportPage() {
 
       <h1 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-1">Import from Outlook</h1>
       <p className="text-gray-500 text-sm mb-8">
-        Scan your Outlook or Microsoft 365 inbox and choose which emails to import. New businesses and contacts
-        will be created automatically.
+        Scan your Outlook or Microsoft 365 inbox and choose which emails to import. We&apos;ll suggest business and contact names — you review everything before anything is saved.
       </p>
 
       {step === 'configure' && (
         <div className="bg-white border border-gray-200 rounded p-6 shadow-[var(--shadow-sm,0_1px_3px_rgba(0,0,0,0.06))]">
           <div className="mb-5">
             <label className="block text-sm font-medium text-gray-700 mb-2">How far back to scan</label>
+            <p className="text-xs text-gray-400 mb-2">3 months is a good starting point</p>
             <div className="flex gap-2">
               {[1, 3, 6].map((m) => (
                 <button
@@ -181,7 +181,7 @@ export default function OutlookImportPage() {
             <span className="font-medium text-brand-dark">{scanStats?.emails ?? 0}</span> emails across{' '}
             <span className="font-medium text-brand-dark">{scanStats?.businesses ?? 0}</span> businesses and{' '}
             <span className="font-medium text-brand-dark">{scanStats?.contacts ?? 0}</span> contacts.
-            Edit names or exclude rows you don&apos;t want before importing.
+            Check the names below and untick anything you don&apos;t want to import.
           </div>
           <ReviewWizard
             scanResult={scanResult}
