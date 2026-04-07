@@ -13,6 +13,7 @@ export type Contract = {
   contract_end: string | null
   contract_amount: number | null
   contract_currency: string | null
+  billing_frequency: 'monthly' | 'annual'
   deal_terms: string | null
   invoice_paid: boolean
   is_current: boolean
@@ -46,6 +47,7 @@ export async function createContract(businessId: string, fields: {
   contract_end?: string | null
   contract_amount?: number | null
   contract_currency?: string
+  billing_frequency?: 'monthly' | 'annual'
   deal_terms?: string | null
   invoice_paid?: boolean
   is_current?: boolean
@@ -67,6 +69,7 @@ export async function createContract(businessId: string, fields: {
       contract_end: fields.contract_end || null,
       contract_amount: fields.contract_amount ?? null,
       contract_currency: fields.contract_currency || 'GBP',
+      billing_frequency: fields.billing_frequency || 'annual',
       deal_terms: fields.deal_terms || null,
       invoice_paid: fields.invoice_paid ?? false,
       is_current: fields.is_current ?? true,
@@ -85,6 +88,7 @@ export async function updateContract(contractId: string, businessId: string, fie
   contract_end: string | null
   contract_amount: number | null
   contract_currency: string
+  billing_frequency: 'monthly' | 'annual'
   deal_terms: string | null
   invoice_paid: boolean
   is_current: boolean

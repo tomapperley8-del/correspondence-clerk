@@ -43,6 +43,7 @@ const emptyForm = {
   contract_end: '',
   contract_amount: '',
   contract_currency: 'GBP',
+  billing_frequency: 'annual' as 'monthly' | 'annual',
   deal_terms: '',
   invoice_paid: false,
   is_current: true,
@@ -99,6 +100,22 @@ function ContractForm({
           <Input id="contractAmount" type="number" step="0.01" min="0" value={data.contract_amount}
             onChange={(e) => setData({ ...data, contract_amount: e.target.value })}
             placeholder="0.00" className="flex-1" />
+        </div>
+        <div className="flex gap-2 mt-2">
+          <button
+            type="button"
+            onClick={() => setData({ ...data, billing_frequency: 'monthly' })}
+            className={`px-3 py-1 text-sm font-semibold border transition-colors ${data.billing_frequency === 'monthly' ? 'bg-brand-navy text-white border-brand-navy' : 'bg-white text-gray-700 border-gray-200 hover:border-brand-navy'}`}
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            onClick={() => setData({ ...data, billing_frequency: 'annual' })}
+            className={`px-3 py-1 text-sm font-semibold border transition-colors ${data.billing_frequency === 'annual' ? 'bg-brand-navy text-white border-brand-navy' : 'bg-white text-gray-700 border-gray-200 hover:border-brand-navy'}`}
+          >
+            Annual
+          </button>
         </div>
       </div>
 
@@ -187,6 +204,7 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
     contract_end: c.contract_end || '',
     contract_amount: c.contract_amount?.toString() || '',
     contract_currency: c.contract_currency || 'GBP',
+    billing_frequency: c.billing_frequency || 'annual',
     deal_terms: c.deal_terms || '',
     invoice_paid: c.invoice_paid,
     is_current: c.is_current,
@@ -199,6 +217,7 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
       contract_end: data.contract_end || null,
       contract_amount: data.contract_amount ? parseFloat(data.contract_amount) : null,
       contract_currency: data.contract_currency,
+      billing_frequency: data.billing_frequency,
       deal_terms: data.deal_terms || null,
       invoice_paid: data.invoice_paid,
       is_current: data.is_current,
@@ -216,6 +235,7 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
       contract_end: data.contract_end || null,
       contract_amount: data.contract_amount ? parseFloat(data.contract_amount) : null,
       contract_currency: data.contract_currency,
+      billing_frequency: data.billing_frequency,
       deal_terms: data.deal_terms || null,
       invoice_paid: data.invoice_paid,
       is_current: data.is_current,
@@ -299,6 +319,9 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
             {contract.contract_amount && (
               <p className="text-xl font-bold text-gray-900 mb-1">
                 {formatAmount(contract.contract_amount, contract.contract_currency || 'GBP')}
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  {contract.billing_frequency === 'monthly' ? 'per month' : 'per year'}
+                </span>
               </p>
             )}
 
