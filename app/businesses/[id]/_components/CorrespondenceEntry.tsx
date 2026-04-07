@@ -27,7 +27,7 @@ interface CorrespondenceEntryProps {
   onCancelEdit: () => void
   onDelete: (id: string, subject: string) => void
   onPin: (id: string, isPinned: boolean) => Promise<void>
-  onAction: (id: string, action: string) => Promise<void>
+  onAction: (id: string, action: string, dueAt?: string) => Promise<void>
   onShowPrevious: (id: string) => void
   onShowNext: (id: string) => void
   showPrevButton: boolean
@@ -285,7 +285,11 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
             <div className="flex gap-2 flex-wrap mb-3">
               <button
                 type="button"
-                onClick={() => onAction(entry.id, 'follow_up')}
+                onClick={() => {
+                  const d = new Date()
+                  d.setDate(d.getDate() + 7)
+                  onAction(entry.id, 'follow_up', d.toISOString().split('T')[0])
+                }}
                 className="px-3 py-2 sm:py-1 text-xs border border-amber-300 text-amber-800 hover:bg-amber-50"
               >
                 Follow-up

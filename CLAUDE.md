@@ -65,7 +65,7 @@ app/
                                ThreadsView, FilterBar, DuplicatesWarningBanner, ContactsList,
                                BusinessFiles
   new-entry/page.tsx           Add correspondence (forced filing + AI formatting + draft autosave)
-  actions/page.tsx             Priority list + needs-reply + gone-quiet + flagged + reminders
+  actions/page.tsx             Unified smart list (replies first → overdue → due today → renewals → quiet → reminders)
   daily-briefing/page.tsx      Full-page inline ChatPanel
   search/page.tsx              Full-text search results
   import/gmail/page.tsx        Gmail bulk import wizard
@@ -121,6 +121,33 @@ lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feat
 - **Thread split**: AI splits → ContactMatchPreviewModal (user reviews contacts) → createFormattedCorrespondence; use `isThreadSplitResponse()` type guard
 - **contact_id nullable**: Note type entries have no contact — guard before accessing contact fields
 - **Toast**: `import { toast } from '@/lib/toast'` then `toast.success('message')` — works anywhere client-side
+
+### Actions Architecture
+
+The Actions page (`app/actions/page.tsx`) is a **unified smart list** — a single sorted feed, no collapsible sections. All signals merge into one `buildUnifiedList()` call client-side.
+
+**Signal sources (5 server action fetches in parallel on load):**
+1. `getNeedsReply()` — received correspondence with no reply within 7 days; client-side `likelyNeedsReply()` heuristic filters closers/OOO
+2. `getOutstandingActions()` — `action_needed != 'none'` entries, ordered by due_at
+3. `getPureReminders()` — `action_needed = 'none'` but `due_at IS NOT NULL`
+4. `getGoneQuiet()` — businesses with `last_contacted_at < 60 days ago` and 3+ entries
+5. `getContractExpiries()` — businesses where `contract_end IS NOT NULL` and within 30 days (null-safe — only fires when data exists)
+
+**Badge urgency order:** REPLY (7+ days) → REPLY (3–6 days) → OVERDUE → DUE_TODAY → DUE_TOMORROW → DUE_SOON → RENEWAL (<7d) → FLAG → RENEWAL (7–30d) → QUIET → REMINDER
+
+**How items enter the system (three paths):**
+1. **Manual one-click flag** — "Follow-up" button on `CorrespondenceEntry.tsx` calls `setCorrespondenceAction(id, 'follow_up', dueAt)` where `dueAt = today + 7 days`. `setCorrespondenceAction` in `app/actions/correspondence.ts` accepts optional `dueAt`.
+2. **AI auto-flag on inbound email** — `app/api/inbound-email/route.ts`: if `ai_result.action_suggestion.confidence === 'high'`, `action_needed` and `due_at` are set on the correspondence row at insert time. Completely automatic. If AI fails, falls back to `action_needed: 'none'` — never blocks.
+3. **Insights push** — "Add to Actions" button in `components/InsightsPanel.tsx` (shown for `call_prep`, `next_best_action`, `what_did_we_agree`, `outreach_draft`, `risk_check` insight types) calls `createCorrespondence` with `action_needed: 'follow_up'` on the business.
+
+**Actions vs Insights distinction:**
+- **Actions** = tactical, time-sensitive, clearable. Answers: "what do I do TODAY?"
+- **Insights** = strategic intelligence, relationship context. Answers: "what should I KNOW?"
+- Insights can push into Actions (one-way). Actions does not pull from Insights automatically.
+
+**Keyboard shortcuts:** `↑ ↓` navigate · `D` done · `S` snooze 7d · `L` reply/log
+
+**No DB migrations required for the Actions system** — all fields (`action_needed`, `due_at`, `contract_end`) pre-exist.
 
 ### Database Tables
 
@@ -229,9 +256,11 @@ All features complete and deployed (unless noted):
 24. UX Audit — **live** (P28: modal save mechanics, consistency pass, toast dismiss, onboarding steps, empty states, design token sweep across 25+ files)
 25. Insight History — **live** (P33: `insight_history` table, "View history" in expanded InsightCard, timeline of past snapshots, click to view previous versions)
 26. Relationship Memory — **live** (P34: Haiku distils 3-sentence summary per business after each insight, stored in `businesses.relationship_memory`. Reduces correspondence context 50→30 entries. Fire-and-forget.)
+27. Actions Page Redesign — **live** (P35: unified smart list replaces 5-section layout. Replies always first. Contract expiries auto-surface (30-day window). AI high-confidence action suggestions applied on inbound auto-file. One-click flag on business page sets due_at +7 days. Enhanced quick log panel (type/date/time + mark done checkbox). Insights "Add to Actions" push button on 5 business insight types. Keyboard shortcut R→L.)
 
 ## Recent Changes
 
+- **Apr 07, 2026:** P35 — Actions page redesign: unified smart list (single sorted feed, no collapsible sections). Replies always first. Added contract expiry signals (30-day window, null-safe). AI high-confidence action suggestions now applied when inbound emails are auto-filed. One-click flag on business page entries sets follow_up + due_at +7 days. Enhanced quick log panel (type/date/time + mark-done checkbox). Insights "Add to Actions" push button for 5 business insight types (call_prep, next_best_action, what_did_we_agree, outreach_draft, risk_check). Keyboard shortcut R→L.
 - **Apr 07, 2026:** P34 — Relationship memory: after each business-specific insight generation, Haiku distils a 3-sentence relationship summary (`businesses.relationship_memory`). Injected into all business insight prompts as context. Correspondence limit reduced from 50→30 when memory exists. Fire-and-forget (doesn't block response). Migration: `20260407_002_add_relationship_memory.sql`. New: `lib/ai/relationship-memory.ts`.
 - **Apr 07, 2026:** P33 — Insight history: new `insight_history` table archives every generated insight. "View history" button in expanded InsightCard shows timeline of past snapshots with content preview. Click any entry to view that version's content, "Back to current" to return. Migration: `20260407_001_add_insight_history.sql`.
 - **Apr 05, 2026:** P28 — Full UX audit: replaced `window.location.reload()` with `router.refresh()` in edit modals, success toasts on all modals, standardised modal styling (errors, buttons, autofocus, close buttons), toast dismiss button, onboarding step numbering fix (5→4), filtered empty state on business page, duplicate detection explainer, Ctrl+K hint in nav, design token sweep (60+ raw blue-600 → brand-navy across 25+ files).

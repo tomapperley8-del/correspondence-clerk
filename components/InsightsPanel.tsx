@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useInsights } from '@/components/InsightsContext'
 import { MarkdownLite } from '@/components/ChatMessage'
 import { getInsightCacheStatus, getUserPresets, getInsightHistory, type CacheStatus, type UserAIPreset, type InsightHistoryEntry } from '@/app/actions/insights'
+import { createCorrespondence } from '@/app/actions/correspondence'
 import { INSIGHT_METADATA, type InsightType } from '@/lib/ai/insight-prompts'
 import { toast } from '@/lib/toast'
 
@@ -22,6 +23,9 @@ const BUSINESS_TYPES: InsightType[] = [
   'call_prep', 'relationship_story', 'outreach_draft', 'what_did_we_agree',
   'next_best_action', 'risk_check', 'full_picture', 'data_health_biz',
 ]
+
+// Insight types where "Add to Actions" makes sense
+const ADD_TO_ACTIONS_TYPES = new Set(['call_prep', 'next_best_action', 'what_did_we_agree', 'outreach_draft', 'risk_check'])
 
 // ---------------------------------------------------------------------------
 // Types
@@ -248,7 +252,8 @@ function InsightCard({
         </div>
         {!viewingEntry && (() => {
           const actions = getInsightActions(insightType, businessId, router, cardState.content)
-          if (actions.length === 0) return null
+          const showAddToActions = businessId && ADD_TO_ACTIONS_TYPES.has(insightType) && cardState.content
+          if (actions.length === 0 && !showAddToActions) return null
           return (
             <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
               {actions.map((action) => (
@@ -260,6 +265,27 @@ function InsightCard({
                   {action.label}
                 </button>
               ))}
+              {showAddToActions && (
+                <button
+                  onClick={async () => {
+                    const meta = INSIGHT_METADATA[insightType.startsWith('custom_') ? 'custom' : insightType as InsightType]
+                    const subject = `[Insight] ${meta?.label ?? insightType}`
+                    const snippet = cardState.content!.slice(0, 200)
+                    const result = await createCorrespondence({
+                      business_id: businessId!,
+                      raw_text_original: snippet,
+                      subject,
+                      type: 'Note',
+                      action_needed: 'follow_up',
+                    })
+                    if ('error' in result && result.error) toast.error('Failed to add to Actions')
+                    else toast.success('Added to Actions')
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-sm border border-brand-navy text-brand-navy hover:bg-brand-navy/5 transition-colors"
+                >
+                  Add to Actions
+                </button>
+              )}
             </div>
           )
         })()}

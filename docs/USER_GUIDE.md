@@ -65,14 +65,29 @@ Receive emails directly into Correspondence Clerk without copying and pasting.
 
 ## Actions
 
-The [Actions page](/actions) shows what needs attention:
+The [Actions page](/actions) is a single sorted list of everything that needs your attention. Replies always appear first, then urgency-ordered flags, renewals, quiet relationships, and reminders.
 
-- **Priority** — flagged entries or items with due dates
-- **Needs Reply** — received emails with no reply logged
-- **Gone Quiet** — businesses you haven't contacted in a while
-- **Reminders** — entries with upcoming due dates
+**What appears and why:**
 
-Navigate with **j/k** keys, press **Space** to expand an entry.
+- **No reply · X days** — a received email has had no response logged within 7 days. Amber for 3–6 days, red for 7+.
+- **Overdue / Due today / Due tomorrow / Due soon** — a flagged entry has a due date approaching or past.
+- **Contract renewal** — a business has a contract ending within the next 30 days. Only appears if a contract end date is set.
+- **Gone quiet** — a business you haven't been in contact with for 60+ days (with at least 3 prior entries).
+- **Reminder** — an entry with an upcoming due date but no specific action flag.
+
+**How items get here:**
+
+- Flag any email as "Follow-up" from the business page — one click sets a 7-day due date automatically.
+- When the AI formats a received email and detects a high-confidence action (e.g. a question requiring a response, an invoice), it flags it automatically. No manual step needed.
+- From Insights, click "Add to Actions" on any business insight card to push it into your action list.
+
+**Taking action:**
+
+- **Done** — marks the item resolved and removes it from the list.
+- **Snooze** — push it back 3 days, 1 week, or 1 month.
+- **Reply / Log** — opens an inline panel. Choose type (Call, Email, or Note), set date and time, write what happened. Check "Mark original as done" to close the source item in one step.
+
+**Keyboard shortcuts:** `↑ ↓` navigate · `D` done · `S` snooze 7 days · `L` reply / log
 
 ## AI Assistant (Daily Briefing)
 

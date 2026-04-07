@@ -848,14 +848,16 @@ export async function markCorrespondenceDone(id: string) {
   return { success: true }
 }
 
-export async function setCorrespondenceAction(id: string, actionNeeded: string) {
+export async function setCorrespondenceAction(id: string, actionNeeded: string, dueAt?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
   const { data: entry } = await supabase.from('correspondence').select('business_id').eq('id', id).single()
-  const { error } = await supabase.from('correspondence').update({ action_needed: actionNeeded }).eq('id', id).eq('organization_id', orgId)
+  const update: Record<string, string | null> = { action_needed: actionNeeded }
+  if (dueAt !== undefined) update.due_at = dueAt
+  const { error } = await supabase.from('correspondence').update(update).eq('id', id).eq('organization_id', orgId)
   if (error) return { error: error.message }
   if (entry) revalidatePath(`/businesses/${entry.business_id}`)
   revalidatePath('/actions')
@@ -1013,4 +1015,29 @@ export async function getOutstandingActionsCount(): Promise<number> {
       .eq('organization_id', orgId).eq('action_needed', 'none').not('due_at', 'is', null),
   ])
   return (flagged.count ?? 0) + (reminders.count ?? 0)
+}
+
+export async function getContractExpiries() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const in30Days = new Date(today)
+  in30Days.setDate(in30Days.getDate() + 30)
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('id, name, contract_end, contract_amount, contract_currency')
+    .eq('organization_id', orgId)
+    .not('contract_end', 'is', null)
+    .gte('contract_end', today.toISOString().split('T')[0])
+    .lte('contract_end', in30Days.toISOString().split('T')[0])
+    .order('contract_end', { ascending: true })
+
+  if (error) return { error: error.message }
+  return { data: data || [] }
 }
