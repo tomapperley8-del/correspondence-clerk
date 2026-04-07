@@ -44,7 +44,7 @@ interface BusinessFilesProps {
 export function BusinessFiles({ businessId }: BusinessFilesProps) {
   const [files, setFiles] = useState<BusinessFile[]>([])
   const [storageUsed, setStorageUsed] = useState(0)
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<BusinessFile | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -57,8 +57,6 @@ export function BusinessFiles({ businessId }: BusinessFilesProps) {
     ])
     setFiles(fileData)
     setStorageUsed(usage)
-    // Auto-expand if files exist
-    if (fileData.length > 0) setIsExpanded(true)
   }, [businessId])
 
   useEffect(() => {
