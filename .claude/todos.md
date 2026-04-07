@@ -102,6 +102,27 @@ Pick up from the first incomplete item each session.
 - [ ] **P11** — Pricing page: "Most Popular" badge on Pro card; monthly/annual toggle (annual = ×10, show "Save 17%" not "2 months"); all CTAs read "Start free trial — [Plan]" *(hold — pricing not finalised)*
 - [x] **P23** — Monthly billing flag: migration to add `billing_frequency ENUM('monthly','annual') DEFAULT 'annual'` to contracts table; add Monthly/Annual toggle to contract add/edit form; display frequency next to contract amount. File: `components/ContractDetailsCard.tsx`. (07/04/2026)
 - [x] **P28** *(replaces P20)* — Full UX audit + fixes: 6 phases — modal save mechanics (router.refresh replacing window.location.reload), modal consistency (error styling, autofocus, close buttons), toast dismiss button, onboarding step numbering, empty states + explainers (filtered entries, duplicates, Ctrl+K hint), design token sweep (60+ blue-600 → brand-navy across 25+ files). (05/04/2026)
+- [x] **P36** — Actions page redesign: unified smart list replacing 5-section layout. Replies first. Contract expiries. AI auto-flagging on inbound. One-click flag from business page. Enhanced Log panel (type/date/time/mark-done). Insights "Add to Actions" push. Dashboard onboarding completion state. USER_GUIDE updated. (07/04/2026)
+
+---
+
+## Batch 9 — Next Level
+
+- [ ] **P37** — **Mobile app** — React Native (Expo) app with core loop: view Actions, log a call/note, view business correspondence. Auth via Supabase. Shared server actions already work. Start with read + log only, no editing.
+
+- [ ] **P38** — **Commitment tracking** — Passive extraction of commitments from correspondence. After each new entry is filed, Haiku scans it for commitments made in either direction ("I'll send that over by Friday", "They promised to confirm by end of week"). Stored in a new `commitments` table (business_id, text, direction, due_date, status: open/resolved, source_correspondence_id). Unresolved commitments auto-surface in Actions as a `[COMMITMENT]` badge item. Haiku also runs a weekly pass to mark resolved ones (new correspondence mentions it was done). Zero-admin — entirely passive.
+
+- [ ] **P39** — **Suggested draft replies** — For `[REPLY]` items in Actions, a "Draft reply" button triggers a Haiku call with the last 5 entries from that business as context. Returns a short draft in the user's style. Appears inline below the item, editable, copy-to-clipboard. No sending — just draft generation. Should take ~2s. One Haiku call per click, cached for 1h per correspondence_id.
+
+- [ ] **P40** — **Team features** — Multi-user collaboration within an org. Phase 1: assign a correspondence entry to a team member (`assigned_to` UUID on correspondence table). Assigned items appear in that user's Actions list with an `[ASSIGNED]` badge. "Assigned to me" filter in Actions. Phase 2: activity feed showing what teammates logged today. Phase 3: shared inbox with claim/release. Uses existing `user_profiles` + org membership.
+
+- [ ] **P41** — **CRM & data import** — Import from Salesforce (CSV export), HubSpot (CSV export), and generic CSV with column mapping UI. Map: Account Name → business, Contact Name/Email → contact, Activity Date/Notes → correspondence. Deduplicates against existing records by name + email (same logic as mastersheet import). New import wizard page at `/import/crm`. Lowers barrier for users switching from other tools.
+
+- [ ] **P42** — **Push notifications & SMS reminders** — Browser push notifications (Web Push API via Vercel Edge) for urgent Actions items: new overdue reply, due-today flag, contract expiring this week. Optional SMS via Twilio for users who opt in. Settings toggle per channel. Only fires for urgencyScore ≤ 4 items — no noise for lower-priority items. Batched: max one push per hour regardless of how many items qualify.
+
+- [ ] **P43** — **Morning email — actionable inline** — Upgrade the existing daily briefing email (P31/Resend cron) so each item in the email has a one-click action link. "Mark done" and "Snooze 1 week" links encode a signed token (HMAC, 24h TTL) that hits a new `/api/actions/quick-act` route — no login required for that single action. Turns the daily email from read-only into a zero-friction triage tool. Top 5 items only, replies first.
+
+- [ ] **P44** — **Public API + Zapier integration** — REST API at `/api/v1/` for businesses, contacts, and correspondence (read + create). API key auth per org (generated in settings, stored hashed). Rate-limited (100 req/min). Zapier integration built on top: triggers (new correspondence filed, action flagged) + actions (create correspondence, flag for follow-up). Unlocks power users and automation workflows without building every integration ourselves.
 
 ---
 
