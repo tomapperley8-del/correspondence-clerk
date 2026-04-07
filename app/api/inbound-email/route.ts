@@ -266,6 +266,8 @@ async function insertCorrespondenceServiceRole(
     formattingStatus: string
     fromEmail: string
     direction: 'received' | 'sent'
+    actionNeeded?: string
+    dueAt?: string | null
   }
 ): Promise<void> {
   const { data: contentHash } = await supabase.rpc('compute_content_hash', {
@@ -296,7 +298,8 @@ async function insertCorrespondenceServiceRole(
     subject: opts.subject,
     type: 'Email',
     direction: opts.direction,
-    action_needed: 'none',
+    action_needed: opts.actionNeeded || 'none',
+    due_at: opts.dueAt || null,
     formatting_status: opts.formattingStatus,
     content_hash: contentHash || null,
     ai_metadata: {
@@ -601,6 +604,8 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       let entryDate = payload.date ?? new Date().toISOString()
       let subject = payload.subject || '(No subject)'
       let formattingStatus = 'unformatted'
+      let actionNeeded: string | undefined
+      let dueAt: string | null | undefined
 
       if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
         const ai = formatResult.data
@@ -608,6 +613,16 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
         entryDate = ai.entry_date_guess || entryDate
         subject = ai.subject_guess || subject
         formattingStatus = 'formatted'
+        if (ai.action_suggestion?.confidence === 'high' && ai.action_suggestion.action_type) {
+          actionNeeded = ai.action_suggestion.action_type
+          if (ai.action_suggestion.suggested_due_date) {
+            dueAt = ai.action_suggestion.suggested_due_date
+          } else {
+            const d = new Date(entryDate)
+            d.setDate(d.getDate() + 7)
+            dueAt = d.toISOString().split('T')[0]
+          }
+        }
       }
 
       log('[inbound-email] formatting_done', { formattingStatus, direction: 'sent' })
@@ -623,6 +638,8 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
         formattingStatus,
         fromEmail,
         direction: 'sent',
+        actionNeeded,
+        dueAt,
       })
 
       return NextResponse.json({}, { status: 200 })
@@ -706,6 +723,8 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     let entryDate = payload.date ?? new Date().toISOString()
     let subject = payload.subject || '(No subject)'
     let formattingStatus = 'unformatted'
+    let actionNeeded: string | undefined
+    let dueAt: string | null | undefined
 
     if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
       const ai = formatResult.data
@@ -713,6 +732,16 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       entryDate = ai.entry_date_guess || entryDate
       subject = ai.subject_guess || subject
       formattingStatus = 'formatted'
+      if (ai.action_suggestion?.confidence === 'high' && ai.action_suggestion.action_type) {
+        actionNeeded = ai.action_suggestion.action_type
+        if (ai.action_suggestion.suggested_due_date) {
+          dueAt = ai.action_suggestion.suggested_due_date
+        } else {
+          const d = new Date(entryDate)
+          d.setDate(d.getDate() + 7)
+          dueAt = d.toISOString().split('T')[0]
+        }
+      }
     }
 
     log('[inbound-email] formatting_done', { formattingStatus, direction: 'received' })
@@ -728,6 +757,8 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       formattingStatus,
       fromEmail: effectiveFromEmail,
       direction: 'received',
+      actionNeeded,
+      dueAt,
     })
 
     return NextResponse.json({}, { status: 200 })

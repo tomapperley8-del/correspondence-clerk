@@ -726,11 +726,11 @@ export default function BusinessDetailPage({
   }, [refreshCorrespondence])
 
   // Quick action handler (optimistic)
-  const handleAction = useCallback(async (entryId: string, action: string) => {
+  const handleAction = useCallback(async (entryId: string, action: string, dueAt?: string) => {
     const entry = correspondence.find(c => c.id === entryId)
     const prevAction = entry?.action_needed ?? 'none'
     setCorrespondence((prev) => prev.map((c) => c.id === entryId ? { ...c, action_needed: action as Correspondence['action_needed'] } : c))
-    const result = await setCorrespondenceAction(entryId, action)
+    const result = await setCorrespondenceAction(entryId, action, dueAt)
     if (result && 'error' in result) {
       setCorrespondence((prev) => prev.map((c) => c.id === entryId ? { ...c, action_needed: prevAction } : c))
       toast.error(action === 'none' ? 'Failed to mark done' : 'Failed to set action')
