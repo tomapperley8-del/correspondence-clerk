@@ -358,9 +358,7 @@ export default function SettingsPage() {
             <div className="mb-5 pb-5 border-b border-gray-100">
               <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--brand-dark)' }}>My email addresses</h3>
               <p className="text-xs text-gray-500 mb-3">
-                Normally, BCC captures sent emails automatically. If you ever forward an email from your Sent folder instead,
-                the system needs to know the From address is yours — otherwise it looks like a received email.
-                Your primary sign-in email is always recognised.
+                If you forward emails from your Sent folder, add your sending addresses here so we know they&apos;re yours — otherwise forwarded sent mail looks like received mail. Your sign-in email is always recognised automatically.
               </p>
               <div className="flex flex-wrap gap-2 mb-3">
                 {/* Auth email — always present, cannot be removed */}
