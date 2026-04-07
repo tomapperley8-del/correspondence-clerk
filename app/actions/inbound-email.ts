@@ -467,6 +467,51 @@ export async function blockSenderEmail(email: string): Promise<{ error?: string 
 }
 
 /**
+ * Get all blocked senders for the current organisation
+ */
+export async function getBlockedSenders(): Promise<{ data?: { id: string; email: string; created_at: string | null }[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data, error } = await supabase
+    .from('blocked_senders')
+    .select('id, email, created_at')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message }
+  return { data: data ?? [] }
+}
+
+/**
+ * Unblock a sender by id
+ */
+export async function unblockSender(id: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { error } = await supabase
+    .from('blocked_senders')
+    .delete()
+    .eq('id', id)
+    .eq('org_id', orgId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/inbox')
+  revalidatePath('/settings')
+  return {}
+}
+
+/**
  * Get the current user's registered own email addresses
  */
 export async function getOwnEmailAddresses(): Promise<{ data: string[] | null; error?: string }> {
