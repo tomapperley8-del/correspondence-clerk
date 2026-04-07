@@ -100,7 +100,7 @@ Pick up from the first incomplete item each session.
 ## Batch 8 — Final Pass (do last)
 
 - [ ] **P11** — Pricing page: "Most Popular" badge on Pro card; monthly/annual toggle (annual = ×10, show "Save 17%" not "2 months"); all CTAs read "Start free trial — [Plan]" *(hold — pricing not finalised)*
-- [ ] **P23** — Monthly billing flag: migration to add `billing_frequency ENUM('monthly','annual') DEFAULT 'annual'` to contracts table; add Monthly/Annual toggle to contract add/edit form; display frequency next to contract amount. File: `components/ContractDetailsCard.tsx`.
+- [x] **P23** — Monthly billing flag: migration to add `billing_frequency ENUM('monthly','annual') DEFAULT 'annual'` to contracts table; add Monthly/Annual toggle to contract add/edit form; display frequency next to contract amount. File: `components/ContractDetailsCard.tsx`. (07/04/2026)
 - [x] **P28** *(replaces P20)* — Full UX audit + fixes: 6 phases — modal save mechanics (router.refresh replacing window.location.reload), modal consistency (error styling, autofocus, close buttons), toast dismiss button, onboarding step numbering, empty states + explainers (filtered entries, duplicates, Ctrl+K hint), design token sweep (60+ blue-600 → brand-navy across 25+ files). (05/04/2026)
 
 ---
