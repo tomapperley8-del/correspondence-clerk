@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useInsights } from '@/components/InsightsContext'
 import { MarkdownLite } from '@/components/ChatMessage'
-import { getInsightCacheStatus, getUserPresets, type CacheStatus, type UserAIPreset } from '@/app/actions/insights'
+import { getInsightCacheStatus, getUserPresets, getInsightHistory, type CacheStatus, type UserAIPreset, type InsightHistoryEntry } from '@/app/actions/insights'
 import { INSIGHT_METADATA, type InsightType } from '@/lib/ai/insight-prompts'
 import { toast } from '@/lib/toast'
 
@@ -46,6 +46,12 @@ function formatAge(generatedAt: string | null): string {
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `Generated ${hrs}h ago`
   return `Generated ${Math.floor(hrs / 24)}d ago`
+}
+
+function formatHistoryDate(isoDate: string): string {
+  const d = new Date(isoDate)
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
+    ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +119,11 @@ function InsightCard({
   isExpanded: boolean
 }) {
   const router = useRouter()
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [history, setHistory] = useState<InsightHistoryEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [viewingEntry, setViewingEntry] = useState<InsightHistoryEntry | null>(null)
+
   const dispatchType = insightType.startsWith('custom_') ? 'custom' : insightType as InsightType
   const meta = INSIGHT_METADATA[dispatchType]
   const label = meta?.label ?? 'Custom'
@@ -128,15 +139,58 @@ function InsightCard({
 
   const isExpired = cacheStatus?.isExpired !== false
 
+  // Reset history state when card collapses
+  useEffect(() => {
+    if (!isExpanded) {
+      setHistoryOpen(false)
+      setViewingEntry(null)
+    }
+  }, [isExpanded])
+
+  const loadHistory = useCallback(async () => {
+    if (history.length > 0) {
+      setHistoryOpen(!historyOpen)
+      return
+    }
+    setHistoryLoading(true)
+    const result = await getInsightHistory(insightType, businessId, 10)
+    if (result.data) {
+      // Exclude the current version (first entry will match current content)
+      const filtered = result.data.filter(
+        (e) => e.generated_at !== cardState.generatedAt
+      )
+      setHistory(filtered)
+    }
+    setHistoryLoading(false)
+    setHistoryOpen(true)
+  }, [insightType, businessId, history.length, historyOpen, cardState.generatedAt])
+
   if (isExpanded && hasContent) {
     return (
       <div className="border rounded-sm p-4 bg-white col-span-2" style={{ border: '1px solid rgba(0,0,0,0.1)' }}>
         <div className="flex items-start justify-between mb-3 gap-2">
           <div>
             <h4 className="font-semibold text-sm text-brand-dark">{label}</h4>
-            <p className="text-xs text-gray-400 mt-0.5">{ageText}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {viewingEntry ? formatAge(viewingEntry.generated_at) : ageText}
+              {viewingEntry && (
+                <button
+                  onClick={() => setViewingEntry(null)}
+                  className="ml-2 text-brand-navy hover:text-brand-dark transition-colors"
+                >
+                  Back to current
+                </button>
+              )}
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={loadHistory}
+              disabled={historyLoading}
+              className="text-xs text-gray-400 hover:text-brand-navy transition-colors disabled:opacity-40"
+            >
+              {historyLoading ? 'Loading…' : 'View history'}
+            </button>
             <button
               onClick={() => onGenerate(insightType, true)}
               disabled={isLoading}
@@ -154,10 +208,45 @@ function InsightCard({
             </Button>
           </div>
         </div>
+
+        {/* History timeline */}
+        {historyOpen && (
+          <div className="mb-3 pb-3 border-b border-gray-100">
+            {history.length === 0 ? (
+              <p className="text-xs text-gray-400">No previous versions yet.</p>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-gray-500 mb-1.5">
+                  {history.length} previous version{history.length !== 1 ? 's' : ''}
+                </p>
+                {history.map((entry) => {
+                  const isViewing = viewingEntry?.id === entry.id
+                  return (
+                    <button
+                      key={entry.id}
+                      onClick={() => setViewingEntry(isViewing ? null : entry)}
+                      className={`block w-full text-left text-xs px-2 py-1.5 rounded-sm transition-colors ${
+                        isViewing
+                          ? 'bg-brand-navy text-white'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {formatHistoryDate(entry.generated_at)}
+                      <span className="text-gray-400 ml-1">
+                        — {entry.content.slice(0, 60).replace(/\n/g, ' ')}…
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="text-sm text-gray-700 leading-relaxed">
-          <MarkdownLite text={cardState.content!} />
+          <MarkdownLite text={viewingEntry ? viewingEntry.content : cardState.content!} />
         </div>
-        {(() => {
+        {!viewingEntry && (() => {
           const actions = getInsightActions(insightType, businessId, router, cardState.content)
           if (actions.length === 0) return null
           return (

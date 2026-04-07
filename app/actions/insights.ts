@@ -71,6 +71,45 @@ export async function getInsightCacheStatus(
 }
 
 // ---------------------------------------------------------------------------
+// Insight history
+// ---------------------------------------------------------------------------
+
+export type InsightHistoryEntry = {
+  id: string
+  content: string
+  generated_at: string
+}
+
+export async function getInsightHistory(
+  insightType: string,
+  businessId?: string | null,
+  limit = 10
+): Promise<{ data?: InsightHistoryEntry[]; error?: string }> {
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) return { error: 'No organization found' }
+
+  const supabase = await createClient()
+
+  let query = supabase
+    .from('insight_history')
+    .select('id, content, generated_at')
+    .eq('org_id', organizationId)
+    .eq('insight_type', insightType)
+    .order('generated_at', { ascending: false })
+    .limit(limit)
+
+  if (businessId) {
+    query = query.eq('business_id', businessId)
+  } else {
+    query = query.is('business_id', null)
+  }
+
+  const { data, error } = await query
+  if (error) return { error: error.message }
+  return { data: (data ?? []) as InsightHistoryEntry[] }
+}
+
+// ---------------------------------------------------------------------------
 // User AI presets
 // ---------------------------------------------------------------------------
 

@@ -149,12 +149,32 @@ export async function POST(request: NextRequest) {
 
   const generatedAt = new Date().toISOString()
 
+  // Archive current cached version to history before overwriting
+  try {
+    await archiveCurrentToHistory(supabase, organizationId, businessId, type)
+  } catch (err) {
+    console.error('Insight history archive error:', err)
+  }
+
   // Upsert cache — two paths for nullable business_id uniqueness
   try {
     await upsertInsightCache(supabase, organizationId, businessId, type, content, generatedAt)
   } catch (err) {
     // Cache write failure doesn't fail the request — return content anyway
     console.error('Insight cache write error:', err)
+  }
+
+  // Also insert new version into history
+  try {
+    await supabase.from('insight_history').insert({
+      org_id: organizationId,
+      business_id: businessId,
+      insight_type: type,
+      content,
+      generated_at: generatedAt,
+    })
+  } catch (err) {
+    console.error('Insight history insert error:', err)
   }
 
   return NextResponse.json({ content, generatedAt, fromCache: false })
@@ -209,6 +229,37 @@ async function getPreviousCachedVersions(
 
   const { data } = await query
   return data ?? []
+}
+
+async function archiveCurrentToHistory(
+  supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never,
+  orgId: string,
+  businessId: string | null,
+  insightType: string
+) {
+  // Fetch the current cached version (if any) and copy it to insight_history
+  let query = supabase
+    .from('insight_cache')
+    .select('org_id, business_id, insight_type, content, generated_at')
+    .eq('org_id', orgId)
+    .eq('insight_type', insightType)
+
+  if (businessId) {
+    query = query.eq('business_id', businessId)
+  } else {
+    query = query.is('business_id', null)
+  }
+
+  const { data } = await query.single()
+  if (data) {
+    await supabase.from('insight_history').insert({
+      org_id: data.org_id,
+      business_id: data.business_id,
+      insight_type: data.insight_type,
+      content: data.content,
+      generated_at: data.generated_at,
+    })
+  }
 }
 
 async function upsertInsightCache(

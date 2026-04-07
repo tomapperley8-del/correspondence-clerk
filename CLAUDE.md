@@ -133,6 +133,7 @@ lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feat
 - **import_queue** - id, org_id, correspondence_id, status (pending/processing/done/failed), retry_count, error
 - **inbound_queue** - queued inbound emails awaiting manual filing
 - **domain_mappings** - org_id, domain, business_id (auto-filing for inbound email, populated on first manual file)
+- **insight_history** - id, org_id, business_id (nullable), insight_type, content, generated_at (archive of all generated insights, populated on each generation)
 - **business_files** - id, business_id, organization_id, user_id, filename, storage_path, file_type, file_size_bytes, parsed_text, created_at (Supabase Storage bucket: `business-files`)
 - **marketing_prospects/leads/referrals/email_sequence_*/social_content/blog_posts/review_requests/chatbot_conversations** - marketing engine tables
 - **RLS:** All authenticated users can read/write (v1 policy)
@@ -225,9 +226,11 @@ All features complete and deployed (unless noted):
 22. Actionable Insight Buttons — contextual actions on 7 insight types (Log call, Copy draft, View Actions, etc.)
 23. File Uploads — **live** (Supabase Storage, 10MB/file, 50MB/org cap, upload/download/delete on business pages.)
 24. UX Audit — **live** (P28: modal save mechanics, consistency pass, toast dismiss, onboarding steps, empty states, design token sweep across 25+ files)
+25. Insight History — **live** (P33: `insight_history` table, "View history" in expanded InsightCard, timeline of past snapshots, click to view previous versions)
 
 ## Recent Changes
 
+- **Apr 07, 2026:** P33 — Insight history: new `insight_history` table archives every generated insight. "View history" button in expanded InsightCard shows timeline of past snapshots with content preview. Click any entry to view that version's content, "Back to current" to return. Migration: `20260407_001_add_insight_history.sql`.
 - **Apr 05, 2026:** P28 — Full UX audit: replaced `window.location.reload()` with `router.refresh()` in edit modals, success toasts on all modals, standardised modal styling (errors, buttons, autofocus, close buttons), toast dismiss button, onboarding step numbering fix (5→4), filtered empty state on business page, duplicate detection explainer, Ctrl+K hint in nav, design token sweep (60+ raw blue-600 → brand-navy across 25+ files).
 - **Apr 04, 2026:** P32 + P19 — Actionable insight buttons (7 types with contextual actions in expanded cards). File uploads on business pages (Supabase Storage, server actions, BusinessFiles component, 50MB org cap). API cost reduction — 9/11 AI call sites switched to claude-haiku-4-5 (3x cheaper). Centralised model constants in `lib/ai/models.ts`. Token budgets reduced (formatter 8K→4K, chat 16K→8K). Insight cache TTLs doubled (org 48h, biz 12h). Prompt caching added to 6 endpoints. Regex bypass skips AI for short structured emails.
 - **Apr 02, 2026:** P31 — daily briefing email via Resend cron (8am, smart cache, opt-out toggle in settings). Replaced SendGrid with Resend across all email sending. Domain verified on Resend (eu-west-1).
