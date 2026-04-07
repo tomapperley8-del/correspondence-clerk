@@ -110,6 +110,8 @@ export type Database = {
           organization_id: string
           payment_structure: string | null
           phone: string | null
+          relationship_memory: string | null
+          relationship_memory_updated_at: string | null
           status: string | null
           updated_at: string
         }
@@ -135,6 +137,8 @@ export type Database = {
           organization_id: string
           payment_structure?: string | null
           phone?: string | null
+          relationship_memory?: string | null
+          relationship_memory_updated_at?: string | null
           status?: string | null
           updated_at?: string
         }
@@ -160,6 +164,8 @@ export type Database = {
           organization_id?: string
           payment_structure?: string | null
           phone?: string | null
+          relationship_memory?: string | null
+          relationship_memory_updated_at?: string | null
           status?: string | null
           updated_at?: string
         }

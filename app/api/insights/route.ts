@@ -15,6 +15,7 @@ import { getAnthropicClient } from '@/lib/ai/client'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { buildInsightPrompt, INSIGHT_METADATA, type InsightType } from '@/lib/ai/insight-prompts'
+import { generateRelationshipMemory } from '@/lib/ai/relationship-memory'
 import { AI_MODELS } from '@/lib/ai/models'
 
 export const maxDuration = 60
@@ -109,8 +110,9 @@ export async function POST(request: NextRequest) {
   // Build prompt (pre-fetches all data)
   let systemPrompt: string
   let userPrompt: string
+  let businessContext: string | undefined
   try {
-    ;({ systemPrompt, userPrompt } = await buildInsightPrompt(
+    ;({ systemPrompt, userPrompt, businessContext } = await buildInsightPrompt(
       dispatchType,
       organizationId,
       businessId,
@@ -175,6 +177,12 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     console.error('Insight history insert error:', err)
+  }
+
+  // Fire-and-forget: update relationship memory for business-scoped insights
+  if (businessId && businessContext) {
+    generateRelationshipMemory(organizationId, businessId, supabase, businessContext)
+      .catch((err) => console.error('Relationship memory background error:', err))
   }
 
   return NextResponse.json({ content, generatedAt, fromCache: false })
