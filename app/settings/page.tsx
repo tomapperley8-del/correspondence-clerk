@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { getUserProfile, updateDisplayName, updateBriefingEmailOptOut, deleteAccount, type UserProfile } from '@/app/actions/user-profile'
-import { getInboundEmailToken, getOwnEmailAddresses, updateOwnEmailAddresses } from '@/app/actions/inbound-email'
+import { getInboundEmailToken, getOwnEmailAddresses, updateOwnEmailAddresses, getBlockedSenders, unblockSender } from '@/app/actions/inbound-email'
 import { getUnformattedCount, formatAllUnformatted } from '@/app/actions/ai-formatter'
 import { toast } from '@/lib/toast'
 import { createClient } from '@/lib/supabase/client'
@@ -35,6 +35,8 @@ export default function SettingsPage() {
   const [newEmailInput, setNewEmailInput] = useState('')
   const [briefingOptOut, setBriefingOptOut] = useState(false)
   const [isSavingBriefing, setIsSavingBriefing] = useState(false)
+  const [blockedSenders, setBlockedSenders] = useState<{ id: string; email: string; created_at: string | null }[]>([])
+  const [unblockingId, setUnblockingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadProfile()
@@ -84,7 +86,25 @@ export default function SettingsPage() {
       setUnformattedCount(countResult.data)
     }
 
+    // Load blocked senders
+    const blockedResult = await getBlockedSenders()
+    if (blockedResult.data) {
+      setBlockedSenders(blockedResult.data)
+    }
+
     setIsLoading(false)
+  }
+
+  async function handleUnblock(id: string, email: string) {
+    setUnblockingId(id)
+    const result = await unblockSender(id)
+    setUnblockingId(null)
+    if (result.error) {
+      toast.error(`Failed to unblock: ${result.error}`)
+    } else {
+      setBlockedSenders(prev => prev.filter(s => s.id !== id))
+      toast.success(`${email} unblocked`)
+    }
   }
 
   async function handleSaveDisplayName(e: React.FormEvent) {
@@ -494,6 +514,48 @@ export default function SettingsPage() {
           </>
         ) : (
           <p className="text-sm text-gray-500">Loading your inbound address…</p>
+        )}
+      </div>
+
+      {/* Blocked Senders */}
+      <div className="bg-white border border-gray-200 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-2 text-gray-900">Blocked Senders</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Emails from these addresses are automatically discarded when forwarded to your inbox.
+        </p>
+        {blockedSenders.length === 0 ? (
+          <p className="text-sm text-gray-500">No blocked senders.</p>
+        ) : (
+          <div className="space-y-2">
+            {blockedSenders.map(sender => (
+              <div
+                key={sender.id}
+                className="flex items-center justify-between py-2 px-3 rounded-sm"
+                style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}
+              >
+                <div>
+                  <span className="text-sm font-medium text-gray-900">{sender.email}</span>
+                  {sender.created_at && (
+                    <span className="text-xs text-gray-400 ml-3">
+                      Blocked {formatLastReceived(sender.created_at)}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleUnblock(sender.id, sender.email)}
+                  disabled={unblockingId === sender.id}
+                  className="text-sm font-medium px-3 py-1 rounded-sm transition-colors"
+                  style={{
+                    color: unblockingId === sender.id ? 'rgba(0,0,0,0.3)' : 'rgba(180,0,0,0.7)',
+                    border: '1px solid rgba(180,0,0,0.2)',
+                    cursor: unblockingId === sender.id ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {unblockingId === sender.id ? 'Unblocking…' : 'Unblock'}
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
