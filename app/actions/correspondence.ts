@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { z } from 'zod'
+import { checkAndResolveActions } from '@/lib/ai/action-resolution'
 
 const createCorrespondenceSchema = z.object({
   business_id: z.string().uuid('Invalid business ID'),
@@ -295,6 +296,14 @@ export async function createCorrespondence(formData: {
   revalidatePath(`/businesses/${formData.business_id}`)
   revalidatePath('/dashboard')
   revalidatePath('/search')
+
+  // Fire-and-forget: check if this entry resolves any outstanding actions
+  checkAndResolveActions(
+    organizationId,
+    formData.business_id,
+    formData.raw_text_original,
+    formData.subject ?? null
+  ).catch(err => console.error('Action resolution check failed:', err))
 
   return { data }
 }
