@@ -209,7 +209,7 @@ async function getUnrepliedInbounds(
     .eq('organization_id', orgId)
     .not('direction', 'is', null)
     .order('entry_date', { ascending: false })
-    .limit(500)
+    .limit(100)
 
   if (error) {
     return { success: false, error: error.message }
@@ -315,7 +315,7 @@ async function getStaleChases(
     `)
     .eq('organization_id', orgId)
     .order('entry_date', { ascending: false })
-    .limit(500)
+    .limit(100)
 
   if (error) {
     return { success: false, error: error.message }
