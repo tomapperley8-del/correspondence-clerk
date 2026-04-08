@@ -124,14 +124,18 @@ lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feat
 
 ### Actions Architecture
 
-The Actions page (`app/actions/page.tsx`) is a **unified smart list** — a single sorted feed, no collapsible sections. All signals merge into one `buildUnifiedList()` call client-side.
+The Actions page (`app/actions/page.tsx`) uses **5 collapsible sections**. Needs Reply + Actions Due are expanded by default; Renewals, Gone Quiet, Reminders are collapsed. Data flows through `buildUnifiedList()` → `unifiedList` (also drives keyboard nav); sections are visual groupings filtering from `unifiedList`. Gone Quiet uses compact `QuietRow` components (not full cards).
 
 **Signal sources (5 server action fetches in parallel on load):**
-1. `getNeedsReply()` — received correspondence with no reply within 7 days; client-side `likelyNeedsReply()` heuristic filters closers/OOO
+1. `getNeedsReply()` — received correspondence where Tom has sent nothing to that business since; client-side `likelyNeedsReply()` heuristic filters closers/OOO/signatures
 2. `getOutstandingActions()` — `action_needed != 'none'` entries, ordered by due_at
 3. `getPureReminders()` — `action_needed = 'none'` but `due_at IS NOT NULL`
 4. `getGoneQuiet()` — businesses with `last_contacted_at < 60 days ago` and 3+ entries
 5. `getContractExpiries()` — businesses where `contract_end IS NOT NULL` and within 30 days (null-safe — only fires when data exists)
+
+**"Needs Reply" logic:** fetches last 90 days; for each received entry checks `entries.some(other => other.direction === 'sent' && other.business_id === entry.business_id && otherDate > entryDate)` — any sent correspondence clears it. Also excludes: `reply_dismissed_at IS NOT NULL` (Done), `due_at > NOW()` (snoozed), `action_needed = 'waiting_on_them'`.
+
+**Done persistence:** `correspondence.reply_dismissed_at TIMESTAMPTZ` (migration 20260408_001). `markCorrespondenceDone()` sets it; `getNeedsReply()` filters it at DB level. Done = permanently done.
 
 **Badge urgency order:** REPLY (7+ days) → REPLY (3–6 days) → OVERDUE → DUE_TODAY → DUE_TOMORROW → DUE_SOON → RENEWAL (<7d) → FLAG → RENEWAL (7–30d) → QUIET → REMINDER
 
@@ -147,13 +151,11 @@ The Actions page (`app/actions/page.tsx`) is a **unified smart list** — a sing
 
 **Keyboard shortcuts:** `↑ ↓` navigate · `D` done · `S` snooze 7d · `L` reply/log
 
-**No DB migrations required for the Actions system** — all fields (`action_needed`, `due_at`, `contract_end`) pre-exist.
-
 ### Database Tables
 
 - **businesses** - name, category, status, membership_type (string, now configurable per org), address, email, phone, notes, contract fields, last_contacted_at, relationship_memory (AI-distilled 3-sentence summary), relationship_memory_updated_at
 - **contacts** - business_id, name, emails[], phones[], role, notes, is_active (unique per business+email)
-- **correspondence** - business_id, contact_id (nullable — Notes have no contact), cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, edited_at, content_hash
+- **correspondence** - business_id, contact_id (nullable — Notes have no contact), cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, reply_dismissed_at, edited_at, content_hash
 - **duplicate_dismissals** - business_id, entry_id_1, entry_id_2, dismissed_by, dismissed_at
 - **organizations** - id, name, business_description, industry (used in Daily Briefing system prompt)
 - **org_membership_types** - id, org_id, label, value, sort_order, is_active (per-org configurable types)
@@ -256,11 +258,13 @@ All features complete and deployed (unless noted):
 24. UX Audit — **live** (P28: modal save mechanics, consistency pass, toast dismiss, onboarding steps, empty states, design token sweep across 25+ files)
 25. Insight History — **live** (P33: `insight_history` table, "View history" in expanded InsightCard, timeline of past snapshots, click to view previous versions)
 26. Relationship Memory — **live** (P34: Haiku distils 3-sentence summary per business after each insight, stored in `businesses.relationship_memory`. Reduces correspondence context 50→30 entries. Fire-and-forget.)
-27. Actions Page Redesign — **live** (P35: unified smart list replaces 5-section layout. Replies always first. Contract expiries auto-surface (30-day window). AI high-confidence action suggestions applied on inbound auto-file. One-click flag on business page sets due_at +7 days. Enhanced quick log panel (type/date/time + mark done checkbox). Insights "Add to Actions" push button on 5 business insight types. Keyboard shortcut R→L.)
+27. Actions Page Redesign — **live** (P35: unified smart list. Replies always first. Contract expiries auto-surface (30-day window). AI high-confidence action suggestions applied on inbound auto-file. One-click flag on business page sets due_at +7 days. Enhanced quick log panel (type/date/time + mark done checkbox). Insights "Add to Actions" push button on 5 business insight types.)
+28. Actions Page v2 — **live** (P36: 5 collapsible sections replace flat list. Smarter "Needs Reply": checks if any sent correspondence to that business exists after the received email — no 7-day cap, direction-aware. Done = permanently done via `reply_dismissed_at` column. Snooze persists via `due_at` check. Signature stripping in likelyNeedsReply(). Gone Quiet uses compact rows. Header shows urgent counts only.)
 
 ## Recent Changes
 
-- **Apr 07, 2026:** P35 — Actions page redesign: unified smart list (single sorted feed, no collapsible sections). Replies always first. Added contract expiry signals (30-day window, null-safe). AI high-confidence action suggestions now applied when inbound emails are auto-filed. One-click flag on business page entries sets follow_up + due_at +7 days. Enhanced quick log panel (type/date/time + mark-done checkbox). Insights "Add to Actions" push button for 5 business insight types (call_prep, next_best_action, what_did_we_agree, outreach_draft, risk_check). Keyboard shortcut R→L.
+- **Apr 08, 2026:** P36 — Actions page v2: 5 collapsible sections (Needs Reply + Actions Due expanded; Renewals / Gone Quiet / Reminders collapsed). "Needs Reply" now direction-aware — any sent correspondence to a business after receiving their email clears it (no 7-day cap). `reply_dismissed_at` column makes Done permanent. Snooze persists via due_at check. likelyNeedsReply() strips signatures before word count. Gone Quiet uses compact rows. Header shows urgent counts only. Migration: `20260408_001_add_reply_dismissed.sql`.
+- **Apr 07, 2026:** P35 — Actions page redesign: unified smart list (single sorted feed). Replies always first. Added contract expiry signals (30-day window, null-safe). AI high-confidence action suggestions now applied when inbound emails are auto-filed. One-click flag on business page entries sets follow_up + due_at +7 days. Enhanced quick log panel (type/date/time + mark-done checkbox). Insights "Add to Actions" push button for 5 business insight types. Keyboard shortcut R→L.
 - **Apr 07, 2026:** P34 — Relationship memory: after each business-specific insight generation, Haiku distils a 3-sentence relationship summary (`businesses.relationship_memory`). Injected into all business insight prompts as context. Correspondence limit reduced from 50→30 when memory exists. Fire-and-forget (doesn't block response). Migration: `20260407_002_add_relationship_memory.sql`. New: `lib/ai/relationship-memory.ts`.
 - **Apr 07, 2026:** P33 — Insight history: new `insight_history` table archives every generated insight. "View history" button in expanded InsightCard shows timeline of past snapshots with content preview. Click any entry to view that version's content, "Back to current" to return. Migration: `20260407_001_add_insight_history.sql`.
 - **Apr 05, 2026:** P28 — Full UX audit: replaced `window.location.reload()` with `router.refresh()` in edit modals, success toasts on all modals, standardised modal styling (errors, buttons, autofocus, close buttons), toast dismiss button, onboarding step numbering fix (5→4), filtered empty state on business page, duplicate detection explainer, Ctrl+K hint in nav, design token sweep (60+ raw blue-600 → brand-navy across 25+ files).
