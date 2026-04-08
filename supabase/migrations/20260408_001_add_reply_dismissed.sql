@@ -1,0 +1,1 @@
+ALTER TABLE correspondence ADD COLUMN IF NOT EXISTS reply_dismissed_at TIMESTAMPTZ DEFAULT NULL;

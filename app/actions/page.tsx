@@ -201,10 +201,26 @@ function likelyNeedsReply(item: CorrespondenceItem): boolean {
     .replace(/\s+/g, ' ')
     .trim()
 
-  const withoutSalutation = cleaned
+  let withoutSalutation = cleaned
     .replace(/^(hi|hello|hey|dear|good (morning|afternoon|evening|day))\s+\w+\s*/, '')
     .replace(/^(hi|hello|hey|dear)\s+(all|there|everyone|team|folks)\s*/, '')
     .trim()
+
+  // Strip email signature content — addresses and phone numbers inflate word count
+  // and prevent closer detection on messages like "Wonderful, thanks! Kind regards, Jane, 1st Floor..."
+  const signatureMarkers = [
+    /\bkind regards\b/, /\bbest regards?\b/, /\bwarm regards?\b/,
+    /\byours (sincerely|faithfully|truly)\b/, /\ball the best\b/,
+    /\bwith (kind |warm |best |many )?regards?\b/, /\bbest wishes\b/,
+    /\bthanks and regards\b/, /\bwith thanks\b/,
+  ]
+  for (const marker of signatureMarkers) {
+    const match = withoutSalutation.search(marker)
+    if (match > 0) {
+      withoutSalutation = withoutSalutation.slice(0, match).trim()
+      break
+    }
+  }
 
   const words = withoutSalutation.split(' ').filter(Boolean)
   const wordCount = words.length
@@ -216,6 +232,7 @@ function likelyNeedsReply(item: CorrespondenceItem): boolean {
     /^(cheers|ta|ta very much)$/,
     /^(brilliant|great|perfect|wonderful|excellent|fantastic|fab|fabulous|superb|lovely)( thanks?| thank you)?$/,
     /^(brilliant|great|perfect|wonderful|excellent|fantastic|fab|superb|lovely)( stuff| one)?$/,
+    /^that (would be|sounds|is) (wonderful|great|perfect|brilliant|lovely|amazing|fantastic)( thanks?| thank you( very much| so much)?)?$/,
     /^noted( thanks?| thank you| with thanks)?$/,
     /^(received|acknowledged?)( thanks?| with thanks)?$/,
     /^(got it|got that)( thanks?| thank you)?$/,
@@ -252,6 +269,7 @@ function likelyNeedsReply(item: CorrespondenceItem): boolean {
       /^sounds good\b/,
       /^no (problem|worries)\b/,
       /^(received|got it|understood)\b/,
+      /^that (would|sounds) (be )?(wonderful|great|perfect|brilliant|lovely|amazing)\b/,
     ]
     if (startsWithCloser.some(p => p.test(withoutSalutation))) return false
   }
@@ -368,6 +386,104 @@ function buildUnifiedList(
   })
 
   return items
+}
+
+// ─── CollapsibleSection ───────────────────────────────────────────────────────
+
+type CollapsibleSectionProps = {
+  title: string
+  count: number
+  defaultExpanded?: boolean
+  subtitle?: string
+  children: React.ReactNode
+}
+function CollapsibleSection({ title, count, defaultExpanded = false, subtitle, children }: CollapsibleSectionProps) {
+  const [open, setOpen] = useState(defaultExpanded)
+  if (count === 0) return null
+  return (
+    <div className="border border-gray-200 bg-white mb-2">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50/60 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-semibold text-gray-800 text-sm">{title}</span>
+          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-gray-100 border border-gray-200 text-gray-600 text-[11px] font-semibold rounded-sm shrink-0">
+            {count}
+          </span>
+          {subtitle && !open && (
+            <span className="text-[11px] text-gray-400 truncate hidden sm:block">{subtitle}</span>
+          )}
+        </div>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ml-2 ${open ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="divide-y divide-gray-100 border-t border-gray-100">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── QuietRow ─────────────────────────────────────────────────────────────────
+
+type QuietRowProps = {
+  item: BusinessItem & { badge: Badge; urgencyScore: number; badgeLabel: string }
+  logOpen: boolean
+  onLogToggle: () => void
+  onLogSave: (markDone: boolean) => void
+  onDone: () => void
+}
+function QuietRow({ item, logOpen, onLogToggle, onLogSave, onDone }: QuietRowProps) {
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-4 py-2.5">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={`/businesses/${item.business_id}`}
+              className="font-medium text-gray-900 hover:text-brand-navy hover:underline text-sm"
+              onClick={e => e.stopPropagation()}
+            >
+              {item.business_name}
+            </Link>
+            <span className="text-xs text-gray-400">{item.badgeLabel}</span>
+            <span className="text-xs text-gray-300">·</span>
+            <span className="text-xs text-gray-400">{item.entry_count} {item.entry_count === 1 ? 'entry' : 'entries'}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={e => { e.stopPropagation(); onDone() }}
+            className="px-2.5 py-1 text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Dismiss
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); onLogToggle() }}
+            className={`px-2.5 py-1 text-xs font-medium border transition-colors ${logOpen ? 'bg-brand-navy border-brand-navy text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+          >
+            Log
+          </button>
+        </div>
+      </div>
+      {logOpen && (
+        <LogPanel
+          businessId={item.business_id}
+          contactId={null}
+          showMarkDone={false}
+          onSave={onLogSave}
+          onCancel={onLogToggle}
+        />
+      )}
+    </div>
+  )
 }
 
 // ─── SnoozeDropdown ───────────────────────────────────────────────────────────
@@ -867,18 +983,50 @@ export default function ActionsPage() {
 
   const allEmpty = unifiedList.length === 0
 
-  const breakdown = useMemo(() => {
-    const replyCount = unifiedList.filter(i => i.badge === 'REPLY').length
-    const overdueCount = unifiedList.filter(i => i.badge === 'OVERDUE' || i.badge === 'DUE_TODAY').length
-    const renewalCount = unifiedList.filter(i => i.badge === 'RENEWAL').length
-    const quietCount = unifiedList.filter(i => i.badge === 'QUIET').length
-    const parts: string[] = []
-    if (replyCount) parts.push(`${replyCount} ${replyCount === 1 ? 'reply' : 'replies'} needed`)
-    if (overdueCount) parts.push(`${overdueCount} overdue`)
-    if (renewalCount) parts.push(`${renewalCount} renewal${renewalCount > 1 ? 's' : ''}`)
-    if (quietCount) parts.push(`${quietCount} gone quiet`)
-    return parts.join(' · ')
+  const sections = useMemo(() => {
+    const reply     = unifiedList.filter(i => i.badge === 'REPLY')
+    const actions   = unifiedList.filter(i => ['OVERDUE', 'DUE_TODAY', 'DUE_TOMORROW', 'DUE_SOON', 'FLAG'].includes(i.badge))
+    const renewals  = unifiedList.filter(i => i.badge === 'RENEWAL')
+    const quiet     = unifiedList.filter(i => i.badge === 'QUIET')
+    const reminders = unifiedList.filter(i => i.badge === 'REMINDER')
+
+    const urgentRenewal = renewals.some(i => {
+      const c = i as ContractItem & { badge: Badge; urgencyScore: number; badgeLabel: string }
+      return daysUntilFn(c.contract_end) < 7
+    })
+
+    // Section subtitles — brief breakdown of what's inside
+    const oldestReply = reply.length ? Math.max(...reply.map(i => (i as CorrespondenceItem).daysAgo ?? 0)) : 0
+    const replySubtitle = reply.length
+      ? `oldest ${oldestReply} days · ${reply.filter(i => ((i as CorrespondenceItem).daysAgo ?? 0) >= 7).length} overdue`
+      : ''
+
+    const overdue   = actions.filter(i => i.badge === 'OVERDUE').length
+    const dueToday  = actions.filter(i => i.badge === 'DUE_TODAY').length
+    const flagged   = actions.filter(i => i.badge === 'FLAG').length
+    const actParts: string[] = []
+    if (overdue)  actParts.push(`${overdue} overdue`)
+    if (dueToday) actParts.push(`${dueToday} due today`)
+    if (flagged)  actParts.push(`${flagged} flagged`)
+    const actionsSubtitle = actParts.join(' · ')
+
+    const renewalSubtitle = renewals.length
+      ? renewals.map(i => {
+          const c = i as ContractItem & { badge: Badge; urgencyScore: number; badgeLabel: string }
+          const days = daysUntilFn(c.contract_end)
+          return days < 7 ? `${c.business_name} — ${days}d` : c.business_name
+        }).join(', ')
+      : ''
+
+    return { reply, actions, renewals, quiet, reminders, urgentRenewal, replySubtitle, actionsSubtitle, renewalSubtitle }
   }, [unifiedList])
+
+  const urgentSummary = useMemo(() => {
+    const parts: string[] = []
+    if (sections.reply.length) parts.push(`${sections.reply.length} ${sections.reply.length === 1 ? 'reply' : 'replies'} needed`)
+    if (sections.actions.length) parts.push(`${sections.actions.length} action${sections.actions.length === 1 ? '' : 's'} due`)
+    return parts.join(' · ')
+  }, [sections])
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -903,11 +1051,8 @@ export default function ActionsPage() {
             Actions
           </h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            {allEmpty ? 'Nothing outstanding.' : `${unifiedList.length} item${unifiedList.length === 1 ? '' : 's'} need${unifiedList.length === 1 ? 's' : ''} your attention.`}
+            {allEmpty ? 'Nothing outstanding.' : urgentSummary || 'Nothing urgent right now.'}
           </p>
-          {!allEmpty && breakdown && (
-            <p className="text-gray-400 text-xs mt-0.5">{breakdown}</p>
-          )}
         </div>
         <div className="text-right text-xs text-gray-400 leading-relaxed hidden sm:block">
           <div className="font-medium text-gray-500 mb-0.5">Keyboard shortcuts</div>
@@ -942,24 +1087,105 @@ export default function ActionsPage() {
           </Link>
         </div>
       ) : (
-        <div className="border border-gray-200 bg-white divide-y divide-gray-100">
-          {unifiedList.map(item => (
-            <ItemRow
-              key={`${item.kind}-${item.id}`}
-              item={item}
-              focused={focusedId === item.id}
-              logOpen={logOpenId === item.id}
-              snoozeOpen={snoozeOpenId === item.id}
-              processing={processingId === item.id}
-              onFocus={() => setFocusedId(item.id)}
-              onDone={() => handleDone(item)}
-              onSnooze={days => handleSnooze(item.id, days)}
-              onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-              onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
-              onLogSave={markDone => handleLogSave(item, markDone)}
-            />
-          ))}
-        </div>
+        <>
+          {/* Needs Reply */}
+          <CollapsibleSection title="Needs Reply" count={sections.reply.length} subtitle={sections.replySubtitle}>
+            {sections.reply.map(item => (
+              <ItemRow
+                key={`${item.kind}-${item.id}`}
+                item={item}
+                focused={focusedId === item.id}
+                logOpen={logOpenId === item.id}
+                snoozeOpen={snoozeOpenId === item.id}
+                processing={processingId === item.id}
+                onFocus={() => setFocusedId(item.id)}
+                onDone={() => handleDone(item)}
+                onSnooze={days => handleSnooze(item.id, days)}
+                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
+                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
+                onLogSave={markDone => handleLogSave(item, markDone)}
+              />
+            ))}
+          </CollapsibleSection>
+
+          {/* Actions Due */}
+          <CollapsibleSection title="Actions Due" count={sections.actions.length} subtitle={sections.actionsSubtitle}>
+            {sections.actions.map(item => (
+              <ItemRow
+                key={`${item.kind}-${item.id}`}
+                item={item}
+                focused={focusedId === item.id}
+                logOpen={logOpenId === item.id}
+                snoozeOpen={snoozeOpenId === item.id}
+                processing={processingId === item.id}
+                onFocus={() => setFocusedId(item.id)}
+                onDone={() => handleDone(item)}
+                onSnooze={days => handleSnooze(item.id, days)}
+                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
+                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
+                onLogSave={markDone => handleLogSave(item, markDone)}
+              />
+            ))}
+          </CollapsibleSection>
+
+          {/* Renewals */}
+          <CollapsibleSection title="Renewals" count={sections.renewals.length} defaultExpanded={sections.urgentRenewal} subtitle={sections.renewalSubtitle}>
+            {sections.renewals.map(item => (
+              <ItemRow
+                key={`${item.kind}-${item.id}`}
+                item={item}
+                focused={focusedId === item.id}
+                logOpen={logOpenId === item.id}
+                snoozeOpen={snoozeOpenId === item.id}
+                processing={processingId === item.id}
+                onFocus={() => setFocusedId(item.id)}
+                onDone={() => handleDone(item)}
+                onSnooze={days => handleSnooze(item.id, days)}
+                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
+                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
+                onLogSave={markDone => handleLogSave(item, markDone)}
+              />
+            ))}
+          </CollapsibleSection>
+
+          {/* Gone Quiet — compact rows */}
+          <CollapsibleSection
+            title="Gone Quiet"
+            count={sections.quiet.length}
+            subtitle="businesses not contacted in 60+ days"
+          >
+            {sections.quiet.map(item => (
+              <QuietRow
+                key={item.id}
+                item={item as BusinessItem & { badge: Badge; urgencyScore: number; badgeLabel: string }}
+                logOpen={logOpenId === item.id}
+                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
+                onLogSave={markDone => handleLogSave(item, markDone)}
+                onDone={() => handleDone(item)}
+              />
+            ))}
+          </CollapsibleSection>
+
+          {/* Reminders */}
+          <CollapsibleSection title="Reminders" count={sections.reminders.length}>
+            {sections.reminders.map(item => (
+              <ItemRow
+                key={`${item.kind}-${item.id}`}
+                item={item}
+                focused={focusedId === item.id}
+                logOpen={logOpenId === item.id}
+                snoozeOpen={snoozeOpenId === item.id}
+                processing={processingId === item.id}
+                onFocus={() => setFocusedId(item.id)}
+                onDone={() => handleDone(item)}
+                onSnooze={days => handleSnooze(item.id, days)}
+                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
+                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
+                onLogSave={markDone => handleLogSave(item, markDone)}
+              />
+            ))}
+          </CollapsibleSection>
+        </>
       )}
     </div>
   )

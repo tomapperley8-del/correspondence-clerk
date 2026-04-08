@@ -834,7 +834,7 @@ export async function markCorrespondenceDone(id: string) {
 
   const { error } = await supabase
     .from('correspondence')
-    .update({ action_needed: 'none', due_at: null })
+    .update({ action_needed: 'none', due_at: null, reply_dismissed_at: new Date().toISOString() })
     .eq('id', id)
 
   if (error) {
@@ -899,13 +899,14 @@ export async function getNeedsReply() {
   const { data, error } = await supabase
     .from('correspondence')
     .select(`
-      id, business_id, contact_id, subject, type, direction, entry_date, action_needed,
+      id, business_id, contact_id, subject, type, direction, entry_date, action_needed, due_at,
       formatted_text_current,
       businesses!inner(id, name),
       contact:contacts(name, role)
     `)
     .eq('organization_id', orgId)
     .gte('entry_date', ninetyDaysAgo.toISOString())
+    .is('reply_dismissed_at', null)
     .order('entry_date', { ascending: false })
     .limit(500)
 
@@ -916,15 +917,15 @@ export async function getNeedsReply() {
   const needsReply = entries.filter(entry => {
     if (entry.direction !== 'received') return false
     if (entry.action_needed === 'waiting_on_them') return false
+    if (entry.due_at && new Date(entry.due_at) > new Date()) return false
     if (!entry.entry_date) return false
     const entryDate = new Date(entry.entry_date)
-    const sevenDaysLater = new Date(entryDate.getTime() + 7 * 24 * 60 * 60 * 1000)
     const hasReply = entries.some(other => {
       if (other.id === entry.id) return false
       if (other.business_id !== entry.business_id) return false
+      if (other.direction === 'received') return false  // only non-received entries (sent OR notes) count as replies
       if (!other.entry_date) return false
-      const otherDate = new Date(other.entry_date)
-      return otherDate > entryDate && otherDate <= sevenDaysLater
+      return new Date(other.entry_date) >= entryDate  // >= catches same-timestamp entries
     })
     return !hasReply
   })
