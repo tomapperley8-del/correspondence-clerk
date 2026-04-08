@@ -297,13 +297,17 @@ export async function createCorrespondence(formData: {
   revalidatePath('/dashboard')
   revalidatePath('/search')
 
-  // Fire-and-forget: check if this entry resolves any outstanding actions
-  checkAndResolveActions(
-    organizationId,
-    formData.business_id,
-    formData.raw_text_original,
-    formData.subject ?? null
-  ).catch(err => console.error('Action resolution check failed:', err))
+  // Await action resolution — errors are caught and logged, never block the return
+  try {
+    await checkAndResolveActions(
+      organizationId,
+      formData.business_id,
+      formData.raw_text_original,
+      formData.subject ?? null
+    )
+  } catch (err) {
+    console.error('Action resolution check failed:', err)
+  }
 
   return { data }
 }

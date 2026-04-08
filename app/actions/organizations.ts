@@ -304,6 +304,7 @@ export async function getOrganizationMembers() {
     .select('id, display_name, role, created_at')
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: true })
+    .limit(100)
 
   if (error) {
     return { error: error.message }
