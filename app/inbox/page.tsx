@@ -1,25 +1,28 @@
-import { getInboundQueue, getAutoFiledRecent, getDiscardedQueue } from '@/app/actions/inbound-email'
+import { getInboundQueue, getAutoFiledRecent, getDiscardedQueue, getDeadLetters } from '@/app/actions/inbound-email'
 import { getBusinesses, type Business } from '@/app/actions/businesses'
 import InboxCard from './_components/InboxCard'
 import AutoFiledSection from './_components/AutoFiledSection'
 import DiscardedSection from './_components/DiscardedSection'
+import FailedSection from './_components/FailedSection'
 
 export const metadata = {
   title: 'Inbox — Correspondence Clerk',
 }
 
 export default async function InboxPage() {
-  const [queueResult, businessesResult, autoFiledResult, discardedResult] = await Promise.all([
+  const [queueResult, businessesResult, autoFiledResult, discardedResult, deadLettersResult] = await Promise.all([
     getInboundQueue(),
     getBusinesses(),
     getAutoFiledRecent(),
     getDiscardedQueue(),
+    getDeadLetters(),
   ])
 
   const items = queueResult.data ?? []
   const businesses = (businessesResult.data ?? []) as Business[]
   const autoFiled = autoFiledResult.data ?? []
   const discarded = discardedResult.data ?? []
+  const deadLetters = deadLettersResult.data ?? []
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -60,6 +63,7 @@ export default async function InboxPage() {
 
       <AutoFiledSection items={autoFiled} />
       <DiscardedSection items={discarded} />
+      <FailedSection items={deadLetters} />
     </div>
   )
 }

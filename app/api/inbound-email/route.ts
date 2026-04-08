@@ -250,7 +250,31 @@ function buildRawForAI(
 }
 
 // ---------------------------------------------------------------------------
+// Dead letter: save failed email payload for later retry
+// ---------------------------------------------------------------------------
+async function saveDeadLetter(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  orgId: string,
+  rawPayload: string,
+  failureReason: string,
+  failurePoint: string
+): Promise<void> {
+  try {
+    await supabase.from('email_dead_letters').insert({
+      org_id: orgId,
+      raw_payload: JSON.parse(rawPayload),
+      failure_reason: failureReason,
+      failure_point: failurePoint,
+    })
+    log('[inbound-email] dead_lettered', { failurePoint, failureReason })
+  } catch (err) {
+    log('[inbound-email] dead_letter_save_failed', { error: String(err) })
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Service-role correspondence insert (no user session in webhook context)
+// Throws on DB error so caller can dead-letter the payload.
 // ---------------------------------------------------------------------------
 async function insertCorrespondenceServiceRole(
   supabase: ReturnType<typeof createServiceRoleClient>,
@@ -286,7 +310,7 @@ async function insertCorrespondenceServiceRole(
     if (existing) return // already stored
   }
 
-  await supabase.from('correspondence').insert({
+  const { error: insertError } = await supabase.from('correspondence').insert({
     organization_id: opts.orgId,
     business_id: opts.businessId,
     contact_id: opts.contactId,
@@ -307,6 +331,8 @@ async function insertCorrespondenceServiceRole(
       from_email: opts.fromEmail,
     },
   })
+
+  if (insertError) throw new Error(insertError.message)
 
   await supabase
     .from('businesses')
@@ -627,27 +653,32 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
 
       log('[inbound-email] formatting_done', { formattingStatus, direction: 'sent' })
 
-      await insertCorrespondenceServiceRole(supabase, {
-        orgId, userId,
-        businessId: match.businessId,
-        contactId: match.contactId,
-        rawText: rawForAI,
-        formattedText,
-        subject,
-        entryDate,
-        formattingStatus,
-        fromEmail,
-        direction: 'sent',
-        actionNeeded,
-        dueAt,
-      })
+      try {
+        await insertCorrespondenceServiceRole(supabase, {
+          orgId, userId,
+          businessId: match.businessId,
+          contactId: match.contactId,
+          rawText: rawForAI,
+          formattedText,
+          subject,
+          entryDate,
+          formattingStatus,
+          fromEmail,
+          direction: 'sent',
+          actionNeeded,
+          dueAt,
+        })
+      } catch (err) {
+        log('[inbound-email] auto_filed_sent_insert_failed', { error: String(err) })
+        await saveDeadLetter(supabase, orgId, rawBody, String(err), 'auto_file_sent')
+      }
 
       return NextResponse.json({}, { status: 200 })
     }
 
     log('[inbound-email] queued_sent', { recipientDomains: recipientEmails.map(e => e.split('@')[1] ?? '') })
     // No domain match → queue for manual triage
-    await supabase.from('inbound_queue').insert({
+    const { error: queueSentError } = await supabase.from('inbound_queue').insert({
       org_id: orgId,
       from_email: fromEmail,
       from_name: fromName || null,
@@ -659,6 +690,10 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       raw_payload: JSON.parse(rawBody),
       status: 'pending',
     })
+    if (queueSentError) {
+      log('[inbound-email] queue_sent_insert_failed', { error: queueSentError.message })
+      await saveDeadLetter(supabase, orgId, rawBody, queueSentError.message, 'queue_sent')
+    }
 
     return NextResponse.json({}, { status: 200 })
   }
@@ -746,27 +781,32 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
 
     log('[inbound-email] formatting_done', { formattingStatus, direction: 'received' })
 
-    await insertCorrespondenceServiceRole(supabase, {
-      orgId, userId,
-      businessId: autoFiledBusinessId,
-      contactId,
-      rawText: rawForAI,
-      formattedText,
-      subject,
-      entryDate,
-      formattingStatus,
-      fromEmail: effectiveFromEmail,
-      direction: 'received',
-      actionNeeded,
-      dueAt,
-    })
+    try {
+      await insertCorrespondenceServiceRole(supabase, {
+        orgId, userId,
+        businessId: autoFiledBusinessId,
+        contactId,
+        rawText: rawForAI,
+        formattedText,
+        subject,
+        entryDate,
+        formattingStatus,
+        fromEmail: effectiveFromEmail,
+        direction: 'received',
+        actionNeeded,
+        dueAt,
+      })
+    } catch (err) {
+      log('[inbound-email] auto_filed_received_insert_failed', { error: String(err) })
+      await saveDeadLetter(supabase, orgId, rawBody, String(err), 'auto_file_received')
+    }
 
     return NextResponse.json({}, { status: 200 })
   }
 
   log('[inbound-email] queued_received', { domain: effectiveDomain || '(personal/unknown)' })
   // No domain match → add to inbound_queue for manual triage
-  await supabase.from('inbound_queue').insert({
+  const { error: queueReceivedError } = await supabase.from('inbound_queue').insert({
     org_id: orgId,
     from_email: effectiveFromEmail,   // original sender if extracted, otherwise forwarder
     from_name: effectiveFromName || null,
@@ -778,6 +818,10 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     raw_payload: JSON.parse(rawBody),
     status: 'pending',
   })
+  if (queueReceivedError) {
+    log('[inbound-email] queue_received_insert_failed', { error: queueReceivedError.message })
+    await saveDeadLetter(supabase, orgId, rawBody, queueReceivedError.message, 'queue_received')
+  }
 
   return NextResponse.json({}, { status: 200 })
 }

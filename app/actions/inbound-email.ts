@@ -528,6 +528,105 @@ export async function getOwnEmailAddresses(): Promise<{ data: string[] | null; e
   return { data: (profile?.own_email_addresses as string[] | null) ?? [] }
 }
 
+export type DeadLetterItem = {
+  id: string
+  from_email: string | null
+  subject: string | null
+  failure_reason: string
+  failure_point: string
+  created_at: string
+}
+
+/**
+ * Fetch unresolved dead letters for the current org
+ */
+export async function getDeadLetters(): Promise<{ data?: DeadLetterItem[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data, error } = await supabase
+    .from('email_dead_letters')
+    .select('id, raw_payload, failure_reason, failure_point, created_at')
+    .eq('org_id', orgId)
+    .is('resolved_at', null)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  if (error) return { error: error.message }
+
+  const items: DeadLetterItem[] = (data ?? []).map((row: Record<string, unknown>) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = row.raw_payload as Record<string, any>
+    return {
+      id: row.id as string,
+      from_email: p?.from?.value?.[0]?.address ?? p?.From ?? null,
+      subject: p?.subject ?? p?.Subject ?? null,
+      failure_reason: row.failure_reason as string,
+      failure_point: row.failure_point as string,
+      created_at: row.created_at as string,
+    }
+  })
+
+  return { data: items }
+}
+
+/**
+ * Retry a dead letter: re-queue it as a pending inbox item for manual filing, then mark resolved.
+ */
+export async function retryDeadLetter(id: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data: letter } = await supabase
+    .from('email_dead_letters')
+    .select('raw_payload')
+    .eq('id', id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (!letter) return { error: 'Dead letter not found' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = letter.raw_payload as Record<string, any>
+  const fromEmail: string = (p?.from?.value?.[0]?.address ?? p?.From ?? '').toLowerCase()
+  const fromName: string = p?.from?.value?.[0]?.name ?? p?.FromName ?? fromEmail
+  const subject: string = p?.subject ?? p?.Subject ?? null
+  const rawBody = stripQuotedContent(p?.text ?? p?.StrippedTextReply ?? p?.TextBody ?? '')
+  const bodyPreview = rawBody.slice(0, 500) || null
+
+  const { error: insertError } = await supabase.from('inbound_queue').insert({
+    org_id: orgId,
+    from_email: fromEmail,
+    from_name: fromName || null,
+    subject: subject || null,
+    body_preview: bodyPreview,
+    body_text: rawBody || null,
+    direction: 'received',
+    to_emails: null,
+    raw_payload: p,
+    status: 'pending',
+  })
+
+  if (insertError) return { error: insertError.message }
+
+  await supabase
+    .from('email_dead_letters')
+    .update({ resolved_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('org_id', orgId)
+
+  revalidatePath('/inbox')
+  return {}
+}
+
 /**
  * Update the current user's registered own email addresses
  */
