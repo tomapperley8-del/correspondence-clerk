@@ -69,8 +69,8 @@ export function ContactExtractionModal({
         const result = await createContact({
           business_id: businessId,
           name: contact.name || 'Unknown',
-          email: contact.email || undefined,
-          phone: contact.phone || undefined,
+          emails: contact.email ? [contact.email] : undefined,
+          phones: contact.phone ? [contact.phone] : undefined,
           role: contact.role || undefined,
         });
 

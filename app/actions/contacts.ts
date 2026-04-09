@@ -11,9 +11,7 @@ const emailSchema = z.string().email('Invalid email format').max(254)
 const createContactSchema = z.object({
   business_id: z.string().uuid('Invalid business ID'),
   name: z.string().min(1, 'Contact name is required').max(200, 'Contact name too long'),
-  email: z.string().email('Invalid email format').max(254).or(z.literal('')).optional(),
   role: z.string().max(200).optional(),
-  phone: z.string().max(50).optional(),
   emails: z.array(emailSchema.or(z.literal(''))).optional(),
   phones: z.array(z.string().max(50)).optional(),
   notes: z.string().max(5000).optional(),
@@ -21,9 +19,7 @@ const createContactSchema = z.object({
 
 const updateContactSchema = z.object({
   name: z.string().min(1, 'Contact name is required').max(200).optional(),
-  email: z.string().email('Invalid email format').max(254).or(z.literal('')).optional(),
   role: z.string().max(200).optional(),
-  phone: z.string().max(50).optional(),
   emails: z.array(emailSchema.or(z.literal(''))).optional(),
   phones: z.array(z.string().max(50)).optional(),
   notes: z.string().max(5000).optional(),
@@ -34,10 +30,8 @@ export type Contact = {
   id: string
   business_id: string
   name: string
-  email: string | null // Deprecated: use emails array
   normalized_email: string | null
   role: string | null
-  phone: string | null // Deprecated: use phones array
   emails: string[]
   phones: string[]
   notes: string | null
@@ -75,7 +69,7 @@ export async function getContactsByBusiness(businessId: string) {
   // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
-    .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, is_active, organization_id, created_at, updated_at')
+    .select('id, business_id, name, normalized_email, role, emails, phones, notes, is_active, organization_id, created_at, updated_at')
     .eq('business_id', businessId)
     .eq('organization_id', orgId)
     .order('is_active', { ascending: false }) // active contacts first
@@ -112,7 +106,7 @@ export async function getContactById(id: string) {
   // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
-    .select('id, business_id, name, email, normalized_email, role, phone, emails, phones, notes, is_active, organization_id, created_at, updated_at')
+    .select('id, business_id, name, normalized_email, role, emails, phones, notes, is_active, organization_id, created_at, updated_at')
     .eq('id', id)
     .eq('organization_id', orgId)
     .single()
@@ -135,9 +129,7 @@ export async function getContactById(id: string) {
 export async function createContact(formData: {
   business_id: string
   name: string
-  email?: string
   role?: string
-  phone?: string
   emails?: string[]
   phones?: string[]
   notes?: string
@@ -163,29 +155,17 @@ export async function createContact(formData: {
     return { error: 'No organization found' }
   }
 
-  // Use new emails/phones arrays if provided, otherwise fall back to single values
-  const emailsArray = formData.emails && formData.emails.length > 0
-    ? formData.emails.map(e => e.trim().toLowerCase()).filter(e => e)
-    : formData.email ? [formData.email.trim().toLowerCase()] : []
-
-  const phonesArray = formData.phones && formData.phones.length > 0
-    ? formData.phones.map(p => p.trim()).filter(p => p)
-    : formData.phone ? [formData.phone.trim()] : []
-
-  // Keep first email for backward compatibility with old normalized_email field
-  const normalized_email = emailsArray.length > 0
-    ? emailsArray[0].toLowerCase().trim()
-    : null
+  const emailsArray = (formData.emails ?? []).map(e => e.trim().toLowerCase()).filter(e => e)
+  const phonesArray = (formData.phones ?? []).map(p => p.trim()).filter(p => p)
+  const normalized_email = emailsArray[0] ?? null
 
   const { data, error } = await supabase
     .from('contacts')
     .insert({
       business_id: formData.business_id,
       name: formData.name.trim(),
-      email: emailsArray[0] || null, // Keep for backward compatibility
       normalized_email,
       role: formData.role?.trim() || null,
-      phone: phonesArray[0] || null, // Keep for backward compatibility
       emails: emailsArray,
       phones: phonesArray,
       notes: formData.notes?.trim() || null,
@@ -213,9 +193,7 @@ export async function updateContact(
   id: string,
   formData: {
     name?: string
-    email?: string
     role?: string
-    phone?: string
     emails?: string[]
     phones?: string[]
     notes?: string
@@ -241,30 +219,14 @@ export async function updateContact(
 
   if (formData.name !== undefined) updateData.name = formData.name.trim()
 
-  // Handle emails array
   if (formData.emails !== undefined) {
     const emailsArray = formData.emails.map(e => e.trim().toLowerCase()).filter(e => e)
     updateData.emails = emailsArray
-    // Update backward compatibility fields
-    updateData.email = emailsArray[0] || null
     updateData.normalized_email = emailsArray[0] || null
-  } else if (formData.email !== undefined) {
-    // Fallback for old single email interface
-    updateData.email = formData.email?.trim().toLowerCase() || null
-    updateData.normalized_email = formData.email ? formData.email.toLowerCase().trim() : null
-    updateData.emails = formData.email ? [formData.email.trim().toLowerCase()] : []
   }
 
-  // Handle phones array
   if (formData.phones !== undefined) {
-    const phonesArray = formData.phones.map(p => p.trim()).filter(p => p)
-    updateData.phones = phonesArray
-    // Update backward compatibility field
-    updateData.phone = phonesArray[0] || null
-  } else if (formData.phone !== undefined) {
-    // Fallback for old single phone interface
-    updateData.phone = formData.phone?.trim() || null
-    updateData.phones = formData.phone ? [formData.phone.trim()] : []
+    updateData.phones = formData.phones.map(p => p.trim()).filter(p => p)
   }
 
   if (formData.role !== undefined) updateData.role = formData.role?.trim() || null
