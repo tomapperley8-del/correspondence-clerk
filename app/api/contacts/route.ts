@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       .from('contacts')
       .select('*')
       .eq('organization_id', orgId)
-      .or(`email.ilike.${normalizedEmail},normalized_email.ilike.${normalizedEmail}`)
+      .eq('normalized_email', normalizedEmail)
       .limit(1)
 
     if (error) {

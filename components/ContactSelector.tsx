@@ -57,8 +57,8 @@ function ContactSelectorComponent({
   const handleStartEdit = () => {
     if (!selectedContact) return
     setEditedRole(selectedContact.role || '')
-    setEditedEmails(selectedContact.emails || [selectedContact.email || ''].filter(Boolean))
-    setEditedPhones(selectedContact.phones || [selectedContact.phone || ''].filter(Boolean))
+    setEditedEmails(selectedContact.emails || [])
+    setEditedPhones(selectedContact.phones || [])
     setIsEditing(true)
   }
 
@@ -184,11 +184,11 @@ function ContactSelectorComponent({
                           {contact.role}
                         </div>
                       )}
-                      {(contact.email || contact.phone) && (
+                      {(contact.emails?.[0] || contact.phones?.[0]) && (
                         <div className="text-xs text-gray-500 mt-1">
-                          {contact.email && <span>{contact.email}</span>}
-                          {contact.email && contact.phone && <span> • </span>}
-                          {contact.phone && <span>{contact.phone}</span>}
+                          {contact.emails?.[0] && <span>{contact.emails[0]}</span>}
+                          {contact.emails?.[0] && contact.phones?.[0] && <span> • </span>}
+                          {contact.phones?.[0] && <span>{contact.phones[0]}</span>}
                         </div>
                       )}
                     </button>

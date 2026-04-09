@@ -87,14 +87,8 @@ export function matchNameToContact(
   if (extractedName.includes('@')) {
     const emailLower = extractedName.toLowerCase();
     for (const contact of contacts) {
-      if (contact.email?.toLowerCase() === emailLower) {
+      if (contact.emails?.some(e => e.toLowerCase() === emailLower)) {
         return contact;
-      }
-      // Check in emails array if present
-      if (contact.emails && Array.isArray(contact.emails)) {
-        if (contact.emails.some(e => e.toLowerCase() === emailLower)) {
-          return contact;
-        }
       }
     }
   }

@@ -25,9 +25,9 @@ export function AddContactButton({ businessId }: { businessId: string }) {
     const result = await createContact({
       business_id: businessId,
       name,
-      email: email || undefined,
       role: role || undefined,
-      phone: phone || undefined,
+      emails: email ? [email] : undefined,
+      phones: phone ? [phone] : undefined,
     })
 
     if ('error' in result) {

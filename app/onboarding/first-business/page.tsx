@@ -44,7 +44,7 @@ export default function FirstBusinessPage() {
       business_id: businessId,
       name: contactName.trim(),
       role: contactRole.trim() || undefined,
-      email: contactEmail.trim() || undefined,
+      emails: contactEmail.trim() ? [contactEmail.trim()] : undefined,
     })
 
     if (contactResult.error) {

@@ -58,15 +58,11 @@ export async function PATCH(request: Request) {
 
     if (emails !== undefined) {
       updateData.emails = emails.filter((e: string) => e.trim())
-      // Backward compatibility: also set single email field
-      updateData.email = emails[0] || null
       updateData.normalized_email = emails[0] ? emails[0].toLowerCase() : null
     }
 
     if (phones !== undefined) {
       updateData.phones = phones.filter((p: string) => p.trim())
-      // Backward compatibility: also set single phone field
-      updateData.phone = phones[0] || null
     }
 
     const { data, error } = await supabase

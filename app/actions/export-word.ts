@@ -152,13 +152,6 @@ export async function exportToWord(businessId: string) {
               })
             )
           })
-        } else if (contact.email) {
-          sections.push(
-            new Paragraph({
-              text: `Email: ${contact.email}`,
-              spacing: { after: 50 },
-            })
-          )
         }
 
         // Multiple phones
@@ -171,13 +164,6 @@ export async function exportToWord(businessId: string) {
               })
             )
           })
-        } else if (contact.phone) {
-          sections.push(
-            new Paragraph({
-              text: `Phone: ${contact.phone}`,
-              spacing: { after: 50 },
-            })
-          )
         }
 
         // Spacing between contacts

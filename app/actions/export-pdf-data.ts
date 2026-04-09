@@ -80,19 +80,8 @@ export async function getPdfExportData(businessId: string) {
 
     // Format contacts for PDF
     const formattedContacts = contacts.map((contact) => {
-      const emails =
-        contact.emails && contact.emails.length > 0
-          ? contact.emails
-          : contact.email
-            ? [contact.email]
-            : []
-
-      const phones =
-        contact.phones && contact.phones.length > 0
-          ? contact.phones
-          : contact.phone
-            ? [contact.phone]
-            : []
+      const emails = contact.emails ?? []
+      const phones = contact.phones ?? []
 
       return {
         name: contact.name,

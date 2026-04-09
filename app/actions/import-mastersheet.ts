@@ -415,9 +415,9 @@ export async function importMastersheet(): Promise<
             .insert({
               business_id: businessId,
               name: contact.name,
-              email: contact.email || null,
               normalized_email: normalizedEmail,
-              phone: contact.phone || null,
+              emails: normalizedEmail ? [normalizedEmail] : [],
+              phones: contact.phone ? [contact.phone.trim()] : [],
               organization_id: organizationId,
             })
 

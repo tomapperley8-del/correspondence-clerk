@@ -229,9 +229,9 @@ async function processDocumentsData(
             .insert({
               business_id: business.id,
               name: contactInfo.name || 'Contact',
-              email: contactInfo.email,
               normalized_email: contactInfo.email?.toLowerCase() || null,
-              phone: contactInfo.phone,
+              emails: contactInfo.email ? [contactInfo.email.toLowerCase()] : [],
+              phones: contactInfo.phone ? [contactInfo.phone] : [],
               role: contactInfo.role,
               organization_id: organizationId,
             })
@@ -256,9 +256,9 @@ async function processDocumentsData(
           .insert({
             business_id: business.id,
             name: 'Contact',
-            email: contactInfo.email,
             normalized_email: contactInfo.email?.toLowerCase() || null,
-            phone: contactInfo.phone,
+            emails: contactInfo.email ? [contactInfo.email.toLowerCase()] : [],
+            phones: contactInfo.phone ? [contactInfo.phone] : [],
             organization_id: organizationId,
           })
           .select('id')
