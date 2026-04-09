@@ -51,6 +51,30 @@ export function stripQuotedContent(text: string): string {
 export function extractForwardedSender(rawBody: string): { email: string; name: string } | null {
   // Regex to extract email from angle brackets <email@domain>
   const angleEmail = /<([^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)>/
+  // Fallback: bare email without angle brackets
+  const bareEmail = /\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/
+
+  function extractEmailFromLine(line: string): { email: string; name: string } | null {
+    const angleMatch = angleEmail.exec(line)
+    if (angleMatch) {
+      const email = angleMatch[1].toLowerCase()
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        const name = line.replace(/<[^>]+>/, '').trim()
+        return { email, name }
+      }
+    }
+    // Fallback: bare email with no angle brackets
+    const bareMatch = bareEmail.exec(line)
+    if (bareMatch) {
+      const email = bareMatch[1].toLowerCase()
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        // Name is everything before the bare email, trimmed
+        const name = line.slice(0, bareMatch.index).trim() || email
+        return { email, name }
+      }
+    }
+    return null
+  }
 
   // --- Strategy 1: look for a forwarding marker, then find From: after it ---
   const markerRe = /^(?:-{3,}\s*Forwarded message\s*-{3,}|Begin forwarded message:|>{0,3}\s*-{3,}\s*Forwarded by .+)/im
@@ -59,14 +83,8 @@ export function extractForwardedSender(rawBody: string): { email: string; name: 
     const after = rawBody.slice(markerMatch.index + markerMatch[0].length)
     const fromLine = /^From:\s+(.{1,200})$/im.exec(after)
     if (fromLine) {
-      const emailMatch = angleEmail.exec(fromLine[1])
-      if (emailMatch) {
-        const email = emailMatch[1].toLowerCase()
-        if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-          const name = fromLine[1].replace(/<[^>]+>/, '').trim()
-          return { email, name }
-        }
-      }
+      const result = extractEmailFromLine(fromLine[1])
+      if (result) return result
     }
   }
 
@@ -77,14 +95,17 @@ export function extractForwardedSender(rawBody: string): { email: string; name: 
   const outlookRe = /^From:\s+(.{1,200})\r?\nSent:\s+/im
   const outlookMatch = outlookRe.exec(rawBody)
   if (outlookMatch) {
-    const emailMatch = angleEmail.exec(outlookMatch[1])
-    if (emailMatch) {
-      const email = emailMatch[1].toLowerCase()
-      if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-        const name = outlookMatch[1].replace(/<[^>]+>/, '').trim()
-        return { email, name }
-      }
-    }
+    const result = extractEmailFromLine(outlookMatch[1])
+    if (result) return result
+  }
+
+  // --- Strategy 3: Apple Mail / newer Outlook — From: immediately followed by Date: ---
+  // Apple Mail and some Outlook versions use "Date:" instead of "Sent:".
+  const appleMailRe = /^From:\s+(.{1,200})\r?\nDate:\s+/im
+  const appleMailMatch = appleMailRe.exec(rawBody)
+  if (appleMailMatch) {
+    const result = extractEmailFromLine(appleMailMatch[1])
+    if (result) return result
   }
 
   return null
