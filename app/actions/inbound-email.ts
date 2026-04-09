@@ -200,6 +200,26 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
     .update({ last_contacted_at: entryDate })
     .eq('id', businessId)
 
+  // Learn email → contact: store sender email in contact record if not already there.
+  // This enables future auto-filing for personal-domain senders (gmail etc.)
+  // where domain mapping is skipped.
+  if (resolvedContactId && fromEmail && itemDirection === 'received') {
+    const { data: contactRow } = await supabase
+      .from('contacts')
+      .select('emails')
+      .eq('id', resolvedContactId)
+      .single()
+    if (contactRow) {
+      const existingEmails: string[] = (contactRow.emails as string[]) ?? []
+      if (!existingEmails.map((e: string) => e.toLowerCase()).includes(fromEmail)) {
+        await supabase
+          .from('contacts')
+          .update({ emails: [...existingEmails, fromEmail] })
+          .eq('id', resolvedContactId)
+      }
+    }
+  }
+
   // Learn domain mapping (skip personal domains)
   // For sent emails, learn from the recipient's domain (not the sender's own domain)
   // For received emails, use item.from_email — already resolved to the original sender
@@ -290,7 +310,7 @@ export async function getAutoFiledRecent(): Promise<{ data?: AutoFiledItem[]; er
     .from('correspondence')
     .select('id, subject, direction, entry_date, business_id, businesses(name)')
     .eq('organization_id', orgId)
-    .filter('ai_metadata->>source', 'in', '("webhook_inbound","webhook_bcc")')
+    .filter('ai_metadata->>source', 'in', '("webhook_inbound","webhook_bcc","inbound_email","bcc_capture")')
     .order('entry_date', { ascending: false })
     .limit(20)
 
