@@ -121,14 +121,14 @@ export function BusinessFiles({ businessId }: BusinessFilesProps) {
 
   return (
     <>
-      <div className="bg-white border p-6 mb-6 rounded-sm" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+      <div className="bg-white border border-black/[0.06] p-6 mb-6 rounded-sm">
         {/* Header */}
         <div className="flex justify-between items-center">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="flex items-center gap-2 text-left"
           >
-            <span className="text-sm text-gray-500 transition-transform" style={{ display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+            <span className={`text-sm text-gray-500 transition-transform inline-block ${isExpanded ? 'rotate-90' : 'rotate-0'}`}>
               ▶
             </span>
             <h2 className="text-xl font-bold font-serif">
@@ -181,8 +181,7 @@ export function BusinessFiles({ businessId }: BusinessFilesProps) {
                 {files.map((file) => (
                   <div
                     key={file.id}
-                    className="flex items-center justify-between p-3 border rounded-sm"
-                    style={{ borderColor: 'rgba(0,0,0,0.06)' }}
+                    className="flex items-center justify-between p-3 border border-black/[0.06] rounded-sm"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-sm whitespace-nowrap">

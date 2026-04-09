@@ -7,10 +7,9 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
-import { getCorrespondenceByBusiness, updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, setCorrespondenceAction, type Correspondence } from '@/app/actions/correspondence'
+import { updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, setCorrespondenceAction, type Correspondence } from '@/app/actions/correspondence'
 import { getThreadsByBusiness, createThread, renameThread, deleteThread, assignCorrespondenceToThread, type ConversationThread } from '@/app/actions/threads'
 import { dismissDuplicatePair, dismissMultipleDuplicatePairs } from '@/app/actions/duplicate-dismissals'
-import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
 import { EditBusinessDetailsButton } from '@/components/EditBusinessDetailsButton'
 import { ExportDropdown } from '@/components/ExportDropdown'
@@ -31,6 +30,7 @@ import { CorrespondenceFilterBar } from './CorrespondenceFilterBar'
 import { AllEntriesView } from './AllEntriesView'
 import { ThreadsView } from './ThreadsView'
 import { type EditFields } from './CorrespondenceEditForm'
+import { useCorrespondence } from './useCorrespondence'
 
 interface Props {
   business: Business
@@ -71,18 +71,31 @@ export function BusinessDetailClient({
   const [threads, setThreads] = useState<ConversationThread[]>(initialThreads)
   const [duplicates, setDuplicates] = useState(initialDuplicates)
 
-  // Correspondence — client-fetched (filter/pagination dependent on localStorage)
-  const [correspondence, setCorrespondence] = useState<Correspondence[]>([])
-  const [displayNames, setDisplayNames] = useState<Record<string, string>>({})
-  const [correspondenceLoading, setCorrespondenceLoading] = useState(true)
+  // Correspondence data, filters, pagination, and derived sections
+  const {
+    correspondence, setCorrespondence,
+    displayNames,
+    loading: correspondenceLoading,
+    totalCount, remainingInDB, isLoadingMore,
+    sortOrder, setSortOrder,
+    contactFilter, setContactFilter,
+    directionFilter, setDirectionFilter,
+    dateRange, setDateRange,
+    customDateFrom, setCustomDateFrom,
+    customDateTo, setCustomDateTo,
+    recentEntries, archiveEntries, pinnedEntries,
+    isArchiveExpanded, setIsArchiveExpanded,
+    refreshCorrespondence,
+    loadMore,
+    getPreviousEntryId, getNextEntryId,
+    isExpandedEntry, handleToggleExpand,
+  } = useCorrespondence({ businessId })
 
   // UI state
-  const [isArchiveExpanded, setIsArchiveExpanded] = useState(false)
   const [formattingInProgress, setFormattingInProgress] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [contextEntryIds, setContextEntryIds] = useState<Set<string>>(new Set())
-  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set())
 
   // Error and confirmation state
   const [actionError, setActionError] = useState<string | null>(null)
@@ -116,70 +129,6 @@ export function BusinessDetailClient({
   const recentSectionRef = useRef<HTMLDivElement>(null)
   const [recentSectionVisible, setRecentSectionVisible] = useState(true)
 
-  // Correspondence view controls
-  const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest')
-  const [contactFilter, setContactFilter] = useState<string>('all')
-  const [directionFilter, setDirectionFilter] = useState<'all' | 'received' | 'sent'>('all')
-  const [dateRange, setDateRange] = useState<'1m' | '6m' | '12m' | 'custom'>('12m')
-  const [customDateFrom, setCustomDateFrom] = useState<string>('')
-  const [customDateTo, setCustomDateTo] = useState<string>('')
-
-  // DB pagination state
-  const PAGE_SIZE = 100
-  const [totalCount, setTotalCount] = useState(0)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const filtersInitialized = useRef(false)
-
-  // Initial load: read localStorage prefs + fetch correspondence
-  useEffect(() => {
-    filtersInitialized.current = false
-
-    const storageKey = `business_${businessId}_view`
-    let initialContact = 'all'
-    let initialDirection: 'all' | 'received' | 'sent' = 'all'
-    try {
-      const saved = localStorage.getItem(storageKey)
-      if (saved) {
-        const prefs = JSON.parse(saved)
-        if (prefs.sortOrder) setSortOrder(prefs.sortOrder)
-        if (prefs.contactFilter) { initialContact = prefs.contactFilter; setContactFilter(prefs.contactFilter) }
-        if (prefs.directionFilter) { initialDirection = prefs.directionFilter; setDirectionFilter(prefs.directionFilter) }
-        if (prefs.dateRange) setDateRange(prefs.dateRange)
-        if (prefs.customDateFrom) setCustomDateFrom(prefs.customDateFrom)
-        if (prefs.customDateTo) setCustomDateTo(prefs.customDateTo)
-      }
-    } catch (e) {
-      console.error('Error loading view preferences:', e)
-    }
-
-    setCorrespondenceLoading(true)
-    getCorrespondenceByBusiness(businessId, {
-      limit: PAGE_SIZE,
-      contactId: initialContact,
-      direction: initialDirection,
-    }).then(async (result) => {
-      const data = 'error' in result ? [] : result.data ?? []
-      setCorrespondence(data)
-      setTotalCount('error' in result ? 0 : result.count ?? 0)
-      setCorrespondenceLoading(false)
-      filtersInitialized.current = true
-
-      // Fetch display names
-      const userIds = [...new Set(data.map(c => c.user_id))]
-      if (userIds.length > 0) {
-        const displayNamesResult = await getDisplayNamesForUsers(userIds)
-        if (displayNamesResult.data) {
-          const namesMap: Record<string, string> = {}
-          displayNamesResult.data.forEach(item => {
-            namesMap[item.id] = item.display_name || ''
-          })
-          setDisplayNames(namesMap)
-        }
-      }
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId])
-
   // Scroll to hash entry after load (e.g. from duplicate warning)
   useEffect(() => {
     if (correspondenceLoading) return
@@ -198,37 +147,6 @@ export function BusinessDetailClient({
     }
   }, [correspondenceLoading])
 
-  // Re-fetch when contact/direction filter changes (after initial load)
-  useEffect(() => {
-    if (!filtersInitialized.current) return
-    setContextEntryIds(new Set())
-    getCorrespondenceByBusiness(businessId, {
-      limit: PAGE_SIZE,
-      contactId: contactFilter,
-      direction: directionFilter,
-    }).then(result => {
-      if (!('error' in result)) {
-        setCorrespondence(result.data ?? [])
-        setTotalCount(result.count ?? 0)
-      }
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId, contactFilter, directionFilter])
-
-  // Save filter preferences to localStorage when they change
-  useEffect(() => {
-    if (!filtersInitialized.current) return
-    const storageKey = `business_${businessId}_view`
-    localStorage.setItem(storageKey, JSON.stringify({
-      sortOrder, contactFilter, directionFilter, dateRange, customDateFrom, customDateTo,
-    }))
-  }, [businessId, sortOrder, contactFilter, directionFilter, dateRange, customDateFrom, customDateTo])
-
-  // Reset context entries when search/filters change
-  useEffect(() => {
-    setContextEntryIds(new Set())
-  }, [contactFilter, directionFilter, dateRange, customDateFrom, customDateTo, searchQuery])
-
   // Jump to today: observe recent section visibility
   useEffect(() => {
     const el = recentSectionRef.current
@@ -241,99 +159,10 @@ export function BusinessDetailClient({
     return () => obs.disconnect()
   }, [correspondenceLoading])
 
-  // Refresh correspondence from DB (page 1 with current filters)
-  const refreshCorrespondence = useCallback(async () => {
-    const result = await getCorrespondenceByBusiness(businessId, {
-      limit: PAGE_SIZE,
-      contactId: contactFilter,
-      direction: directionFilter,
-    })
-    if (!('error' in result)) {
-      setCorrespondence(result.data ?? [])
-      setTotalCount(result.count ?? 0)
-    }
-  }, [businessId, contactFilter, directionFilter])
-
-  // Append next page of correspondence from DB
-  const loadMore = useCallback(async () => {
-    if (correspondence.length >= totalCount) return
-    setIsLoadingMore(true)
-    const result = await getCorrespondenceByBusiness(businessId, {
-      limit: PAGE_SIZE,
-      offset: correspondence.length,
-      contactId: contactFilter,
-      direction: directionFilter,
-    })
-    if (!('error' in result)) {
-      setCorrespondence(prev => [...prev, ...(result.data ?? [])])
-    }
-    setIsLoadingMore(false)
-  }, [businessId, correspondence, totalCount, contactFilter, directionFilter])
-
-  // Split correspondence into recent/archive/pinned with filters applied
-  const { recentEntries, archiveEntries, pinnedEntries } = useMemo(() => {
-    let cutoffDate: Date
-    if (dateRange === 'custom' && customDateFrom) {
-      cutoffDate = new Date(customDateFrom)
-    } else {
-      cutoffDate = new Date()
-      switch (dateRange) {
-        case '1m': cutoffDate.setMonth(cutoffDate.getMonth() - 1); break
-        case '6m': cutoffDate.setMonth(cutoffDate.getMonth() - 6); break
-        default: cutoffDate.setMonth(cutoffDate.getMonth() - 12); break
-      }
-    }
-    const endDate = dateRange === 'custom' && customDateTo ? new Date(customDateTo) : null
-
-    const sortFn = (a: Correspondence, b: Correspondence) => {
-      const dateA = new Date(a.entry_date || a.created_at).getTime()
-      const dateB = new Date(b.entry_date || b.created_at).getTime()
-      return sortOrder === 'oldest' ? dateA - dateB : dateB - dateA
-    }
-
-    const recent = correspondence
-      .filter(e => {
-        const d = new Date(e.entry_date || e.created_at)
-        return d >= cutoffDate && (endDate ? d <= endDate : true)
-      })
-      .sort(sortFn)
-
-    const archive = correspondence
-      .filter(e => {
-        const d = new Date(e.entry_date || e.created_at)
-        if (endDate) return d < cutoffDate || d > endDate
-        return d < cutoffDate
-      })
-      .sort(sortFn)
-
-    const pinned = correspondence
-      .filter(e => e.is_pinned)
-      .sort((a, b) => new Date(b.entry_date || b.created_at).getTime() - new Date(a.entry_date || a.created_at).getTime())
-
-    return { recentEntries: recent, archiveEntries: archive, pinnedEntries: pinned }
-  }, [correspondence, sortOrder, dateRange, customDateFrom, customDateTo])
-
-  // Chronological index for neighbour lookup
-  const { chronoIndex } = useMemo(() => {
-    const sorted = [...correspondence].sort((a, b) =>
-      new Date(a.entry_date || a.created_at).getTime() - new Date(b.entry_date || b.created_at).getTime()
-    )
-    const indexMap = new Map<string, number>()
-    sorted.forEach((entry, i) => indexMap.set(entry.id, i))
-    return { chronoIndex: { sorted, indexMap } }
-  }, [correspondence])
-
-  const getPreviousEntryId = useCallback((entryId: string): string | null => {
-    const idx = chronoIndex.indexMap.get(entryId)
-    if (idx === undefined || idx === 0) return null
-    return chronoIndex.sorted[idx - 1].id
-  }, [chronoIndex])
-
-  const getNextEntryId = useCallback((entryId: string): string | null => {
-    const idx = chronoIndex.indexMap.get(entryId)
-    if (idx === undefined || idx >= chronoIndex.sorted.length - 1) return null
-    return chronoIndex.sorted[idx + 1].id
-  }, [chronoIndex])
+  // Reset context entries when search query changes
+  useEffect(() => {
+    setContextEntryIds(new Set())
+  }, [searchQuery])
 
   const handleShowPrevious = useCallback((entryId: string) => {
     const prevId = getPreviousEntryId(entryId)
@@ -381,8 +210,6 @@ export function BusinessDetailClient({
       if (hasContextInArchive) setIsArchiveExpanded(true)
     }
   }, [searchQuery, contextEntryIds, filteredCorrespondence.archive])
-
-  const isExpandedEntry = useCallback((entryId: string) => expandedEntries.has(entryId), [expandedEntries])
 
   // --- Handlers ---
 
@@ -652,17 +479,6 @@ export function BusinessDetailClient({
     const [threadsRes] = await Promise.all([getThreadsByBusiness(businessId), refreshCorrespondence()])
     setThreads('error' in threadsRes ? [] : threadsRes.data || [])
   }, [businessId, refreshCorrespondence])
-
-  const handleToggleExpand = useCallback((entryId: string) => {
-    setExpandedEntries(prev => {
-      const next = new Set(prev)
-      if (next.has(entryId)) next.delete(entryId)
-      else next.add(entryId)
-      return next
-    })
-  }, [])
-
-  const remainingInDB = Math.max(0, totalCount - correspondence.length)
 
   // Common props passed to both AllEntriesView and ThreadsView
   const entryPassthroughProps = {

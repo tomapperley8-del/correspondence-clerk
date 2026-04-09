@@ -59,6 +59,7 @@ export const DuplicatesWarningBanner = React.memo(function DuplicatesWarningBann
           <label className="flex items-center cursor-pointer">
             <input
               type="checkbox"
+              aria-label="Select all duplicates"
               checked={selectedDuplicateHashes.size === duplicates.length && duplicates.length > 0}
               onChange={onToggleSelectAll}
               disabled={isBulkOperationRunning}
@@ -103,6 +104,7 @@ export const DuplicatesWarningBanner = React.memo(function DuplicatesWarningBann
           <div className="flex items-start gap-2">
             <input
               type="checkbox"
+              aria-label={`Select duplicate: ${dup.entries[0]?.subject || 'No subject'}`}
               checked={selectedDuplicateHashes.has(dup.hash)}
               onChange={() => onToggleHash(dup.hash)}
               disabled={isBulkOperationRunning}

@@ -74,10 +74,11 @@ export function CorrespondenceEditForm({
 
       {/* Subject */}
       <div className="mb-3">
-        <label className="block text-sm font-semibold text-gray-900 mb-1">
+        <label htmlFor="edit-subject" className="block text-sm font-semibold text-gray-900 mb-1">
           Subject:
         </label>
         <input
+          id="edit-subject"
           type="text"
           value={editedSubject}
           onChange={(e) => setEditedSubject(e.target.value)}
@@ -88,10 +89,11 @@ export function CorrespondenceEditForm({
 
       {/* Direction Dropdown */}
       <div className="mb-3">
-        <label className="block text-sm font-semibold text-gray-900 mb-1">
+        <label htmlFor="edit-direction" className="block text-sm font-semibold text-gray-900 mb-1">
           Direction:
         </label>
         <select
+          id="edit-direction"
           value={editedDirection}
           onChange={(e) => setEditedDirection(e.target.value as 'received' | 'sent' | '')}
           className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
@@ -104,10 +106,11 @@ export function CorrespondenceEditForm({
 
       {/* Internal Sender */}
       <div className="mb-3">
-        <label className="block text-sm font-semibold text-gray-900 mb-1">
+        <label htmlFor="edit-internal-sender" className="block text-sm font-semibold text-gray-900 mb-1">
           {editedDirection === 'sent' ? 'Sent from:' : editedDirection === 'received' ? 'Received by:' : 'Internal sender:'}
         </label>
         <select
+          id="edit-internal-sender"
           value={editedInternalSender}
           onChange={(e) => setEditedInternalSender(e.target.value)}
           className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
@@ -123,10 +126,11 @@ export function CorrespondenceEditForm({
 
       {/* Contact Dropdown */}
       <div className="mb-3">
-        <label className="block text-sm font-semibold text-gray-900 mb-1">
+        <label htmlFor="edit-contact" className="block text-sm font-semibold text-gray-900 mb-1">
           Contact:
         </label>
         <select
+          id="edit-contact"
           value={editedContactId}
           onChange={(e) => setEditedContactId(e.target.value)}
           className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
@@ -141,10 +145,11 @@ export function CorrespondenceEditForm({
 
       {/* Date Input */}
       <div className="mb-3">
-        <label className="block text-sm font-semibold text-gray-900 mb-1">
+        <label htmlFor="edit-date" className="block text-sm font-semibold text-gray-900 mb-1">
           Entry Date:
         </label>
         <input
+          id="edit-date"
           type="date"
           value={editedDate}
           onChange={(e) => setEditedDate(e.target.value)}
@@ -154,10 +159,11 @@ export function CorrespondenceEditForm({
 
       {/* Action Needed */}
       <div className="mb-3">
-        <label className="block text-sm font-semibold text-gray-900 mb-1">
+        <label htmlFor="edit-action-needed" className="block text-sm font-semibold text-gray-900 mb-1">
           Action needed:
         </label>
         <select
+          id="edit-action-needed"
           value={editedActionNeeded}
           onChange={(e) => setEditedActionNeeded(e.target.value)}
           className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
@@ -174,10 +180,11 @@ export function CorrespondenceEditForm({
       {/* Due Date (only shown when action is set) */}
       {editedActionNeeded !== 'none' && (
         <div className="mb-3">
-          <label className="block text-sm font-semibold text-gray-900 mb-1">
+          <label htmlFor="edit-due-at" className="block text-sm font-semibold text-gray-900 mb-1">
             Due date (optional):
           </label>
           <input
+            id="edit-due-at"
             type="date"
             value={editedDueAt}
             onChange={(e) => setEditedDueAt(e.target.value)}
@@ -188,6 +195,7 @@ export function CorrespondenceEditForm({
 
       {/* Text Textarea */}
       <textarea
+        aria-label="Entry text"
         value={editedText}
         onChange={(e) => setEditedText(e.target.value)}
         className="w-full min-h-[200px] px-3 py-2 border-2 border-gray-300 text-sm font-mono focus:border-brand-navy focus:outline-none"
