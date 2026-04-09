@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next'
 import { Lora, Inter } from 'next/font/google'
 import './globals.css'
 import { Navigation } from '@/components/Navigation'
-import { ChatProvider } from '@/components/ChatContext'
 import { InsightsProvider } from '@/components/InsightsContext'
 import { ToastContainer } from '@/components/Toast'
 import { DynamicPanels } from '@/components/DynamicPanels'
@@ -45,8 +44,7 @@ export default function RootLayout({
         {supabaseUrl && <link rel="preconnect" href={supabaseUrl} />}
       </head>
       <body>
-        <ChatProvider>
-          <InsightsProvider>
+        <InsightsProvider>
           <a
             href="#main-content"
             className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-brand-navy focus:text-white focus:px-4 focus:py-2 focus:font-semibold"
@@ -57,9 +55,8 @@ export default function RootLayout({
           <DynamicPanels />
           <ToastContainer />
           <main id="main-content">{children}</main>
-          </InsightsProvider>
-        </ChatProvider>
-      </body>
+        </InsightsProvider>
+</body>
     </html>
   )
 }
