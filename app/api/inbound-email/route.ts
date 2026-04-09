@@ -20,14 +20,14 @@
  *  - BCCed (sent): token only in session.recipient — To shows real recipients
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import crypto from 'crypto'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { formatCorrespondence } from '@/lib/ai/formatter'
 import { isThreadSplitResponse } from '@/lib/ai/types'
 import { isPersonalDomain, stripQuotedContent, extractForwardedSender } from '@/lib/inbound/utils'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 type EmailAddress = { address: string; name: string }
 
@@ -276,6 +276,8 @@ async function saveDeadLetter(
 // Service-role correspondence insert (no user session in webhook context)
 // Throws on DB error so caller can dead-letter the payload.
 // ---------------------------------------------------------------------------
+// Returns the new correspondence ID, or null if the email was a duplicate (dedup skipped).
+// Throws on DB error so caller can dead-letter the payload.
 async function insertCorrespondenceServiceRole(
   supabase: ReturnType<typeof createServiceRoleClient>,
   opts: {
@@ -284,16 +286,12 @@ async function insertCorrespondenceServiceRole(
     businessId: string
     contactId: string | null
     rawText: string
-    formattedText: string | null
     subject: string
     entryDate: string
-    formattingStatus: string
     fromEmail: string
     direction: 'received' | 'sent'
-    actionNeeded?: string
-    dueAt?: string | null
   }
-): Promise<void> {
+): Promise<string | null> {
   const { data: contentHash } = await supabase.rpc('compute_content_hash', {
     raw_text: opts.rawText,
   })
@@ -307,30 +305,34 @@ async function insertCorrespondenceServiceRole(
       .eq('content_hash', contentHash)
       .limit(1)
       .maybeSingle()
-    if (existing) return // already stored
+    if (existing) return null // already stored
   }
 
-  const { error: insertError } = await supabase.from('correspondence').insert({
-    organization_id: opts.orgId,
-    business_id: opts.businessId,
-    contact_id: opts.contactId,
-    user_id: opts.userId,
-    raw_text_original: opts.rawText,
-    formatted_text_original: opts.formattedText,
-    formatted_text_current: opts.formattedText,
-    entry_date: opts.entryDate,
-    subject: opts.subject,
-    type: 'Email',
-    direction: opts.direction,
-    action_needed: opts.actionNeeded || 'none',
-    due_at: opts.dueAt || null,
-    formatting_status: opts.formattingStatus,
-    content_hash: contentHash || null,
-    ai_metadata: {
-      source: opts.direction === 'sent' ? 'webhook_bcc' : 'webhook_inbound',
-      from_email: opts.fromEmail,
-    },
-  })
+  const { data: inserted, error: insertError } = await supabase
+    .from('correspondence')
+    .insert({
+      organization_id: opts.orgId,
+      business_id: opts.businessId,
+      contact_id: opts.contactId,
+      user_id: opts.userId,
+      raw_text_original: opts.rawText,
+      formatted_text_original: null,
+      formatted_text_current: null,
+      entry_date: opts.entryDate,
+      subject: opts.subject,
+      type: 'Email',
+      direction: opts.direction,
+      action_needed: 'none',
+      due_at: null,
+      formatting_status: 'unformatted',
+      content_hash: contentHash || null,
+      ai_metadata: {
+        source: opts.direction === 'sent' ? 'webhook_bcc' : 'webhook_inbound',
+        from_email: opts.fromEmail,
+      },
+    })
+    .select('id')
+    .single()
 
   if (insertError) throw new Error(insertError.message)
 
@@ -338,6 +340,51 @@ async function insertCorrespondenceServiceRole(
     .from('businesses')
     .update({ last_contacted_at: opts.entryDate })
     .eq('id', opts.businessId)
+
+  return inserted.id
+}
+
+// Runs after the 200 response is sent. Calls the AI formatter and patches the
+// correspondence row with formatted text, a refined date/subject, and any action.
+// If the AI fails or times out, the row stays unformatted — never blocks delivery.
+async function applyFormattingBackground(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  id: string,
+  rawText: string,
+  fallbackDate: string,
+  direction: string
+): Promise<void> {
+  const formatResult = await formatCorrespondence(rawText, false)
+  if (!formatResult.success || isThreadSplitResponse(formatResult.data)) return
+
+  const ai = formatResult.data
+  const entryDate = ai.entry_date_guess || fallbackDate
+  let actionNeeded = 'none'
+  let dueAt: string | null = null
+
+  if (ai.action_suggestion?.confidence === 'high' && ai.action_suggestion.action_type) {
+    actionNeeded = ai.action_suggestion.action_type
+    if (ai.action_suggestion.suggested_due_date) {
+      dueAt = ai.action_suggestion.suggested_due_date
+    } else {
+      const d = new Date(entryDate)
+      d.setDate(d.getDate() + 7)
+      dueAt = d.toISOString().split('T')[0]
+    }
+  }
+
+  const update: Record<string, unknown> = {
+    formatted_text_original: ai.formatted_text,
+    formatted_text_current: ai.formatted_text,
+    entry_date: entryDate,
+    formatting_status: 'formatted',
+    action_needed: actionNeeded,
+    due_at: dueAt,
+  }
+  if (ai.subject_guess) update.subject = ai.subject_guess
+
+  await supabase.from('correspondence').update(update).eq('id', id)
+  log('[inbound-email] bg_format_done', { direction, id })
 }
 
 // ---------------------------------------------------------------------------
@@ -622,57 +669,38 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     const match = await matchBusinessFromRecipients(supabase, orgId, recipientEmails)
 
     if (match) {
-      log('[inbound-email] auto_filed_sent', { businessId: match.businessId, matchedEmail: match.matchedEmail })
       const rawForAI = buildRawForAI(payload, strippedBody, 'sent')
-      const formatResult = await formatCorrespondence(rawForAI, false)
+      const entryDate = payload.date ?? new Date().toISOString()
 
-      let formattedText: string | null = null
-      let entryDate = payload.date ?? new Date().toISOString()
-      let subject = payload.subject || '(No subject)'
-      let formattingStatus = 'unformatted'
-      let actionNeeded: string | undefined
-      let dueAt: string | null | undefined
-
-      if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
-        const ai = formatResult.data
-        formattedText = ai.formatted_text
-        entryDate = ai.entry_date_guess || entryDate
-        subject = ai.subject_guess || subject
-        formattingStatus = 'formatted'
-        if (ai.action_suggestion?.confidence === 'high' && ai.action_suggestion.action_type) {
-          actionNeeded = ai.action_suggestion.action_type
-          if (ai.action_suggestion.suggested_due_date) {
-            dueAt = ai.action_suggestion.suggested_due_date
-          } else {
-            const d = new Date(entryDate)
-            d.setDate(d.getDate() + 7)
-            dueAt = d.toISOString().split('T')[0]
-          }
-        }
-      }
-
-      log('[inbound-email] formatting_done', { formattingStatus, direction: 'sent' })
-
+      let insertedId: string | null = null
       try {
-        await insertCorrespondenceServiceRole(supabase, {
+        insertedId = await insertCorrespondenceServiceRole(supabase, {
           orgId, userId,
           businessId: match.businessId,
           contactId: match.contactId,
           rawText: rawForAI,
-          formattedText,
-          subject,
+          subject: payload.subject || '(No subject)',
           entryDate,
-          formattingStatus,
           fromEmail,
           direction: 'sent',
-          actionNeeded,
-          dueAt,
         })
       } catch (err) {
         log('[inbound-email] auto_filed_sent_insert_failed', { error: String(err) })
         await saveDeadLetter(supabase, orgId, rawBody, String(err), 'auto_file_sent')
+        return NextResponse.json({}, { status: 200 })
       }
 
+      if (insertedId) {
+        after(async () => {
+          try {
+            await applyFormattingBackground(supabase, insertedId, rawForAI, entryDate, 'sent')
+          } catch (err) {
+            log('[inbound-email] bg_format_failed', { error: String(err), id: insertedId })
+          }
+        })
+      }
+
+      log('[inbound-email] auto_filed_sent', { businessId: match.businessId, matchedEmail: match.matchedEmail })
       return NextResponse.json({}, { status: 200 })
     }
 
@@ -752,53 +780,34 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       'received',
       effectiveFromEmail !== fromEmail ? { email: effectiveFromEmail, name: effectiveFromName } : undefined
     )
-    const formatResult = await formatCorrespondence(rawForAI, false)
+    const entryDate = payload.date ?? new Date().toISOString()
 
-    let formattedText: string | null = null
-    let entryDate = payload.date ?? new Date().toISOString()
-    let subject = payload.subject || '(No subject)'
-    let formattingStatus = 'unformatted'
-    let actionNeeded: string | undefined
-    let dueAt: string | null | undefined
-
-    if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
-      const ai = formatResult.data
-      formattedText = ai.formatted_text
-      entryDate = ai.entry_date_guess || entryDate
-      subject = ai.subject_guess || subject
-      formattingStatus = 'formatted'
-      if (ai.action_suggestion?.confidence === 'high' && ai.action_suggestion.action_type) {
-        actionNeeded = ai.action_suggestion.action_type
-        if (ai.action_suggestion.suggested_due_date) {
-          dueAt = ai.action_suggestion.suggested_due_date
-        } else {
-          const d = new Date(entryDate)
-          d.setDate(d.getDate() + 7)
-          dueAt = d.toISOString().split('T')[0]
-        }
-      }
-    }
-
-    log('[inbound-email] formatting_done', { formattingStatus, direction: 'received' })
-
+    let insertedId: string | null = null
     try {
-      await insertCorrespondenceServiceRole(supabase, {
+      insertedId = await insertCorrespondenceServiceRole(supabase, {
         orgId, userId,
         businessId: autoFiledBusinessId,
         contactId,
         rawText: rawForAI,
-        formattedText,
-        subject,
+        subject: payload.subject || '(No subject)',
         entryDate,
-        formattingStatus,
         fromEmail: effectiveFromEmail,
         direction: 'received',
-        actionNeeded,
-        dueAt,
       })
     } catch (err) {
       log('[inbound-email] auto_filed_received_insert_failed', { error: String(err) })
       await saveDeadLetter(supabase, orgId, rawBody, String(err), 'auto_file_received')
+      return NextResponse.json({}, { status: 200 })
+    }
+
+    if (insertedId) {
+      after(async () => {
+        try {
+          await applyFormattingBackground(supabase, insertedId, rawForAI, entryDate, 'received')
+        } catch (err) {
+          log('[inbound-email] bg_format_failed', { error: String(err), id: insertedId })
+        }
+      })
     }
 
     return NextResponse.json({}, { status: 200 })
