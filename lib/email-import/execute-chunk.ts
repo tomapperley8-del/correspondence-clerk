@@ -134,7 +134,7 @@ export async function executeChunk({
         organization_id: orgId,
         name: c.name,
         normalized_email: key,
-        emails: JSON.stringify([key]),
+        emails: [key],
       })
       .select('id')
       .single()
