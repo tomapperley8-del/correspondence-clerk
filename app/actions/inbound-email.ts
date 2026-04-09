@@ -229,6 +229,8 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
 
   revalidatePath('/inbox')
   revalidatePath(`/businesses/${businessId}`)
+  revalidatePath('/dashboard')
+  revalidatePath('/actions')
 
   return { data: entry }
 }
