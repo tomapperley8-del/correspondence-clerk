@@ -404,22 +404,26 @@ async function matchBusinessFromEmail(
   if (!email) return null
 
   // 1. Check contacts.emails[]
-  const { data: contactMatches } = await supabase
+  const { data: contactMatches, error: contactError } = await supabase
     .from('contacts')
     .select('id, business_id')
     .contains('emails', [email])
     .eq('is_active', true)
     .limit(5)
 
+  console.error(JSON.stringify({ event: '[match_debug] contacts_query', email, orgId, count: contactMatches?.length ?? 0, error: contactError?.message ?? null }))
+
   if (contactMatches && contactMatches.length > 0) {
     const businessIds = [...new Set(contactMatches.map(c => c.business_id))]
-    const { data: biz } = await supabase
+    const { data: biz, error: bizError } = await supabase
       .from('businesses')
       .select('id')
       .in('id', businessIds)
       .eq('organization_id', orgId)
       .limit(1)
       .maybeSingle()
+
+    console.error(JSON.stringify({ event: '[match_debug] biz_query', businessIds, orgId, found: !!biz, error: bizError?.message ?? null }))
 
     if (biz) {
       const contact = contactMatches.find(c => c.business_id === biz.id)!
