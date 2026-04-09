@@ -414,12 +414,15 @@ export async function formatCorrespondence(
   try {
     const client = getAnthropicClient();
 
-    // Strip quoted/replied content before sending to AI
-    const cleanText = stripQuotedContent(rawText)
+    // For thread splitting, use raw text — stripping removes From:/Sent:/To: headers
+    // that the AI needs to find where each email begins and ends.
+    // For single-email mode, strip quoted/replied content as normal.
+    const cleanText = shouldSplit ? rawText.trim() : stripQuotedContent(rawText)
 
     // Capture what was stripped for metadata (primarily "---Original Message---" blocks)
+    // Only relevant in single-email mode where we actually strip.
     let quotedContent: string | undefined
-    if (cleanText !== rawText.trim()) {
+    if (!shouldSplit && cleanText !== rawText.trim()) {
       const originalMsgMatch = rawText.match(/(-{3,}\s*original\s+message\s*-{3,}[\s\S]*)/i)
       const onWroteMatch = rawText.match(/(on\s+.{5,80}\s+wrote:[\s\S]*)/i)
       const fromSentToMatch = rawText.match(/(^from:\s.+\nsent:\s.+\nto:.+(?:\nsubject:.+)?[\s\S]*)/im)
@@ -551,7 +554,9 @@ Text to process:
 ${cleanText}`;
 
     const response = await client.beta.messages.create({
-      model: AI_MODELS.ECONOMY,
+      // Thread splitting requires more reasoning (date extraction, direction detection across
+      // multiple emails) — use Sonnet. Single-email formatting stays on Haiku.
+      model: shouldSplit ? AI_MODELS.PREMIUM : AI_MODELS.ECONOMY,
       max_tokens: 4096,
       temperature: 0,
       betas: ['structured-outputs-2025-11-13'],
