@@ -358,7 +358,11 @@ async function applyFormattingBackground(
   if (!formatResult.success || isThreadSplitResponse(formatResult.data)) return
 
   const ai = formatResult.data
-  const entryDate = ai.entry_date_guess || fallbackDate
+  // Always use the email header date (fallbackDate) as the authoritative entry_date.
+  // The AI's entry_date_guess can pick up dates from the email body content (e.g.
+  // "since we last spoke in March") and set a completely wrong date. For webhook
+  // emails the SMTP date header is definitive — don't let the AI override it.
+  const entryDate = fallbackDate
   let actionNeeded = 'none'
   let dueAt: string | null = null
 
