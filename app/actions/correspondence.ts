@@ -858,6 +858,7 @@ export async function markCorrespondenceDone(id: string) {
     revalidatePath(`/businesses/${entry.business_id}`)
   }
   revalidatePath('/actions')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -883,6 +884,7 @@ export async function snoozeCorrespondence(id: string, days: number) {
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
+  const { data: entry } = await supabase.from('correspondence').select('business_id').eq('id', id).single()
   const dueAt = new Date()
   dueAt.setDate(dueAt.getDate() + days)
   const { error } = await supabase
@@ -891,6 +893,7 @@ export async function snoozeCorrespondence(id: string, days: number) {
     .eq('id', id)
     .eq('organization_id', orgId)
   if (error) return { error: error.message }
+  if (entry) revalidatePath(`/businesses/${entry.business_id}`)
   revalidatePath('/actions')
   return { success: true }
 }
@@ -927,20 +930,23 @@ export async function getNeedsReply() {
 
   const entries = data || []
 
+  // O(n) pre-pass: find latest non-received date per business
+  const latestNonReceivedByBusiness = new Map<string, Date>()
+  for (const entry of entries) {
+    if (entry.direction === 'received' || !entry.entry_date) continue
+    const d = new Date(entry.entry_date)
+    const existing = latestNonReceivedByBusiness.get(entry.business_id)
+    if (!existing || d > existing) latestNonReceivedByBusiness.set(entry.business_id, d)
+  }
+
   const needsReply = entries.filter(entry => {
     if (entry.direction !== 'received') return false
     if (entry.action_needed === 'waiting_on_them') return false
     if (entry.due_at && new Date(entry.due_at) > new Date()) return false
     if (!entry.entry_date) return false
     const entryDate = new Date(entry.entry_date)
-    const hasReply = entries.some(other => {
-      if (other.id === entry.id) return false
-      if (other.business_id !== entry.business_id) return false
-      if (other.direction === 'received') return false  // only non-received entries (sent OR notes) count as replies
-      if (!other.entry_date) return false
-      return new Date(other.entry_date) >= entryDate  // >= catches same-timestamp entries
-    })
-    return !hasReply
+    const latestNonReceived = latestNonReceivedByBusiness.get(entry.business_id)
+    return !latestNonReceived || latestNonReceived < entryDate
   })
 
   // Keep only the most recent unreplied received entry per business

@@ -236,7 +236,7 @@ export function Navigation() {
               >
                 Help
               </Link>
-              {pathname !== '/insights' && pathname !== '/dashboard' && <InsightsButton />}
+              {pathname !== '/insights' && <InsightsButton />}
             </div>
           </div>
 
