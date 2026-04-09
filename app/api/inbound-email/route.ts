@@ -404,26 +404,22 @@ async function matchBusinessFromEmail(
   if (!email) return null
 
   // 1. Check contacts.emails[]
-  const { data: contactMatches, error: contactError } = await supabase
+  const { data: contactMatches } = await supabase
     .from('contacts')
     .select('id, business_id')
-    .contains('emails', [email])
+    .filter('emails', 'cs', JSON.stringify([email]))
     .eq('is_active', true)
     .limit(5)
 
-  console.error(JSON.stringify({ event: '[match_debug] contacts_query', email, orgId, count: contactMatches?.length ?? 0, error: contactError?.message ?? null }))
-
   if (contactMatches && contactMatches.length > 0) {
     const businessIds = [...new Set(contactMatches.map(c => c.business_id))]
-    const { data: biz, error: bizError } = await supabase
+    const { data: biz } = await supabase
       .from('businesses')
       .select('id')
       .in('id', businessIds)
       .eq('organization_id', orgId)
       .limit(1)
       .maybeSingle()
-
-    console.error(JSON.stringify({ event: '[match_debug] biz_query', businessIds, orgId, found: !!biz, error: bizError?.message ?? null }))
 
     if (biz) {
       const contact = contactMatches.find(c => c.business_id === biz.id)!
@@ -479,7 +475,7 @@ async function matchBusinessFromRecipients(
         .from('contacts')
         .select('id')
         .eq('business_id', mapping.business_id)
-        .contains('emails', [email])
+        .filter('emails', 'cs', JSON.stringify([email]))
         .limit(1)
         .maybeSingle()
 
@@ -776,7 +772,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
         .from('contacts')
         .select('id')
         .eq('business_id', autoFiledBusinessId)
-        .contains('emails', [effectiveFromEmail])
+        .filter('emails', 'cs', JSON.stringify([effectiveFromEmail]))
         .limit(1)
         .maybeSingle()
       contactId = contact?.id ?? null

@@ -137,7 +137,7 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
         .from('contacts')
         .select('id')
         .eq('business_id', businessId)
-        .contains('emails', [emailToMatch])
+        .filter('emails', 'cs', JSON.stringify([emailToMatch]))
         .limit(1)
         .maybeSingle()
       resolvedContactId = contact?.id ?? null
@@ -418,7 +418,7 @@ export async function findEmailMatch(email: string): Promise<{
   const { data: contactMatches } = await supabase
     .from('contacts')
     .select('id, name, business_id')
-    .contains('emails', [normalised])
+    .filter('emails', 'cs', JSON.stringify([normalised]))
     .eq('is_active', true)
     .limit(5)
 
