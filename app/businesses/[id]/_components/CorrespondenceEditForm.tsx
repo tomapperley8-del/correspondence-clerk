@@ -135,6 +135,7 @@ export function CorrespondenceEditForm({
           onChange={(e) => setEditedContactId(e.target.value)}
           className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
         >
+          <option value="">-- No contact --</option>
           {contacts.map((contact) => (
             <option key={contact.id} value={contact.id}>
               {contact.name}{contact.role ? ` (${contact.role})` : ''}
