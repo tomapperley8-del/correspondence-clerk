@@ -53,14 +53,13 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
       <div className="border-t-2 border-gray-300 pt-4 mb-6">
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-4 items-start mb-3">
           {/* Date Range */}
-          <div className="sm:order-3">
-            <label className="text-sm font-semibold text-gray-700 block mb-1">
-              Show:
-            </label>
+          <div className="sm:order-3" role="group" aria-label="Date range">
+            <span className="text-sm font-semibold text-gray-700 block mb-1">Show:</span>
             <div className="flex border-2 border-gray-300">
               <button
                 type="button"
                 onClick={() => setDateRange('1m')}
+                aria-pressed={dateRange === '1m'}
                 className={`px-3 py-1 text-sm font-medium ${
                   dateRange === '1m'
                     ? 'bg-brand-navy text-white'
@@ -72,6 +71,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
               <button
                 type="button"
                 onClick={() => setDateRange('6m')}
+                aria-pressed={dateRange === '6m'}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   dateRange === '6m'
                     ? 'bg-brand-navy text-white'
@@ -83,6 +83,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
               <button
                 type="button"
                 onClick={() => setDateRange('12m')}
+                aria-pressed={dateRange === '12m'}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   dateRange === '12m'
                     ? 'bg-brand-navy text-white'
@@ -94,6 +95,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
               <button
                 type="button"
                 onClick={() => setDateRange('custom')}
+                aria-pressed={dateRange === 'custom'}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   dateRange === 'custom'
                     ? 'bg-brand-navy text-white'
@@ -109,10 +111,11 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
           {dateRange === 'custom' && (
             <div className="flex gap-2 items-end">
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-1">
+                <label htmlFor="filter-date-from" className="text-sm font-semibold text-gray-700 block mb-1">
                   From:
                 </label>
                 <input
+                  id="filter-date-from"
                   type="date"
                   value={customDateFrom}
                   onChange={(e) => setCustomDateFrom(e.target.value)}
@@ -120,10 +123,11 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
                 />
               </div>
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-1">
+                <label htmlFor="filter-date-to" className="text-sm font-semibold text-gray-700 block mb-1">
                   To:
                 </label>
                 <input
+                  id="filter-date-to"
                   type="date"
                   value={customDateTo}
                   onChange={(e) => setCustomDateTo(e.target.value)}
@@ -134,14 +138,13 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
           )}
 
           {/* Sort Order */}
-          <div className="sm:order-1">
-            <label className="text-sm font-semibold text-gray-700 block mb-1">
-              Sort:
-            </label>
+          <div className="sm:order-1" role="group" aria-label="Sort order">
+            <span className="text-sm font-semibold text-gray-700 block mb-1">Sort:</span>
             <div className="flex border-2 border-gray-300">
               <button
                 type="button"
                 onClick={() => setSortOrder('oldest')}
+                aria-pressed={sortOrder === 'oldest'}
                 className={`px-3 py-1 text-sm font-medium ${
                   sortOrder === 'oldest'
                     ? 'bg-brand-navy text-white'
@@ -153,6 +156,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
               <button
                 type="button"
                 onClick={() => setSortOrder('newest')}
+                aria-pressed={sortOrder === 'newest'}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   sortOrder === 'newest'
                     ? 'bg-brand-navy text-white'
@@ -166,10 +170,11 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
 
           {/* Contact Filter */}
           <div className="sm:order-4">
-            <label className="text-sm font-semibold text-gray-700 block mb-1">
+            <label htmlFor="filter-contact" className="text-sm font-semibold text-gray-700 block mb-1">
               Contact:
             </label>
             <select
+              id="filter-contact"
               value={contactFilter}
               onChange={(e) => setContactFilter(e.target.value)}
               className="px-3 py-1 border-2 border-gray-300 bg-white text-sm focus:border-brand-navy focus:outline-none"
@@ -184,14 +189,13 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
           </div>
 
           {/* Direction Filter */}
-          <div className="sm:order-2">
-            <label className="text-sm font-semibold text-gray-700 block mb-1">
-              Direction:
-            </label>
+          <div className="sm:order-2" role="group" aria-label="Direction filter">
+            <span className="text-sm font-semibold text-gray-700 block mb-1">Direction:</span>
             <div className="flex border-2 border-gray-300">
               <button
                 type="button"
                 onClick={() => setDirectionFilter('all')}
+                aria-pressed={directionFilter === 'all'}
                 className={`px-3 py-1 text-sm font-medium ${
                   directionFilter === 'all'
                     ? 'bg-brand-navy text-white'
@@ -203,6 +207,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
               <button
                 type="button"
                 onClick={() => setDirectionFilter('received')}
+                aria-pressed={directionFilter === 'received'}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   directionFilter === 'received'
                     ? 'bg-brand-navy text-white'
@@ -214,6 +219,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
               <button
                 type="button"
                 onClick={() => setDirectionFilter('sent')}
+                aria-pressed={directionFilter === 'sent'}
                 className={`px-3 py-1 text-sm font-medium border-l-2 border-gray-300 ${
                   directionFilter === 'sent'
                     ? 'bg-brand-navy text-white'
@@ -252,11 +258,12 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
 
       {/* View mode toggle */}
       {threadsCount > 0 && (
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4" role="group" aria-label="View mode">
           <div className="flex border-2 border-gray-300 overflow-hidden">
             <button
               type="button"
               onClick={() => setViewMode('all')}
+              aria-pressed={viewMode === 'all'}
               className={`px-4 py-1.5 text-sm font-semibold ${viewMode === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
             >
               All
@@ -264,6 +271,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
             <button
               type="button"
               onClick={() => setViewMode('threads')}
+              aria-pressed={viewMode === 'threads'}
               className={`px-4 py-1.5 text-sm font-semibold border-l-2 border-gray-300 ${viewMode === 'threads' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
             >
               Threads ({threadsCount})
