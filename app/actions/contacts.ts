@@ -186,8 +186,8 @@ export async function createContact(formData: {
       normalized_email,
       role: formData.role?.trim() || null,
       phone: phonesArray[0] || null, // Keep for backward compatibility
-      emails: JSON.stringify(emailsArray),
-      phones: JSON.stringify(phonesArray),
+      emails: emailsArray,
+      phones: phonesArray,
       notes: formData.notes?.trim() || null,
       organization_id: organizationId,
     })
@@ -244,7 +244,7 @@ export async function updateContact(
   // Handle emails array
   if (formData.emails !== undefined) {
     const emailsArray = formData.emails.map(e => e.trim().toLowerCase()).filter(e => e)
-    updateData.emails = JSON.stringify(emailsArray)
+    updateData.emails = emailsArray
     // Update backward compatibility fields
     updateData.email = emailsArray[0] || null
     updateData.normalized_email = emailsArray[0] || null
@@ -252,19 +252,19 @@ export async function updateContact(
     // Fallback for old single email interface
     updateData.email = formData.email?.trim().toLowerCase() || null
     updateData.normalized_email = formData.email ? formData.email.toLowerCase().trim() : null
-    updateData.emails = formData.email ? JSON.stringify([formData.email.trim().toLowerCase()]) : JSON.stringify([])
+    updateData.emails = formData.email ? [formData.email.trim().toLowerCase()] : []
   }
 
   // Handle phones array
   if (formData.phones !== undefined) {
     const phonesArray = formData.phones.map(p => p.trim()).filter(p => p)
-    updateData.phones = JSON.stringify(phonesArray)
+    updateData.phones = phonesArray
     // Update backward compatibility field
     updateData.phone = phonesArray[0] || null
   } else if (formData.phone !== undefined) {
     // Fallback for old single phone interface
     updateData.phone = formData.phone?.trim() || null
-    updateData.phones = formData.phone ? JSON.stringify([formData.phone.trim()]) : JSON.stringify([])
+    updateData.phones = formData.phone ? [formData.phone.trim()] : []
   }
 
   if (formData.role !== undefined) updateData.role = formData.role?.trim() || null

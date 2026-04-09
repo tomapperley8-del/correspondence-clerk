@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
                   organization_id: orgId,
                   name: contact.name,
                   normalized_email: contact.email.toLowerCase(),
-                  emails: JSON.stringify([contact.email.toLowerCase()]),
+                  emails: [contact.email.toLowerCase()],
                 })
                 .select('id')
                 .single()
