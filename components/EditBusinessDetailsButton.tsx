@@ -43,11 +43,7 @@ export function EditBusinessDetailsButton({
       appEvents.businessesChanged()
       setSaving(false)
       setIsOpen(false)
-      if (onUpdate) {
-        onUpdate()
-      } else {
-        window.location.reload()
-      }
+      if (onUpdate) onUpdate()
     }
   }
 

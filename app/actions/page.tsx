@@ -447,7 +447,7 @@ function QuietRow({ item, logOpen, onLogToggle, onLogSave, onDone }: QuietRowPro
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Link
-              href={`/businesses/${item.business_id}`}
+              href={`/businesses/${item.business_id}?from=actions`}
               className="font-medium text-gray-900 hover:text-brand-navy hover:underline text-sm"
               onClick={e => e.stopPropagation()}
             >
@@ -695,7 +695,7 @@ function ItemRow({ item, focused, logOpen, snoozeOpen, processing, onFocus, onDo
           {/* Business + contact */}
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
             <Link
-              href={`/businesses/${item.business_id}`}
+              href={`/businesses/${item.business_id}?from=actions`}
               className="font-semibold text-gray-900 hover:text-brand-navy hover:underline text-sm"
               onClick={e => e.stopPropagation()}
             >
