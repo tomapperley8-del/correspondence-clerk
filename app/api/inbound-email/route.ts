@@ -490,6 +490,57 @@ async function matchBusinessFromRecipients(
 }
 
 // ---------------------------------------------------------------------------
+// Match a contact by sender/recipient name when exact email lookup fails.
+// Normalises names, requires at least one token ≥4 chars, and only assigns
+// when exactly ONE contact matches (avoids ambiguous multi-contact businesses).
+// If matched, saves the email to the contact's emails[] so future emails
+// auto-match by address without needing another name lookup.
+// ---------------------------------------------------------------------------
+async function matchContactByNameAndLearn(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  businessId: string,
+  displayName: string,
+  email: string
+): Promise<string | null> {
+  if (!displayName || !businessId) return null
+
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('id, name, emails')
+    .eq('business_id', businessId)
+    .eq('is_active', true)
+
+  if (!contacts || contacts.length === 0) return null
+
+  const normalise = (s: string) => s.toLowerCase().trim()
+  // Only use name tokens long enough to be meaningful (avoids matching "Al" → "Alice")
+  const nameParts = normalise(displayName).split(/\s+/).filter(p => p.length >= 4)
+  if (nameParts.length === 0) return null
+
+  const matched = contacts.filter(c => {
+    const cn = normalise(c.name ?? '')
+    return nameParts.some(part => cn.includes(part))
+  })
+
+  // Only assign when exactly one contact matches to avoid wrong assignments
+  if (matched.length !== 1) return null
+
+  const contact = matched[0]
+
+  // Save email so future messages auto-match by address
+  const existing: string[] = contact.emails ?? []
+  if (!existing.map((e: string) => e.toLowerCase()).includes(email.toLowerCase())) {
+    await supabase
+      .from('contacts')
+      .update({ emails: [...existing, email.toLowerCase()] })
+      .eq('id', contact.id)
+    log('[inbound-email] contact_email_learned_by_name', { contactId: contact.id, email })
+  }
+
+  return contact.id
+}
+
+// ---------------------------------------------------------------------------
 // Structured logger
 // ---------------------------------------------------------------------------
 function log(event: string, data: Record<string, unknown> = {}) {
@@ -673,6 +724,19 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     const match = await matchBusinessFromRecipients(supabase, orgId, recipientEmails)
 
     if (match) {
+      // If email-based matching didn't find a contact, try name-based fallback
+      // using the recipient's display name from the To/Cc headers.
+      let resolvedContactId = match.contactId
+      if (!resolvedContactId) {
+        const toEntry = [...(payload.to?.value ?? []), ...(payload.cc?.value ?? [])]
+          .find(r => r.address?.toLowerCase() === match.matchedEmail)
+        if (toEntry?.name) {
+          resolvedContactId = await matchContactByNameAndLearn(
+            supabase, match.businessId, toEntry.name, match.matchedEmail
+          )
+        }
+      }
+
       const rawForAI = buildRawForAI(payload, strippedBody, 'sent')
       const entryDate = payload.date ?? new Date().toISOString()
 
@@ -681,7 +745,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
         insertedId = await insertCorrespondenceServiceRole(supabase, {
           orgId, userId,
           businessId: match.businessId,
-          contactId: match.contactId,
+          contactId: resolvedContactId,
           rawText: rawForAI,
           subject: payload.subject || '(No subject)',
           entryDate,
@@ -765,7 +829,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
 
   if (autoFiledBusinessId) {
     log('[inbound-email] auto_filed_received', { businessId: autoFiledBusinessId, domain: effectiveDomain })
-    // Use email-match contact if available; otherwise try to match by email within the business
+    // Use email-match contact if available; otherwise try to match by email, then by name
     let contactId: string | null = autoFiledContactId
     if (!contactId) {
       const { data: contact } = await supabase
@@ -776,6 +840,11 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
         .limit(1)
         .maybeSingle()
       contactId = contact?.id ?? null
+    }
+    if (!contactId && effectiveFromName) {
+      contactId = await matchContactByNameAndLearn(
+        supabase, autoFiledBusinessId, effectiveFromName, effectiveFromEmail
+      )
     }
 
     const rawForAI = buildRawForAI(
