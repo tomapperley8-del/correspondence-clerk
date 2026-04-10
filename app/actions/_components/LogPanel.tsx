@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createCorrespondence } from '@/app/actions/correspondence'
+import { toast } from '@/lib/toast'
 
 type LogPanelProps = {
   businessId: string
@@ -50,6 +51,11 @@ export function LogPanel({ businessId, contactId, showMarkDone, onSave, onCancel
       setError(result.error)
       setSaving(false)
     } else {
+      const resolved = ('actionsResolved' in result ? (result as { actionsResolved: number }).actionsResolved : 0)
+      if (resolved > 0) {
+        const label = resolved === 1 ? '1 action auto-resolved' : `${resolved} actions auto-resolved`
+        toast.success(`${label} — check Actions`)
+      }
       onSave(markDone)
     }
   }

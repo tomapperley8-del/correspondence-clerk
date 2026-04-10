@@ -17,7 +17,7 @@ export async function checkAndResolveActions(
   businessId: string,
   newEntryText: string,
   newEntrySubject: string | null
-): Promise<void> {
+): Promise<number> {
   try {
     const supabase = createServiceRoleClient()
 
@@ -30,7 +30,7 @@ export async function checkAndResolveActions(
       .neq('action_needed', 'none')
       .limit(10)
 
-    if (!actions || actions.length === 0) return
+    if (!actions || actions.length === 0) return 0
 
     // Build prompt
     const actionsList = actions
@@ -51,7 +51,7 @@ export async function checkAndResolveActions(
     })
 
     const block = response.content[0]
-    if (block.type !== 'text' || !block.text.trim()) return
+    if (block.type !== 'text' || !block.text.trim()) return 0
 
     // Parse JSON response
     let resolved: string[] = []
@@ -62,16 +62,16 @@ export async function checkAndResolveActions(
       }
     } catch {
       // AI returned something unparseable — skip silently
-      return
+      return 0
     }
 
-    if (resolved.length === 0) return
+    if (resolved.length === 0) return 0
 
     // Validate that all resolved IDs actually belong to this business + org
     const validIds = actions.map((a) => a.id)
     const safeIds = resolved.filter((id) => validIds.includes(id))
 
-    if (safeIds.length === 0) return
+    if (safeIds.length === 0) return 0
 
     await supabase
       .from('correspondence')
@@ -80,7 +80,9 @@ export async function checkAndResolveActions(
       .eq('organization_id', orgId)
 
     revalidatePath('/actions')
+    return safeIds.length
   } catch (err) {
     console.error('Action resolution check failed:', err)
+    return 0
   }
 }
