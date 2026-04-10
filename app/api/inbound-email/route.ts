@@ -366,7 +366,17 @@ async function applyFormattingBackground(
   let actionNeeded = 'none'
   let dueAt: string | null = null
 
-  if (ai.action_suggestion?.confidence === 'high' && ai.action_suggestion.action_type) {
+  // Apply high-confidence AI flags unconditionally.
+  // Also apply medium-confidence for financial/obligation types — these are high-value
+  // signals that matter even at medium confidence (better to over-flag than miss).
+  const MEDIUM_CONFIDENCE_TYPES = ['invoice', 'waiting_on_them', 'prospect']
+  const shouldApply =
+    ai.action_suggestion?.action_type &&
+    (ai.action_suggestion.confidence === 'high' ||
+      (ai.action_suggestion.confidence === 'medium' &&
+        MEDIUM_CONFIDENCE_TYPES.includes(ai.action_suggestion.action_type)))
+
+  if (shouldApply && ai.action_suggestion) {
     actionNeeded = ai.action_suggestion.action_type
     if (ai.action_suggestion.suggested_due_date) {
       dueAt = ai.action_suggestion.suggested_due_date
