@@ -32,6 +32,16 @@ import { ThreadsView } from './ThreadsView'
 import { type EditFields } from './CorrespondenceEditForm'
 import { useCorrespondence } from './useCorrespondence'
 
+function formatRelativeTime(isoString: string): string {
+  const diffMs = Date.now() - new Date(isoString).getTime()
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  if (diffHours < 1) return 'Updated just now'
+  if (diffHours < 24) return `Updated ${diffHours}h ago`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays === 1) return 'Updated yesterday'
+  return `Updated ${diffDays}d ago`
+}
+
 interface Props {
   business: Business
   contacts: Contact[]
@@ -640,6 +650,27 @@ export function BusinessDetailClient({
         </div>
       </div>
 
+      {/* Relationship Memory — AI-distilled summary, updated after each Insight generation */}
+      {business.relationship_memory && (
+        <div className="bg-brand-warm border border-black/[0.06] p-4 mb-6">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Relationship Memory</h3>
+            <div className="flex items-center gap-3 text-xs text-gray-400">
+              {business.relationship_memory_updated_at && (
+                <span>{formatRelativeTime(business.relationship_memory_updated_at)}</span>
+              )}
+              <button
+                onClick={() => openInsights(business.id, business.name)}
+                className="text-brand-navy hover:underline"
+              >
+                Refresh via Insights
+              </button>
+            </div>
+          </div>
+          <p className="text-sm text-gray-700 leading-relaxed">{business.relationship_memory}</p>
+        </div>
+      )}
+
       {/* AI Summary — lazy, generates on demand */}
       <CorrespondenceSummary businessId={business.id} refreshTrigger={summaryRefreshTrigger} />
 
@@ -691,9 +722,13 @@ export function BusinessDetailClient({
           <div className="flex gap-3">
             <button
               onClick={() => openInsights(business.id, business.name)}
-              className="px-3 py-2 text-sm font-semibold border rounded-sm text-brand-navy border-brand-navy hover:bg-brand-navy hover:text-white transition-colors"
+              className="relative px-3 py-2 text-sm font-semibold border rounded-sm text-brand-navy border-brand-navy hover:bg-brand-navy hover:text-white transition-colors"
+              title={business.relationship_memory ? `Memory: ${formatRelativeTime(business.relationship_memory_updated_at ?? '')}` : undefined}
             >
               Insights
+              {business.relationship_memory && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-brand-olive rounded-full border-2 border-white" aria-label="Relationship memory available" />
+              )}
             </button>
             <ExportDropdown businessId={business.id} />
             <Link href={`/new-entry?businessId=${business.id}`}>

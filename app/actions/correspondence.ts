@@ -297,9 +297,10 @@ export async function createCorrespondence(formData: {
   revalidatePath('/dashboard')
   revalidatePath('/search')
 
-  // Await action resolution — errors are caught and logged, never block the return
+  // Await action resolution — errors are caught inside, never block the return
+  let actionsResolved = 0
   try {
-    await checkAndResolveActions(
+    actionsResolved = await checkAndResolveActions(
       organizationId,
       formData.business_id,
       formData.raw_text_original,
@@ -309,7 +310,7 @@ export async function createCorrespondence(formData: {
     console.error('Action resolution check failed:', err)
   }
 
-  return { data }
+  return { data, actionsResolved }
 }
 
 /**
