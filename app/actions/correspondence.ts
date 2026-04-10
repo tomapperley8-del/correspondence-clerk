@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { z } from 'zod'
 import { checkAndResolveActions } from '@/lib/ai/action-resolution'
+import { detectTier1Action } from '@/lib/ai/keyword-detection'
 
 const createCorrespondenceSchema = z.object({
   business_id: z.string().uuid('Invalid business ID'),
@@ -258,6 +259,27 @@ export async function createCorrespondence(formData: {
     }
   }
 
+  // For Meeting/Call/Note entries where no action was explicitly set by the user,
+  // run Tier 1 keyword detection as a backstop. These entry types skip AI formatting
+  // so action flags would otherwise be silent for all financial/obligation language.
+  let resolvedActionNeeded = formData.action_needed || 'none'
+  let resolvedDueAt = formData.due_at || null
+  const isMeetingCallNote =
+    !formData.action_needed || formData.action_needed === 'none'
+      ? formData.type === 'Meeting' || formData.type === 'Call' || formData.type === 'Note'
+      : false
+
+  if (isMeetingCallNote) {
+    const keywordMatch = detectTier1Action(formData.raw_text_original, formData.direction ?? null)
+    if (keywordMatch) {
+      resolvedActionNeeded = keywordMatch.action_type
+      // Default due date: 7 days from entry date
+      const base = formData.entry_date ? new Date(formData.entry_date) : new Date()
+      base.setDate(base.getDate() + 7)
+      resolvedDueAt = base.toISOString().split('T')[0]
+    }
+  }
+
   const { data, error } = await supabase
     .from('correspondence')
     .insert({
@@ -271,8 +293,8 @@ export async function createCorrespondence(formData: {
       subject: formData.subject || null,
       type: formData.type || null,
       direction: formData.direction || null,
-      action_needed: formData.action_needed || 'none',
-      due_at: formData.due_at || null,
+      action_needed: resolvedActionNeeded,
+      due_at: resolvedDueAt,
       ai_metadata: formData.ai_metadata || null,
       thread_participants: formData.thread_participants || null,
       internal_sender: formData.internal_sender || null,

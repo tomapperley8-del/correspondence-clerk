@@ -7,6 +7,7 @@
 import { stripQuotedContent } from '@/lib/inbound/utils';
 import { getAnthropicClient } from './client';
 import { AI_MODELS } from './models';
+import { detectTier1Action } from './keyword-detection';
 import {
   AIFormatterResponse,
   FormattingResult,
@@ -206,11 +207,17 @@ Your job is to:
 - Detect any single pending action in the text (action_suggestion field)
 
 ACTION DETECTION RULES:
-- Only suggest an action if explicitly mentioned in the text — NEVER invent one
 - action_type must be one of: prospect, follow_up, waiting_on_them, invoice, renewal
-- Set confidence based on how explicit the trigger is: "I'll follow up next week" = high, vague hints = low
+- Set confidence based on how explicit the trigger is
 - suggested_due_date: extract if mentioned (ISO 8601 date), otherwise null
 - If no clear action is present, set action_suggestion to null
+
+DIRECTION-AWARE DETECTION (apply these rules strictly):
+- SENT email with invoice/payment/outstanding/BACS language → action_type: "waiting_on_them", confidence: "high" (Tom sent the invoice; waiting for payment)
+- SENT email where Tom commits to doing something ("I'll send", "I'll arrange", "I'll check", "will get back to you") → action_type: "follow_up", confidence: "medium"
+- RECEIVED email where contact commits to doing something ("I'll get back to you", "will check", "will confirm", "leave it with me") → action_type: "waiting_on_them", confidence: "high"
+- RECEIVED email where contact expresses interest or asks for pricing/details → action_type: "prospect", confidence: "medium"
+- RECEIVED email with unpaid invoice language (overdue, outstanding, payment due, not yet paid) → action_type: "invoice", confidence: "high"
 
 NEVER add content that wasn't in the original text.`;
 
@@ -385,6 +392,19 @@ function tryDeterministicExtraction(text: string): SingleEntryResponse | null {
   const senderName = fromMatch?.[1]?.trim().replace(/["']/g, '') || null
   const recipientName = toMatch?.[1]?.trim().replace(/["']/g, '') || null
 
+  // Apply Tier 1 keyword detection as a backstop — the fast-path skips AI so
+  // action detection would otherwise be silent for all short emails.
+  // direction_guess is null here (caller determines from context), so we pass null.
+  const keywordMatch = detectTier1Action(body, null)
+  const action_suggestion = keywordMatch
+    ? {
+        action_type: keywordMatch.action_type,
+        confidence: keywordMatch.confidence as 'high',
+        priority: 'high' as const,
+        suggested_due_date: null,
+      }
+    : null
+
   return {
     subject_guess: subjectMatch[1].trim().substring(0, 90),
     entry_type_guess: 'Email',
@@ -396,7 +416,7 @@ function tryDeterministicExtraction(text: string): SingleEntryResponse | null {
       sender: senderName,
       recipient: recipientName,
     },
-    action_suggestion: null,
+    action_suggestion,
   }
 }
 
