@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { getUserProfile, updateDisplayName, updateBriefingEmailOptOut, deleteAccount, type UserProfile } from '@/app/actions/user-profile'
 import { getInboundEmailToken, getOwnEmailAddresses, updateOwnEmailAddresses, getBlockedSenders, unblockSender } from '@/app/actions/inbound-email'
 import { getUnformattedCount, formatAllUnformatted } from '@/app/actions/ai-formatter'
+import { runRetroScan, applyRetroScanResult, dismissRetroScanResult, type RetroMediumResult } from '@/app/actions/retro-scan'
 import { toast } from '@/lib/toast'
 import { createClient } from '@/lib/supabase/client'
 
@@ -37,6 +38,11 @@ export default function SettingsPage() {
   const [isSavingBriefing, setIsSavingBriefing] = useState(false)
   const [blockedSenders, setBlockedSenders] = useState<{ id: string; email: string; created_at: string | null }[]>([])
   const [unblockingId, setUnblockingId] = useState<string | null>(null)
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanDone, setScanDone] = useState(false)
+  const [scanAutoApplied, setScanAutoApplied] = useState(0)
+  const [scanReview, setScanReview] = useState<RetroMediumResult[]>([])
+  const [applyingRetroId, setApplyingRetroId] = useState<string | null>(null)
 
   useEffect(() => {
     loadProfile()
@@ -208,6 +214,47 @@ export default function SettingsPage() {
     setOwnEmailAddresses(updated)
     const result = await updateOwnEmailAddresses(updated)
     if (result.error) { toast.error(result.error); setOwnEmailAddresses(ownEmailAddresses) }
+  }
+
+  async function handleRunRetroScan() {
+    setIsScanning(true)
+    setScanDone(false)
+    setScanReview([])
+    const result = await runRetroScan()
+    setIsScanning(false)
+    setScanDone(true)
+    if (result.error) {
+      toast.error(`Scan failed: ${result.error}`)
+      return
+    }
+    setScanAutoApplied(result.auto_applied)
+    setScanReview(result.needs_review)
+    if (result.auto_applied > 0) {
+      toast.success(`${result.auto_applied} obligation${result.auto_applied === 1 ? '' : 's'} automatically flagged`)
+    }
+  }
+
+  async function handleApplyRetro(entryId: string, actionType: RetroMediumResult['action_type']) {
+    setApplyingRetroId(entryId)
+    const result = await applyRetroScanResult(entryId, actionType)
+    setApplyingRetroId(null)
+    if (result.error) {
+      toast.error('Could not apply flag')
+    } else {
+      setScanReview(prev => prev.filter(r => r.id !== entryId))
+      toast.success('Flag applied')
+    }
+  }
+
+  async function handleDismissRetro(entryId: string) {
+    setApplyingRetroId(entryId)
+    const result = await dismissRetroScanResult(entryId)
+    setApplyingRetroId(null)
+    if (result.error) {
+      toast.error('Could not dismiss')
+    } else {
+      setScanReview(prev => prev.filter(r => r.id !== entryId))
+    }
   }
 
   function formatLastReceived(iso: string): string {
@@ -583,7 +630,7 @@ export default function SettingsPage() {
       {/* Tools Section */}
       <div className="bg-white border border-gray-200 p-6 mb-6">
         <h2 className="text-xl font-bold mb-4 text-gray-900">Tools</h2>
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="font-semibold text-gray-900">
@@ -600,6 +647,95 @@ export default function SettingsPage() {
             >
               Install
             </Link>
+          </div>
+
+          <div className="border-t border-gray-100 pt-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">Obligation Scan</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Scan historical correspondence for unresolved obligations (invoices, commitments, follow-ups)
+                  that were filed before automatic detection was in place. High-confidence results are applied
+                  automatically; medium-confidence results are shown for review.
+                </p>
+              </div>
+              <button
+                onClick={handleRunRetroScan}
+                disabled={isScanning}
+                className="shrink-0 px-4 py-2 text-sm font-semibold text-white rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: isScanning ? 'rgba(0,0,0,0.2)' : '#2C4A6E' }}
+              >
+                {isScanning ? 'Scanning…' : scanDone ? 'Run again' : 'Run scan'}
+              </button>
+            </div>
+
+            {/* Scan results */}
+            {scanDone && !isScanning && (
+              <div className="mt-4">
+                {scanAutoApplied > 0 && (
+                  <p className="text-sm text-green-700 mb-3">
+                    {scanAutoApplied} obligation{scanAutoApplied === 1 ? '' : 's'} automatically flagged in Actions.
+                  </p>
+                )}
+
+                {scanReview.length === 0 && (
+                  <p className="text-sm text-gray-500">
+                    {scanAutoApplied === 0 ? 'No unresolved obligations found.' : 'No items require review.'}
+                  </p>
+                )}
+
+                {scanReview.length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-3">
+                      {scanReview.length} item{scanReview.length === 1 ? '' : 's'} need review — apply or skip each:
+                    </p>
+                    <div className="space-y-2">
+                      {scanReview.map(item => (
+                        <div
+                          key={item.id}
+                          className="border border-amber-200 bg-amber-50 p-3 flex items-start gap-3"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                                {item.action_type.replace('_', ' ')}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {item.business_name} · {item.type} · {item.entry_date.slice(0, 10)}
+                              </span>
+                            </div>
+                            {item.subject && (
+                              <p className="text-sm font-medium text-gray-800 truncate">{item.subject}</p>
+                            )}
+                            {item.snippet && (
+                              <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{item.snippet}</p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-1 italic">{item.reasoning}</p>
+                          </div>
+                          <div className="flex gap-2 shrink-0">
+                            <button
+                              onClick={() => handleApplyRetro(item.id, item.action_type)}
+                              disabled={applyingRetroId === item.id}
+                              className="px-3 py-1 text-xs font-semibold text-white bg-brand-navy hover:bg-brand-navy-hover transition-colors disabled:opacity-50"
+                            >
+                              Apply
+                            </button>
+                            <button
+                              onClick={() => handleDismissRetro(item.id)}
+                              disabled={applyingRetroId === item.id}
+                              className="px-3 py-1 text-xs font-semibold border border-gray-300 hover:border-gray-500 transition-colors disabled:opacity-50"
+                              style={{ color: 'var(--brand-dark)' }}
+                            >
+                              Skip
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
