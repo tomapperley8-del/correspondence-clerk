@@ -54,18 +54,28 @@ function buildUnifiedList(
     items.push({ ...item, badge, urgencyScore, badgeLabel })
   }
 
-  // 3. Contract expiries — before gone quiet, after flagged
+  // 3. Contract expiries — expired contracts first (EXPIRED badge), then upcoming (RENEWAL)
   for (const item of contracts) {
     if (bizSeen.has(item.business_id)) continue
     bizSeen.add(item.business_id)
     const until = daysUntilFn(item.contract_end)
-    const urgencyScore = until < 7 ? 7 : 9
-    items.push({
-      ...item,
-      badge: 'RENEWAL',
-      urgencyScore,
-      badgeLabel: `Contract ends ${formatDateGB(item.contract_end)}`,
-    })
+    if (until < 0) {
+      const daysAgo = Math.abs(until)
+      items.push({
+        ...item,
+        badge: 'EXPIRED',
+        urgencyScore: 3.5,
+        badgeLabel: daysAgo === 1 ? 'Contract expired · 1 day ago' : `Contract expired · ${daysAgo} days ago`,
+      })
+    } else {
+      const urgencyScore = until < 7 ? 7 : 9
+      items.push({
+        ...item,
+        badge: 'RENEWAL',
+        urgencyScore,
+        badgeLabel: `Contract ends ${formatDateGB(item.contract_end)}`,
+      })
+    }
   }
 
   // 4. Gone quiet businesses (skip if already shown as contract)
@@ -129,13 +139,13 @@ export function useUnifiedList(
   const sections = useMemo(() => {
     const reply     = unifiedList.filter(i => i.badge === 'REPLY')
     const actions   = unifiedList.filter(i => ['OVERDUE', 'DUE_TODAY', 'DUE_TOMORROW', 'DUE_SOON', 'FLAG'].includes(i.badge))
-    const renewals  = unifiedList.filter(i => i.badge === 'RENEWAL')
+    const renewals  = unifiedList.filter(i => i.badge === 'RENEWAL' || i.badge === 'EXPIRED')
     const quiet     = unifiedList.filter(i => i.badge === 'QUIET')
     const reminderItems = unifiedList.filter(i => i.badge === 'REMINDER')
 
     const urgentRenewal = renewals.some(i => {
       const c = i as ContractItem & { badge: Badge; urgencyScore: number; badgeLabel: string }
-      return daysUntilFn(c.contract_end) < 7
+      return daysUntilFn(c.contract_end) < 7 // includes negative (expired)
     })
 
     const oldestReply = reply.length ? Math.max(...reply.map(i => (i as CorrespondenceItem).daysAgo ?? 0)) : 0
@@ -156,6 +166,7 @@ export function useUnifiedList(
       ? renewals.map(i => {
           const c = i as ContractItem & { badge: Badge; urgencyScore: number; badgeLabel: string }
           const days = daysUntilFn(c.contract_end)
+          if (days < 0) return `${c.business_name} — expired`
           return days < 7 ? `${c.business_name} — ${days}d` : c.business_name
         }).join(', ')
       : ''

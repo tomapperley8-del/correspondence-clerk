@@ -6,14 +6,23 @@ import { SnoozeMenu } from './SnoozeMenu'
 import { getBadgeClass, LEFT_BORDER, ACTION_LABELS, ACTION_COLOURS, formatDateGB } from '../_utils'
 import type { UnifiedItem, CorrespondenceItem, ContractItem, BusinessItem } from '../_types'
 
+const RESOLUTION_OPTIONS = [
+  { value: 'payment_received', label: 'Payment received' },
+  { value: 'cancelled', label: 'Cancelled / wrote off' },
+  { value: 'other', label: 'Other' },
+]
+
 type ItemRowProps = {
   item: UnifiedItem
   focused: boolean
   logOpen: boolean
   snoozeOpen: boolean
   processing: boolean
+  resolutionPending: boolean
   onFocus: () => void
   onDone: () => void
+  onDoneWithResolution: (resolution: string) => void
+  onResolutionCancel: () => void
   onSnooze: (days: number) => void
   onSnoozeToggle: () => void
   onLogToggle: () => void
@@ -21,8 +30,9 @@ type ItemRowProps = {
 }
 
 export function ItemRow({
-  item, focused, logOpen, snoozeOpen, processing,
-  onFocus, onDone, onSnooze, onSnoozeToggle, onLogToggle, onLogSave,
+  item, focused, logOpen, snoozeOpen, processing, resolutionPending,
+  onFocus, onDone, onDoneWithResolution, onResolutionCancel,
+  onSnooze, onSnoozeToggle, onLogToggle, onLogSave,
 }: ItemRowProps) {
   const isCorr = item.kind === 'correspondence'
   const isContract = item.kind === 'contract'
@@ -94,7 +104,10 @@ export function ItemRow({
               {contract.contract_amount && (
                 <span>{contract.contract_currency || '£'}{contract.contract_amount.toLocaleString()} · </span>
               )}
-              <span className="text-gray-400 italic">Consider discussing renewal before this date.</span>
+              {item.badge === 'EXPIRED'
+                ? <span className="text-red-600 italic">Contract has expired — consider renewing or removing.</span>
+                : <span className="text-gray-400 italic">Consider discussing renewal before this date.</span>
+              }
             </div>
           )}
 
@@ -134,6 +147,31 @@ export function ItemRow({
           </button>
         </div>
       </div>
+
+      {/* Resolution reason picker — shown for invoice/waiting_on_them before marking done */}
+      {resolutionPending && (
+        <div className="px-4 pb-3 pt-0 border-t border-gray-100 bg-amber-50/60">
+          <p className="text-xs font-medium text-gray-700 mb-2">How was this resolved?</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {RESOLUTION_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={e => { e.stopPropagation(); onDoneWithResolution(opt.value) }}
+                disabled={processing}
+                className="px-3 py-1 text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-brand-navy hover:text-white hover:border-brand-navy transition-colors disabled:opacity-50"
+              >
+                {opt.label}
+              </button>
+            ))}
+            <button
+              onClick={e => { e.stopPropagation(); onResolutionCancel() }}
+              className="px-3 py-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {logOpen && (
         <LogPanel

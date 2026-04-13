@@ -45,6 +45,7 @@ export type Badge =
   | 'DUE_SOON'
   | 'FLAG'
   | 'RENEWAL'
+  | 'EXPIRED'
   | 'QUIET'
   | 'REMINDER'
 

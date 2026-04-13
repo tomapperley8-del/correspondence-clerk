@@ -27,6 +27,7 @@ export const BADGE_CLASSES: Record<Badge, string> = {
   DUE_SOON:     'bg-amber-50 border border-amber-300 text-amber-800',
   FLAG:         'bg-brand-olive/10 border border-brand-olive/40 text-[#5a7244]',
   RENEWAL:      'bg-brand-olive/10 border border-brand-olive/40 text-[#5a7244]',
+  EXPIRED:      'bg-red-50 border border-red-300 text-red-700',
   QUIET:        'bg-slate-50 border border-slate-300 text-slate-700',
   REMINDER:     'bg-gray-50 border border-gray-300 text-gray-600',
 }
@@ -49,6 +50,7 @@ export const LEFT_BORDER: Record<Badge, string> = {
   DUE_SOON:     'border-l-2 border-amber-300',
   FLAG:         'border-l-2 border-brand-olive/60',
   RENEWAL:      'border-l-2 border-brand-olive/60',
+  EXPIRED:      'border-l-2 border-red-400',
   QUIET:        'border-l-2 border-slate-300',
   REMINDER:     'border-l-2 border-transparent',
 }

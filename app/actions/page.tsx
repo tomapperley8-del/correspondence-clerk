@@ -30,7 +30,9 @@ export default function ActionsPage() {
   const {
     processingId, logOpenId, setLogOpenId,
     snoozeOpenId, setSnoozeOpenId,
-    handleDone, handleSnooze, handleLogSave,
+    resolutionPendingId,
+    handleDone, handleDoneWithResolution, handleResolutionCancel,
+    handleSnooze, handleLogSave,
   } = useActionHandlers({
     removeItem,
     onClearFocus: (id) => clearFocusRef.current(id),
@@ -116,8 +118,11 @@ export default function ActionsPage() {
                 logOpen={logOpenId === item.id}
                 snoozeOpen={snoozeOpenId === item.id}
                 processing={processingId === item.id}
+                resolutionPending={resolutionPendingId === item.id}
                 onFocus={() => setFocusedId(item.id)}
                 onDone={() => handleDone(item)}
+                onDoneWithResolution={res => handleDoneWithResolution(item, res)}
+                onResolutionCancel={() => handleResolutionCancel(item.id)}
                 onSnooze={days => handleSnooze(item.id, days)}
                 onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
                 onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
@@ -136,8 +141,11 @@ export default function ActionsPage() {
                 logOpen={logOpenId === item.id}
                 snoozeOpen={snoozeOpenId === item.id}
                 processing={processingId === item.id}
+                resolutionPending={resolutionPendingId === item.id}
                 onFocus={() => setFocusedId(item.id)}
                 onDone={() => handleDone(item)}
+                onDoneWithResolution={res => handleDoneWithResolution(item, res)}
+                onResolutionCancel={() => handleResolutionCancel(item.id)}
                 onSnooze={days => handleSnooze(item.id, days)}
                 onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
                 onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
@@ -146,8 +154,8 @@ export default function ActionsPage() {
             ))}
           </CollapsibleSection>
 
-          {/* Renewals */}
-          <CollapsibleSection title="Renewals" count={sections.renewals.length} defaultExpanded={sections.urgentRenewal} subtitle={sections.renewalSubtitle}>
+          {/* Renewals & Contracts */}
+          <CollapsibleSection title="Renewals & Contracts" count={sections.renewals.length} defaultExpanded={sections.urgentRenewal} subtitle={sections.renewalSubtitle}>
             {sections.renewals.map(item => (
               <ItemRow
                 key={`${item.kind}-${item.id}`}
@@ -156,8 +164,11 @@ export default function ActionsPage() {
                 logOpen={logOpenId === item.id}
                 snoozeOpen={snoozeOpenId === item.id}
                 processing={processingId === item.id}
+                resolutionPending={resolutionPendingId === item.id}
                 onFocus={() => setFocusedId(item.id)}
                 onDone={() => handleDone(item)}
+                onDoneWithResolution={res => handleDoneWithResolution(item, res)}
+                onResolutionCancel={() => handleResolutionCancel(item.id)}
                 onSnooze={days => handleSnooze(item.id, days)}
                 onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
                 onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
@@ -194,8 +205,11 @@ export default function ActionsPage() {
                 logOpen={logOpenId === item.id}
                 snoozeOpen={snoozeOpenId === item.id}
                 processing={processingId === item.id}
+                resolutionPending={resolutionPendingId === item.id}
                 onFocus={() => setFocusedId(item.id)}
                 onDone={() => handleDone(item)}
+                onDoneWithResolution={res => handleDoneWithResolution(item, res)}
+                onResolutionCancel={() => handleResolutionCancel(item.id)}
                 onSnooze={days => handleSnooze(item.id, days)}
                 onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
                 onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}

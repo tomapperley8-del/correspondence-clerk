@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { z } from 'zod'
 import { checkAndResolveActions } from '@/lib/ai/action-resolution'
-import { detectTier1Action } from '@/lib/ai/keyword-detection'
+import { detectTier1Action, detectPaymentResolution, TIER1_FINANCIAL, PAYMENT_RESOLUTION, TIER2_RECEIVED_COMMITMENTS, TIER2_INTEREST_SIGNALS } from '@/lib/ai/keyword-detection'
 
 const createCorrespondenceSchema = z.object({
   business_id: z.string().uuid('Invalid business ID'),
@@ -318,6 +318,32 @@ export async function createCorrespondence(formData: {
   revalidatePath(`/businesses/${formData.business_id}`)
   revalidatePath('/dashboard')
   revalidatePath('/search')
+
+  // Fast-path: if this entry contains payment confirmation language, immediately
+  // resolve any open invoice/waiting_on_them flags for this business without
+  // waiting for the Haiku AI call (which may miss this signal).
+  if (detectPaymentResolution(formData.raw_text_original)) {
+    try {
+      const supabaseService = await createClient()
+      const { data: paymentFlags } = await supabaseService
+        .from('correspondence')
+        .select('id')
+        .eq('business_id', formData.business_id)
+        .eq('organization_id', organizationId)
+        .in('action_needed', ['invoice', 'waiting_on_them'])
+        .neq('id', data.id)
+      if (paymentFlags && paymentFlags.length > 0) {
+        await supabaseService
+          .from('correspondence')
+          .update({ action_needed: 'none', due_at: null })
+          .in('id', paymentFlags.map((f: { id: string }) => f.id))
+          .eq('organization_id', organizationId)
+        revalidatePath('/actions')
+      }
+    } catch (err) {
+      console.error('Payment fast-path resolution failed:', err)
+    }
+  }
 
   // Await action resolution — errors are caught inside, never block the return
   let actionsResolved = 0
@@ -852,7 +878,7 @@ export async function getOutstandingActions() {
 /**
  * Mark a correspondence entry as done (clears action_needed + due_at)
  */
-export async function markCorrespondenceDone(id: string) {
+export async function markCorrespondenceDone(id: string, resolution?: string) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -864,13 +890,23 @@ export async function markCorrespondenceDone(id: string) {
 
   const { data: entry } = await supabase
     .from('correspondence')
-    .select('business_id')
+    .select('business_id, ai_metadata')
     .eq('id', id)
     .single()
 
+  const updatePayload: Record<string, unknown> = {
+    action_needed: 'none',
+    due_at: null,
+    reply_dismissed_at: new Date().toISOString(),
+  }
+  if (resolution) {
+    const existingMeta = (entry?.ai_metadata as Record<string, unknown>) ?? {}
+    updatePayload.ai_metadata = { ...existingMeta, resolution }
+  }
+
   const { error } = await supabase
     .from('correspondence')
-    .update({ action_needed: 'none', due_at: null, reply_dismissed_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq('id', id)
 
   if (error) {
@@ -932,8 +968,8 @@ export async function getNeedsReply() {
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const ninetyDaysAgo = new Date()
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+  const oneYearAgo = new Date()
+  oneYearAgo.setDate(oneYearAgo.getDate() - 365)
 
   const { data, error } = await supabase
     .from('correspondence')
@@ -944,7 +980,7 @@ export async function getNeedsReply() {
       contact:contacts(name, role)
     `)
     .eq('organization_id', orgId)
-    .gte('entry_date', ninetyDaysAgo.toISOString())
+    .gte('entry_date', oneYearAgo.toISOString())
     .is('reply_dismissed_at', null)
     .order('entry_date', { ascending: false })
     .limit(500)
@@ -1045,6 +1081,185 @@ export async function getPureReminders() {
   return { data: data || [] }
 }
 
+// ---------------------------------------------------------------------------
+// Open Threads — structural detection (pure JS, no AI)
+// ---------------------------------------------------------------------------
+
+export type OpenThread = {
+  thread_type: 'sent_invoice' | 'received_commitment' | 'meeting_call_followup' | 'interest_signal'
+  entry_id: string
+  business_id: string
+  business_name: string
+  entry_date: string
+  subject: string | null
+  days_since: number
+  snippet: string | null
+}
+
+function threadSnippet(text: string | null | undefined): string | null {
+  if (!text) return null
+  const stripped = text.replace(/\*\*|__|[_*#>`~]/g, '').replace(/\s+/g, ' ').trim()
+  return stripped.length <= 120 ? stripped : stripped.slice(0, 120).replace(/\s\S*$/, '') + '…'
+}
+
+/**
+ * Structural detection of open/unresolved threads — no AI, pure JS.
+ * Detects 4 signal types across a 180-day window:
+ *   1. sent_invoice           — Tom sent invoice keywords, no payment confirmation received since
+ *   2. received_commitment    — They promised to follow up, no sent reply from Tom since
+ *   3. meeting_call_followup  — Meeting/Call with no subsequent sent entry
+ *   4. interest_signal        — Inbound enquiry/interest with no reply sent
+ *
+ * Only covers entries where action_needed='none' (already-flagged records handled by Actions page).
+ * Optionally scoped to one business via options.businessId.
+ */
+export async function getOpenThreads(options?: { businessId?: string }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const window180dAgo = new Date(Date.now() - 180 * 86400000)
+
+  let query = supabase
+    .from('correspondence')
+    .select('id, business_id, direction, type, entry_date, action_needed, subject, formatted_text_current, businesses!inner(id, name)')
+    .eq('organization_id', orgId)
+    .gte('entry_date', window180dAgo.toISOString())
+    .order('entry_date', { ascending: true })
+    .limit(2000)
+
+  if (options?.businessId) {
+    query = query.eq('business_id', options.businessId)
+  }
+
+  const { data: rawData, error: rawError } = await query
+  if (rawError) return { error: rawError.message }
+
+  const entries = rawData || []
+  const now = Date.now()
+
+  // Group by business
+  const byBusiness = new Map<string, typeof entries>()
+  for (const e of entries) {
+    const arr = byBusiness.get(e.business_id) || []
+    arr.push(e)
+    byBusiness.set(e.business_id, arr)
+  }
+
+  const openThreads: OpenThread[] = []
+
+  for (const bizEntries of byBusiness.values()) {
+    const bizRaw = bizEntries[0].businesses as unknown as { id: string; name: string } | { id: string; name: string }[] | null
+    const bizInfo = Array.isArray(bizRaw) ? bizRaw[0] : bizRaw
+    const businessName = bizInfo?.name ?? ''
+    const businessId = bizEntries[0].business_id
+
+    for (const entry of bizEntries) {
+      if (!entry.entry_date) continue
+      // Skip entries already flagged — open threads only surfaces missed detections
+      if (entry.action_needed !== 'none') continue
+
+      const entryDate = new Date(entry.entry_date)
+      const daysSince = Math.floor((now - entryDate.getTime()) / 86400000)
+      const text = (entry.formatted_text_current || '').toLowerCase()
+
+      // All entries filed after this one for the same business
+      const later = bizEntries.filter(e => e.entry_date && new Date(e.entry_date) > entryDate)
+
+      // --- Signal 1: Sent invoice/payment terms, no payment confirmation received (14–180d) ---
+      if (entry.direction === 'sent' && daysSince >= 14 && daysSince <= 180) {
+        const hasFinancial = TIER1_FINANCIAL.some(kw => text.includes(kw))
+        if (hasFinancial) {
+          const paymentReceived = later.some(e => {
+            if (e.direction !== 'received') return false
+            const t = (e.formatted_text_current || '').toLowerCase()
+            return PAYMENT_RESOLUTION.some(p => t.includes(p))
+          })
+          if (!paymentReceived) {
+            openThreads.push({
+              thread_type: 'sent_invoice',
+              entry_id: entry.id,
+              business_id: businessId,
+              business_name: businessName,
+              entry_date: entry.entry_date,
+              subject: entry.subject,
+              days_since: daysSince,
+              snippet: threadSnippet(entry.formatted_text_current),
+            })
+            continue
+          }
+        }
+      }
+
+      // --- Signal 2: They committed to follow up, no sent reply from Tom (7–60d) ---
+      if (entry.direction === 'received' && daysSince >= 7 && daysSince <= 60) {
+        const hasCommitment = TIER2_RECEIVED_COMMITMENTS.some(kw => text.includes(kw))
+        if (hasCommitment) {
+          const hasSentReply = later.some(e => e.direction === 'sent')
+          if (!hasSentReply) {
+            openThreads.push({
+              thread_type: 'received_commitment',
+              entry_id: entry.id,
+              business_id: businessId,
+              business_name: businessName,
+              entry_date: entry.entry_date,
+              subject: entry.subject,
+              days_since: daysSince,
+              snippet: threadSnippet(entry.formatted_text_current),
+            })
+            continue
+          }
+        }
+      }
+
+      // --- Signal 3: Meeting/Call with no subsequent sent entry or further meeting (3–90d) ---
+      if ((entry.type === 'Meeting' || entry.type === 'Call') && daysSince >= 3 && daysSince <= 90) {
+        const hasFollowUp = later.some(e => e.direction === 'sent' || e.type === 'Meeting' || e.type === 'Call')
+        if (!hasFollowUp) {
+          openThreads.push({
+            thread_type: 'meeting_call_followup',
+            entry_id: entry.id,
+            business_id: businessId,
+            business_name: businessName,
+            entry_date: entry.entry_date,
+            subject: entry.subject,
+            days_since: daysSince,
+            snippet: threadSnippet(entry.formatted_text_current),
+          })
+          continue
+        }
+      }
+
+      // --- Signal 4: Inbound enquiry/interest signal, no reply sent (7–60d) ---
+      if (entry.direction === 'received' && daysSince >= 7 && daysSince <= 60) {
+        const hasInterest = TIER2_INTEREST_SIGNALS.some(kw => text.includes(kw))
+        if (hasInterest) {
+          const hasSentReply = later.some(e => e.direction === 'sent')
+          if (!hasSentReply) {
+            openThreads.push({
+              thread_type: 'interest_signal',
+              entry_id: entry.id,
+              business_id: businessId,
+              business_name: businessName,
+              entry_date: entry.entry_date,
+              subject: entry.subject,
+              days_since: daysSince,
+              snippet: threadSnippet(entry.formatted_text_current),
+            })
+          }
+        }
+      }
+    }
+  }
+
+  // Oldest first — most likely to be genuinely stale
+  openThreads.sort((a, b) => b.days_since - a.days_since)
+
+  return { data: openThreads }
+}
+
 export async function getOutstandingActionsCount(): Promise<number> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -1069,16 +1284,18 @@ export async function getContractExpiries() {
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const in30Days = new Date(today)
-  in30Days.setDate(in30Days.getDate() + 30)
+  const ninetyDaysAgo = new Date(today)
+  ninetyDaysAgo.setDate(today.getDate() - 90)
+  const in90Days = new Date(today)
+  in90Days.setDate(today.getDate() + 90)
 
   const { data, error } = await supabase
     .from('businesses')
     .select('id, name, contract_end, contract_amount, contract_currency')
     .eq('organization_id', orgId)
     .not('contract_end', 'is', null)
-    .gte('contract_end', today.toISOString().split('T')[0])
-    .lte('contract_end', in30Days.toISOString().split('T')[0])
+    .gte('contract_end', ninetyDaysAgo.toISOString().split('T')[0])
+    .lte('contract_end', in90Days.toISOString().split('T')[0])
     .order('contract_end', { ascending: true })
 
   if (error) return { error: error.message }
