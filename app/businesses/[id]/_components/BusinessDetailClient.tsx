@@ -18,6 +18,7 @@ import { CorrespondenceSummary } from '@/components/CorrespondenceSummary'
 import { ActionSuggestions } from '@/components/ActionSuggestions'
 import { ContractDetailsCard } from '@/components/ContractDetailsCard'
 import { SuccessBanner } from '@/components/SuccessBanner'
+import { OpenThreadsCard } from '@/components/OpenThreadsCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { retryFormatting } from '@/app/actions/ai-formatter'
 import { type MembershipType } from '@/app/actions/membership-types'
@@ -57,6 +58,7 @@ interface Props {
   }>
   initialThreads: ConversationThread[]
   membershipTypes: MembershipType[]
+  initialOpenThreads: import('@/app/actions/correspondence').OpenThread[]
   businessId: string
   saved?: string
   fromActions: boolean
@@ -68,6 +70,7 @@ export function BusinessDetailClient({
   initialDuplicates,
   initialThreads,
   membershipTypes,
+  initialOpenThreads,
   businessId,
   saved,
   fromActions,
@@ -751,6 +754,7 @@ export function BusinessDetailClient({
           </div>
         ) : correspondence.length > 0 ? (
           <>
+            <OpenThreadsCard threads={initialOpenThreads} />
             <CorrespondenceFilterBar
               sortOrder={sortOrder}
               setSortOrder={setSortOrder}
