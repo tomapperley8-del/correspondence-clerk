@@ -345,18 +345,18 @@ export async function createCorrespondence(formData: {
     }
   }
 
-  // Await action resolution — errors are caught inside, never block the return
-  let actionsResolved = 0
-  try {
-    actionsResolved = await checkAndResolveActions(
+  // Run action resolution + structural promotion in parallel.
+  // Both are fire-and-forget: errors are caught inside and never block the return.
+  const [actionsResolved] = await Promise.all([
+    checkAndResolveActions(
       organizationId,
       formData.business_id,
       formData.raw_text_original,
       formData.subject ?? null
-    )
-  } catch (err) {
-    console.error('Action resolution check failed:', err)
-  }
+    ).catch(err => { console.error('Action resolution check failed:', err); return 0 }),
+    promoteOpenThreadsToActions(organizationId, formData.business_id)
+      .catch(err => { console.error('promoteOpenThreadsToActions failed:', err); return 0 }),
+  ])
 
   return { data, actionsResolved }
 }
@@ -1260,6 +1260,123 @@ export async function getOpenThreads(options?: { businessId?: string }) {
   return { data: openThreads }
 }
 
+/**
+ * Structural promotion of open threads → action flags.
+ * Called at filing time (after createCorrespondence), scoped to one business.
+ * Reuses the same 4-signal detection logic as getOpenThreads() but UPDATEs rows
+ * instead of returning them. Pure SQL — no AI calls, $0 cost.
+ *
+ * Only promotes entries where action_needed = 'none' and reply_dismissed_at IS NULL.
+ */
+export async function promoteOpenThreadsToActions(orgId: string, businessId: string): Promise<number> {
+  const supabase = await createClient()
+
+  const window180dAgo = new Date(Date.now() - 180 * 86400000)
+  const { data: rawEntries, error } = await supabase
+    .from('correspondence')
+    .select('id, direction, type, entry_date, action_needed, reply_dismissed_at, formatted_text_current')
+    .eq('organization_id', orgId)
+    .eq('business_id', businessId)
+    .eq('action_needed', 'none')
+    .is('reply_dismissed_at', null)
+    .gte('entry_date', window180dAgo.toISOString())
+    .order('entry_date', { ascending: true })
+
+  if (error || !rawEntries || rawEntries.length === 0) return 0
+
+  const now = Date.now()
+  const dueAt = new Date()
+  dueAt.setDate(dueAt.getDate() + 7)
+  const dueAtStr = dueAt.toISOString().split('T')[0]
+
+  // Collect promotion decisions: { id, action_needed }
+  const toPromote: Array<{ id: string; action_needed: string }> = []
+
+  for (const entry of rawEntries) {
+    if (!entry.entry_date) continue
+
+    const entryDate = new Date(entry.entry_date)
+    const daysSince = Math.floor((now - entryDate.getTime()) / 86400000)
+    const text = (entry.formatted_text_current || '').toLowerCase()
+
+    // All entries filed after this one for the same business (within the fetched window)
+    const later = rawEntries.filter(e => e.entry_date && new Date(e.entry_date) > entryDate)
+
+    // Signal 1: Sent invoice/payment terms, no payment confirmation received (14–180d)
+    if (entry.direction === 'sent' && daysSince >= 14 && daysSince <= 180) {
+      const hasFinancial = TIER1_FINANCIAL.some(kw => text.includes(kw))
+      if (hasFinancial) {
+        const paymentReceived = later.some(e => {
+          if (e.direction !== 'received') return false
+          const t = (e.formatted_text_current || '').toLowerCase()
+          return PAYMENT_RESOLUTION.some(p => t.includes(p))
+        })
+        if (!paymentReceived) {
+          toPromote.push({ id: entry.id, action_needed: 'waiting_on_them' })
+          continue
+        }
+      }
+    }
+
+    // Signal 2: They committed to follow up, no sent reply from Tom (7–60d)
+    if (entry.direction === 'received' && daysSince >= 7 && daysSince <= 60) {
+      const hasCommitment = TIER2_RECEIVED_COMMITMENTS.some(kw => text.includes(kw))
+      if (hasCommitment) {
+        const hasSentReply = later.some(e => e.direction === 'sent')
+        if (!hasSentReply) {
+          toPromote.push({ id: entry.id, action_needed: 'waiting_on_them' })
+          continue
+        }
+      }
+    }
+
+    // Signal 3: Meeting/Call with financial/commitment keywords + no follow-up (3–90d)
+    if ((entry.type === 'Meeting' || entry.type === 'Call') && daysSince >= 3 && daysSince <= 90) {
+      const hasKeywords = TIER1_FINANCIAL.some(kw => text.includes(kw)) ||
+        TIER2_RECEIVED_COMMITMENTS.some(kw => text.includes(kw))
+      if (hasKeywords) {
+        const hasFollowUp = later.some(e => e.direction === 'sent' || e.type === 'Meeting' || e.type === 'Call')
+        if (!hasFollowUp) {
+          toPromote.push({ id: entry.id, action_needed: 'invoice' })
+          continue
+        }
+      }
+    }
+
+    // Signal 4: Inbound interest/enquiry, no reply sent (7–60d)
+    if (entry.direction === 'received' && daysSince >= 7 && daysSince <= 60) {
+      const hasInterest = TIER2_INTEREST_SIGNALS.some(kw => text.includes(kw))
+      if (hasInterest) {
+        const hasSentReply = later.some(e => e.direction === 'sent')
+        if (!hasSentReply) {
+          toPromote.push({ id: entry.id, action_needed: 'prospect' })
+        }
+      }
+    }
+  }
+
+  if (toPromote.length === 0) return 0
+
+  // Batch updates grouped by action type
+  const byAction = new Map<string, string[]>()
+  for (const p of toPromote) {
+    const ids = byAction.get(p.action_needed) || []
+    ids.push(p.id)
+    byAction.set(p.action_needed, ids)
+  }
+
+  for (const [actionNeeded, ids] of byAction) {
+    await supabase
+      .from('correspondence')
+      .update({ action_needed: actionNeeded, due_at: dueAtStr })
+      .in('id', ids)
+      .eq('organization_id', orgId)
+  }
+
+  revalidatePath('/actions')
+  return toPromote.length
+}
+
 export async function getOutstandingActionsCount(): Promise<number> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -1274,6 +1391,15 @@ export async function getOutstandingActionsCount(): Promise<number> {
   ])
   return (flagged.count ?? 0) + (reminders.count ?? 0)
 }
+
+// Language in recent correspondence that signals a one-off arrangement — auto-suppresses renewal signal
+const CONTRACT_DISMISSAL_KEYWORDS = [
+  'one-off', 'one off', 'one time', 'one-time',
+  "won't be renewing", 'will not be renewing', 'not renewing', 'not looking to renew',
+  'not going to renew', 'not interested in renewing', 'decided not to renew',
+  'short-term', 'short term', 'event only', 'no longer interested',
+  "doesn't want to continue", 'does not want to continue',
+]
 
 export async function getContractExpiries() {
   const supabase = await createClient()
@@ -1294,10 +1420,74 @@ export async function getContractExpiries() {
     .select('id, name, contract_end, contract_amount, contract_currency')
     .eq('organization_id', orgId)
     .not('contract_end', 'is', null)
+    .not('contract_renewal_type', 'eq', 'one_off')
     .gte('contract_end', ninetyDaysAgo.toISOString().split('T')[0])
     .lte('contract_end', in90Days.toISOString().split('T')[0])
     .order('contract_end', { ascending: true })
 
   if (error) return { error: error.message }
-  return { data: data || [] }
+  if (!data || data.length === 0) return { data: [] }
+
+  // Fetch the most recent correspondence for each business (for snippet + dismissal auto-detection)
+  const businessIds = data.map(b => b.id)
+  const { data: corrData } = await supabase
+    .from('correspondence')
+    .select('business_id, entry_date, formatted_text_current')
+    .in('business_id', businessIds)
+    .eq('organization_id', orgId)
+    .order('entry_date', { ascending: false })
+    .limit(businessIds.length * 5)
+
+  // Most recent correspondence per business (first occurrence wins — already sorted DESC)
+  const latestByBusiness = new Map<string, { entry_date: string; formatted_text_current: string | null }>()
+  for (const c of (corrData || [])) {
+    if (!latestByBusiness.has(c.business_id)) {
+      latestByBusiness.set(c.business_id, {
+        entry_date: c.entry_date,
+        formatted_text_current: c.formatted_text_current,
+      })
+    }
+  }
+
+  // Auto-detect one-off language in the most recent entry for each business
+  const detectedOneOff: string[] = []
+  for (const b of data) {
+    const latest = latestByBusiness.get(b.id)
+    if (!latest?.formatted_text_current) continue
+    const text = latest.formatted_text_current.toLowerCase()
+    if (CONTRACT_DISMISSAL_KEYWORDS.some(kw => text.includes(kw))) {
+      detectedOneOff.push(b.id)
+    }
+  }
+
+  // Silently persist auto-detected one-off businesses (idempotent, fire-and-forget)
+  if (detectedOneOff.length > 0) {
+    void (async () => {
+      const { error: uErr } = await supabase
+        .from('businesses')
+        .update({ contract_renewal_type: 'one_off' })
+        .in('id', detectedOneOff)
+        .eq('organization_id', orgId)
+      if (uErr) console.error('Auto-detect one_off update failed:', uErr.message)
+    })()
+  }
+
+  const detectedSet = new Set(detectedOneOff)
+
+  const results = data
+    .filter(b => !detectedSet.has(b.id))
+    .map(b => {
+      const latest = latestByBusiness.get(b.id)
+      const raw = latest?.formatted_text_current
+      const snippet = raw
+        ? raw.replace(/\*\*|__|[_*#>`~]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100).replace(/\s\S*$/, (s) => s.length > 1 ? '…' : s)
+        : null
+      return {
+        ...b,
+        last_correspondence_date: latest?.entry_date ?? null,
+        last_correspondence_snippet: snippet,
+      }
+    })
+
+  return { data: results }
 }

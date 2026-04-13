@@ -91,6 +91,8 @@ export function useActionsData() {
         contract_end: b.contract_end as string,
         contract_amount: b.contract_amount as number | null,
         contract_currency: b.contract_currency as string | null,
+        last_correspondence_date: b.last_correspondence_date as string | null,
+        last_correspondence_snippet: b.last_correspondence_snippet as string | null,
       }))
     )
 

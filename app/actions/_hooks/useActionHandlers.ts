@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { markCorrespondenceDone, snoozeCorrespondence } from '@/app/actions/correspondence'
+import { setContractRenewalType } from '@/app/actions/businesses'
 import { toast } from '@/lib/toast'
 import type { UnifiedItem } from '../_types'
 
-// Action types that warrant a resolution reason before marking done
+// Correspondence action types that warrant a resolution reason before marking done
 const RESOLUTION_ACTIONS = new Set(['invoice', 'waiting_on_them'])
 
 export function useActionHandlers({
@@ -18,20 +19,28 @@ export function useActionHandlers({
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [logOpenId, setLogOpenId] = useState<string | null>(null)
   const [snoozeOpenId, setSnoozeOpenId] = useState<string | null>(null)
-  // Resolution picker: shown for invoice/waiting_on_them before marking done
+  // Resolution picker: shown for invoice/waiting_on_them, and for contract items
   const [resolutionPendingId, setResolutionPendingId] = useState<string | null>(null)
 
   async function handleDone(item: UnifiedItem) {
     if (item.kind === 'correspondence') {
-      const actionNeeded = item.action_needed
-      // For invoice/waiting_on_them, prompt for resolution reason first
-      if (RESOLUTION_ACTIONS.has(actionNeeded) && resolutionPendingId !== item.id) {
+      // invoice/waiting_on_them → prompt for resolution reason
+      if (RESOLUTION_ACTIONS.has(item.action_needed) && resolutionPendingId !== item.id) {
         setResolutionPendingId(item.id)
         return
       }
-      // Proceed with done (resolution may be passed separately via handleDoneWithResolution)
       await _markDone(item, undefined)
+    } else if (item.kind === 'contract') {
+      // Contract → prompt for renewal outcome
+      if (resolutionPendingId !== item.id) {
+        setResolutionPendingId(item.id)
+        return
+      }
+      // Fallback if called again without going through picker
+      removeItem(item.id)
+      onClearFocus(item.id)
     } else {
+      // Gone Quiet business — simple client-side dismiss
       removeItem(item.id)
       onClearFocus(item.id)
       toast.success('Dismissed')
@@ -40,13 +49,15 @@ export function useActionHandlers({
 
   async function handleDoneWithResolution(item: UnifiedItem, resolution: string) {
     setResolutionPendingId(null)
-    await _markDone(item, resolution)
+    if (item.kind === 'contract') {
+      await _handleContractResolution(item, resolution)
+    } else {
+      await _markDone(item, resolution)
+    }
   }
 
   function handleResolutionCancel(id: string) {
     setResolutionPendingId(null)
-    // Also mark done without a resolution if they dismissed
-    // (no-op: just close picker, leave item visible)
   }
 
   async function _markDone(item: UnifiedItem, resolution?: string) {
@@ -60,6 +71,31 @@ export function useActionHandlers({
       if (logOpenId === item.id) setLogOpenId(null)
       onClearFocus(item.id)
       toast.success('Marked done')
+    }
+    setProcessingId(null)
+  }
+
+  async function _handleContractResolution(item: UnifiedItem, resolution: string) {
+    if (item.kind !== 'contract') return
+
+    if (resolution === 'in_progress') {
+      // Renewal is being handled — dismiss from the list for this session.
+      // Will reappear on next load until contract_end is updated or it's marked one_off.
+      removeItem(item.id)
+      onClearFocus(item.id)
+      toast.success('Noted — will check back next time')
+      return
+    }
+
+    // 'one_off' or 'removed' → persist as one_off so it never surfaces again
+    setProcessingId(item.id)
+    const result = await setContractRenewalType(item.business_id, 'one_off')
+    if ('error' in result && result.error) {
+      toast.error('Failed to update contract status')
+    } else {
+      removeItem(item.id)
+      onClearFocus(item.id)
+      toast.success('Removed from renewals — won\'t show again')
     }
     setProcessingId(null)
   }
