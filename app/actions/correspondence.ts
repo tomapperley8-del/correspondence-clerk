@@ -1415,21 +1415,27 @@ export async function getContractExpiries() {
   const in90Days = new Date(today)
   in90Days.setDate(today.getDate() + 90)
 
+  // Include contract_renewal_type so we can filter one_off in JS.
+  // Cannot use .not('contract_renewal_type', 'eq', 'one_off') at DB level —
+  // PostgREST's != operator is NULL-unsafe, so it would exclude all rows where the
+  // column is NULL (i.e. every business until explicitly set). JS filter is correct.
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, contract_end, contract_amount, contract_currency')
+    .select('id, name, contract_end, contract_amount, contract_currency, contract_renewal_type')
     .eq('organization_id', orgId)
     .not('contract_end', 'is', null)
-    .not('contract_renewal_type', 'eq', 'one_off')
     .gte('contract_end', ninetyDaysAgo.toISOString().split('T')[0])
     .lte('contract_end', in90Days.toISOString().split('T')[0])
     .order('contract_end', { ascending: true })
 
   if (error) return { error: error.message }
-  if (!data || data.length === 0) return { data: [] }
+
+  // Filter one_off contracts here — null and 'recurring' both surface normally
+  const eligible = (data || []).filter(b => (b as Record<string, unknown>).contract_renewal_type !== 'one_off')
+  if (eligible.length === 0) return { data: [] }
 
   // Fetch the most recent correspondence for each business (for snippet + dismissal auto-detection)
-  const businessIds = data.map(b => b.id)
+  const businessIds = eligible.map(b => b.id)
   const { data: corrData } = await supabase
     .from('correspondence')
     .select('business_id, entry_date, formatted_text_current')
@@ -1451,7 +1457,7 @@ export async function getContractExpiries() {
 
   // Auto-detect one-off language in the most recent entry for each business
   const detectedOneOff: string[] = []
-  for (const b of data) {
+  for (const b of eligible) {
     const latest = latestByBusiness.get(b.id)
     if (!latest?.formatted_text_current) continue
     const text = latest.formatted_text_current.toLowerCase()
@@ -1474,7 +1480,7 @@ export async function getContractExpiries() {
 
   const detectedSet = new Set(detectedOneOff)
 
-  const results = data
+  const results = eligible
     .filter(b => !detectedSet.has(b.id))
     .map(b => {
       const latest = latestByBusiness.get(b.id)
