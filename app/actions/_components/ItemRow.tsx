@@ -6,10 +6,18 @@ import { SnoozeMenu } from './SnoozeMenu'
 import { getBadgeClass, LEFT_BORDER, ACTION_LABELS, ACTION_COLOURS, formatDateGB } from '../_utils'
 import type { UnifiedItem, CorrespondenceItem, ContractItem, BusinessItem } from '../_types'
 
+// Resolution options for invoice / waiting_on_them correspondence
 const RESOLUTION_OPTIONS = [
   { value: 'payment_received', label: 'Payment received' },
   { value: 'cancelled', label: 'Cancelled / wrote off' },
   { value: 'other', label: 'Other' },
+]
+
+// Resolution options for contract expiry / renewal items
+const CONTRACT_RESOLUTION_OPTIONS = [
+  { value: 'in_progress', label: 'Renewal in progress' },
+  { value: 'one_off', label: 'One-off — won\'t recur' },
+  { value: 'removed', label: 'Removed from scheme' },
 ]
 
 type ItemRowProps = {
@@ -40,6 +48,10 @@ export function ItemRow({
   const corr = isCorr ? (item as CorrespondenceItem) : null
   const contract = isContract ? (item as ContractItem) : null
   const biz = isBusiness ? (item as BusinessItem) : null
+
+  // Which picker to show when resolutionPending
+  const showCorrPicker = resolutionPending && isCorr && corr && RESOLUTION_OPTIONS.length > 0
+  const showContractPicker = resolutionPending && isContract
 
   return (
     <div
@@ -98,20 +110,26 @@ export function ItemRow({
             </div>
           )}
 
-          {/* Contract details + nudge */}
+          {/* Contract details */}
           {contract && (
             <div className="text-xs text-gray-500 mb-0.5">
               {contract.contract_amount && (
-                <span>{contract.contract_currency || '£'}{contract.contract_amount.toLocaleString()} · </span>
+                <span className="mr-1">{contract.contract_currency || '£'}{contract.contract_amount.toLocaleString()} ·</span>
               )}
-              {item.badge === 'EXPIRED'
-                ? <span className="text-red-600 italic">Contract has expired — consider renewing or removing.</span>
-                : <span className="text-gray-400 italic">Consider discussing renewal before this date.</span>
-              }
+              {contract.last_correspondence_date && contract.last_correspondence_snippet ? (
+                <span>
+                  Last contact: {formatDateGB(contract.last_correspondence_date)} ·{' '}
+                  <span className="italic text-gray-400">&ldquo;{contract.last_correspondence_snippet}&rdquo;</span>
+                </span>
+              ) : (
+                item.badge === 'EXPIRED'
+                  ? <span className="text-red-600 italic">Contract has expired — consider renewing or removing.</span>
+                  : <span className="text-gray-400 italic">Consider discussing renewal before this date.</span>
+              )}
             </div>
           )}
 
-          {/* Gone quiet detail + nudge */}
+          {/* Gone quiet detail */}
           {biz && (
             <div className="text-xs text-gray-500 mb-0.5">
               Last contact: {formatDateGB(biz.last_contacted_at)} · {biz.entry_count} {biz.entry_count === 1 ? 'entry' : 'entries'}
@@ -148,12 +166,37 @@ export function ItemRow({
         </div>
       </div>
 
-      {/* Resolution reason picker — shown for invoice/waiting_on_them before marking done */}
-      {resolutionPending && (
+      {/* Resolution picker — invoice / waiting_on_them */}
+      {showCorrPicker && (
         <div className="px-4 pb-3 pt-0 border-t border-gray-100 bg-amber-50/60">
           <p className="text-xs font-medium text-gray-700 mb-2">How was this resolved?</p>
           <div className="flex items-center gap-2 flex-wrap">
             {RESOLUTION_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={e => { e.stopPropagation(); onDoneWithResolution(opt.value) }}
+                disabled={processing}
+                className="px-3 py-1 text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-brand-navy hover:text-white hover:border-brand-navy transition-colors disabled:opacity-50"
+              >
+                {opt.label}
+              </button>
+            ))}
+            <button
+              onClick={e => { e.stopPropagation(); onResolutionCancel() }}
+              className="px-3 py-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Contract resolution picker */}
+      {showContractPicker && (
+        <div className="px-4 pb-3 pt-0 border-t border-gray-100 bg-amber-50/60">
+          <p className="text-xs font-medium text-gray-700 mb-2">How do you want to handle this contract?</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {CONTRACT_RESOLUTION_OPTIONS.map(opt => (
               <button
                 key={opt.value}
                 onClick={e => { e.stopPropagation(); onDoneWithResolution(opt.value) }}

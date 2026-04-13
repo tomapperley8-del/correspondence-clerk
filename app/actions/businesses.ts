@@ -237,6 +237,31 @@ export async function updateBusiness(
   return { data }
 }
 
+/**
+ * Mark a business's contract as recurring or one-off.
+ * one_off → permanently suppresses it from the Renewals & Contracts Actions section.
+ */
+export async function setContractRenewalType(
+  businessId: string,
+  renewalType: 'recurring' | 'one_off' | null
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update({ contract_renewal_type: renewalType })
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/actions')
+  return { success: true }
+}
+
 export async function deleteBusiness(id: string) {
   const supabase = await createClient()
   const {

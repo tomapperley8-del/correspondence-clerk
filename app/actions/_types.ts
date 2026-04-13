@@ -35,6 +35,8 @@ export type ContractItem = {
   contract_end: string
   contract_amount: number | null
   contract_currency: string | null
+  last_correspondence_date: string | null
+  last_correspondence_snippet: string | null
 }
 
 export type Badge =
