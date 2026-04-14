@@ -77,6 +77,22 @@ export type Correspondence = {
   }>
 }
 
+export async function getCorrespondenceEntry(id: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+  const { data, error } = await supabase
+    .from('correspondence')
+    .select('*')
+    .eq('id', id)
+    .eq('organization_id', orgId)
+    .single()
+  if (error || !data) return { error: error?.message ?? 'Not found' }
+  return { data: data as Correspondence }
+}
+
 export async function getCorrespondenceByBusiness(
   businessId: string,
   options: {
@@ -349,7 +365,7 @@ export async function createCorrespondence(formData: {
 
   // Run action resolution + structural promotion in parallel.
   // Both are fire-and-forget: errors are caught inside and never block the return.
-  const [actionsResolved] = await Promise.all([
+  const [actionsResolved, threadsPromoted] = await Promise.all([
     checkAndResolveActions(
       organizationId,
       formData.business_id,
@@ -360,7 +376,7 @@ export async function createCorrespondence(formData: {
       .catch(err => { console.error('promoteOpenThreadsToActions failed:', err); return 0 }),
   ])
 
-  return { data, actionsResolved }
+  return { data, actionsResolved, threadsPromoted }
 }
 
 /**

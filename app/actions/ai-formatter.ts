@@ -6,6 +6,9 @@ import { createClient } from '@/lib/supabase/server'
 import type { ContactMatchResult } from '@/lib/contact-matching'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { checkRateLimit, rateLimitError } from '@/lib/rate-limit'
+import { revalidatePath } from 'next/cache'
+import { checkAndResolveActions } from '@/lib/ai/action-resolution'
+import { promoteOpenThreadsToActions } from '@/app/actions/correspondence'
 
 /**
  * Format correspondence text using AI
@@ -166,7 +169,18 @@ export async function createFormattedCorrespondence(
       .update({ last_contacted_at: latestDate.toISOString() })
       .eq('id', formData.business_id)
 
-    return { data, count: data.length }
+    revalidatePath(`/businesses/${formData.business_id}`)
+    revalidatePath('/dashboard')
+    revalidatePath('/search')
+
+    const [actionsResolved, threadsPromoted] = await Promise.all([
+      checkAndResolveActions(organizationId, formData.business_id, formData.raw_text_original, null)
+        .catch(err => { console.error('Action resolution failed:', err); return 0 }),
+      promoteOpenThreadsToActions(organizationId, formData.business_id)
+        .catch(err => { console.error('promoteOpenThreadsToActions failed:', err); return 0 }),
+    ])
+
+    return { data, count: data.length, actionsResolved, threadsPromoted }
   } else {
     // Single entry - compute hash from raw text
     const { data: contentHash } = await supabase.rpc('compute_content_hash', {
@@ -219,7 +233,18 @@ export async function createFormattedCorrespondence(
       })
       .eq('id', formData.business_id)
 
-    return { data }
+    revalidatePath(`/businesses/${formData.business_id}`)
+    revalidatePath('/dashboard')
+    revalidatePath('/search')
+
+    const [actionsResolved, threadsPromoted] = await Promise.all([
+      checkAndResolveActions(organizationId, formData.business_id, formData.raw_text_original, aiResponse.subject_guess ?? null)
+        .catch(err => { console.error('Action resolution failed:', err); return 0 }),
+      promoteOpenThreadsToActions(organizationId, formData.business_id)
+        .catch(err => { console.error('promoteOpenThreadsToActions failed:', err); return 0 }),
+    ])
+
+    return { data, actionsResolved, threadsPromoted }
   }
 }
 
@@ -307,7 +332,18 @@ export async function createUnformattedCorrespondence(formData: {
     })
     .eq('id', formData.business_id)
 
-  return { data }
+  revalidatePath(`/businesses/${formData.business_id}`)
+  revalidatePath('/dashboard')
+  revalidatePath('/search')
+
+  const [actionsResolved, threadsPromoted] = await Promise.all([
+    checkAndResolveActions(organizationId, formData.business_id, formData.raw_text_original, formData.subject ?? null)
+      .catch(err => { console.error('Action resolution failed:', err); return 0 }),
+    promoteOpenThreadsToActions(organizationId, formData.business_id)
+      .catch(err => { console.error('promoteOpenThreadsToActions failed:', err); return 0 }),
+  ])
+
+  return { data, actionsResolved, threadsPromoted }
 }
 
 /**

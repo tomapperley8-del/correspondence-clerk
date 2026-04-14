@@ -22,6 +22,7 @@ import { matchEntriesToContacts, type ContactMatchResult } from '@/lib/contact-m
 import { isThreadSplitResponse } from '@/lib/ai/types'
 import { checkForDuplicates, type Correspondence } from '@/app/actions/correspondence'
 import { isInternalSender, detectInternalSender } from '@/lib/internal-senders'
+import { toast } from '@/lib/toast'
 
 import { useThreadDetection } from './_hooks/useThreadDetection'
 import { useContactExtraction } from './_hooks/useContactExtraction'
@@ -236,7 +237,9 @@ function NewEntryPageContent() {
   })
 
   // --- Post-save navigation ---
-  const afterSave = () => {
+  const afterSave = (actionsResolved?: number, threadsPromoted?: number) => {
+    if (actionsResolved) toast.info(`${actionsResolved} action${actionsResolved > 1 ? 's' : ''} auto-resolved`)
+    if (threadsPromoted) toast.info(`${threadsPromoted} open thread${threadsPromoted > 1 ? 's' : ''} flagged`)
     setIsDirty(false)
     clearDraft()
     if (searchParams.get('onboarding') === 'true') {
@@ -304,7 +307,7 @@ function NewEntryPageContent() {
     setActionError(null)
     const result = await createFormattedCorrespondence(buildPayload(), previewData)
     if ('error' in result) { setActionError(`Error saving: ${result.error}`); setIsLoading(false) }
-    else afterSave()
+    else afterSave('actionsResolved' in result ? result.actionsResolved : 0, 'threadsPromoted' in result ? result.threadsPromoted : 0)
   }
 
   const handleEditPreview = () => { setShowPreview(false); setPreviewData(null); setPreviewText('') }
@@ -324,7 +327,7 @@ function NewEntryPageContent() {
 
     const result = await createFormattedCorrespondence(buildPayload(), filteredAiResponse, filteredMatches)
     if ('error' in result) { setActionError(`Error saving: ${result.error}`); setIsLoading(false) }
-    else afterSave()
+    else afterSave('actionsResolved' in result ? result.actionsResolved : 0, 'threadsPromoted' in result ? result.threadsPromoted : 0)
   }
 
   // --- Save without formatting ---
@@ -360,7 +363,7 @@ function NewEntryPageContent() {
     })
 
     if ('error' in result) { setActionError(`Error saving: ${result.error}`); setIsLoading(false) }
-    else { setIsDirty(false); clearDraft(); router.push(`/businesses/${selectedBusinessId}?saved=true`) }
+    else afterSave('actionsResolved' in result ? result.actionsResolved : 0, 'threadsPromoted' in result ? result.threadsPromoted : 0)
   }
 
   // --- Business / contact handlers ---
