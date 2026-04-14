@@ -77,7 +77,7 @@ export function ItemRow({
           {/* Business + contact */}
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
             <Link
-              href={`/businesses/${item.business_id}?from=actions`}
+              href={`/businesses/${item.business_id}?from=actions${item.kind === 'correspondence' ? `#entry-${item.id}` : ''}`}
               className="font-semibold text-gray-900 hover:text-brand-navy hover:underline text-sm"
               onClick={e => e.stopPropagation()}
             >

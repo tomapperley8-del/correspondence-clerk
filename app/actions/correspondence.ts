@@ -442,6 +442,7 @@ export async function updateFormattedText(
     revalidatePath(`/businesses/${data.business_id}`)
     revalidatePath('/search')
   }
+  revalidatePath('/actions')
 
   return { data }
 }
@@ -483,6 +484,7 @@ export async function deleteCorrespondence(id: string) {
   }
   revalidatePath('/dashboard')
   revalidatePath('/search')
+  revalidatePath('/actions')
 
   return { success: true }
 }
@@ -528,6 +530,7 @@ export async function deleteMultipleCorrespondence(ids: string[]) {
   }
   revalidatePath('/dashboard')
   revalidatePath('/search')
+  revalidatePath('/actions')
 
   return { success: true, deletedCount: ids.length }
 }
