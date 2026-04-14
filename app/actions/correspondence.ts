@@ -1296,115 +1296,168 @@ export async function promoteOpenThreadsToActions(orgId: string, businessId: str
   return total
 }
 
+// Auto-reply / OOO phrases used to filter candidates in the Haiku fallback
+const AUTO_REPLY_PHRASES = [
+  'out of office', 'automatic reply', 'auto-reply', 'automated response',
+  'this is an automated', 'do not reply to this', 'noreply', 'no-reply',
+  'delivery failure', 'mail delivery', 'undeliverable',
+]
+
 /**
- * Layer 3: Haiku fallback for entries that passed all structural signals.
- * Targets received entries 14–60 days old, >100 chars, no sent reply since.
- * Capped at 3 per filing call. Only applies high-confidence results.
+ * Layer 3: Haiku fallback for entries that slipped past all structural signals.
+ *
+ * Covers two pools:
+ *   A) Received emails: 14–60d old, >100 chars, no sent reply since, not auto-reply
+ *   B) Meeting/Call notes: 3–90d old, >100 chars, no follow-up since
+ *
+ * Both pools: action_needed = 'none', reply_dismissed_at IS NULL, due_at IS NULL
+ * (snoozed/reminder entries are protected).
+ *
+ * All candidates are batched into a single Haiku call (one API round-trip).
+ * Capped at 5 entries total. High-confidence results only.
  * Fire-and-forget safe — any error returns 0.
  */
 async function _haikuFallbackCheck(orgId: string, businessId: string): Promise<number> {
   try {
     const supabase = await createClient()
 
-    const cutoffOld = new Date(Date.now() - 60 * 86400000).toISOString()
-    const cutoffRecent = new Date(Date.now() - 14 * 86400000).toISOString()
+    const cut60d = new Date(Date.now() - 60 * 86400000).toISOString()
+    const cut14d = new Date(Date.now() - 14 * 86400000).toISOString()
+    const cut90d = new Date(Date.now() - 90 * 86400000).toISOString()
+    const cut3d  = new Date(Date.now() -  3 * 86400000).toISOString()
 
-    // Fetch received entries in the 14–60d window that structural detection missed
-    const { data: candidates, error } = await supabase
+    // Fetch Pool A (received emails) and Pool B (Meeting/Call notes) in parallel
+    const [{ data: poolA }, { data: poolB }] = await Promise.all([
+      supabase
+        .from('correspondence')
+        .select('id, entry_date, formatted_text_current, subject, direction, type')
+        .eq('organization_id', orgId)
+        .eq('business_id', businessId)
+        .eq('action_needed', 'none')
+        .is('reply_dismissed_at', null)
+        .is('due_at', null)
+        .eq('direction', 'received')
+        .gte('entry_date', cut60d)
+        .lte('entry_date', cut14d)
+        .order('entry_date', { ascending: false })
+        .limit(8),
+      supabase
+        .from('correspondence')
+        .select('id, entry_date, formatted_text_current, subject, direction, type')
+        .eq('organization_id', orgId)
+        .eq('business_id', businessId)
+        .eq('action_needed', 'none')
+        .is('reply_dismissed_at', null)
+        .is('due_at', null)
+        .in('type', ['Meeting', 'Call'])
+        .gte('entry_date', cut90d)
+        .lte('entry_date', cut3d)
+        .order('entry_date', { ascending: false })
+        .limit(5),
+    ])
+
+    // Fetch sent correspondence and follow-up entries for resolution checks
+    const { data: sentEntries } = await supabase
       .from('correspondence')
-      .select('id, entry_date, formatted_text_current, subject')
+      .select('entry_date, direction, type')
       .eq('organization_id', orgId)
       .eq('business_id', businessId)
-      .eq('action_needed', 'none')
-      .is('reply_dismissed_at', null)
-      .eq('direction', 'received')
-      .gte('entry_date', cutoffOld)
-      .lte('entry_date', cutoffRecent)
-      .order('entry_date', { ascending: false })
-      .limit(10)
-
-    if (error || !candidates || candidates.length === 0) return 0
-
-    // Only consider entries with enough text to be meaningful
-    const substantial = candidates.filter(c =>
-      (c.formatted_text_current || '').length > 100
-    )
-    if (substantial.length === 0) return 0
-
-    // Check if any sent reply exists for this business after each candidate
-    // (SQL already handles this — but we need to re-check here for the JS-side filter)
-    const { data: sentAfter } = await supabase
-      .from('correspondence')
-      .select('entry_date')
-      .eq('organization_id', orgId)
-      .eq('business_id', businessId)
-      .eq('direction', 'sent')
-      .gte('entry_date', cutoffOld)
+      .gte('entry_date', cut90d)
       .order('entry_date', { ascending: true })
 
-    const sentDates = (sentAfter || []).map(r => new Date(r.entry_date).getTime())
+    const sentDates = (sentEntries || [])
+      .filter(e => e.direction === 'sent')
+      .map(e => new Date(e.entry_date).getTime())
 
-    // Filter to entries with no sent reply after them
-    const unreplied = substantial.filter(c => {
+    const followUpDates = (sentEntries || [])
+      .filter(e => e.direction === 'sent' || e.type === 'Meeting' || e.type === 'Call')
+      .map(e => new Date(e.entry_date).getTime())
+
+    // Filter Pool A: substantial text, no auto-reply, no sent reply after
+    const filteredA = (poolA || []).filter(c => {
+      const text = (c.formatted_text_current || '')
+      if (text.length <= 100) return false
+      const lower = text.toLowerCase()
+      if (AUTO_REPLY_PHRASES.some(p => lower.includes(p))) return false
       const entryTime = new Date(c.entry_date).getTime()
       return !sentDates.some(t => t > entryTime)
     })
 
-    if (unreplied.length === 0) return 0
+    // Filter Pool B: substantial text, no follow-up (sent/meeting/call) after
+    const filteredB = (poolB || []).filter(c => {
+      if ((c.formatted_text_current || '').length <= 100) return false
+      const entryTime = new Date(c.entry_date).getTime()
+      return !followUpDates.some(t => t > entryTime)
+    })
 
-    // Cap at 3 to control cost
-    const toCheck = unreplied.slice(0, 3)
+    // Most recent from each pool first; cap total at 5
+    const candidates = [...filteredA.slice(0, 3), ...filteredB.slice(0, 2)]
+    if (candidates.length === 0) return 0
 
+    // Single batched Haiku call — one round-trip for all candidates
     const anthropic = getAnthropicClient()
+    const entriesJson = candidates.map((c, i) => ({
+      index: i,
+      type: c.type || (c.direction === 'received' ? 'Email' : 'Note'),
+      subject: c.subject || '(none)',
+      text: (c.formatted_text_current || '').slice(0, 1200),
+    }))
+
+    const response = await anthropic.messages.create({
+      model: AI_MODELS.ECONOMY,
+      max_tokens: 300,
+      system: `You are a correspondence assistant for a UK business relationship manager.
+For each correspondence entry below, decide if a follow-up action is required.
+
+Return a JSON array only — one object per entry, in the same order:
+[{ "index": 0, "action": "waiting_on_them"|"prospect"|"invoice"|"none", "confidence": "high"|"low" }, ...]
+
+Rules:
+- "waiting_on_them": they committed to something (call back, send info, get approval) and haven't yet
+- "prospect": they expressed genuine interest or made an enquiry about your services
+- "invoice": meeting/call where money or a deal was discussed but no invoice sent yet
+- "none": no follow-up needed (acknowledgement, thanks, general info only)
+- Only use "high" confidence when you are very sure. When in doubt use "low".`,
+      messages: [{
+        role: 'user',
+        content: JSON.stringify(entriesJson),
+      }],
+    })
+
+    const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+    let results: Array<{ index: number; action: string; confidence: string }> = []
+    try {
+      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+      results = JSON.parse(cleaned)
+    } catch {
+      return 0
+    }
+
+    if (!Array.isArray(results)) return 0
+
     const dueAt = new Date()
     dueAt.setDate(dueAt.getDate() + 7)
     const dueAtStr = dueAt.toISOString().split('T')[0]
 
     let promoted = 0
+    const validActions = new Set(['waiting_on_them', 'prospect', 'invoice'])
 
-    for (const entry of toCheck) {
-      const text = (entry.formatted_text_current || '').slice(0, 1500)
-
-      const response = await anthropic.messages.create({
-        model: AI_MODELS.ECONOMY,
-        max_tokens: 100,
-        system: `You are a correspondence assistant for a UK business. Classify whether this received message requires a follow-up action.
-
-Respond with JSON only:
-{
-  "action": "waiting_on_them" | "prospect" | "none",
-  "confidence": "high" | "low"
-}
-
-Use "waiting_on_them" if they committed to something and you haven't heard back.
-Use "prospect" if they expressed interest or made an enquiry.
-Use "none" if no follow-up is needed.
-Only use "high" confidence if you are very sure.`,
-        messages: [{ role: 'user', content: `Subject: ${entry.subject || '(none)'}\n\n${text}` }],
-      })
-
-      const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
-      let parsed: { action: string; confidence: string } | null = null
-      try {
-        // Strip markdown code fences if present
-        const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
-        parsed = JSON.parse(cleaned)
-      } catch {
-        continue
-      }
-
+    for (const result of results) {
       if (
-        parsed &&
-        parsed.confidence === 'high' &&
-        (parsed.action === 'waiting_on_them' || parsed.action === 'prospect')
-      ) {
-        const { error: uErr } = await supabase
-          .from('correspondence')
-          .update({ action_needed: parsed.action, due_at: dueAtStr, updated_at: new Date().toISOString() })
-          .eq('id', entry.id)
-          .eq('organization_id', orgId)
-        if (!uErr) promoted++
-      }
+        typeof result.index !== 'number' ||
+        result.confidence !== 'high' ||
+        !validActions.has(result.action)
+      ) continue
+
+      const entry = candidates[result.index]
+      if (!entry) continue
+
+      const { error: uErr } = await supabase
+        .from('correspondence')
+        .update({ action_needed: result.action, due_at: dueAtStr, updated_at: new Date().toISOString() })
+        .eq('id', entry.id)
+        .eq('organization_id', orgId)
+      if (!uErr) promoted++
     }
 
     return promoted
