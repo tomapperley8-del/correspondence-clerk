@@ -52,10 +52,9 @@ export function LogPanel({ businessId, contactId, showMarkDone, onSave, onCancel
       setSaving(false)
     } else {
       const resolved = ('actionsResolved' in result ? (result as { actionsResolved: number }).actionsResolved : 0)
-      if (resolved > 0) {
-        const label = resolved === 1 ? '1 action auto-resolved' : `${resolved} actions auto-resolved`
-        toast.success(`${label} — check Actions`)
-      }
+      const promoted = ('threadsPromoted' in result ? (result as { threadsPromoted: number }).threadsPromoted : 0)
+      if (resolved > 0) toast.info(`${resolved} action${resolved > 1 ? 's' : ''} auto-resolved`)
+      if (promoted > 0) toast.info(`${promoted} open thread${promoted > 1 ? 's' : ''} flagged`)
       onSave(markDone)
     }
   }

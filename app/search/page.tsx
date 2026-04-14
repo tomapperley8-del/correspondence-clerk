@@ -65,7 +65,7 @@ export default function SearchPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Search</h1>
+      <h1 className="text-2xl font-bold text-brand-dark mb-6">Search</h1>
 
       {/* Search Form */}
       <form onSubmit={handleSearch} className="mb-8">
@@ -110,43 +110,43 @@ export default function SearchPage() {
 
         {/* Filters Panel */}
         {showFilters && (
-          <div className="mt-4 bg-gray-50 border border-gray-200 p-4">
+          <div className="mt-4 bg-brand-warm border border-black/[0.06] p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Date From */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-brand-dark mb-1">
                   From Date
                 </label>
                 <input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
+                  className="w-full px-3 py-2 border border-black/[0.06] bg-white text-sm focus:border-brand-navy focus:outline-none"
                 />
               </div>
 
               {/* Date To */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-brand-dark mb-1">
                   To Date
                 </label>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
+                  className="w-full px-3 py-2 border border-black/[0.06] bg-white text-sm focus:border-brand-navy focus:outline-none"
                 />
               </div>
 
               {/* Direction */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-brand-dark mb-1">
                   Direction
                 </label>
                 <select
                   value={direction}
                   onChange={(e) => setDirection(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
+                  className="w-full px-3 py-2 border border-black/[0.06] bg-white text-sm focus:border-brand-navy focus:outline-none"
                 >
                   <option value="">All</option>
                   <option value="received">Received</option>
@@ -156,13 +156,13 @@ export default function SearchPage() {
 
               {/* Type */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-brand-dark mb-1">
                   Type
                 </label>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
+                  className="w-full px-3 py-2 border border-black/[0.06] bg-white text-sm focus:border-brand-navy focus:outline-none"
                 >
                   <option value="">All</option>
                   <option value="Email">Email</option>
@@ -176,13 +176,13 @@ export default function SearchPage() {
 
             {/* Sort */}
             <div className="mt-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-brand-dark mb-1">
                 Sort by
               </label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-3 py-2 border border-gray-200 bg-white text-sm focus:border-brand-navy focus:outline-none"
+                className="px-3 py-2 border border-black/[0.06] bg-white text-sm focus:border-brand-navy focus:outline-none"
               >
                 <option value="relevance">Relevance</option>
                 <option value="date_newest">Date (newest first)</option>
@@ -195,7 +195,7 @@ export default function SearchPage() {
 
       {/* Pre-search hint */}
       {!hasSearched && (
-        <div className="bg-gray-50 border border-gray-200 p-8 text-center">
+        <div className="bg-brand-warm border border-black/[0.06] p-8 text-center">
           <p className="text-gray-600">
             Search across all businesses and correspondence entries.
           </p>
@@ -214,9 +214,9 @@ export default function SearchPage() {
 
       {/* Loading skeleton while searching */}
       {isSearching && (
-        <div className="bg-white border border-gray-200 p-6 space-y-4">
+        <div className="bg-white border border-black/[0.06] p-6 space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse border border-gray-100 p-4">
+            <div key={i} className="animate-pulse border border-black/[0.04] p-4">
               <div className="flex gap-2 mb-2">
                 <div className="h-5 w-20 bg-gray-200 rounded" />
                 <div className="h-5 w-48 bg-gray-200 rounded" />
@@ -229,7 +229,7 @@ export default function SearchPage() {
 
       {/* Results */}
       {hasSearched && !isSearching && !searchError && (
-        <div className="bg-white border border-gray-200 p-6">
+        <div className="bg-white border border-black/[0.06] p-6">
           {/* Result count */}
           <p className="text-sm text-gray-600 mb-4" aria-live="polite">
             {results.length === 0
@@ -244,13 +244,13 @@ export default function SearchPage() {
                   <Link
                     key={`business-${result.id}`}
                     href={`/businesses/${result.id}`}
-                    className="block border border-gray-200 p-4 hover:border-brand-navy/40 hover:bg-brand-navy/[0.03]"
+                    className="block border border-black/[0.06] p-4 hover:border-brand-navy/40 hover:bg-brand-navy/[0.03]"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs bg-green-100 px-2 py-1 text-green-800">
                         Business
                       </span>
-                      <h3 className="font-semibold text-gray-900">{result.title}</h3>
+                      <h3 className="font-semibold text-brand-dark">{result.title}</h3>
                     </div>
                     {result.snippet && (
                       <p className="text-sm text-gray-600">{result.snippet}</p>
@@ -260,13 +260,13 @@ export default function SearchPage() {
                   <Link
                     key={`correspondence-${result.id}`}
                     href={`/businesses/${result.business_id}#entry-${result.id}`}
-                    className="block border border-gray-200 p-4 hover:border-brand-navy/40 hover:bg-brand-navy/[0.03]"
+                    className="block border border-black/[0.06] p-4 hover:border-brand-navy/40 hover:bg-brand-navy/[0.03]"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs bg-brand-navy/10 px-2 py-1 text-brand-navy">
                         Correspondence
                       </span>
-                      <h3 className="font-semibold text-gray-900">{result.title}</h3>
+                      <h3 className="font-semibold text-brand-dark">{result.title}</h3>
                     </div>
                     <p className="text-sm text-gray-600 mb-1">
                       {result.business_name} • {result.contact_name}
@@ -284,7 +284,7 @@ export default function SearchPage() {
                       )}
                     </p>
                     {result.snippet && (
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                      <p className="text-sm text-brand-dark whitespace-pre-wrap">
                         {result.snippet}
                       </p>
                     )}

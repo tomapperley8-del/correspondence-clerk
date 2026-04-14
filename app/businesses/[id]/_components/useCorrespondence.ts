@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { getCorrespondenceByBusiness, type Correspondence } from '@/app/actions/correspondence'
+import { getCorrespondenceByBusiness, getCorrespondenceEntry, type Correspondence } from '@/app/actions/correspondence'
 import { getDisplayNamesForUsers } from '@/app/actions/user-profile'
 
 const PAGE_SIZE = 100
@@ -86,11 +86,25 @@ export function useCorrespondence({ businessId }: UseCorrespondenceOptions) {
       setLoading(false)
       filtersInitialized.current = true
 
-      // Auto-expand + scroll to deep-linked entry if it's in the loaded set
-      if (deepLinkEntryId && data.some(e => e.id === deepLinkEntryId)) {
-        pendingScrollEntryId.current = deepLinkEntryId
-        setIsArchiveExpanded(true) // ensure archive is visible in case entry is older
-        setExpandedEntries(prev => new Set([...prev, deepLinkEntryId]))
+      // Auto-expand + scroll to deep-linked entry
+      if (deepLinkEntryId) {
+        if (data.some(e => e.id === deepLinkEntryId)) {
+          // Entry is in the initial page — expand immediately
+          pendingScrollEntryId.current = deepLinkEntryId
+          setIsArchiveExpanded(true)
+          setExpandedEntries(prev => new Set([...prev, deepLinkEntryId]))
+        } else {
+          // Entry is beyond the initial 100 — fetch it directly and inject
+          const singleResult = await getCorrespondenceEntry(deepLinkEntryId)
+          if (!('error' in singleResult) && singleResult.data) {
+            pendingScrollEntryId.current = deepLinkEntryId
+            setIsArchiveExpanded(true)
+            setCorrespondence(prev =>
+              prev.some(e => e.id === deepLinkEntryId) ? prev : [...prev, singleResult.data]
+            )
+            setExpandedEntries(prev => new Set([...prev, deepLinkEntryId]))
+          }
+        }
       }
 
       const userIds = [...new Set(data.map(c => c.user_id))]
