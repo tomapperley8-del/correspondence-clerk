@@ -33,9 +33,29 @@ export function useCorrespondence({ businessId }: UseCorrespondenceOptions) {
   const [isArchiveExpanded, setIsArchiveExpanded] = useState(false)
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set())
 
+  // Deep-link: track which entry to auto-expand + scroll to (set from URL hash)
+  const pendingScrollEntryId = useRef<string | null>(null)
+
+  // Scroll to the target entry once it has been expanded
+  useEffect(() => {
+    const targetId = pendingScrollEntryId.current
+    if (!targetId || !expandedEntries.has(targetId)) return
+    const el = document.getElementById(`entry-${targetId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      pendingScrollEntryId.current = null
+    }
+  }, [expandedEntries])
+
   // Initial load: read localStorage prefs + fetch correspondence
   useEffect(() => {
     filtersInitialized.current = false
+
+    // Detect deep-link hash (#entry-<uuid>) — must read before any state changes
+    const hash = typeof window !== 'undefined' ? window.location.hash : ''
+    const hashMatch = hash.match(/^#entry-([0-9a-f-]{36})$/)
+    const deepLinkEntryId = hashMatch ? hashMatch[1] : null
+
     const storageKey = `business_${businessId}_view`
     let initialContact = 'all'
     let initialDirection: 'all' | 'received' | 'sent' = 'all'
@@ -65,6 +85,13 @@ export function useCorrespondence({ businessId }: UseCorrespondenceOptions) {
       setTotalCount('error' in result ? 0 : result.count ?? 0)
       setLoading(false)
       filtersInitialized.current = true
+
+      // Auto-expand + scroll to deep-linked entry if it's in the loaded set
+      if (deepLinkEntryId && data.some(e => e.id === deepLinkEntryId)) {
+        pendingScrollEntryId.current = deepLinkEntryId
+        setIsArchiveExpanded(true) // ensure archive is visible in case entry is older
+        setExpandedEntries(prev => new Set([...prev, deepLinkEntryId]))
+      }
 
       const userIds = [...new Set(data.map(c => c.user_id))]
       if (userIds.length > 0) {

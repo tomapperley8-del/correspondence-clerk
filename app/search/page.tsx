@@ -259,7 +259,7 @@ export default function SearchPage() {
                 ) : (
                   <Link
                     key={`correspondence-${result.id}`}
-                    href={`/businesses/${result.business_id}`}
+                    href={`/businesses/${result.business_id}#entry-${result.id}`}
                     className="block border border-gray-200 p-4 hover:border-brand-navy/40 hover:bg-brand-navy/[0.03]"
                   >
                     <div className="flex items-center gap-2 mb-1">
