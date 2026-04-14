@@ -5,7 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { z } from 'zod'
 import { checkAndResolveActions } from '@/lib/ai/action-resolution'
-import { detectTier1Action, detectPaymentResolution, TIER1_FINANCIAL, PAYMENT_RESOLUTION, TIER2_RECEIVED_COMMITMENTS, TIER2_INTEREST_SIGNALS } from '@/lib/ai/keyword-detection'
+import { detectTier1Action, detectPaymentResolution, TIER1_FINANCIAL, PAYMENT_RESOLUTION, TIER2_RECEIVED_COMMITMENTS, TIER2_INTEREST_SIGNALS, COMMITMENT_REGEX_PATTERNS, INTEREST_REGEX_PATTERNS } from '@/lib/ai/keyword-detection'
+import { getAnthropicClient } from '@/lib/ai/client'
+import { AI_MODELS } from '@/lib/ai/models'
 
 const createCorrespondenceSchema = z.object({
   business_id: z.string().uuid('Invalid business ID'),
@@ -1263,118 +1265,153 @@ export async function getOpenThreads(options?: { businessId?: string }) {
 /**
  * Structural promotion of open threads → action flags.
  * Called at filing time (after createCorrespondence), scoped to one business.
- * Reuses the same 4-signal detection logic as getOpenThreads() but UPDATEs rows
- * instead of returning them. Pure SQL — no AI calls, $0 cost.
+ *
+ * Layer 1+2: SQL RPC — 4-signal keyword + regex detection, pure PostgreSQL, $0 cost.
+ * Layer 3: Haiku fallback — fires on received entries that slipped past structural
+ *           detection. Capped at 3 entries/filing. High-confidence only.
  *
  * Only promotes entries where action_needed = 'none' and reply_dismissed_at IS NULL.
  */
 export async function promoteOpenThreadsToActions(orgId: string, businessId: string): Promise<number> {
   const supabase = await createClient()
 
-  const window180dAgo = new Date(Date.now() - 180 * 86400000)
-  const { data: rawEntries, error } = await supabase
-    .from('correspondence')
-    .select('id, direction, type, entry_date, action_needed, reply_dismissed_at, formatted_text_current')
-    .eq('organization_id', orgId)
-    .eq('business_id', businessId)
-    .eq('action_needed', 'none')
-    .is('reply_dismissed_at', null)
-    .gte('entry_date', window180dAgo.toISOString())
-    .order('entry_date', { ascending: true })
+  const { data: sqlCount, error } = await supabase.rpc('promote_open_threads_to_actions', {
+    p_org_id: orgId,
+    p_business_id: businessId,
+    p_tier1_financial: TIER1_FINANCIAL,
+    p_payment_resolution: PAYMENT_RESOLUTION,
+    p_tier2_commitments: TIER2_RECEIVED_COMMITMENTS,
+    p_tier2_interest: TIER2_INTEREST_SIGNALS,
+    p_commitment_patterns: COMMITMENT_REGEX_PATTERNS,
+    p_interest_patterns: INTEREST_REGEX_PATTERNS,
+  })
 
-  if (error || !rawEntries || rawEntries.length === 0) return 0
+  if (error) console.error('promoteOpenThreadsToActions RPC failed:', error.message)
 
-  const now = Date.now()
-  const dueAt = new Date()
-  dueAt.setDate(dueAt.getDate() + 7)
-  const dueAtStr = dueAt.toISOString().split('T')[0]
+  const rpcTotal = (sqlCount as number) ?? 0
+  const haikuTotal = await _haikuFallbackCheck(orgId, businessId)
+  const total = rpcTotal + haikuTotal
 
-  // Collect promotion decisions: { id, action_needed }
-  const toPromote: Array<{ id: string; action_needed: string }> = []
+  if (total > 0) revalidatePath('/actions')
+  return total
+}
 
-  for (const entry of rawEntries) {
-    if (!entry.entry_date) continue
+/**
+ * Layer 3: Haiku fallback for entries that passed all structural signals.
+ * Targets received entries 14–60 days old, >100 chars, no sent reply since.
+ * Capped at 3 per filing call. Only applies high-confidence results.
+ * Fire-and-forget safe — any error returns 0.
+ */
+async function _haikuFallbackCheck(orgId: string, businessId: string): Promise<number> {
+  try {
+    const supabase = await createClient()
 
-    const entryDate = new Date(entry.entry_date)
-    const daysSince = Math.floor((now - entryDate.getTime()) / 86400000)
-    const text = (entry.formatted_text_current || '').toLowerCase()
+    const cutoffOld = new Date(Date.now() - 60 * 86400000).toISOString()
+    const cutoffRecent = new Date(Date.now() - 14 * 86400000).toISOString()
 
-    // All entries filed after this one for the same business (within the fetched window)
-    const later = rawEntries.filter(e => e.entry_date && new Date(e.entry_date) > entryDate)
-
-    // Signal 1: Sent invoice/payment terms, no payment confirmation received (14–180d)
-    if (entry.direction === 'sent' && daysSince >= 14 && daysSince <= 180) {
-      const hasFinancial = TIER1_FINANCIAL.some(kw => text.includes(kw))
-      if (hasFinancial) {
-        const paymentReceived = later.some(e => {
-          if (e.direction !== 'received') return false
-          const t = (e.formatted_text_current || '').toLowerCase()
-          return PAYMENT_RESOLUTION.some(p => t.includes(p))
-        })
-        if (!paymentReceived) {
-          toPromote.push({ id: entry.id, action_needed: 'waiting_on_them' })
-          continue
-        }
-      }
-    }
-
-    // Signal 2: They committed to follow up, no sent reply from Tom (7–60d)
-    if (entry.direction === 'received' && daysSince >= 7 && daysSince <= 60) {
-      const hasCommitment = TIER2_RECEIVED_COMMITMENTS.some(kw => text.includes(kw))
-      if (hasCommitment) {
-        const hasSentReply = later.some(e => e.direction === 'sent')
-        if (!hasSentReply) {
-          toPromote.push({ id: entry.id, action_needed: 'waiting_on_them' })
-          continue
-        }
-      }
-    }
-
-    // Signal 3: Meeting/Call with financial/commitment keywords + no follow-up (3–90d)
-    if ((entry.type === 'Meeting' || entry.type === 'Call') && daysSince >= 3 && daysSince <= 90) {
-      const hasKeywords = TIER1_FINANCIAL.some(kw => text.includes(kw)) ||
-        TIER2_RECEIVED_COMMITMENTS.some(kw => text.includes(kw))
-      if (hasKeywords) {
-        const hasFollowUp = later.some(e => e.direction === 'sent' || e.type === 'Meeting' || e.type === 'Call')
-        if (!hasFollowUp) {
-          toPromote.push({ id: entry.id, action_needed: 'invoice' })
-          continue
-        }
-      }
-    }
-
-    // Signal 4: Inbound interest/enquiry, no reply sent (7–60d)
-    if (entry.direction === 'received' && daysSince >= 7 && daysSince <= 60) {
-      const hasInterest = TIER2_INTEREST_SIGNALS.some(kw => text.includes(kw))
-      if (hasInterest) {
-        const hasSentReply = later.some(e => e.direction === 'sent')
-        if (!hasSentReply) {
-          toPromote.push({ id: entry.id, action_needed: 'prospect' })
-        }
-      }
-    }
-  }
-
-  if (toPromote.length === 0) return 0
-
-  // Batch updates grouped by action type
-  const byAction = new Map<string, string[]>()
-  for (const p of toPromote) {
-    const ids = byAction.get(p.action_needed) || []
-    ids.push(p.id)
-    byAction.set(p.action_needed, ids)
-  }
-
-  for (const [actionNeeded, ids] of byAction) {
-    await supabase
+    // Fetch received entries in the 14–60d window that structural detection missed
+    const { data: candidates, error } = await supabase
       .from('correspondence')
-      .update({ action_needed: actionNeeded, due_at: dueAtStr })
-      .in('id', ids)
+      .select('id, entry_date, formatted_text_current, subject')
       .eq('organization_id', orgId)
-  }
+      .eq('business_id', businessId)
+      .eq('action_needed', 'none')
+      .is('reply_dismissed_at', null)
+      .eq('direction', 'received')
+      .gte('entry_date', cutoffOld)
+      .lte('entry_date', cutoffRecent)
+      .order('entry_date', { ascending: false })
+      .limit(10)
 
-  revalidatePath('/actions')
-  return toPromote.length
+    if (error || !candidates || candidates.length === 0) return 0
+
+    // Only consider entries with enough text to be meaningful
+    const substantial = candidates.filter(c =>
+      (c.formatted_text_current || '').length > 100
+    )
+    if (substantial.length === 0) return 0
+
+    // Check if any sent reply exists for this business after each candidate
+    // (SQL already handles this — but we need to re-check here for the JS-side filter)
+    const { data: sentAfter } = await supabase
+      .from('correspondence')
+      .select('entry_date')
+      .eq('organization_id', orgId)
+      .eq('business_id', businessId)
+      .eq('direction', 'sent')
+      .gte('entry_date', cutoffOld)
+      .order('entry_date', { ascending: true })
+
+    const sentDates = (sentAfter || []).map(r => new Date(r.entry_date).getTime())
+
+    // Filter to entries with no sent reply after them
+    const unreplied = substantial.filter(c => {
+      const entryTime = new Date(c.entry_date).getTime()
+      return !sentDates.some(t => t > entryTime)
+    })
+
+    if (unreplied.length === 0) return 0
+
+    // Cap at 3 to control cost
+    const toCheck = unreplied.slice(0, 3)
+
+    const anthropic = getAnthropicClient()
+    const dueAt = new Date()
+    dueAt.setDate(dueAt.getDate() + 7)
+    const dueAtStr = dueAt.toISOString().split('T')[0]
+
+    let promoted = 0
+
+    for (const entry of toCheck) {
+      const text = (entry.formatted_text_current || '').slice(0, 1500)
+
+      const response = await anthropic.messages.create({
+        model: AI_MODELS.ECONOMY,
+        max_tokens: 100,
+        system: `You are a correspondence assistant for a UK business. Classify whether this received message requires a follow-up action.
+
+Respond with JSON only:
+{
+  "action": "waiting_on_them" | "prospect" | "none",
+  "confidence": "high" | "low"
+}
+
+Use "waiting_on_them" if they committed to something and you haven't heard back.
+Use "prospect" if they expressed interest or made an enquiry.
+Use "none" if no follow-up is needed.
+Only use "high" confidence if you are very sure.`,
+        messages: [{ role: 'user', content: `Subject: ${entry.subject || '(none)'}\n\n${text}` }],
+      })
+
+      const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+      let parsed: { action: string; confidence: string } | null = null
+      try {
+        // Strip markdown code fences if present
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+        parsed = JSON.parse(cleaned)
+      } catch {
+        continue
+      }
+
+      if (
+        parsed &&
+        parsed.confidence === 'high' &&
+        (parsed.action === 'waiting_on_them' || parsed.action === 'prospect')
+      ) {
+        const { error: uErr } = await supabase
+          .from('correspondence')
+          .update({ action_needed: parsed.action, due_at: dueAtStr, updated_at: new Date().toISOString() })
+          .eq('id', entry.id)
+          .eq('organization_id', orgId)
+        if (!uErr) promoted++
+      }
+    }
+
+    return promoted
+  } catch (err) {
+    console.error('_haikuFallbackCheck failed:', err)
+    return 0
+  }
 }
 
 export async function getOutstandingActionsCount(): Promise<number> {
