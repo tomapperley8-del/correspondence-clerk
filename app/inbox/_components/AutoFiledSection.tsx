@@ -31,8 +31,8 @@ export default function AutoFiledSection({ items }: Props) {
 
       {open && (
         <div
-          className="mt-2 rounded"
-          style={{ border: '1px solid rgba(0,0,0,0.06)', background: '#FAFAF8' }}
+          className="mt-2 rounded bg-brand-paper"
+          style={{ border: '1px solid rgba(0,0,0,0.06)' }}
         >
           {items.map((item, i) => (
             <div

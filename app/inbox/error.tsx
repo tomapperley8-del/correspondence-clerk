@@ -12,11 +12,11 @@ export default function InboxError({
       <h2 className="text-2xl font-bold text-brand-dark font-serif mb-3">
         Something went wrong
       </h2>
-      <p className="text-gray-600 mb-6">
+      <p className="mb-6" style={{ color: 'rgba(0,0,0,0.55)' }}>
         The Inbox couldn&apos;t load. Your data is safe — this is a temporary issue.
       </p>
       {error.digest && (
-        <p className="text-xs text-gray-400 mb-6 font-mono">{error.digest}</p>
+        <p className="text-xs mb-6 font-mono" style={{ color: 'rgba(0,0,0,0.35)' }}>{error.digest}</p>
       )}
       <button
         onClick={reset}

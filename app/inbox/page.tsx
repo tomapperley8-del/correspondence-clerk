@@ -40,8 +40,8 @@ export default async function InboxPage() {
 
       {items.length === 0 ? (
         <div
-          className="rounded p-10 text-center"
-          style={{ background: '#FAFAF8', border: '1px solid rgba(0,0,0,0.06)' }}
+          className="bg-brand-paper rounded p-10 text-center"
+          style={{ border: '1px solid rgba(0,0,0,0.06)' }}
         >
           <p
             className="text-xl mb-2"
