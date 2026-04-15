@@ -348,11 +348,7 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
             <button
               onClick={handleFile}
               disabled={!selectedBusinessId || filing}
-              className="px-4 py-2 text-sm font-medium text-white rounded-sm transition-colors"
-              style={{
-                backgroundColor: selectedBusinessId && !filing ? '#2C4A6E' : 'rgba(0,0,0,0.2)',
-                cursor: selectedBusinessId && !filing ? 'pointer' : 'not-allowed',
-              }}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-sm transition-colors ${selectedBusinessId && !filing ? 'bg-brand-navy hover:bg-brand-navy-hover cursor-pointer' : 'bg-black/20 cursor-not-allowed'}`}
             >
               {filing ? 'Filing…' : 'File it'}
             </button>

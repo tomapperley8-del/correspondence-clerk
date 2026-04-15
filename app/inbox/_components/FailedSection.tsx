@@ -56,8 +56,8 @@ export default function FailedSection({ items: initialItems }: Props) {
 
       {open && (
         <div
-          className="mt-2 rounded"
-          style={{ border: '1px solid rgba(180,0,0,0.15)', background: '#FAFAF8' }}
+          className="mt-2 rounded bg-brand-paper"
+          style={{ border: '1px solid rgba(180,0,0,0.15)' }}
         >
           {items.map((item, i) => (
             <div
