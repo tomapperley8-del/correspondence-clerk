@@ -1124,15 +1124,15 @@ function threadSnippet(text: string | null | undefined): string | null {
 }
 
 /**
- * Structural detection of open/unresolved threads — no AI, pure JS.
+ * Structural detection of open/unresolved threads — SQL RPC, no AI.
  * Detects 4 signal types across a 180-day window:
- *   1. sent_invoice           — Tom sent invoice keywords, no payment confirmation received since
- *   2. received_commitment    — They promised to follow up, no sent reply from Tom since
+ *   1. sent_invoice           — sent invoice keywords, no payment confirmation received since
+ *   2. received_commitment    — they promised to follow up, no sent reply since
  *   3. meeting_call_followup  — Meeting/Call with no subsequent sent entry
- *   4. interest_signal        — Inbound enquiry/interest with no reply sent
+ *   4. interest_signal        — inbound enquiry/interest with no reply sent
  *
- * Only covers entries where action_needed='none' (already-flagged records handled by Actions page).
- * Optionally scoped to one business via options.businessId.
+ * Only covers entries where action_needed='none'. Scoped to one business
+ * via options.businessId, or all businesses in the org if omitted.
  */
 export async function getOpenThreads(options?: { businessId?: string }) {
   const supabase = await createClient()
@@ -1141,139 +1141,38 @@ export async function getOpenThreads(options?: { businessId?: string }) {
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const window180dAgo = new Date(Date.now() - 180 * 86400000)
+  const { data, error } = await supabase.rpc('get_open_threads', {
+    p_org_id:              orgId,
+    p_business_id:         options?.businessId ?? null,
+    p_tier1_financial:     TIER1_FINANCIAL,
+    p_payment_resolution:  PAYMENT_RESOLUTION,
+    p_tier2_commitments:   TIER2_RECEIVED_COMMITMENTS,
+    p_tier2_interest:      TIER2_INTEREST_SIGNALS,
+    p_commitment_patterns: COMMITMENT_REGEX_PATTERNS,
+    p_interest_patterns:   INTEREST_REGEX_PATTERNS,
+  })
 
-  let query = supabase
-    .from('correspondence')
-    .select('id, business_id, direction, type, entry_date, action_needed, subject, formatted_text_current, businesses!inner(id, name)')
-    .eq('organization_id', orgId)
-    .gte('entry_date', window180dAgo.toISOString())
-    .order('entry_date', { ascending: true })
-    .limit(2000)
+  if (error) return { error: error.message }
 
-  if (options?.businessId) {
-    query = query.eq('business_id', options.businessId)
-  }
-
-  const { data: rawData, error: rawError } = await query
-  if (rawError) return { error: rawError.message }
-
-  const entries = rawData || []
-  const now = Date.now()
-
-  // Group by business
-  const byBusiness = new Map<string, typeof entries>()
-  for (const e of entries) {
-    const arr = byBusiness.get(e.business_id) || []
-    arr.push(e)
-    byBusiness.set(e.business_id, arr)
-  }
-
-  const openThreads: OpenThread[] = []
-
-  for (const bizEntries of byBusiness.values()) {
-    const bizRaw = bizEntries[0].businesses as unknown as { id: string; name: string } | { id: string; name: string }[] | null
-    const bizInfo = Array.isArray(bizRaw) ? bizRaw[0] : bizRaw
-    const businessName = bizInfo?.name ?? ''
-    const businessId = bizEntries[0].business_id
-
-    for (const entry of bizEntries) {
-      if (!entry.entry_date) continue
-      // Skip entries already flagged — open threads only surfaces missed detections
-      if (entry.action_needed !== 'none') continue
-
-      const entryDate = new Date(entry.entry_date)
-      const daysSince = Math.floor((now - entryDate.getTime()) / 86400000)
-      const text = (entry.formatted_text_current || '').toLowerCase()
-
-      // All entries filed after this one for the same business
-      const later = bizEntries.filter(e => e.entry_date && new Date(e.entry_date) > entryDate)
-
-      // --- Signal 1: Sent invoice/payment terms, no payment confirmation received (14–180d) ---
-      if (entry.direction === 'sent' && daysSince >= 14 && daysSince <= 180) {
-        const hasFinancial = TIER1_FINANCIAL.some(kw => text.includes(kw))
-        if (hasFinancial) {
-          const paymentReceived = later.some(e => {
-            if (e.direction !== 'received') return false
-            const t = (e.formatted_text_current || '').toLowerCase()
-            return PAYMENT_RESOLUTION.some(p => t.includes(p))
-          })
-          if (!paymentReceived) {
-            openThreads.push({
-              thread_type: 'sent_invoice',
-              entry_id: entry.id,
-              business_id: businessId,
-              business_name: businessName,
-              entry_date: entry.entry_date,
-              subject: entry.subject,
-              days_since: daysSince,
-              snippet: threadSnippet(entry.formatted_text_current),
-            })
-            continue
-          }
-        }
-      }
-
-      // --- Signal 2: They committed to follow up, no sent reply from Tom (7–60d) ---
-      if (entry.direction === 'received' && daysSince >= 7 && daysSince <= 60) {
-        const hasCommitment = TIER2_RECEIVED_COMMITMENTS.some(kw => text.includes(kw))
-        if (hasCommitment) {
-          const hasSentReply = later.some(e => e.direction === 'sent')
-          if (!hasSentReply) {
-            openThreads.push({
-              thread_type: 'received_commitment',
-              entry_id: entry.id,
-              business_id: businessId,
-              business_name: businessName,
-              entry_date: entry.entry_date,
-              subject: entry.subject,
-              days_since: daysSince,
-              snippet: threadSnippet(entry.formatted_text_current),
-            })
-            continue
-          }
-        }
-      }
-
-      // --- Signal 3: Meeting/Call with no subsequent sent entry or further meeting (3–90d) ---
-      if ((entry.type === 'Meeting' || entry.type === 'Call') && daysSince >= 3 && daysSince <= 90) {
-        const hasFollowUp = later.some(e => e.direction === 'sent' || e.type === 'Meeting' || e.type === 'Call')
-        if (!hasFollowUp) {
-          openThreads.push({
-            thread_type: 'meeting_call_followup',
-            entry_id: entry.id,
-            business_id: businessId,
-            business_name: businessName,
-            entry_date: entry.entry_date,
-            subject: entry.subject,
-            days_since: daysSince,
-            snippet: threadSnippet(entry.formatted_text_current),
-          })
-          continue
-        }
-      }
-
-      // --- Signal 4: Inbound enquiry/interest signal, no reply sent (7–60d) ---
-      if (entry.direction === 'received' && daysSince >= 7 && daysSince <= 60) {
-        const hasInterest = TIER2_INTEREST_SIGNALS.some(kw => text.includes(kw))
-        if (hasInterest) {
-          const hasSentReply = later.some(e => e.direction === 'sent')
-          if (!hasSentReply) {
-            openThreads.push({
-              thread_type: 'interest_signal',
-              entry_id: entry.id,
-              business_id: businessId,
-              business_name: businessName,
-              entry_date: entry.entry_date,
-              subject: entry.subject,
-              days_since: daysSince,
-              snippet: threadSnippet(entry.formatted_text_current),
-            })
-          }
-        }
-      }
-    }
-  }
+  const openThreads: OpenThread[] = (data || []).map((row: {
+    entry_id: string
+    business_id: string
+    business_name: string
+    entry_date: string
+    subject: string | null
+    days_since: number
+    snippet: string | null
+    thread_type: string
+  }) => ({
+    thread_type: row.thread_type as OpenThread['thread_type'],
+    entry_id:     row.entry_id,
+    business_id:  row.business_id,
+    business_name: row.business_name,
+    entry_date:   row.entry_date,
+    subject:      row.subject,
+    days_since:   row.days_since,
+    snippet:      threadSnippet(row.snippet),
+  }))
 
   // Oldest first — most likely to be genuinely stale
   openThreads.sort((a, b) => b.days_since - a.days_since)
