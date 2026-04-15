@@ -45,28 +45,28 @@ export function useActionsData() {
     setLoading(true)
     setError(null)
     const [nrResult, gqResult, flagResult, remResult, contractResult] = await Promise.all([
-      getNeedsReply(),
-      getGoneQuiet(),
-      getOutstandingActions(),
-      getPureReminders(),
-      getContractExpiries(),
+      getNeedsReply().catch(() => ({ data: [], error: null })),
+      getGoneQuiet().catch(() => ({ data: [], error: null })),
+      getOutstandingActions().catch(() => ({ data: [], error: null })),
+      getPureReminders().catch(() => ({ data: [], error: null })),
+      getContractExpiries().catch(() => ({ data: [], error: null })),
     ])
 
-    if ('error' in nrResult && nrResult.error) { setError(nrResult.error); setLoading(false); return }
-    if ('error' in gqResult && gqResult.error) { setError(gqResult.error); setLoading(false); return }
-    if ('error' in flagResult && flagResult.error) { setError(flagResult.error); setLoading(false); return }
-    if ('error' in remResult && remResult.error) { setError(remResult.error); setLoading(false); return }
+    const nrData = ('error' in nrResult && nrResult.error) ? [] : (nrResult.data || [])
+    const gqData = ('error' in gqResult && gqResult.error) ? [] : (gqResult.data || [])
+    const flagData = ('error' in flagResult && flagResult.error) ? [] : (flagResult.data || [])
+    const remData = ('error' in remResult && remResult.error) ? [] : (remResult.data || [])
     const contractData = contractResult && !('error' in contractResult) ? contractResult.data || [] : []
 
     setNeedsReply(
-      (nrResult.data || []).map((e: Record<string, unknown>) => {
+      nrData.map((e: Record<string, unknown>) => {
         const item = mapCorrEntry(e)
         return { ...item, due_at: null, daysAgo: e.entry_date ? daysAgoFn(e.entry_date as string) : undefined }
       }).filter(likelyNeedsReply)
     )
 
     setGoneQuiet(
-      (gqResult.data || []).map((b: Record<string, unknown>) => {
+      gqData.map((b: Record<string, unknown>) => {
         const countArr = b.correspondence as [{ count: number }] | undefined
         return {
           kind: 'business' as const,
@@ -79,8 +79,8 @@ export function useActionsData() {
       })
     )
 
-    setFlagged((flagResult.data || []).map(mapCorrEntry))
-    setReminders((remResult.data || []).map(mapCorrEntry))
+    setFlagged(flagData.map(mapCorrEntry))
+    setReminders(remData.map(mapCorrEntry))
 
     setContracts(
       contractData.map((b: Record<string, unknown>) => ({
