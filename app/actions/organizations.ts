@@ -10,7 +10,8 @@ export type NavData = {
   displayName: string | null
   organizationId: string | null
   organizationName: string | null
-  actionsCount: number
+  actionsCount: number   // urgent: flagged items due today or earlier (not future-snoozed)
+  overdueCount: number   // strictly past-due flagged items (drives red vs amber colour)
   inboundCount: number
   hasCorrespondence: boolean
 }
@@ -22,7 +23,7 @@ export type NavData = {
 export async function getNavData(): Promise<NavData> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, inboundCount: 0, hasCorrespondence: false }
+  if (!user) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, overdueCount: 0, inboundCount: 0, hasCorrespondence: false }
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -30,17 +31,27 @@ export async function getNavData(): Promise<NavData> {
     .eq('id', user.id)
     .single()
 
-  if (!profile) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, inboundCount: 0, hasCorrespondence: false }
+  if (!profile) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, overdueCount: 0, inboundCount: 0, hasCorrespondence: false }
 
   const orgId = profile.organization_id
   const orgs = profile.organizations as { id: string; name: string }[] | { id: string; name: string } | null
   const org = Array.isArray(orgs) ? orgs[0] ?? null : orgs
 
-  const [flagged, reminders, inbound, anyCorrespondence] = await Promise.all([
+  const now = new Date().toISOString()
+
+  const [urgent, overdue, inbound, anyCorrespondence] = await Promise.all([
+    // Urgent: flagged items due today or earlier (or no due date), not dismissed
     supabase.from('correspondence').select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId).neq('action_needed', 'none'),
+      .eq('organization_id', orgId)
+      .neq('action_needed', 'none')
+      .is('reply_dismissed_at', null)
+      .or(`due_at.is.null,due_at.lte.${now}`),
+    // Overdue: strictly past-due flagged items (for red vs amber colour)
     supabase.from('correspondence').select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId).eq('action_needed', 'none').not('due_at', 'is', null),
+      .eq('organization_id', orgId)
+      .neq('action_needed', 'none')
+      .is('reply_dismissed_at', null)
+      .lt('due_at', now),
     supabase.from('inbound_queue').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('status', 'pending'),
     supabase.from('correspondence').select('id', { count: 'exact', head: true })
@@ -51,7 +62,8 @@ export async function getNavData(): Promise<NavData> {
     displayName: profile.display_name,
     organizationId: orgId,
     organizationName: org?.name ?? null,
-    actionsCount: (flagged.count ?? 0) + (reminders.count ?? 0),
+    actionsCount: urgent.count ?? 0,
+    overdueCount: overdue.count ?? 0,
     inboundCount: inbound.count ?? 0,
     hasCorrespondence: (anyCorrespondence.count ?? 0) > 0,
   }
