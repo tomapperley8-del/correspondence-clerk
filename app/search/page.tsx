@@ -269,7 +269,7 @@ export default function SearchPage() {
                       <h3 className="font-semibold text-brand-dark">{result.title}</h3>
                     </div>
                     <p className="text-sm text-gray-600 mb-1">
-                      {result.business_name} • {result.contact_name}
+                      {result.business_name}{result.contact_name && ` • ${result.contact_name}`}
                       {result.direction && (
                         <span> • {result.direction === 'sent' ? 'Sent' : 'Received'}</span>
                       )}
