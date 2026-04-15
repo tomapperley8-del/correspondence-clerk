@@ -110,7 +110,7 @@ export default function ActionsPage() {
       ) : (
         <>
           {/* Needs Reply */}
-          <CollapsibleSection title="Needs Reply" count={sections.reply.length} subtitle={sections.replySubtitle}>
+          <CollapsibleSection title="Needs Reply" count={sections.reply.length} subtitle={sections.replySubtitle} initialLimit={10}>
             {sections.reply.map(item => (
               <ItemRow
                 key={`${item.kind}-${item.id}`}

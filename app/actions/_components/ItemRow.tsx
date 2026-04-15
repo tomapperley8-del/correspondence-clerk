@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { LogPanel } from './LogPanel'
 import { DraftPanel } from './DraftPanel'
@@ -49,6 +50,7 @@ export function ItemRow({
   onSnooze, onSnoozeToggle, onLogToggle, onLogSave,
   onDraftToggle, onUseInLog,
 }: ItemRowProps) {
+  const [snippetExpanded, setSnippetExpanded] = useState(false)
   const isCorr = item.kind === 'correspondence'
   const isContract = item.kind === 'contract'
   const isBusiness = item.kind === 'business'
@@ -104,15 +106,23 @@ export function ItemRow({
 
           {/* Direction + snippet */}
           {corr && (corr.direction || corr.snippet) && (
-            <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
-              {corr.direction === 'received' && (
-                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-brand-navy/8 text-brand-navy border border-brand-navy/20">↓ Received</span>
-              )}
-              {corr.direction === 'sent' && (
-                <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-brand-olive/10 text-brand-olive border border-brand-olive/20">↑ Sent</span>
-              )}
+            <div className="mb-0.5">
+              <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                {corr.direction === 'received' && (
+                  <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-brand-navy/8 text-brand-navy border border-brand-navy/20">↓ Received</span>
+                )}
+                {corr.direction === 'sent' && (
+                  <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-brand-olive/10 text-brand-olive border border-brand-olive/20">↑ Sent</span>
+                )}
+              </div>
               {corr.snippet && (
-                <span className="text-xs text-gray-400 italic">{corr.snippet}</span>
+                <p
+                  className={`text-xs text-gray-400 italic leading-relaxed ${snippetExpanded ? '' : 'line-clamp-2'}`}
+                  onClick={e => { e.stopPropagation(); setSnippetExpanded(v => !v) }}
+                  title={snippetExpanded ? undefined : 'Click to expand'}
+                >
+                  {corr.snippet}
+                </p>
               )}
             </div>
           )}
