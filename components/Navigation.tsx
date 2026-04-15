@@ -172,19 +172,15 @@ export function Navigation() {
                 New Entry
               </Link>
 
-              <Link
-                href="/search"
-                className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/search'
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
+              <button
+                onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'k', bubbles: true }))}
+                className="px-4 h-16 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 text-white hover:bg-brand-olive/20"
               >
                 Search
                 <kbd className="hidden lg:inline-block text-[10px] px-1.5 py-0.5 bg-white/10 rounded text-white/60 font-mono">
                   Ctrl+K
                 </kbd>
-              </Link>
+              </button>
 
               <Link
                 href="/inbox"
@@ -226,16 +222,6 @@ export function Navigation() {
                 </Link>
               )}
 
-              <Link
-                href="/help"
-                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/help'
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
-              >
-                Help
-              </Link>
               {pathname !== '/insights' && <InsightsButton />}
             </div>
           </div>
@@ -251,14 +237,26 @@ export function Navigation() {
               <span className="block w-5 h-0.5 bg-white" />
               <span className="block w-5 h-0.5 bg-white" />
             </button>
-            <div className="hidden md:block text-right">
-              <div className="text-sm text-white">
+            <div className="hidden md:block text-right max-w-[160px]">
+              <div className="text-sm text-white truncate">
                 {displayName || user.email?.split('@')[0] || user.email}
               </div>
               {organization && (
-                <div className="text-xs text-gray-400">{organization.name}</div>
+                <div className="text-xs text-gray-400 truncate">{organization.name}</div>
               )}
             </div>
+            <Link
+              href="/help"
+              aria-label="Help"
+              title="Help"
+              className={`hidden md:flex px-3 h-16 items-center text-sm font-medium transition-colors ${
+                pathname === '/help'
+                  ? 'text-white bg-brand-olive'
+                  : 'text-white/60 hover:text-white hover:bg-brand-olive/20'
+              }`}
+            >
+              ?
+            </Link>
             <Link
               href="/settings"
               className={`hidden md:flex px-4 h-16 items-center text-sm font-medium transition-colors ${
