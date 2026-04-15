@@ -117,6 +117,14 @@ const TIER1_THEIR_FINANCIAL_COMMITMENT = [
   'will raise a purchase order',
   'po being raised',
   'will get a po raised',
+  // British colloquial payment commitments (received direction only)
+  'sorting the invoice',
+  'sorting the payment',
+  'sorting invoice payment',
+  'will get that sorted',
+  'getting that sorted',
+  'will sort the payment',
+  'sorting it out',
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -203,6 +211,30 @@ export const PAYMENT_RESOLUTION = [
   'stripe payment',
   'paypal sent',
   'paypal payment',
+  // British colloquial payment confirmations
+  'thanks for sorting',
+  'thanks for sorting that',
+  'thanks for sorting it',
+  'thanks for sorting the invoice',
+  'thanks for sorting the payment',
+  'all sorted',
+  'all been sorted',
+  'sorted the invoice',
+  'sorted the payment',
+  'got it sorted',
+  'getting it sorted',
+  'put a payment through',
+  'put payment through',
+  'put the payment through',
+  'payment gone through',
+  'payment has gone through',
+  'payment went through',
+  'payment on its way',
+  'money sent',
+  'money transferred',
+  'settled that',
+  'all taken care of',
+  'no longer outstanding',
   // Multilingual
   'paiement effectué',   // French
   'virement effectué',   // French
