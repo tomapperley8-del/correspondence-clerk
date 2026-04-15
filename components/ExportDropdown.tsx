@@ -345,9 +345,9 @@ export function ExportDropdown({ businessId }: { businessId: string }) {
         <Button
           onClick={() => setShowDropdown(!showDropdown)}
           disabled={exporting}
-          className="bg-green-600 text-white hover:bg-green-700 px-6 py-3 font-semibold"
+          className="border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-800 px-4 py-2 font-medium text-sm"
         >
-          {exporting ? 'Exporting...' : 'Export ▼'}
+          {exporting ? 'Exporting…' : 'Export ▼'}
         </Button>
       </div>
 
