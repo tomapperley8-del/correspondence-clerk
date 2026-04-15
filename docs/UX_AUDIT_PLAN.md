@@ -47,7 +47,7 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 
 ## Phase 2 — Dashboard
 
-### P2.1 — Onboarding banners persist for established users
+### ✅ P2.1 — Onboarding banners persist for established users
 **File:** `app/dashboard/page.tsx`  
 **Screenshot:** `01-dashboard.png` (top of page — both banners visible above the business grid)  
 **Issues:** The "You're new here" banner and the "Import Emails" strip both show permanently regardless of how established the user is. With 806 businesses these are pure noise.  
@@ -56,7 +56,7 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 - Make the "Import Emails" strip dismissible — store a `hide_import_banner` flag in `user_profiles` (or `localStorage` as a lighter alternative)
 - The onboarding checklist widget (the "Get started" card) should auto-hide once all three steps are complete — check if this is already gated
 
-### P2.2 — Two onboarding elements on mobile dashboard
+### ✅ P2.2 — Two onboarding elements on mobile dashboard
 **File:** `app/dashboard/page.tsx`  
 **Screenshot:** `14-mobile-dashboard.png` ("Get started" checklist + "Welcome to Correspondence Clerk" card both visible)  
 **Issue:** On mobile, both the "Get started" checklist widget AND the "Welcome to Correspondence Clerk" full card render simultaneously. They're redundant — two different onboarding patterns saying the same thing.  
