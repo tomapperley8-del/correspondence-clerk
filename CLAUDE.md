@@ -2,6 +2,10 @@
 
 Single source of truth for Claude Code sessions on Correspondence Clerk.
 
+## Quick Commands
+
+- **"lets go"** — read `docs/UX_AUDIT_PLAN.md`, find the first item without a ✅, do it, commit + push, mark it ✅, update CLAUDE.md Recent Changes and any relevant memory files, then move straight to the next item. Keep going until told to stop or context gets long. If context gets long, commit, update the plan, then say so.
+
 ## Production
 
 - **URL:** https://correspondence-clerk.vercel.app
@@ -263,6 +267,7 @@ All features complete and deployed (unless noted):
 
 ## Recent Changes
 
+- **Apr 15, 2026:** UX Audit Phase 0+1 — P0.1: Actions page degrades gracefully on auth errors (try/catch on all 5 parallel fetches, empty arrays on failure — no more raw "Unauthorized" in UI). P1.1: Nav user/org display truncated with max-w-[160px] truncate; Help moved to `?` icon at far right. P1.2: Search nav item now dispatches Ctrl+K event to open CommandSearch overlay instead of navigating to /search. P1.3: Mobile nav overhauled — logo shortens to "Clerk" on xs; hamburger replaced with slide-out right drawer (backdrop overlay, badges, close button); fixed bottom bar on mobile (Home / New Entry / Actions / Inbox / More); layout.tsx pb-16 md:pb-0 so content never hides behind bottom bar.
 - **Apr 09, 2026:** Session 8 — Inbound email fixes: (1) JSONB contact email matching broken everywhere — postgrest-js `.contains([array])` generates `cs.{val}` (text array syntax) which silently returns 0 rows against JSONB columns; fixed all 5 query sites to use `.filter('emails', 'cs', JSON.stringify([val]))` — now generates correct `cs.["val"]` format. This means personal-domain senders (Gmail etc.) now auto-file correctly if their email is in contacts. (2) AI formatter was overriding SMTP header date with guessed dates from email body content — fixed to always use header date as authoritative `entry_date`. (3) `fileInboundEmail` now saves sender email to contact's emails[] for future auto-filing. (4) `getAutoFiledRecent()` broadened to include inbox-filed items (source `inbound_email`/`bcc_capture`). Domain mapping auto-filing always worked; contact email matching never did until now.
 - **Apr 09, 2026:** Sessions 6-7 — New Entry page decomposition: `app/new-entry/page.tsx` reduced 1722→732 lines. Extracted 4 hooks into `_hooks/`: `useThreadDetection`, `useContactExtraction`, `useDraftAutosave`, `useEmailImport` (handles postMessage bookmarklet, token-based retrieval, and URL param import — all paths unified). Extracted 5 components into `_components/`: `EmailSelectionDialog`, `AIPreviewPanel`, `FilingSection`, `EntryDetailsSection`, `TextInputSection`. Bonus: onboarding step label fixed "4 of 5" → "4 of 4". Also fixed `next/font/google` Turbopack build noise by switching to standard Google Fonts `<link>` in `layout.tsx`.
 - **Apr 09, 2026:** Session 5 — Business page decomposition continued: extracted `useCorrespondence` hook from `BusinessDetailClient.tsx` (1012→828 lines) — data fetching, filter/sort state, localStorage prefs, pagination, section splitting, and chrono index all in reusable hook. Aria attributes added across `CorrespondenceEditForm` (htmlFor+id on all inputs/selects, aria-label on textarea), `CorrespondenceFilterBar` (aria-pressed on all toggle buttons, role=group, htmlFor on date inputs), `DuplicatesWarningBanner` (aria-label on checkboxes). Inline style cleanup in `BusinessFiles` (border token classes replace rgba inline styles, Tailwind rotate classes replace transform inline style).
