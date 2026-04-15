@@ -36,6 +36,7 @@ export function Navigation() {
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [actionsCount, setActionsCount] = useState(0)
+  const [overdueCount, setOverdueCount] = useState(0)
   const [inboundCount, setInboundCount] = useState(0)
   const [hasCorrespondence, setHasCorrespondence] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -49,6 +50,7 @@ export function Navigation() {
     const nav = await getNavData()
     setDisplayName(nav.displayName)
     setActionsCount(nav.actionsCount)
+    setOverdueCount(nav.overdueCount)
     setInboundCount(nav.inboundCount)
     setHasCorrespondence(nav.hasCorrespondence)
     if (nav.organizationId) {
@@ -215,10 +217,10 @@ export function Navigation() {
                   Actions
                   {actionsCount > 0 && (
                     <span
-                      title={`${actionsCount} action${actionsCount === 1 ? '' : 's'} need attention`}
-                      className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                      title={`${actionsCount} urgent action${actionsCount === 1 ? '' : 's'}`}
+                      className={`min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center leading-none ${overdueCount > 0 ? 'bg-red-500' : 'bg-amber-500'}`}
                     >
-                      {actionsCount > 99 ? '99+' : actionsCount}
+                      {actionsCount > 20 ? '20+' : actionsCount}
                     </span>
                   )}
                 </Link>
@@ -315,11 +317,11 @@ export function Navigation() {
                 { href: '/new-entry', label: 'New Entry' },
                 { href: '/search', label: 'Search' },
                 { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
-                ...(hasCorrespondence ? [{ href: '/actions', label: 'Actions', badge: actionsCount > 0 ? actionsCount : null }] : []),
+                ...(hasCorrespondence ? [{ href: '/actions', label: 'Actions', badge: actionsCount > 0 ? actionsCount : null, overdue: overdueCount > 0 }] : []),
                 { href: '/insights', label: 'Insights' },
                 { href: '/help', label: 'Help' },
                 { href: '/settings', label: 'Settings' },
-              ].map(({ href, label, badge }: { href: string; label: string; badge?: number | null }) => (
+              ].map(({ href, label, badge, overdue }: { href: string; label: string; badge?: number | null; overdue?: boolean }) => (
                 <Link
                   key={href}
                   href={href}
@@ -331,8 +333,8 @@ export function Navigation() {
                 >
                   {label}
                   {badge != null && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                      {badge > 99 ? '99+' : badge}
+                    <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center leading-none ${overdue ? 'bg-red-500' : 'bg-amber-500'}`}>
+                      {badge > 20 ? '20+' : badge}
                     </span>
                   )}
                 </Link>
@@ -391,7 +393,7 @@ export function Navigation() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
               {actionsCount > 0 && (
-                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                <span className={`absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full text-white text-[9px] font-bold flex items-center justify-center leading-none ${overdueCount > 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
                   {actionsCount > 20 ? '20+' : actionsCount}
                 </span>
               )}
