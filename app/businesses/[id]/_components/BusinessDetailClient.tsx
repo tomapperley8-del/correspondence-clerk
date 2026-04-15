@@ -829,7 +829,7 @@ export function BusinessDetailClient({
       {!recentSectionVisible && filteredCorrespondence.recent.length > 0 && (
         <button
           onClick={() => recentSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          className="fixed bottom-6 left-6 z-40 px-3 py-2 bg-brand-dark text-white text-xs font-medium shadow-lg hover:bg-brand-navy transition-colors"
+          className="fixed bottom-6 right-6 z-40 px-3 py-2 bg-brand-dark text-white text-xs font-medium shadow-lg hover:bg-brand-navy transition-colors"
           title="Jump to recent entries"
         >
           ↑ Today
