@@ -62,7 +62,7 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 **Issue:** On mobile, both the "Get started" checklist widget AND the "Welcome to Correspondence Clerk" full card render simultaneously. They're redundant — two different onboarding patterns saying the same thing.  
 **Fix:** These should be mutually exclusive. The checklist widget is the right pattern (lightweight, dismissible). The full welcome card should only show when there are zero businesses, then disappear permanently. On mobile specifically, the checklist widget should stack cleanly below the page heading.
 
-### P2.3 — Dashboard is splitting attention between two jobs
+### ✅ P2.3 — Dashboard is splitting attention between two jobs
 **File:** `app/dashboard/page.tsx`  
 **Screenshot:** `01-dashboard.png` (business grid left, Insights sidebar right — two competing panels)  
 **Issue:** The page is simultaneously a business list (paginated grid, 806 entries, filters) and a command centre (Insights sidebar). These are different jobs and compete for attention.  
@@ -72,7 +72,7 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 
 ## Phase 3 — Actions Page
 
-### P3.1 — Actions badge count creates anxiety
+### ✅ P3.1 — Actions badge count creates anxiety
 **Files:** `components/Navigation.tsx`, `app/actions/page.tsx`  
 **Screenshot:** `01-dashboard.png` (nav bar — red "64" badge visible)  
 **Issue:** A bright red "64" badge in the nav looks like a system alert. It counts everything — including low-urgency "Gone Quiet" and "Reminder" items — which inflates the number.  
