@@ -137,6 +137,7 @@ export function Navigation() {
   }
 
   return (
+    <>
     <nav aria-label="Main navigation" className="bg-brand-dark border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
@@ -146,7 +147,8 @@ export function Navigation() {
               className="text-xl font-bold text-white"
               style={{ fontFamily: 'Lora, Georgia, serif' }}
             >
-              Correspondence Clerk
+              <span className="hidden sm:inline">Correspondence Clerk</span>
+              <span className="sm:hidden">Clerk</span>
             </Link>
 
             <div className="hidden md:flex h-16">
@@ -278,46 +280,153 @@ export function Navigation() {
         </div>
       </div>
 
-      {/* Mobile dropdown menu */}
+    </nav>
+
+      {/* Mobile slide-out drawer */}
       {mobileOpen && (
-        <div className="md:hidden bg-brand-dark border-t border-white/20">
-          <div className="px-4 py-2 space-y-1">
-            {[
-              { href: '/dashboard', label: 'Dashboard' },
-              { href: '/new-entry', label: 'New Entry' },
-              { href: '/search', label: 'Search' },
-              { href: '/inbox', label: `Inbox${inboundCount > 0 ? ` (${inboundCount})` : ''}` },
-              ...(hasCorrespondence ? [{ href: '/actions', label: `Actions${actionsCount > 0 ? ` (${actionsCount})` : ''}` }] : []),
-              { href: '/help', label: 'Help' },
-              { href: '/settings', label: 'Settings' },
-            ].map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`block px-3 py-2 text-sm font-medium transition-colors ${
-                  pathname === href || (href === '/settings' && pathname?.startsWith('/settings'))
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
+        <>
+          {/* Backdrop */}
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/50"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+          {/* Drawer */}
+          <div className="md:hidden fixed top-0 right-0 z-50 h-full w-72 bg-brand-dark flex flex-col shadow-xl">
+            {/* Drawer header */}
+            <div className="flex items-center justify-between h-16 px-4 border-b border-white/20">
+              <span className="text-base font-semibold text-white" style={{ fontFamily: 'Lora, Georgia, serif' }}>
+                Menu
+              </span>
+              <button
+                onClick={() => setMobileOpen(false)}
+                aria-label="Close menu"
+                className="p-2 text-white/70 hover:text-white transition-colors"
               >
-                {label}
-              </Link>
-            ))}
-            <div className="pt-2 pb-1 border-t border-white/20">
-              <p className="text-xs text-gray-400 px-3 pb-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* Nav items */}
+            <div className="flex-1 overflow-y-auto py-2">
+              {[
+                { href: '/dashboard', label: 'Dashboard' },
+                { href: '/new-entry', label: 'New Entry' },
+                { href: '/search', label: 'Search' },
+                { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
+                ...(hasCorrespondence ? [{ href: '/actions', label: 'Actions', badge: actionsCount > 0 ? actionsCount : null }] : []),
+                { href: '/insights', label: 'Insights' },
+                { href: '/help', label: 'Help' },
+                { href: '/settings', label: 'Settings' },
+              ].map(({ href, label, badge }: { href: string; label: string; badge?: number | null }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center justify-between px-5 py-3 text-sm font-medium transition-colors ${
+                    pathname === href || (href === '/settings' && pathname?.startsWith('/settings'))
+                      ? 'text-white bg-brand-olive'
+                      : 'text-white hover:bg-brand-olive/20'
+                  }`}
+                >
+                  {label}
+                  {badge != null && (
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+            {/* User / Logout footer */}
+            <div className="border-t border-white/20 px-5 py-4">
+              <p className="text-xs text-gray-400 truncate mb-3">
                 {displayName || user.email?.split('@')[0] || user.email}
                 {organization && ` · ${organization.name}`}
               </p>
               <button
                 onClick={handleLogout}
-                className="block w-full text-left px-3 py-2 text-sm font-medium text-white hover:bg-brand-olive/20 transition-colors"
+                className="text-sm font-medium text-white hover:text-brand-olive transition-colors"
               >
                 Logout
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
-    </nav>
+
+      {/* Mobile bottom bar — primary actions always accessible */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-brand-dark border-t border-white/20 flex">
+        <Link
+          href="/dashboard"
+          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors ${
+            pathname === '/dashboard' ? 'text-white' : 'text-white/60 hover:text-white'
+          }`}
+        >
+          <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          Home
+        </Link>
+        <Link
+          href="/new-entry"
+          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors ${
+            pathname === '/new-entry' ? 'text-white' : 'text-white/60 hover:text-white'
+          }`}
+        >
+          <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          New Entry
+        </Link>
+        {hasCorrespondence && (
+          <Link
+            href="/actions"
+            className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${
+              pathname === '/actions' ? 'text-white' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            <span className="relative">
+              <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              {actionsCount > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                  {actionsCount > 20 ? '20+' : actionsCount}
+                </span>
+              )}
+            </span>
+            Actions
+          </Link>
+        )}
+        <Link
+          href="/inbox"
+          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${
+            pathname === '/inbox' ? 'text-white' : 'text-white/60 hover:text-white'
+          }`}
+        >
+          <span className="relative">
+            <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+            {inboundCount > 0 && (
+              <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                {inboundCount > 20 ? '20+' : inboundCount}
+              </span>
+            )}
+          </span>
+          Inbox
+        </Link>
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium text-white/60 hover:text-white transition-colors"
+        >
+          <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          More
+        </button>
+      </div>
+    </>
   )
 }

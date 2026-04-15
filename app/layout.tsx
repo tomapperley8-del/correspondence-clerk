@@ -45,7 +45,7 @@ export default function RootLayout({
           <Navigation />
           <DynamicPanels />
           <ToastContainer />
-          <main id="main-content">{children}</main>
+          <main id="main-content" className="pb-16 md:pb-0">{children}</main>
         </InsightsProvider>
 </body>
     </html>
