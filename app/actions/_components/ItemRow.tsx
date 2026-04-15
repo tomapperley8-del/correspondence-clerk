@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { LogPanel } from './LogPanel'
+import { DraftPanel } from './DraftPanel'
 import { SnoozeMenu } from './SnoozeMenu'
 import { getBadgeClass, LEFT_BORDER, ACTION_LABELS, ACTION_COLOURS, formatDateGB } from '../_utils'
 import type { UnifiedItem, CorrespondenceItem, ContractItem, BusinessItem } from '../_types'
@@ -24,9 +25,11 @@ type ItemRowProps = {
   item: UnifiedItem
   focused: boolean
   logOpen: boolean
+  draftOpen: boolean
   snoozeOpen: boolean
   processing: boolean
   resolutionPending: boolean
+  logInitialText?: string
   onFocus: () => void
   onDone: () => void
   onDoneWithResolution: (resolution: string) => void
@@ -35,12 +38,16 @@ type ItemRowProps = {
   onSnoozeToggle: () => void
   onLogToggle: () => void
   onLogSave: (markDone: boolean) => void
+  onDraftToggle: () => void
+  onUseInLog: (draft: string) => void
 }
 
 export function ItemRow({
-  item, focused, logOpen, snoozeOpen, processing, resolutionPending,
+  item, focused, logOpen, draftOpen, snoozeOpen, processing, resolutionPending,
+  logInitialText,
   onFocus, onDone, onDoneWithResolution, onResolutionCancel,
   onSnooze, onSnoozeToggle, onLogToggle, onLogSave,
+  onDraftToggle, onUseInLog,
 }: ItemRowProps) {
   const isCorr = item.kind === 'correspondence'
   const isContract = item.kind === 'contract'
@@ -157,6 +164,14 @@ export function ItemRow({
             />
           )}
 
+          {item.badge === 'REPLY' && isCorr && (
+            <button
+              onClick={e => { e.stopPropagation(); onDraftToggle() }}
+              className={`px-3 py-1 text-xs font-medium border transition-colors ${draftOpen ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            >
+              Draft
+            </button>
+          )}
           <button
             onClick={e => { e.stopPropagation(); onLogToggle() }}
             className={`px-3 py-1 text-xs font-medium border transition-colors ${logOpen ? 'bg-brand-navy border-brand-navy text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
@@ -216,11 +231,20 @@ export function ItemRow({
         </div>
       )}
 
+      {draftOpen && isCorr && (
+        <DraftPanel
+          correspondenceId={item.id}
+          onUseInLog={onUseInLog}
+          onClose={onDraftToggle}
+        />
+      )}
+
       {logOpen && (
         <LogPanel
           businessId={item.business_id}
           contactId={isCorr ? corr!.contact_id : null}
           showMarkDone={isCorr}
+          initialText={logInitialText}
           onSave={onLogSave}
           onCancel={onLogToggle}
         />
