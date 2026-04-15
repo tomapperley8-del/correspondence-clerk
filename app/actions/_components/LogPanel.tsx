@@ -8,12 +8,13 @@ type LogPanelProps = {
   businessId: string
   contactId: string | null
   showMarkDone: boolean
+  initialText?: string
   onSave: (markDone: boolean) => void
   onCancel: () => void
 }
 
-export function LogPanel({ businessId, contactId, showMarkDone, onSave, onCancel }: LogPanelProps) {
-  const [text, setText] = useState('')
+export function LogPanel({ businessId, contactId, showMarkDone, initialText, onSave, onCancel }: LogPanelProps) {
+  const [text, setText] = useState(initialText ?? '')
   const [logType, setLogType] = useState<'Note' | 'Call' | 'Email'>('Note')
   const [logDate, setLogDate] = useState(() => new Date().toISOString().split('T')[0])
   const [logTime, setLogTime] = useState(() => {

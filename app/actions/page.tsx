@@ -29,10 +29,11 @@ export default function ActionsPage() {
 
   const {
     processingId, logOpenId, setLogOpenId,
+    logInitialText, setLogInitialText, draftOpenId, setDraftOpenId,
     snoozeOpenId, setSnoozeOpenId,
     resolutionPendingId,
     handleDone, handleDoneWithResolution, handleResolutionCancel,
-    handleSnooze, handleLogSave,
+    handleSnooze, handleLogSave, handleUseInLog,
   } = useActionHandlers({
     removeItem,
     onClearFocus: (id) => clearFocusRef.current(id),
@@ -116,17 +117,21 @@ export default function ActionsPage() {
                 item={item}
                 focused={focusedId === item.id}
                 logOpen={logOpenId === item.id}
+                draftOpen={draftOpenId === item.id}
                 snoozeOpen={snoozeOpenId === item.id}
                 processing={processingId === item.id}
                 resolutionPending={resolutionPendingId === item.id}
+                logInitialText={logOpenId === item.id ? logInitialText : undefined}
                 onFocus={() => setFocusedId(item.id)}
                 onDone={() => handleDone(item)}
                 onDoneWithResolution={res => handleDoneWithResolution(item, res)}
                 onResolutionCancel={() => handleResolutionCancel(item.id)}
                 onSnooze={days => handleSnooze(item.id, days)}
                 onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
+                onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
                 onLogSave={markDone => handleLogSave(item, markDone)}
+                onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
+                onUseInLog={draft => handleUseInLog(item.id, draft)}
               />
             ))}
           </CollapsibleSection>
@@ -139,17 +144,21 @@ export default function ActionsPage() {
                 item={item}
                 focused={focusedId === item.id}
                 logOpen={logOpenId === item.id}
+                draftOpen={draftOpenId === item.id}
                 snoozeOpen={snoozeOpenId === item.id}
                 processing={processingId === item.id}
                 resolutionPending={resolutionPendingId === item.id}
+                logInitialText={logOpenId === item.id ? logInitialText : undefined}
                 onFocus={() => setFocusedId(item.id)}
                 onDone={() => handleDone(item)}
                 onDoneWithResolution={res => handleDoneWithResolution(item, res)}
                 onResolutionCancel={() => handleResolutionCancel(item.id)}
                 onSnooze={days => handleSnooze(item.id, days)}
                 onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
+                onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
                 onLogSave={markDone => handleLogSave(item, markDone)}
+                onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
+                onUseInLog={draft => handleUseInLog(item.id, draft)}
               />
             ))}
           </CollapsibleSection>
@@ -162,17 +171,21 @@ export default function ActionsPage() {
                 item={item}
                 focused={focusedId === item.id}
                 logOpen={logOpenId === item.id}
+                draftOpen={draftOpenId === item.id}
                 snoozeOpen={snoozeOpenId === item.id}
                 processing={processingId === item.id}
                 resolutionPending={resolutionPendingId === item.id}
+                logInitialText={logOpenId === item.id ? logInitialText : undefined}
                 onFocus={() => setFocusedId(item.id)}
                 onDone={() => handleDone(item)}
                 onDoneWithResolution={res => handleDoneWithResolution(item, res)}
                 onResolutionCancel={() => handleResolutionCancel(item.id)}
                 onSnooze={days => handleSnooze(item.id, days)}
                 onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
+                onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
                 onLogSave={markDone => handleLogSave(item, markDone)}
+                onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
+                onUseInLog={draft => handleUseInLog(item.id, draft)}
               />
             ))}
           </CollapsibleSection>
@@ -203,17 +216,21 @@ export default function ActionsPage() {
                 item={item}
                 focused={focusedId === item.id}
                 logOpen={logOpenId === item.id}
+                draftOpen={draftOpenId === item.id}
                 snoozeOpen={snoozeOpenId === item.id}
                 processing={processingId === item.id}
                 resolutionPending={resolutionPendingId === item.id}
+                logInitialText={logOpenId === item.id ? logInitialText : undefined}
                 onFocus={() => setFocusedId(item.id)}
                 onDone={() => handleDone(item)}
                 onDoneWithResolution={res => handleDoneWithResolution(item, res)}
                 onResolutionCancel={() => handleResolutionCancel(item.id)}
                 onSnooze={days => handleSnooze(item.id, days)}
                 onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
+                onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
                 onLogSave={markDone => handleLogSave(item, markDone)}
+                onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
+                onUseInLog={draft => handleUseInLog(item.id, draft)}
               />
             ))}
           </CollapsibleSection>

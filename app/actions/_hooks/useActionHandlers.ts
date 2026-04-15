@@ -18,6 +18,8 @@ export function useActionHandlers({
 }) {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [logOpenId, setLogOpenId] = useState<string | null>(null)
+  const [logInitialText, setLogInitialText] = useState<string>('')
+  const [draftOpenId, setDraftOpenId] = useState<string | null>(null)
   const [snoozeOpenId, setSnoozeOpenId] = useState<string | null>(null)
   // Resolution picker: shown for invoice/waiting_on_them, and for contract items
   const [resolutionPendingId, setResolutionPendingId] = useState<string | null>(null)
@@ -60,6 +62,12 @@ export function useActionHandlers({
     setResolutionPendingId(null)
   }
 
+  function handleUseInLog(id: string, draft: string) {
+    setDraftOpenId(null)
+    setLogInitialText(draft)
+    setLogOpenId(id)
+  }
+
   async function _markDone(item: UnifiedItem, resolution?: string) {
     if (item.kind !== 'correspondence') return
     setProcessingId(item.id)
@@ -69,6 +77,7 @@ export function useActionHandlers({
     } else {
       removeItem(item.id)
       if (logOpenId === item.id) setLogOpenId(null)
+      if (draftOpenId === item.id) setDraftOpenId(null)
       onClearFocus(item.id)
       toast.success('Marked done')
     }
@@ -118,6 +127,7 @@ export function useActionHandlers({
   function handleLogSave(item: UnifiedItem, markDone: boolean) {
     removeItem(item.id)
     setLogOpenId(null)
+    setLogInitialText('')
     onClearFocus(item.id)
     toast.success('Logged')
     if (markDone && item.kind === 'correspondence') {
@@ -129,6 +139,10 @@ export function useActionHandlers({
     processingId,
     logOpenId,
     setLogOpenId,
+    logInitialText,
+    setLogInitialText,
+    draftOpenId,
+    setDraftOpenId,
     snoozeOpenId,
     setSnoozeOpenId,
     resolutionPendingId,
@@ -137,5 +151,6 @@ export function useActionHandlers({
     handleResolutionCancel,
     handleSnooze,
     handleLogSave,
+    handleUseInLog,
   }
 }
