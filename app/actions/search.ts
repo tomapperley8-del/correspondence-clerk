@@ -41,7 +41,7 @@ interface CorrespondenceSearchResult {
   type: 'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note' | null
   business_id: string
   businesses: { name: string }
-  contacts: { name: string }
+  contacts: { name: string } | null
 }
 
 /**
@@ -106,7 +106,7 @@ export async function searchAll(query: string, filters?: SearchFilters) {
       type,
       business_id,
       businesses!inner(name),
-      contacts!inner(name)
+      contacts(name)
     `
     )
     .eq('organization_id', orgId)
@@ -166,7 +166,7 @@ export async function searchAll(query: string, filters?: SearchFilters) {
       snippet,
       business_id: c.business_id,
       business_name: c.businesses?.name || 'Unknown Business',
-      contact_name: c.contacts?.name || 'Unknown Contact',
+      contact_name: c.contacts?.name || undefined,
       entry_date: c.entry_date ?? undefined,
       direction: c.direction ?? undefined,
       correspondence_type: c.type ?? undefined,
