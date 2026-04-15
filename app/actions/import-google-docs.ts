@@ -214,8 +214,8 @@ async function processDocumentsData(
             .from('contacts')
             .select('id')
             .eq('business_id', business.id)
-            .ilike('email', contactInfo.email)
-            .single()
+            .filter('emails', 'cs', JSON.stringify([contactInfo.email.toLowerCase()]))
+            .maybeSingle()
 
           if (existingContact) {
             contactId = existingContact.id
