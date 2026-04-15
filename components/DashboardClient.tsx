@@ -47,6 +47,14 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
   const allDone = hasBusiness && hasContact && hasEntry
   const [checklistDismissed, setChecklistDismissed] = useState(true) // start hidden, read from localStorage
 
+  // Auto-dismiss checklist once all steps complete
+  useEffect(() => {
+    if (allDone && !checklistDismissed) {
+      localStorage.setItem('checklist_dismissed', 'true')
+      setChecklistDismissed(true)
+    }
+  }, [allDone, checklistDismissed])
+
   // New entries badge: tracks which businesses have activity since last visit
   const [hasNewEntries, setHasNewEntries] = useState<Set<string>>(new Set())
 
@@ -199,8 +207,8 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
         </div>
       </div>
 
-      {/* Onboarding checklist — hidden when dismissed */}
-      {!checklistDismissed && (
+      {/* Onboarding checklist — only for new users (1–5 businesses), hidden once dismissed or all steps done */}
+      {!checklistDismissed && businesses.length > 0 && businesses.length <= 5 && (
         <div
           className="mb-6 rounded-sm border px-5 py-4"
           style={{ backgroundColor: '#F0F4F0', borderColor: 'rgba(124,154,94,0.3)' }}
