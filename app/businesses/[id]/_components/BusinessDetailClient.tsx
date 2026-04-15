@@ -774,7 +774,6 @@ export function BusinessDetailClient({
               viewMode={viewMode}
               setViewMode={setViewMode}
               threadsCount={threads.length}
-              exportProps={{ businessId: business.id }}
             />
 
             {viewMode === 'threads' ? (
