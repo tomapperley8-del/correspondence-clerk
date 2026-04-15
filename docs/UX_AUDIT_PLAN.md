@@ -81,7 +81,7 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 - Cap display at `20+` so it doesn't keep climbing
 - Consider making the badge amber rather than red for counts under a threshold (e.g., red only when something is genuinely overdue)
 
-### P3.2 — Needs Reply section is a wall of text
+### ✅ P3.2 — Needs Reply section is a wall of text
 **File:** `app/actions/page.tsx` + `_components/`  
 **Screenshot:** `03-actions.png` (full page — long unbroken list of items with multi-line snippets)  
 **Issue:** With 30+ items all fully expanded showing multi-line snippets, the Needs Reply section is overwhelming. Items blend into each other without clear visual boundaries.  
@@ -94,19 +94,19 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 
 ## Phase 4 — Business Page
 
-### P4.1 — Correspondence filter bar has too many controls
+### ✅ P4.1 — Correspondence filter bar has too many controls
 **Files:** `app/businesses/[id]/_components/FilterBar.tsx` (or equivalent)  
 **Screenshot:** `12-business-page-scrolled.png` (Correspondence section — full filter bar visible above entries)  
 **Issue:** Sort (2 toggle buttons) + Direction (3 toggle buttons) + Show (4 buttons + Custom) + Contact dropdown = 10+ visible controls above the correspondence list on every page load.  
 **Fix:** Collapse to a single "Filter & Sort" button that opens a compact dropdown/popover showing all the options. Show active filter state on the collapsed button (e.g., "Newest · All · 12 Months"). Most users never change these from defaults — they shouldn't dominate the UI.
 
-### P4.2 — Export button is the wrong visual weight
+### ✅ P4.2 — Export button is the wrong visual weight
 **File:** `app/businesses/[id]/page.tsx` or `_components/`  
 **Screenshot:** `12-business-page-scrolled.png` (Correspondence header — green Export button same weight as navy New Entry)  
 **Issue:** The Export button uses the same olive/green accent fill as primary actions, making it visually compete with "New Entry". Export is a rare action.  
 **Fix:** Change Export to a ghost/outline button style. The hierarchy in the Correspondence header should be: New Entry (primary, navy) → Insights (secondary outline) → Export (ghost/text).
 
-### P4.3 — "Today" floating button is oddly positioned
+### ✅ P4.3 — "Today" floating button is oddly positioned
 **File:** `app/businesses/[id]/page.tsx` or `_components/`  
 **Screenshot:** `12-business-page-scrolled.png` (bottom-left corner — "↑ Today" button)  
 **Issue:** The floating `↑ Today` button sits bottom-left, which is unconventional (floating actions are usually bottom-right). Its purpose isn't immediately obvious.  
