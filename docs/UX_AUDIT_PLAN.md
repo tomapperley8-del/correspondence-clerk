@@ -144,7 +144,7 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 
 ## Phase 6 — Insights Page
 
-### P6.1 — Insight cards are empty and inert
+### ✅ P6.1 — Insight cards are empty and inert
 **File:** `app/daily-briefing/page.tsx` (Insights page)  
 **Screenshot:** `08-daily-briefing.png` (8 identical blank cards, all showing "Generated Xd ago" with no content)  
 **Issue:** All 8 cards look identical. Most show "Generated 5d ago" with no content preview — the card is completely blank until you generate. Users can't tell if the insights are stale or relevant without clicking Generate. The page has very low information density.  
@@ -157,7 +157,7 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 
 ## Phase 7 — Import Pages
 
-### P7.1 — Gmail and Outlook import pages are nearly empty
+### ✅ P7.1 — Gmail and Outlook import pages are nearly empty
 **Files:** `app/import/gmail/page.tsx`, `app/import/outlook/page.tsx`  
 **Screenshots:** `09-import-gmail.png`, `10-import-outlook.png` (single button on a nearly empty page)  
 **Issue:** A single "Connect Gmail/Outlook" button centred on a vast white page. No context about what happens after connecting — how many emails, what the review process looks like, whether it's reversible.  
@@ -172,7 +172,7 @@ This is a trust-building moment — users are about to grant email access. Give 
 
 ## Phase 8 — New Entry
 
-### P8.1 — Step indicator is decorative and misleading
+### ✅ P8.1 — Step indicator is decorative and misleading
 **File:** `app/new-entry/page.tsx`  
 **Screenshot:** `04-new-entry.png` (top of form — step indicator above a fully-rendered single-page form)  
 **Issue:** The "1 Business → 2 Contact → 3 Correspondence" step indicator at the top of New Entry implies a wizard/multi-step flow, but the entire form renders at once. For a first-time user this is confusing — they might think they need to complete step 1 before step 2 becomes available (Contact is indeed disabled until a business is selected, which reinforces this expectation).  
