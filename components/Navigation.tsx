@@ -109,13 +109,21 @@ export function Navigation() {
     router.refresh()
   }
 
-  // Don't show navigation on auth pages, onboarding, or invite pages
+  // Don't show navigation on auth pages, onboarding, invite pages, or marketing pages
   if (
+    pathname === '/' ||
     pathname === '/login' ||
     pathname === '/signup' ||
+    pathname === '/pricing' ||
+    pathname === '/features' ||
     pathname?.startsWith('/auth/') ||
     pathname?.startsWith('/onboarding/') ||
-    pathname?.startsWith('/invite/')
+    pathname?.startsWith('/invite/') ||
+    pathname?.startsWith('/for/') ||
+    pathname?.startsWith('/blog') ||
+    pathname?.startsWith('/tools/') ||
+    pathname?.startsWith('/terms') ||
+    pathname?.startsWith('/privacy')
   ) {
     return null
   }
