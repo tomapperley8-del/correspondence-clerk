@@ -79,6 +79,22 @@ export default function OutlookImportPage() {
           >
             Connect Outlook
           </a>
+
+          <div className="mt-8 border-t border-gray-100 pt-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">What happens next</p>
+            <ol className="space-y-3">
+              {[
+                { n: 1, text: 'We scan your email headers only — subject lines, senders, and dates. Email bodies are never read.' },
+                { n: 2, text: 'You review the suggested businesses and contacts and choose exactly what to import.' },
+                { n: 3, text: 'Emails are filed to the right business and contact. Nothing is sent or deleted.' },
+              ].map(({ n, text }) => (
+                <li key={n} className="flex gap-3">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-brand-navy/10 text-brand-navy text-xs font-semibold flex items-center justify-center mt-0.5">{n}</span>
+                  <span className="text-sm text-gray-600">{text}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </div>
     )
