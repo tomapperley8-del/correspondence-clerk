@@ -4,12 +4,17 @@
  * server actions and API routes without 'use server' restrictions.
  */
 
-// Personal email domains — never mapped to a business
+// Personal email domains and notification service domains — never mapped to a business
 const PERSONAL_DOMAINS = new Set([
   'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.uk', 'yahoo.co.in',
   'hotmail.com', 'hotmail.co.uk', 'outlook.com', 'live.com', 'live.co.uk',
   'icloud.com', 'me.com', 'mac.com', 'msn.com',
   'protonmail.com', 'proton.me', 'fastmail.com', 'aol.com',
+  // Transactional/notification services — emails from these should never be
+  // mapped to a business as they're shared infrastructure, not a sender identity
+  'notification.intuit.com', 'intuit.com', 'quickbooks.com',
+  'mailchimp.com', 'mandrillapp.com', 'sendgrid.net', 'amazonses.com',
+  'bounce.gmail.com', 'noreply.github.com',
 ])
 
 export function isPersonalDomain(domain: string): boolean {

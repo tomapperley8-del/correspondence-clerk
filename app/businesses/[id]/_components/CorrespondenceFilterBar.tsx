@@ -77,7 +77,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
   }
 
   function ToggleGroup({ children }: { children: React.ReactNode }) {
-    return <div className="flex border border-gray-300">{children}</div>
+    return <div className="flex border border-gray-300 rounded overflow-hidden">{children}</div>
   }
 
   function ToggleBtn({
@@ -87,7 +87,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
       <button
         type="button"
         onClick={onClick}
-        className={`px-3 py-1 text-xs font-medium border-l first:border-l-0 border-gray-300 transition-colors ${
+        className={`px-3 py-1.5 text-xs font-medium border-l first:border-l-0 border-gray-300 transition-colors ${
           active ? 'bg-brand-navy text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
         }`}
       >
