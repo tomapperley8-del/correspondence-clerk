@@ -38,6 +38,7 @@ export default function SettingsPage() {
   const [isSavingBriefing, setIsSavingBriefing] = useState(false)
   const [blockedSenders, setBlockedSenders] = useState<{ id: string; email: string; created_at: string | null }[]>([])
   const [unblockingId, setUnblockingId] = useState<string | null>(null)
+  const [blockedSendersExpanded, setBlockedSendersExpanded] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
   const [scanDone, setScanDone] = useState(false)
   const [scanAutoApplied, setScanAutoApplied] = useState(0)
@@ -565,43 +566,60 @@ export default function SettingsPage() {
       </div>
 
       {/* Blocked Senders */}
-      <div className="bg-white border border-gray-200 p-6 mb-6">
-        <h2 className="text-xl font-bold mb-2 text-gray-900">Blocked Senders</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Emails from these addresses are automatically discarded when forwarded to your inbox.
-        </p>
-        {blockedSenders.length === 0 ? (
-          <p className="text-sm text-gray-500">No blocked senders.</p>
-        ) : (
-          <div className="space-y-2">
-            {blockedSenders.map(sender => (
-              <div
-                key={sender.id}
-                className="flex items-center justify-between py-2 px-3 rounded-sm"
-                style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}
-              >
-                <div>
-                  <span className="text-sm font-medium text-gray-900">{sender.email}</span>
-                  {sender.created_at && (
-                    <span className="text-xs text-gray-400 ml-3">
-                      Blocked {formatLastReceived(sender.created_at)}
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => handleUnblock(sender.id, sender.email)}
-                  disabled={unblockingId === sender.id}
-                  className="text-sm font-medium px-3 py-1 rounded-sm transition-colors"
-                  style={{
-                    color: unblockingId === sender.id ? 'rgba(0,0,0,0.3)' : 'rgba(180,0,0,0.7)',
-                    border: '1px solid rgba(180,0,0,0.2)',
-                    cursor: unblockingId === sender.id ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {unblockingId === sender.id ? 'Unblocking…' : 'Unblock'}
-                </button>
+      <div className="bg-white border border-gray-200 mb-6">
+        <button
+          onClick={() => setBlockedSendersExpanded(v => !v)}
+          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition-colors"
+        >
+          <div>
+            <span className="text-xl font-bold text-gray-900">Blocked Senders</span>
+            {blockedSenders.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-500">({blockedSenders.length})</span>
+            )}
+          </div>
+          <span className="text-gray-400 text-sm ml-4 shrink-0">
+            {blockedSendersExpanded ? 'Hide ▲' : 'Manage ▼'}
+          </span>
+        </button>
+        {blockedSendersExpanded && (
+          <div className="px-6 pb-6 border-t border-gray-100">
+            <p className="text-sm text-gray-600 my-4">
+              Emails from these addresses are automatically discarded when forwarded to your inbox.
+            </p>
+            {blockedSenders.length === 0 ? (
+              <p className="text-sm text-gray-500">No blocked senders.</p>
+            ) : (
+              <div className="space-y-2">
+                {blockedSenders.map(sender => (
+                  <div
+                    key={sender.id}
+                    className="flex items-center justify-between py-2 px-3 rounded-sm"
+                    style={{ background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}
+                  >
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{sender.email}</span>
+                      {sender.created_at && (
+                        <span className="text-xs text-gray-400 ml-3">
+                          Blocked {formatLastReceived(sender.created_at)}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleUnblock(sender.id, sender.email)}
+                      disabled={unblockingId === sender.id}
+                      className="text-sm font-medium px-3 py-1 rounded-sm transition-colors"
+                      style={{
+                        color: unblockingId === sender.id ? 'rgba(0,0,0,0.3)' : 'rgba(180,0,0,0.7)',
+                        border: '1px solid rgba(180,0,0,0.2)',
+                        cursor: unblockingId === sender.id ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {unblockingId === sender.id ? 'Unblocking…' : 'Unblock'}
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
