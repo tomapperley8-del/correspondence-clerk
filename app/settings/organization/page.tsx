@@ -355,25 +355,13 @@ function OrganizationSettingsContent() {
       </p>
 
       {/* Navigation to other settings pages */}
-      <div className="flex gap-2 mb-6 pb-6 border-b-2 border-gray-300">
-        <Link
-          href="/settings"
-          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-brand-navy"
-        >
-          User Profile
-        </Link>
-        <Link
-          href="/settings/organization"
-          className="px-4 py-2 bg-brand-navy text-white font-semibold border-2 border-brand-navy"
-        >
-          Organization
-        </Link>
-        <Link
-          href="/settings/billing"
-          className="px-4 py-2 bg-white text-gray-700 font-semibold border-2 border-gray-300 hover:border-brand-navy"
-        >
-          Billing
-        </Link>
+      <div className="flex gap-1 mb-8 pb-6 border-b-2 border-gray-300 flex-wrap">
+        <Link href="/settings" className="px-4 py-2 font-semibold bg-white text-gray-700 border border-gray-200 hover:border-brand-navy transition-colors">Profile</Link>
+        <Link href="/settings?tab=email" className="px-4 py-2 font-semibold bg-white text-gray-700 border border-gray-200 hover:border-brand-navy transition-colors">Email</Link>
+        <Link href="/settings/organization" className="px-4 py-2 font-semibold bg-brand-navy text-white border border-brand-navy">Organisation</Link>
+        <Link href="/settings?tab=tools" className="px-4 py-2 font-semibold bg-white text-gray-700 border border-gray-200 hover:border-brand-navy transition-colors">Tools</Link>
+        <Link href="/settings/billing" className="px-4 py-2 font-semibold bg-white text-gray-700 border border-gray-200 hover:border-brand-navy transition-colors">Billing</Link>
+        <Link href="/settings?tab=account" className="px-4 py-2 font-semibold bg-white text-gray-700 border border-gray-200 hover:border-brand-navy transition-colors">Account</Link>
       </div>
 
       {error && (
