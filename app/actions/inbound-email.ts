@@ -203,7 +203,10 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
   // Learn email → contact: store sender email in contact record if not already there.
   // This enables future auto-filing for personal-domain senders (gmail etc.)
   // where domain mapping is skipped.
-  if (resolvedContactId && fromEmail && itemDirection === 'received') {
+  // Use item.from_email (resolved by webhook to the original sender) rather than
+  // fromEmail (outer From header, which can be the user's own address for forwarded emails).
+  const senderEmailToLearn = (item.from_email as string | null)?.toLowerCase() ?? ''
+  if (resolvedContactId && senderEmailToLearn && itemDirection === 'received') {
     const { data: contactRow } = await supabase
       .from('contacts')
       .select('emails')
@@ -211,10 +214,10 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
       .single()
     if (contactRow) {
       const existingEmails: string[] = (contactRow.emails as string[]) ?? []
-      if (!existingEmails.map((e: string) => e.toLowerCase()).includes(fromEmail)) {
+      if (!existingEmails.map((e: string) => e.toLowerCase()).includes(senderEmailToLearn)) {
         await supabase
           .from('contacts')
-          .update({ emails: [...existingEmails, fromEmail] })
+          .update({ emails: [...existingEmails, senderEmailToLearn] })
           .eq('id', resolvedContactId)
       }
     }
