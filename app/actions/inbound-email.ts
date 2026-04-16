@@ -469,10 +469,13 @@ export async function blockSenderEmail(email: string): Promise<{ error?: string 
 
   const normalised = email.trim().toLowerCase()
 
-  // Upsert block rule
-  const { error } = await supabase
+  // Insert block rule — ignore conflict if already blocked (avoids UPDATE RLS path)
+  const { error: insertError } = await supabase
     .from('blocked_senders')
-    .upsert({ org_id: orgId, email: normalised }, { onConflict: 'org_id,email' })
+    .insert({ org_id: orgId, email: normalised })
+
+  // 23505 = unique_violation — sender already blocked, that's fine
+  const error = insertError && insertError.code !== '23505' ? insertError : null
 
   if (error) return { error: error.message }
 
