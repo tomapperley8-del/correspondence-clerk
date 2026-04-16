@@ -708,7 +708,38 @@ export default function NewEntryPage() {
   return (
     <Suspense fallback={
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <p className="text-gray-600">Loading...</p>
+        <div className="h-8 w-32 bg-gray-200 animate-pulse rounded-sm mb-6" />
+        <div className="space-y-6">
+          <div className="animate-pulse">
+            <div className="h-5 w-24 bg-gray-200 rounded-sm mb-2" />
+            <div className="h-10 w-full bg-gray-200 rounded-sm" />
+          </div>
+          <div className="animate-pulse">
+            <div className="h-5 w-24 bg-gray-200 rounded-sm mb-2" />
+            <div className="h-10 w-full bg-gray-200 rounded-sm" />
+          </div>
+          <div className="bg-gray-50 border border-gray-200 p-6 animate-pulse rounded-sm">
+            <div className="h-6 w-28 bg-gray-200 rounded-sm mb-4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <div className="h-5 w-20 bg-gray-200 rounded-sm mb-2" />
+                <div className="h-10 w-full bg-gray-200 rounded-sm" />
+              </div>
+              <div>
+                <div className="h-5 w-20 bg-gray-200 rounded-sm mb-2" />
+                <div className="h-10 w-full bg-gray-200 rounded-sm" />
+              </div>
+            </div>
+          </div>
+          <div className="animate-pulse">
+            <div className="h-5 w-24 bg-gray-200 rounded-sm mb-2" />
+            <div className="h-72 w-full bg-gray-200 rounded-sm" />
+          </div>
+          <div className="flex gap-4 animate-pulse">
+            <div className="h-12 w-32 bg-gray-200 rounded-sm" />
+            <div className="h-12 w-24 bg-gray-200 rounded-sm" />
+          </div>
+        </div>
       </div>
     }>
       <NewEntryPageContent />

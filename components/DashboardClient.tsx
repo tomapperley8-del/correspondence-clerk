@@ -344,7 +344,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
               href="/new-entry"
               className="inline-block text-center px-5 py-2.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-dark transition-colors"
             >
-              Add your first business
+              Add a business and first entry
             </Link>
             <Link
               href="/import"
