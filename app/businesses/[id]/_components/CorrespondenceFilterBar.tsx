@@ -77,7 +77,7 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
   }
 
   function ToggleGroup({ children }: { children: React.ReactNode }) {
-    return <div className="flex border border-gray-300 rounded overflow-hidden">{children}</div>
+    return <div className="inline-flex border border-gray-300 rounded overflow-hidden">{children}</div>
   }
 
   function ToggleBtn({
