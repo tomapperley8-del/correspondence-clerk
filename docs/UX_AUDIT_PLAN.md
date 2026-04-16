@@ -116,13 +116,13 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 
 ## Phase 5 — Settings Page
 
-### P5.1 — Blocked Senders dominates the page
+### ✅ P5.1 — Blocked Senders dominates the page
 **File:** `app/settings/page.tsx`  
 **Screenshot:** `07-settings.png` (full page — blocked senders list occupies ~70% of the scroll)  
 **Issue:** ~50 blocked sender entries take up roughly 70% of the Settings page, pushing all other settings far down.  
 **Fix:** Collapse the Blocked Senders list by default. Show: "Blocked Senders (47) — Manage ▼". Expanding reveals the full list with Unblock buttons. Alternatively, move it into a separate "Email" tab alongside forwarding address and email addresses (these are all email-related settings anyway).
 
-### P5.2 — Settings page needs proper sub-navigation
+### ✅ P5.2 — Settings page needs proper sub-navigation
 **File:** `app/settings/page.tsx`  
 **Screenshot:** `07-settings.png` (full page scroll — unrelated settings grouped together under one tab)  
 **Issue:** The existing three tabs (User Profile / Organisation / Billing) don't meaningfully chunk the content. The User Profile tab contains profile settings, email settings, daily briefing, email forwarding, email addresses, blocked senders, tools, exports, and account deletion — completely unrelated things grouped together because they're "user" settings.  
@@ -134,7 +134,7 @@ Screenshots are in `screenshots-audit/` in the project root. Filenames are refer
 - **Billing** — existing billing tab
 - **Account** — delete account (isolated, deliberate)
 
-### P5.3 — Delete Account button is too accessible
+### ✅ P5.3 — Delete Account button is too accessible
 **File:** `app/settings/page.tsx`  
 **Screenshot:** `07-settings.png` (bottom of page — red Delete button in the main settings flow)  
 **Issue:** The red "Delete my account" button sits at the bottom of the main settings scroll, one stray click away.  
