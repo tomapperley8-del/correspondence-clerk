@@ -9,6 +9,7 @@ export type CacheStatus = {
   generatedAt: string | null
   ageMinutes: number | null
   isExpired: boolean
+  contentSnippet: string | null
 }
 
 export type UserAIPreset = {
@@ -35,7 +36,7 @@ export async function getInsightCacheStatus(
 
   let query = supabase
     .from('insight_cache')
-    .select('insight_type, generated_at')
+    .select('insight_type, generated_at, content')
     .eq('org_id', organizationId)
     .in('insight_type', types)
 
@@ -53,17 +54,19 @@ export async function getInsightCacheStatus(
   for (const type of types) {
     const row = data?.find((r) => r.insight_type === type)
     if (!row) {
-      result[type] = { generatedAt: null, ageMinutes: null, isExpired: true }
+      result[type] = { generatedAt: null, ageMinutes: null, isExpired: true, contentSnippet: null }
       continue
     }
     const ageMs = now - new Date(row.generated_at).getTime()
     const ageMinutes = Math.floor(ageMs / 60000)
     const dispatchType = type.startsWith('custom_') ? 'custom' : (type as InsightType)
     const ttlHours = INSIGHT_METADATA[dispatchType]?.cacheTtlHours ?? 24
+    const rawSnippet = row.content ? row.content.replace(/[#*_`]/g, '').replace(/\n+/g, ' ').trim().slice(0, 120) : null
     result[type] = {
       generatedAt: row.generated_at,
       ageMinutes,
       isExpired: ageMs > ttlHours * 3600000,
+      contentSnippet: rawSnippet,
     }
   }
 

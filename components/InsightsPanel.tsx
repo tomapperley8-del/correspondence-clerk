@@ -143,6 +143,23 @@ function InsightCard({
 
   const isExpired = cacheStatus?.isExpired !== false
 
+  // Staleness dot: green = generated today, amber = 2-7 days, grey = 7+ days, none = never generated
+  const stalenessMinutes = cardState.generatedAt
+    ? Math.floor((Date.now() - new Date(cardState.generatedAt).getTime()) / 60000)
+    : cacheStatus?.ageMinutes ?? null
+  const stalenessDot = stalenessMinutes === null
+    ? null
+    : stalenessMinutes < 60 * 24
+    ? 'bg-green-400'
+    : stalenessMinutes < 60 * 24 * 7
+    ? 'bg-amber-400'
+    : 'bg-gray-300'
+
+  // Content snippet: prefer live cardState content, fall back to cached snippet
+  const contentSnippet = (cardState.status === 'loaded' && cardState.content)
+    ? cardState.content.replace(/[#*_`]/g, '').replace(/\n+/g, ' ').trim().slice(0, 120)
+    : cacheStatus?.contentSnippet ?? null
+
   // Reset history state when card collapses
   useEffect(() => {
     if (!isExpanded) {
@@ -299,10 +316,17 @@ function InsightCard({
       style={{ border: '1px solid rgba(0,0,0,0.08)' }}
       onClick={() => hasContent && !isLoading && onExpand(insightType)}
     >
-      <div>
+      <div className="flex items-start justify-between gap-1">
         <h4 className="font-semibold text-sm text-brand-dark leading-tight">{label}</h4>
-        <p className="text-xs text-gray-400 mt-0.5 leading-snug">{description}</p>
+        {stalenessDot && (
+          <span className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${stalenessDot}`} title={ageText} />
+        )}
       </div>
+      {contentSnippet ? (
+        <p className="text-xs text-gray-500 leading-snug line-clamp-2">{contentSnippet}</p>
+      ) : (
+        <p className="text-xs text-gray-400 leading-snug">{description}</p>
+      )}
       <div className="flex items-center justify-between gap-2 mt-auto">
         <span className={`text-xs ${isExpired ? 'text-gray-400' : 'text-brand-olive'}`}>
           {isLoading ? 'Generating…' : ageText}
@@ -406,7 +430,7 @@ export function InsightsPanel({ inline = false }: InsightsPanelProps = {}) {
       // Update cache status entry
       setCacheStatus((prev) => ({
         ...prev,
-        [type]: { generatedAt: data.generatedAt, ageMinutes: 0, isExpired: false },
+        [type]: { generatedAt: data.generatedAt, ageMinutes: 0, isExpired: false, contentSnippet: null },
       }))
     } catch {
       setCardStates((prev) => ({
