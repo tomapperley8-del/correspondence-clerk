@@ -690,7 +690,14 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  const discardReason = fromSelf ? null : shouldDiscard(payload, headers)
+  // 7. Detect direction first — BCC sent emails must never hit the spam filter regardless
+  // of whether fromSelf is true. The fromSelf check only catches emails sent from the
+  // exact auth email; sending from an alias (e.g. "Chiswick Calendar Team") sets
+  // fromSelf=false and would incorrectly discard legitimate BCC'd sent emails.
+  const direction = detectDirection(payload, token)
+
+  // Spam filter only applies to inbound received emails, never to BCC'd sent emails.
+  const discardReason = (fromSelf || direction === 'sent') ? null : shouldDiscard(payload, headers)
   if (discardReason) {
     log('[inbound-email] discarded', { reason: discardReason, from: fromEmail })
     await supabase.from('inbound_queue').insert({
@@ -708,16 +715,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({}, { status: 200 })
   }
 
-  // 7. Detect direction
-  // detectDirection checks if the token appears in mail.to/cc:
-  //   - Forwarded received email: Outlook sets To = token address → 'received'
-  //   - BCCed sent email: To shows real recipient, token only in session.recipient → 'sent'
-  // Do NOT override based on fromSelf here — forwarded received emails also come
-  // "from" the user's own address (Outlook is the forwarder), and overriding would
-  // incorrectly mark them as sent.
-  const direction = detectDirection(payload, token)
-
-  log('[inbound-email] direction_detected', { direction, fromEmail })
+  log('[inbound-email] direction_detected', { direction, fromEmail, fromSelf })
 
   // 8. Extract body and recipients
   const strippedBody = stripQuotedContent(payload.text ?? '')
