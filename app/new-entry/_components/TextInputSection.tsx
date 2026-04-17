@@ -21,6 +21,7 @@ type Props = {
   onShouldSplitChange: (v: boolean) => void
   onShowContactModal: () => void
   onSaveUnformatted: () => void
+  onDiscardDraft?: () => void
 }
 
 export function TextInputSection({
@@ -28,7 +29,7 @@ export function TextInputSection({
   threadDetection, shouldSplit,
   formattingError, extractedContacts, contactsAdded,
   selectedBusinessId, businesses, isLoading,
-  onChange, onShouldSplitChange, onShowContactModal, onSaveUnformatted,
+  onChange, onShouldSplitChange, onShowContactModal, onSaveUnformatted, onDiscardDraft,
 }: Props) {
   const businessName = businesses.find((b) => b.id === selectedBusinessId)?.name
 
@@ -38,12 +39,26 @@ export function TextInputSection({
         <Label htmlFor="rawText" className="font-semibold">
           Entry Text <span className="text-red-600">*</span>
         </Label>
-        {draftStatus && (
-          <span className="text-xs text-gray-400 italic">
-            {draftStatus === 'restored' ? 'Draft restored' : 'Draft saved'}
-          </span>
+        {draftStatus === 'saved' && (
+          <span className="text-xs text-gray-400 italic">Draft saved</span>
         )}
       </div>
+      {draftStatus === 'restored' && (
+        <div className="mb-2 flex items-center justify-between gap-3 bg-brand-navy/[0.06] border border-brand-navy/30 px-3 py-2 text-sm">
+          <span className="text-brand-dark">
+            <strong>Draft restored</strong> from an earlier session. Review the text below before saving.
+          </span>
+          {onDiscardDraft && (
+            <button
+              type="button"
+              onClick={onDiscardDraft}
+              className="shrink-0 text-xs font-semibold text-brand-navy hover:text-brand-navy-hover underline underline-offset-2"
+            >
+              Discard draft
+            </button>
+          )}
+        </div>
+      )}
       <textarea
         id="rawText"
         value={rawText}

@@ -829,6 +829,23 @@ export async function buildInsightPrompt(
   const org = await fetchOrgContext(orgId, supabase)
   const orgName = org?.name ?? 'your organisation'
 
+  // All insight prompts get an explicit "today" line prepended to the system
+  // prompt so the AI doesn't hallucinate stale dates from training data.
+  const today = new Date().toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+  const withToday = <T extends { systemPrompt: string }>(result: T): T => ({
+    ...result,
+    systemPrompt: `Today is ${today}. Any date you mention must be consistent with this. ${result.systemPrompt}`,
+  })
+
+  const dispatched = await dispatchBuildInsight()
+  return withToday(dispatched)
+
+  async function dispatchBuildInsight(): Promise<{ systemPrompt: string; userPrompt: string; businessContext?: string }> {
   switch (type) {
     case 'briefing': {
       const [businesses, actions] = await Promise.all([
@@ -944,4 +961,5 @@ ${businessList || 'No businesses found.'}${formatPreviousInsights(previousInsigh
   }
 
   throw new Error(`Unknown insight type: ${type}`)
+  }
 }

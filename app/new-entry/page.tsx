@@ -110,11 +110,22 @@ function NewEntryPageContent() {
       if (draft.subject) setSubject(draft.subject)
       if (draft.entryType) setEntryType(draft.entryType as typeof entryType)
       if (draft.direction) setDirection(draft.direction as typeof direction)
-      if (draft.entryDateOnly) setEntryDateOnly(draft.entryDateOnly)
       if (draft.actionNeeded) setActionNeeded(draft.actionNeeded as typeof actionNeeded)
+      // entryDateOnly is deliberately not restored — always default to today.
     },
     hasEmailImport
   )
+
+  const handleDiscardDraft = () => {
+    clearDraft()
+    setRawText('')
+    setSubject('')
+    setEntryType('')
+    setDirection('')
+    setActionNeeded('none')
+    setEntryDateOnly(new Date().toISOString().slice(0, 10))
+    setIsDirty(false)
+  }
 
   // --- Apply email data to form fields ---
   const applyEmailData = useCallback(async (data: ParsedEmailData) => {
@@ -575,6 +586,7 @@ function NewEntryPageContent() {
           onShouldSplitChange={setShouldSplit}
           onShowContactModal={() => setShowContactModal(true)}
           onSaveUnformatted={handleSaveUnformatted}
+          onDiscardDraft={handleDiscardDraft}
         />
 
         {/* Optional Details */}

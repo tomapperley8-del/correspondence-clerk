@@ -8,17 +8,26 @@ interface ContractStatusBadgeProps {
   isCurrent?: boolean
 }
 
+// Parse YYYY-MM-DD (ignoring any time component) into a local-midnight Date so
+// comparisons don't slip by a day in timezones behind UTC.
+function parseLocalDate(isoDate: string): Date {
+  const [y, m, d] = isoDate.slice(0, 10).split('-').map((n) => parseInt(n, 10))
+  return new Date(y, (m || 1) - 1, d || 1)
+}
+
 export function ContractStatusBadge({ startDate, endDate, isCurrent = true }: ContractStatusBadgeProps) {
   const status = useMemo(() => {
-    const start = new Date(startDate)
-    const end = new Date(endDate)
-    const today = new Date()
+    const start = parseLocalDate(startDate)
+    const end = parseLocalDate(endDate)
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-    const daysRemaining = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    const isExpired = today > end
+    const msPerDay = 1000 * 60 * 60 * 24
+    const daysRemaining = Math.round((end.getTime() - today.getTime()) / msPerDay)
+    // The contract is valid through the whole of its end date (inclusive).
+    const isExpired = daysRemaining < 0
     const isExpiringSoon = !isExpired && daysRemaining <= 90
 
-    // Format dates in DD/MM/YYYY
     const formatDate = (d: Date) => d.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: '2-digit',
@@ -32,6 +41,9 @@ export function ContractStatusBadge({ startDate, endDate, isCurrent = true }: Co
       const daysOverdue = Math.abs(daysRemaining)
       badgeText = `Expired ${daysOverdue} day${daysOverdue === 1 ? '' : 's'} ago`
       colorScheme = 'red'
+    } else if (daysRemaining === 0) {
+      badgeText = 'Ends today'
+      colorScheme = 'yellow'
     } else if (isExpiringSoon) {
       badgeText = `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining`
       colorScheme = 'yellow'
