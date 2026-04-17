@@ -22,12 +22,14 @@ export default function SearchPage() {
   const [sortBy, setSortBy] = useState<'relevance' | 'date_newest' | 'date_oldest'>('relevance')
   const [showFilters, setShowFilters] = useState(false)
 
+  const hasActiveFilters = dateFrom || dateTo || direction || type || sortBy !== 'relevance'
+  const hasBrowseFilters = dateFrom || dateTo || direction || type
+  const canSubmit = query.trim().length >= 2 || !!hasBrowseFilters
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!query.trim()) {
-      return
-    }
+    if (!canSubmit) return
 
     setIsSearching(true)
     setHasSearched(true)
@@ -61,8 +63,6 @@ export default function SearchPage() {
     setSortBy('relevance')
   }
 
-  const hasActiveFilters = dateFrom || dateTo || direction || type || sortBy !== 'relevance'
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-2xl font-bold text-brand-dark mb-6">Search</h1>
@@ -74,16 +74,16 @@ export default function SearchPage() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search businesses or correspondence..."
+            placeholder="Search — or leave blank and use filters to browse by date"
             className="flex-1 px-4 py-3 text-lg"
             aria-label="Search query"
           />
           <Button
             type="submit"
-            disabled={isSearching || !query.trim()}
+            disabled={isSearching || !canSubmit}
             className="bg-brand-navy text-white hover:bg-brand-navy-hover px-8 py-3 text-lg font-semibold"
           >
-            {isSearching ? 'Searching...' : 'Search'}
+            {isSearching ? 'Searching...' : query.trim() ? 'Search' : 'Browse'}
           </Button>
         </div>
 
@@ -200,7 +200,7 @@ export default function SearchPage() {
             Search across all businesses and correspondence entries.
           </p>
           <p className="text-gray-500 text-sm mt-2">
-            Use filters to narrow results by date, direction, or type.
+            Or leave the search box empty and apply a date range to browse everything from that period.
           </p>
         </div>
       )}
@@ -232,9 +232,11 @@ export default function SearchPage() {
         <div className="bg-white border border-black/[0.06] p-6">
           {/* Result count */}
           <p className="text-sm text-gray-600 mb-4" aria-live="polite">
-            {results.length === 0
-              ? `No results found for "${query}"`
-              : `Found ${results.length} result${results.length !== 1 ? 's' : ''} for "${query}"`}
+            {(() => {
+              const label = query.trim() ? `for "${query.trim()}"` : 'matching your filters'
+              if (results.length === 0) return `No results ${label}`
+              return `Found ${results.length} result${results.length !== 1 ? 's' : ''} ${label}`
+            })()}
           </p>
 
           {results.length > 0 && (
