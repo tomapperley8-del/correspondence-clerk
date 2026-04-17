@@ -40,7 +40,7 @@ interface CorrespondenceSearchResult {
   direction: 'received' | 'sent' | null
   type: 'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note' | null
   business_id: string
-  businesses: { name: string }
+  businesses: { name: string } | null
   contacts: { name: string } | null
 }
 
@@ -105,7 +105,7 @@ export async function searchAll(query: string, filters?: SearchFilters) {
       direction,
       type,
       business_id,
-      businesses!inner(name),
+      businesses(name),
       contacts(name)
     `
     )

@@ -399,7 +399,7 @@ function SettingsPageContent() {
             <p className="text-sm text-gray-600 mb-5">
               One address handles both directions. Forward received emails to it, or BCC it on emails you send.
               Either way they auto-file once a domain is recognised — or land in your{' '}
-              <Link href="/inbox" className="underline" style={{ color: 'var(--brand-navy)' }}>Inbox</Link>{' '}
+              <Link href="/inbox" className="underline" style={{ color: '#2C4A6E' }}>Inbox</Link>{' '}
               for manual filing.
             </p>
 
