@@ -54,7 +54,13 @@ type ForwardEmailPayload = {
 function verifySignature(rawBody: string, signature: string): boolean {
   const secret = process.env.FORWARD_EMAIL_WEBHOOK_SECRET
   if (!secret) {
-    console.warn('FORWARD_EMAIL_WEBHOOK_SECRET not set — skipping signature verification. Set this env var in Vercel dashboard to secure the webhook.')
+    // In production, a missing secret means the env var hasn't been set yet —
+    // reject all requests until it is. In development, warn and pass through.
+    if (process.env.NODE_ENV === 'production') {
+      console.error('FORWARD_EMAIL_WEBHOOK_SECRET not set in production — rejecting request. Set this env var in Vercel dashboard.')
+      return false
+    }
+    console.warn('FORWARD_EMAIL_WEBHOOK_SECRET not set — skipping signature verification (dev only).')
     return true
   }
   if (!signature) return false
