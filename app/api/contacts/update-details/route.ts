@@ -57,7 +57,7 @@ export async function PATCH(request: Request) {
     }
 
     if (emails !== undefined) {
-      updateData.emails = emails.filter((e: string) => e.trim())
+      updateData.emails = emails.filter((e: string) => e.trim()).map((e: string) => e.toLowerCase())
       updateData.normalized_email = emails[0] ? emails[0].toLowerCase() : null
     }
 

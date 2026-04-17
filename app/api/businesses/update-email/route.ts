@@ -48,7 +48,7 @@ export async function PATCH(request: Request) {
     // Update business email
     const { data, error } = await supabase
       .from('businesses')
-      .update({ email })
+      .update({ email: email.toLowerCase() })
       .eq('id', businessId)
       .eq('organization_id', orgId)
       .select()
