@@ -115,7 +115,8 @@
       "WebFetch(domain:improvmx.com)",
       "Bash(set -a)",
       "Bash(source .env.local)",
-      "Bash(DOTENV_CONFIG_PATH=.env.local npx tsx scripts/run-migrations.ts)"
+      "Bash(DOTENV_CONFIG_PATH=.env.local npx tsx scripts/run-migrations.ts)",
+      "Bash(git *)"
     ]
   }
 }
