@@ -51,27 +51,23 @@ type ForwardEmailPayload = {
 // ---------------------------------------------------------------------------
 // Signature verification (HMAC-SHA256)
 // ---------------------------------------------------------------------------
-function verifySignature(rawBody: string, signature: string): boolean {
+// Forward Email does not sign webhook payloads, so we verify via a secret token
+// embedded in the webhook URL (?wh=SECRET). The secret must match
+// FORWARD_EMAIL_WEBHOOK_SECRET in the environment.
+// ---------------------------------------------------------------------------
+function verifyToken(token: string | null): boolean {
   const secret = process.env.FORWARD_EMAIL_WEBHOOK_SECRET
   if (!secret) {
-    // In production, a missing secret means the env var hasn't been set yet —
-    // reject all requests until it is. In development, warn and pass through.
     if (process.env.NODE_ENV === 'production') {
-      console.error('FORWARD_EMAIL_WEBHOOK_SECRET not set in production — rejecting request. Set this env var in Vercel dashboard.')
+      console.error('FORWARD_EMAIL_WEBHOOK_SECRET not set in production — rejecting request.')
       return false
     }
-    console.warn('FORWARD_EMAIL_WEBHOOK_SECRET not set — skipping signature verification (dev only).')
+    console.warn('FORWARD_EMAIL_WEBHOOK_SECRET not set — skipping token verification (dev only).')
     return true
   }
-  if (!signature) return false
-
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(rawBody)
-    .digest('hex')
-
+  if (!token) return false
   try {
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))
+    return crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(token))
   } catch {
     return false
   }
@@ -579,10 +575,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 async function handleInbound(request: NextRequest): Promise<NextResponse> {
   const rawBody = await request.text()
 
-  // 1. Verify signature
-  const sig = request.headers.get('x-webhook-signature') ?? ''
-  if (!verifySignature(rawBody, sig)) {
-    log('[inbound-email] sig_mismatch')
+  // 1. Verify URL token (?wh=SECRET) — Forward Email doesn't sign payloads
+  const urlToken = request.nextUrl.searchParams.get('wh')
+  if (!verifyToken(urlToken)) {
+    log('[inbound-email] token_mismatch')
     return NextResponse.json({}, { status: 200 })
   }
 
