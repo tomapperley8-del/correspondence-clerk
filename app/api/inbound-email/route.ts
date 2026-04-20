@@ -51,20 +51,13 @@ type ForwardEmailPayload = {
 // ---------------------------------------------------------------------------
 // Signature verification (HMAC-SHA256)
 // ---------------------------------------------------------------------------
-// Forward Email does not sign webhook payloads, so we verify via a secret token
-// embedded in the webhook URL (?wh=SECRET). The secret must match
-// FORWARD_EMAIL_WEBHOOK_SECRET in the environment.
+// Optional URL token verification (?wh=SECRET). If FORWARD_EMAIL_WEBHOOK_SECRET
+// is set, the wh param must match. If not set, all requests pass through.
+// Primary security is the per-user inbound_email_token checked at step 3.
 // ---------------------------------------------------------------------------
 function verifyToken(token: string | null): boolean {
   const secret = process.env.FORWARD_EMAIL_WEBHOOK_SECRET
-  if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('FORWARD_EMAIL_WEBHOOK_SECRET not set in production — rejecting request.')
-      return false
-    }
-    console.warn('FORWARD_EMAIL_WEBHOOK_SECRET not set — skipping token verification (dev only).')
-    return true
-  }
+  if (!secret) return true
   if (!token) return false
   try {
     return crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(token))
