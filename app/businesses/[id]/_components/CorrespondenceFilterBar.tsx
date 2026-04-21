@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { type Contact } from '@/app/actions/contacts'
 
 interface CorrespondenceFilterBarProps {
@@ -60,12 +60,15 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
 
   const isFiltered = sortOrder !== 'oldest' || contactFilter !== 'all' || directionFilter !== 'all' || dateRange !== '12m'
 
-  const activeLabel = [
-    sortOrder === 'oldest' ? 'Oldest' : 'Newest',
-    directionFilter !== 'all' ? (directionFilter === 'received' ? 'Received' : 'Sent') : null,
-    dateRange === '1m' ? '1 Month' : dateRange === '6m' ? '6 Months' : dateRange === 'custom' ? 'Custom' : null,
-    contactFilter !== 'all' ? (contacts.find(c => c.id === contactFilter)?.name ?? null) : null,
-  ].filter(Boolean).join(' · ') || 'Oldest · 12 Months'
+  const activeLabel = useMemo(() =>
+    [
+      sortOrder === 'oldest' ? 'Oldest' : 'Newest',
+      directionFilter !== 'all' ? (directionFilter === 'received' ? 'Received' : 'Sent') : null,
+      dateRange === '1m' ? '1 Month' : dateRange === '6m' ? '6 Months' : dateRange === 'custom' ? 'Custom' : null,
+      contactFilter !== 'all' ? (contacts.find(c => c.id === contactFilter)?.name ?? null) : null,
+    ].filter(Boolean).join(' · ') || 'Oldest · 12 Months',
+    [sortOrder, directionFilter, dateRange, contactFilter, contacts]
+  )
 
   function resetFilters() {
     setSortOrder('oldest')
