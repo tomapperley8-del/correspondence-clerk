@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useDeferredValue } from 'react'
 import Link from 'next/link'
 import type { BusinessListItem } from '@/app/actions/businesses'
 import type { MembershipType } from '@/app/actions/membership-types'
@@ -25,6 +25,8 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
 
   // Filter and sort state
   const [searchQuery, setSearchQuery] = useState('')
+  // Deferred so heavy filtering doesn't block the input keystroke
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const [filterType, setFilterType] = useState<FilterType>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortType>('recent')
@@ -103,7 +105,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
   // Reset to page 1 when filters/search change and would result in empty page
   useEffect(() => {
     const filtered = businesses.filter((business) => {
-      if (searchQuery && !business.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      if (deferredSearchQuery && !business.name.toLowerCase().includes(deferredSearchQuery.toLowerCase())) {
         return false
       }
       if (filterType === 'prospect' && business.membership_type) return false
@@ -116,7 +118,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1)
     }
-  }, [searchQuery, filterType, selectedCategory, businesses, currentPage, itemsPerPage])
+  }, [deferredSearchQuery, filterType, selectedCategory, businesses, currentPage, itemsPerPage])
 
   // Persist filter preferences to localStorage
   useEffect(() => {
@@ -132,10 +134,10 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
     [businesses]
   )
 
-  // Filter and sort businesses (memoized)
+  // Filter and sort businesses (memoized, deferred so typing stays responsive)
   const filtered = useMemo(() => {
     const result = businesses.filter((business) => {
-      if (searchQuery && !business.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      if (deferredSearchQuery && !business.name.toLowerCase().includes(deferredSearchQuery.toLowerCase())) {
         return false
       }
       if (filterType === 'prospect' && business.membership_type) return false
@@ -164,7 +166,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
           return 0
       }
     })
-  }, [businesses, searchQuery, filterType, selectedCategory, sortBy])
+  }, [businesses, deferredSearchQuery, filterType, selectedCategory, sortBy])
 
   // Pagination calculations
   const totalPages = Math.ceil(filtered.length / itemsPerPage)

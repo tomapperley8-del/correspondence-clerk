@@ -85,7 +85,13 @@ export async function getCorrespondenceEntry(id: string) {
   if (!orgId) return { error: 'No organization found' }
   const { data, error } = await supabase
     .from('correspondence')
-    .select('*')
+    .select(`
+      id, business_id, contact_id, cc_contact_ids, bcc_contact_ids, user_id,
+      raw_text_original, formatted_text_original, formatted_text_current,
+      entry_date, subject, type, direction, formatting_status, action_needed,
+      due_at, content_hash, ai_metadata, organization_id, created_at, updated_at, edited_at, edited_by,
+      is_pinned, thread_participants, internal_sender, thread_id
+    `)
     .eq('id', id)
     .eq('organization_id', orgId)
     .single()
@@ -989,26 +995,26 @@ export async function getNeedsReply() {
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const oneYearAgo = new Date()
-  oneYearAgo.setDate(oneYearAgo.getDate() - 365)
-
-  const { data, error } = await supabase
-    .from('correspondence')
-    .select(`
-      id, business_id, contact_id, subject, type, direction, entry_date, action_needed, due_at,
-      formatted_text_current,
-      businesses!inner(id, name),
-      contact:contacts(name, role)
-    `)
-    .eq('organization_id', orgId)
-    .gte('entry_date', oneYearAgo.toISOString())
-    .is('reply_dismissed_at', null)
-    .order('entry_date', { ascending: false })
-    .limit(500)
-
+  const { data, error } = await supabase.rpc('get_needs_reply_candidates', { p_org_id: orgId })
   if (error) return { error: error.message }
 
-  const entries = data || []
+  type Row = {
+    id: string
+    business_id: string
+    contact_id: string | null
+    subject: string | null
+    type: string | null
+    direction: string | null
+    entry_date: string | null
+    action_needed: string | null
+    due_at: string | null
+    snippet_text: string | null
+    business_name: string | null
+    contact_name: string | null
+    contact_role: string | null
+  }
+
+  const entries = (data || []) as Row[]
 
   // O(n) pre-pass: find latest non-received date per business
   const latestNonReceivedByBusiness = new Map<string, Date>()
@@ -1037,7 +1043,23 @@ export async function getNeedsReply() {
     return true
   })
 
-  return { data: deduped }
+  // Reshape to match the previous query embedding shape (businesses + contact nested)
+  const reshaped = deduped.map(e => ({
+    id: e.id,
+    business_id: e.business_id,
+    contact_id: e.contact_id,
+    subject: e.subject,
+    type: e.type,
+    direction: e.direction,
+    entry_date: e.entry_date,
+    action_needed: e.action_needed,
+    due_at: e.due_at,
+    formatted_text_current: e.snippet_text,
+    businesses: { id: e.business_id, name: e.business_name ?? '' },
+    contact: e.contact_name ? { name: e.contact_name, role: e.contact_role } : null,
+  }))
+
+  return { data: reshaped }
 }
 
 /**
@@ -1050,29 +1072,18 @@ export async function getGoneQuiet() {
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const sixtyDaysAgo = new Date()
-  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
-
-  const { data, error } = await supabase
-    .from('businesses')
-    .select(`
-      id, name, last_contacted_at,
-      correspondence(count)
-    `)
-    .eq('organization_id', orgId)
-    .lt('last_contacted_at', sixtyDaysAgo.toISOString())
-    .not('last_contacted_at', 'is', null)
-    .order('last_contacted_at', { ascending: true })
-    .limit(100)
-
+  const { data, error } = await supabase.rpc('get_gone_quiet', { p_org_id: orgId })
   if (error) return { error: error.message }
 
-  const goneQuiet = (data || []).filter(biz => {
-    const countArr = biz.correspondence as unknown as [{ count: number }]
-    return (countArr?.[0]?.count ?? 0) >= 3
-  })
+  // Shape result to match the prior { correspondence: [{ count }] } contract used by the hook
+  const shaped = (data || []).map((row: { id: string; name: string; last_contacted_at: string; correspondence_count: number }) => ({
+    id: row.id,
+    name: row.name,
+    last_contacted_at: row.last_contacted_at,
+    correspondence: [{ count: Number(row.correspondence_count) }],
+  }))
 
-  return { data: goneQuiet }
+  return { data: shaped }
 }
 
 /**
@@ -1416,59 +1427,30 @@ export async function getContractExpiries() {
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const ninetyDaysAgo = new Date(today)
-  ninetyDaysAgo.setDate(today.getDate() - 90)
-  const in90Days = new Date(today)
-  in90Days.setDate(today.getDate() + 90)
-
-  // Include contract_renewal_type so we can filter one_off in JS.
-  // Cannot use .not('contract_renewal_type', 'eq', 'one_off') at DB level —
-  // PostgREST's != operator is NULL-unsafe, so it would exclude all rows where the
-  // column is NULL (i.e. every business until explicitly set). JS filter is correct.
-  const { data, error } = await supabase
-    .from('businesses')
-    .select('id, name, contract_end, contract_amount, contract_currency, contract_renewal_type')
-    .eq('organization_id', orgId)
-    .not('contract_end', 'is', null)
-    .gte('contract_end', ninetyDaysAgo.toISOString().split('T')[0])
-    .lte('contract_end', in90Days.toISOString().split('T')[0])
-    .order('contract_end', { ascending: true })
-
+  const { data, error } = await supabase.rpc('get_contract_expiries', { p_org_id: orgId })
   if (error) return { error: error.message }
 
-  // Filter one_off contracts here — null and 'recurring' both surface normally
-  const eligible = (data || []).filter(b => (b as Record<string, unknown>).contract_renewal_type !== 'one_off')
-  if (eligible.length === 0) return { data: [] }
-
-  // Fetch the most recent correspondence for each business (for snippet + dismissal auto-detection)
-  const businessIds = eligible.map(b => b.id)
-  const { data: corrData } = await supabase
-    .from('correspondence')
-    .select('business_id, entry_date, formatted_text_current')
-    .in('business_id', businessIds)
-    .eq('organization_id', orgId)
-    .order('entry_date', { ascending: false })
-    .limit(businessIds.length * 5)
-
-  // Most recent correspondence per business (first occurrence wins — already sorted DESC)
-  const latestByBusiness = new Map<string, { entry_date: string; formatted_text_current: string | null }>()
-  for (const c of (corrData || [])) {
-    if (!latestByBusiness.has(c.business_id)) {
-      latestByBusiness.set(c.business_id, {
-        entry_date: c.entry_date,
-        formatted_text_current: c.formatted_text_current,
-      })
-    }
+  type ExpiryRow = {
+    id: string
+    name: string
+    contract_end: string
+    contract_amount: number | null
+    contract_currency: string | null
+    contract_renewal_type: string | null
+    last_correspondence_date: string | null
+    last_correspondence_text: string | null
   }
+
+  // Filter one_off in JS — PostgREST != is NULL-unsafe; same constraint applies here so we
+  // return all candidates from the RPC and filter after, keeping NULL and 'recurring'.
+  const eligible = ((data || []) as ExpiryRow[]).filter(b => b.contract_renewal_type !== 'one_off')
+  if (eligible.length === 0) return { data: [] }
 
   // Auto-detect one-off language in the most recent entry for each business
   const detectedOneOff: string[] = []
   for (const b of eligible) {
-    const latest = latestByBusiness.get(b.id)
-    if (!latest?.formatted_text_current) continue
-    const text = latest.formatted_text_current.toLowerCase()
+    if (!b.last_correspondence_text) continue
+    const text = b.last_correspondence_text.toLowerCase()
     if (CONTRACT_DISMISSAL_KEYWORDS.some(kw => text.includes(kw))) {
       detectedOneOff.push(b.id)
     }
@@ -1491,14 +1473,18 @@ export async function getContractExpiries() {
   const results = eligible
     .filter(b => !detectedSet.has(b.id))
     .map(b => {
-      const latest = latestByBusiness.get(b.id)
-      const raw = latest?.formatted_text_current
+      const raw = b.last_correspondence_text
       const snippet = raw
         ? raw.replace(/\*\*|__|[_*#>`~]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100).replace(/\s\S*$/, (s) => s.length > 1 ? '…' : s)
         : null
       return {
-        ...b,
-        last_correspondence_date: latest?.entry_date ?? null,
+        id: b.id,
+        name: b.name,
+        contract_end: b.contract_end,
+        contract_amount: b.contract_amount,
+        contract_currency: b.contract_currency,
+        contract_renewal_type: b.contract_renewal_type,
+        last_correspondence_date: b.last_correspondence_date,
         last_correspondence_snippet: snippet,
       }
     })

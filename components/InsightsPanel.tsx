@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useInsights } from '@/components/InsightsContext'
 import { MarkdownLite } from '@/components/MarkdownLite'
@@ -62,25 +62,26 @@ function formatHistoryDate(isoDate: string): string {
 // Insight action buttons (per insight type)
 // ---------------------------------------------------------------------------
 
-type InsightAction = { label: string; onClick: () => void }
+type InsightAction =
+  | { label: string; href: string }
+  | { label: string; onClick: () => void }
 
 function getInsightActions(
   insightType: string,
   businessId: string | null,
-  router: ReturnType<typeof useRouter>,
   content: string | null,
 ): InsightAction[] {
   switch (insightType) {
     case 'call_prep':
       if (!businessId) return []
-      return [{ label: 'Log this call', onClick: () => router.push(`/new-entry?businessId=${businessId}&type=Call`) }]
+      return [{ label: 'Log this call', href: `/new-entry?businessId=${businessId}&type=Call` }]
     case 'what_did_we_agree':
       if (!businessId) return []
-      return [{ label: 'View actions', onClick: () => router.push(`/businesses/${businessId}?tab=actions`) }]
+      return [{ label: 'View actions', href: `/businesses/${businessId}?tab=actions` }]
     case 'briefing':
-      return [{ label: 'View Actions', onClick: () => router.push('/actions') }]
+      return [{ label: 'View Actions', href: '/actions' }]
     case 'reconnect_list':
-      return [{ label: 'View Reconnect List', onClick: () => router.push('/actions') }]
+      return [{ label: 'View Reconnect List', href: '/actions' }]
     case 'outreach_draft':
       if (!content) return []
       return [{
@@ -92,10 +93,10 @@ function getInsightActions(
         },
       }]
     case 'relationship_radar':
-      return [{ label: 'View Actions', onClick: () => router.push('/actions') }]
+      return [{ label: 'View Actions', href: '/actions' }]
     case 'next_best_action':
       if (!businessId) return []
-      return [{ label: 'Log this action', onClick: () => router.push(`/new-entry?businessId=${businessId}&type=Note`) }]
+      return [{ label: 'Log this action', href: `/new-entry?businessId=${businessId}&type=Note` }]
     default:
       return []
   }
@@ -122,7 +123,6 @@ function InsightCard({
   onExpand: (type: string | null) => void
   isExpanded: boolean
 }) {
-  const router = useRouter()
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<InsightHistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -268,19 +268,26 @@ function InsightCard({
           <MarkdownLite text={viewingEntry ? viewingEntry.content : cardState.content!} />
         </div>
         {!viewingEntry && (() => {
-          const actions = getInsightActions(insightType, businessId, router, cardState.content)
+          const actions = getInsightActions(insightType, businessId, cardState.content)
           const showAddToActions = businessId && ADD_TO_ACTIONS_TYPES.has(insightType) && cardState.content
           if (actions.length === 0 && !showAddToActions) return null
+          const actionClass = "text-xs font-medium px-3 py-1.5 rounded-sm bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors inline-block"
           return (
             <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
               {actions.map((action) => (
-                <button
-                  key={action.label}
-                  onClick={action.onClick}
-                  className="text-xs font-medium px-3 py-1.5 rounded-sm bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
-                >
-                  {action.label}
-                </button>
+                'href' in action ? (
+                  <Link key={action.label} href={action.href} className={actionClass}>
+                    {action.label}
+                  </Link>
+                ) : (
+                  <button
+                    key={action.label}
+                    onClick={action.onClick}
+                    className={actionClass}
+                  >
+                    {action.label}
+                  </button>
+                )
               ))}
               {showAddToActions && (
                 <button
