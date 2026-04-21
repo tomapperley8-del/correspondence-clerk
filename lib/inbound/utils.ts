@@ -22,6 +22,58 @@ export function isPersonalDomain(domain: string): boolean {
 }
 
 /**
+ * Derive the set of domains owned by the user from their own_email_addresses
+ * (and optionally their auth email). Used to block domain_mapping creation
+ * and lookup when the "sender" is really the user's own infrastructure
+ * (e.g. a website contact form that forwards from info@yourdomain.com).
+ */
+export function getOwnDomains(emails: (string | null | undefined)[]): Set<string> {
+  const domains = new Set<string>()
+  for (const e of emails) {
+    const d = (e ?? '').split('@')[1]?.toLowerCase()
+    if (d) domains.add(d)
+  }
+  return domains
+}
+
+/**
+ * Extract the real sender from a contact-form-style email body.
+ *
+ * Websites commonly POST contact-form submissions via their own mail alias
+ * (e.g. info@yourdomain.com) with the submitter's name/email as labeled
+ * fields in the body:
+ *
+ *   Name: Emily
+ *   E-Mail: emily@example.com
+ *   Subject: Enquiry
+ *   Message: ...
+ *
+ * Returns null if no Email/E-Mail label is found. The matched Name: line
+ * (within 10 lines of the email label) is returned as the name; otherwise
+ * the email's local-part is used.
+ */
+export function extractContactFormSender(rawBody: string): { email: string; name: string } | null {
+  // Match a labeled email field. Accept "E-Mail", "E Mail", "Email", or "Sender Email".
+  const emailLine = /^\s*(?:E[-\s]?Mail|Email|Sender\s+Email)\s*:\s*([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\s*$/im
+  const emailMatch = emailLine.exec(rawBody)
+  if (!emailMatch) return null
+
+  const email = emailMatch[1].toLowerCase()
+  // Reject obvious junk (like empty local-part after normalisation)
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return null
+
+  // Look for a Name: line anywhere in the body (contact forms usually put
+  // Name immediately above Email, but order can vary)
+  const nameLine = /^\s*Name\s*:\s*(.{1,100})$/im
+  const nameMatch = nameLine.exec(rawBody)
+  const rawName = nameMatch ? nameMatch[1].trim() : ''
+  // Fall back to the local-part of the email if no name was supplied
+  const name = rawName || email.split('@')[0]
+
+  return { email, name }
+}
+
+/**
  * Strip quoted content from email body text.
  * Postmark's StrippedTextReply already does most of this; we apply
  * an extra pass to catch remaining patterns.

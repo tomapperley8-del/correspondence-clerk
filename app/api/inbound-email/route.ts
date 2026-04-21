@@ -25,7 +25,13 @@ import crypto from 'crypto'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { formatCorrespondence } from '@/lib/ai/formatter'
 import { isThreadSplitResponse } from '@/lib/ai/types'
-import { isPersonalDomain, stripQuotedContent, extractForwardedSender } from '@/lib/inbound/utils'
+import {
+  isPersonalDomain,
+  stripQuotedContent,
+  extractForwardedSender,
+  extractContactFormSender,
+  getOwnDomains,
+} from '@/lib/inbound/utils'
 
 export const maxDuration = 60
 
@@ -454,19 +460,24 @@ async function matchBusinessFromEmail(
 async function matchBusinessFromRecipients(
   supabase: ReturnType<typeof createServiceRoleClient>,
   orgId: string,
-  recipientEmails: string[]
+  recipientEmails: string[],
+  ownDomains: Set<string>
 ): Promise<{ businessId: string; contactId: string | null; matchedEmail: string } | null> {
   // 1. Exact email match against contacts.emails[] or businesses.email
   //    Handles personal-domain contacts (gmail, hotmail, etc.)
+  //    Skip emails on one of the user's own domains — those represent the
+  //    user's own infrastructure, not a business they correspond with.
   for (const email of recipientEmails) {
+    const domain = email.split('@')[1]?.toLowerCase() ?? ''
+    if (domain && ownDomains.has(domain)) continue
     const match = await matchBusinessFromEmail(supabase, orgId, email)
     if (match) return { ...match, matchedEmail: email }
   }
 
-  // 2. Domain mapping fallback (skips personal domains)
+  // 2. Domain mapping fallback (skips personal domains and own domains)
   for (const email of recipientEmails) {
-    const domain = email.split('@')[1] ?? ''
-    if (!domain || isPersonalDomain(domain)) continue
+    const domain = email.split('@')[1]?.toLowerCase() ?? ''
+    if (!domain || isPersonalDomain(domain) || ownDomains.has(domain)) continue
 
     const { data: mapping } = await supabase
       .from('domain_mappings')
@@ -645,22 +656,35 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     authEmail,
     ...(profile.own_email_addresses ?? []).map((e: string) => e.toLowerCase()),
   ].filter(Boolean)
-  const fromSelf = ownEmails.includes(fromEmail)
+  const ownDomains = getOwnDomains(ownEmails)
+  const fromDomain = fromEmail.split('@')[1]?.toLowerCase() ?? ''
+  // fromSelf = sender is one of the user's own addresses OR on one of their
+  // own domains. Domain-level match catches contact-form submissions sent
+  // from info@yourdomain.com where the specific alias wasn't registered.
+  const fromSelf = ownEmails.includes(fromEmail) || (fromDomain !== '' && ownDomains.has(fromDomain))
 
-  // For forwarded received emails (fromSelf=true), the outer SMTP From is the Outlook
-  // forwarder's address. Extract the original sender buried in the forwarded body.
-  // Must run on payload.text (raw body) BEFORE stripQuotedContent removes the block.
-  // For BCC sent emails that are also fromSelf, extractForwardedSender returns null
-  // (no forwarding block) → effectiveFromEmail stays as fromEmail. Safe.
+  // For emails where the outer sender is on our own infrastructure the
+  // real sender lives inside the body — either as a forwarded-message
+  // block (Outlook/Gmail/Apple Mail forwards) or as labeled contact-form
+  // fields (Name:/E-Mail:). Try both; contact-form extraction is stricter
+  // so we run it first. Must run on payload.text BEFORE stripQuotedContent.
   let effectiveFromEmail = fromEmail
   let effectiveFromName = fromName
 
   if (fromSelf) {
-    const forwardedSender = extractForwardedSender(payload.text ?? '')
-    if (forwardedSender) {
-      effectiveFromEmail = forwardedSender.email
-      effectiveFromName = forwardedSender.name
-      log('[inbound-email] forwarded_sender_extracted', { original: fromEmail, extracted: effectiveFromEmail })
+    const rawBody = payload.text ?? ''
+    const contactFormSender = extractContactFormSender(rawBody)
+    if (contactFormSender) {
+      effectiveFromEmail = contactFormSender.email
+      effectiveFromName = contactFormSender.name
+      log('[inbound-email] contact_form_sender_extracted', { original: fromEmail, extracted: effectiveFromEmail })
+    } else {
+      const forwardedSender = extractForwardedSender(rawBody)
+      if (forwardedSender) {
+        effectiveFromEmail = forwardedSender.email
+        effectiveFromName = forwardedSender.name
+        log('[inbound-email] forwarded_sender_extracted', { original: fromEmail, extracted: effectiveFromEmail })
+      }
     }
   }
 
@@ -724,7 +748,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   if (direction === 'sent') {
     const recipientEmails = extractRecipientEmails(payload)
 
-    const match = await matchBusinessFromRecipients(supabase, orgId, recipientEmails)
+    const match = await matchBusinessFromRecipients(supabase, orgId, recipientEmails, ownDomains)
 
     if (match) {
       // If email-based matching didn't find a contact, try name-based fallback
@@ -803,11 +827,18 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   // Use effectiveFromEmail (original sender if forwarded, otherwise the outer From).
   // Skip auto-filing only if the effective sender is still one of our own addresses
   // (i.e. extraction failed and we fell back to the forwarder's address).
-  const effectiveDomain = effectiveFromEmail.split('@')[1] ?? ''
+  const effectiveDomain = effectiveFromEmail.split('@')[1]?.toLowerCase() ?? ''
   let autoFiledBusinessId: string | null = null
   let autoFiledContactId: string | null = null
 
-  if (!ownEmails.includes(effectiveFromEmail)) {
+  // Never auto-file when the (resolved) sender is on our own infrastructure —
+  // either exactly one of our addresses, or any address on an own domain.
+  // Own-domain senders should always queue for manual triage.
+  const senderIsOwn =
+    ownEmails.includes(effectiveFromEmail) ||
+    (effectiveDomain !== '' && ownDomains.has(effectiveDomain))
+
+  if (!senderIsOwn) {
     // 1. Try exact email match (contacts.emails[] or businesses.email)
     //    Works for any sender, including personal-domain contacts.
     const emailMatch = await matchBusinessFromEmail(supabase, orgId, effectiveFromEmail)
@@ -817,8 +848,9 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       log('[inbound-email] auto_filed_received_email_match', { businessId: autoFiledBusinessId, email: effectiveFromEmail })
     }
 
-    // 2. Fall back to domain mapping (for business senders not yet in contacts)
-    if (!autoFiledBusinessId && effectiveDomain && !isPersonalDomain(effectiveDomain)) {
+    // 2. Fall back to domain mapping (for business senders not yet in contacts).
+    //    Skip personal domains and own domains — neither represents a business identity.
+    if (!autoFiledBusinessId && effectiveDomain && !isPersonalDomain(effectiveDomain) && !ownDomains.has(effectiveDomain)) {
       const { data: mapping } = await supabase
         .from('domain_mappings')
         .select('business_id')

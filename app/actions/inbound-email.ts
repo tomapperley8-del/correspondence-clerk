@@ -5,7 +5,7 @@ import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { formatCorrespondence } from '@/lib/ai/formatter'
 import { isThreadSplitResponse } from '@/lib/ai/types'
 import { revalidatePath } from 'next/cache'
-import { isPersonalDomain, stripQuotedContent } from '@/lib/inbound/utils'
+import { isPersonalDomain, stripQuotedContent, getOwnDomains } from '@/lib/inbound/utils'
 
 export { isPersonalDomain, stripQuotedContent }
 
@@ -223,10 +223,25 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
     }
   }
 
-  // Learn domain mapping (skip personal domains)
+  // Learn domain mapping (skip personal domains AND the user's own domains).
   // For sent emails, learn from the recipient's domain (not the sender's own domain)
   // For received emails, use item.from_email — already resolved to the original sender
-  // by the webhook (not the Outlook forwarder's address)
+  // by the webhook (not the Outlook forwarder's address).
+  //
+  // Own-domain guard: if Tom files an email that came from his own contact form
+  // (info@chiswickcalendar.co.uk) to a business, we must NOT learn that domain —
+  // every subsequent contact-form submission from that address would then
+  // auto-file to the same business regardless of who the real sender was.
+  const { data: fileProfile } = await supabase
+    .from('user_profiles')
+    .select('own_email_addresses')
+    .eq('id', user.id)
+    .maybeSingle()
+  const ownDomains = getOwnDomains([
+    user.email ?? '',
+    ...((fileProfile?.own_email_addresses ?? []) as string[]),
+  ])
+
   const domainSource = itemDirection === 'sent'
     ? (
         payload.to?.value?.[0]?.address ??
@@ -235,7 +250,7 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
       ).toLowerCase()
     : (item.from_email as string)
   const domain = domainSource.split('@')[1]?.toLowerCase()
-  if (domain && !isPersonalDomain(domain)) {
+  if (domain && !isPersonalDomain(domain) && !ownDomains.has(domain)) {
     await supabase
       .from('domain_mappings')
       .upsert(
