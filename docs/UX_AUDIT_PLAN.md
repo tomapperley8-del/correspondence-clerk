@@ -180,6 +180,55 @@ This is a trust-building moment — users are about to grant email access. Give 
 
 ---
 
+## Phase 9 — Actions + Insights Overhaul
+
+Background: full UX/UI re-audit of the Actions and Insights surfaces (April 2026). Decisions captured in `~/.claude/plans/right-full-review-what-expressive-quasar.md`. Conclusion: Actions is organised by *why* an item exists, not *when* you need to deal with it; the unified urgency score the code already computes is thrown away by the 5-section grouping. Insights is a 16-card menu, not a briefing — staleness dots exist but don't drive ordering.
+
+This phase reshapes both pages so the answer to "what matters today?" is on the page when you land.
+
+### ✅ P9.1 — Actions: drop Gone Quiet, merge Reminders, expose topPriority slice
+**Files:** `app/actions/page.tsx`, `app/actions/_hooks/useActionsData.ts`, `app/actions/_hooks/useUnifiedList.ts`, `app/actions/_components/QuietRow.tsx` (delete)
+**Why:** Gone Quiet isn't an action — it's an observation; the existing Reconnect List insight covers it. Reminders vs Actions Due is a technical distinction (action_needed flag set vs unset), not a user one. Top 5 needs a derived slice off the already-sorted unifiedList.
+**Fix:**
+- Drop `getGoneQuiet()` from `page.tsx` parallel fetch and from `useActionsData` (state, mapping, reload, removeItem).
+- In `useUnifiedList.ts`: drop the `goneQuiet` parameter and the QUIET branch; drop the `quiet` slice from `sections`; merge REMINDER items into the `actions` slice filter (keep REMINDER badge — only the section grouping changes, not urgency colour).
+- Expose `topPriority = unifiedList.slice(0, 5)` from the hook (no padding — actual count if <5).
+- Delete `app/actions/_components/QuietRow.tsx`.
+- Update `actionsSubtitle` to include reminder count.
+
+### ✅ P9.2 — Actions: render Top Priorities hero block
+**Files:** `app/actions/_components/ItemRow.tsx`, `app/actions/_components/ActionsClient.tsx`
+**Why:** The page should lead with a single prioritised list across categories. Numbered 1-5 (or 1-N), same row style as below — priority is communicated by the number, not by changing row size.
+**Fix:**
+- `ItemRow.tsx`: add optional `priorityNumber?: string` prop. Render small "1." style prefix to the left of the badge area when present.
+- `ActionsClient.tsx`: add a Top Priorities block above the existing sections. Heading reads "Top priorities" if 5+, else "Top {N} {priority|priorities}". Render `topPriority` items as `ItemRow` with `priorityNumber`. Show only when `topPriority.length > 0`.
+
+### ✅ P9.3 — Actions: collapse all sections by default + persist subtitle on expand
+**Files:** `app/actions/_components/ActionsClient.tsx`, `app/actions/_components/CollapsibleSection.tsx`
+**Why:** Top Priorities is now the hero — sections become a reference catalogue beneath it. Section subtitles (e.g. "oldest 5 days · 2 overdue") currently vanish when the section opens, losing context exactly when the user needs it.
+**Fix:**
+- `ActionsClient.tsx`: Remove the entire Gone Quiet `CollapsibleSection`. Remove the standalone Reminders `CollapsibleSection` (items now live under Actions Due). Set `defaultExpanded={false}` on Needs Reply, Actions Due, and Renewals & Contracts (drop the `urgentRenewal` conditional).
+- `CollapsibleSection.tsx`: render `subtitle` regardless of `open` state (move out of the `!open` conditional).
+
+### ✅ P9.4 — Insights: grid → vertical tools-menu list, sort by staleness
+**File:** `components/InsightsPanel.tsx`
+**Why:** The 16-card 2-column grid is a menu of tools, not a briefing. Cards are ordered by type, not freshness — green-dot insights should float up. Recasting as a vertical list signals "these are run-on-demand analyses" rather than "look at all this".
+**Fix:**
+- Replace `grid grid-cols-2 gap-2` with a vertical tools-menu list. Each row: title (left) with one-line description below, staleness dot + age (right), Generate/Regenerate button on far right.
+- Sort within each section (`ORG_WIDE_TYPES`, `BUSINESS_TYPES`, `presets`) by staleness then last-generated time — greens first, never-generated last. Reuse the existing `cacheStatus` data already loaded on mount.
+- Keep the expanded card behaviour intact (history, refresh, action buttons, "Add to Actions"). Section headings (Org-Wide / For [Business] / Your Presets) stay.
+
+### ✅ P9.5 — Dashboard: remove Insights sidebar entirely
+**File:** `components/DashboardClient.tsx`
+**Why:** Once the page is the tools menu (no longer "today's important stuff"), the 8px collapsed sidebar strip is dead weight. The mobile Insights button is also redundant. Insights live at `/insights` only; business-page slide-out remains for per-business context.
+**Fix:**
+- Remove the dashboard sidebar (both collapsed strip and expanded panel).
+- Remove the `insights_sidebar_expanded` localStorage reads/writes (orphan key, no migration).
+- Remove the mobile Insights button in the dashboard header.
+- Leave `components/InsightsContext.tsx` and the business-page slide-out (`BusinessDetailClient.tsx`) untouched.
+
+---
+
 ## Implementation Order Summary
 
 | Phase | What | Why first |
