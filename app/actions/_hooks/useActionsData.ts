@@ -3,19 +3,17 @@
 import { useState } from 'react'
 import {
   getNeedsReply,
-  getGoneQuiet,
   getOutstandingActions,
   getPureReminders,
   getContractExpiries,
 } from '@/app/actions/correspondence'
 import { daysAgoFn, makeSnippet, likelyNeedsReply } from '../_utils'
-import type { CorrespondenceItem, BusinessItem, ContractItem } from '../_types'
+import type { CorrespondenceItem, ContractItem } from '../_types'
 
 type RawResult<T> = { data?: T[]; error?: string | null }
 
 export type InitialActionsData = {
   needsReply: RawResult<Record<string, unknown>>
-  goneQuiet: RawResult<Record<string, unknown>>
   flagged: RawResult<Record<string, unknown>>
   reminders: RawResult<Record<string, unknown>>
   contracts: RawResult<Record<string, unknown>>
@@ -51,20 +49,6 @@ function mapNeedsReply(rows: Record<string, unknown>[]): CorrespondenceItem[] {
     .filter(likelyNeedsReply)
 }
 
-function mapGoneQuiet(rows: Record<string, unknown>[]): BusinessItem[] {
-  return rows.map(b => {
-    const countArr = b.correspondence as [{ count: number }] | undefined
-    return {
-      kind: 'business' as const,
-      id: b.id as string,
-      business_id: b.id as string,
-      business_name: b.name as string,
-      last_contacted_at: b.last_contacted_at as string,
-      entry_count: countArr?.[0]?.count ?? 0,
-    }
-  })
-}
-
 function mapContracts(rows: Record<string, unknown>[]): ContractItem[] {
   return rows.map(b => ({
     kind: 'contract' as const,
@@ -88,9 +72,6 @@ export function useActionsData(initial?: InitialActionsData) {
   const [needsReply, setNeedsReply] = useState<CorrespondenceItem[]>(() =>
     initial ? mapNeedsReply(unwrap(initial.needsReply)) : []
   )
-  const [goneQuiet, setGoneQuiet] = useState<BusinessItem[]>(() =>
-    initial ? mapGoneQuiet(unwrap(initial.goneQuiet)) : []
-  )
   const [flagged, setFlagged] = useState<CorrespondenceItem[]>(() =>
     initial ? unwrap(initial.flagged).map(mapCorrEntry) : []
   )
@@ -106,16 +87,14 @@ export function useActionsData(initial?: InitialActionsData) {
   async function reload() {
     setLoading(true)
     setError(null)
-    const [nrResult, gqResult, flagResult, remResult, contractResult] = await Promise.all([
+    const [nrResult, flagResult, remResult, contractResult] = await Promise.all([
       getNeedsReply().catch(() => ({ data: [], error: null } as RawResult<Record<string, unknown>>)),
-      getGoneQuiet().catch(() => ({ data: [], error: null } as RawResult<Record<string, unknown>>)),
       getOutstandingActions().catch(() => ({ data: [], error: null } as RawResult<Record<string, unknown>>)),
       getPureReminders().catch(() => ({ data: [], error: null } as RawResult<Record<string, unknown>>)),
       getContractExpiries().catch(() => ({ data: [], error: null } as RawResult<Record<string, unknown>>)),
     ])
 
     setNeedsReply(mapNeedsReply(unwrap(nrResult as RawResult<Record<string, unknown>>)))
-    setGoneQuiet(mapGoneQuiet(unwrap(gqResult as RawResult<Record<string, unknown>>)))
     setFlagged(unwrap(flagResult as RawResult<Record<string, unknown>>).map(mapCorrEntry))
     setReminders(unwrap(remResult as RawResult<Record<string, unknown>>).map(mapCorrEntry))
     setContracts(mapContracts(unwrap(contractResult as RawResult<Record<string, unknown>>)))
@@ -127,13 +106,11 @@ export function useActionsData(initial?: InitialActionsData) {
     setNeedsReply(prev => prev.filter(i => i.id !== id))
     setFlagged(prev => prev.filter(i => i.id !== id))
     setReminders(prev => prev.filter(i => i.id !== id))
-    setGoneQuiet(prev => prev.filter(i => i.id !== id))
     setContracts(prev => prev.filter(i => i.id !== id))
   }
 
   return {
     needsReply,
-    goneQuiet,
     flagged,
     reminders,
     contracts,

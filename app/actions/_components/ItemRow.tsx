@@ -31,6 +31,7 @@ type ItemRowProps = {
   processing: boolean
   resolutionPending: boolean
   logInitialText?: string
+  priorityNumber?: string
   onFocus: () => void
   onDone: () => void
   onDoneWithResolution: (resolution: string) => void
@@ -45,7 +46,7 @@ type ItemRowProps = {
 
 export function ItemRow({
   item, focused, logOpen, draftOpen, snoozeOpen, processing, resolutionPending,
-  logInitialText,
+  logInitialText, priorityNumber,
   onFocus, onDone, onDoneWithResolution, onResolutionCancel,
   onSnooze, onSnoozeToggle, onLogToggle, onLogSave,
   onDraftToggle, onUseInLog,
@@ -70,6 +71,11 @@ export function ItemRow({
       className={`outline-none transition-colors ${focused ? 'bg-brand-navy/[0.04]' : 'hover:bg-gray-50/60'} ${LEFT_BORDER[item.badge]}`}
     >
       <div className="flex items-start gap-3 px-4 py-3">
+        {priorityNumber && (
+          <span className="shrink-0 w-5 text-right text-sm font-semibold text-gray-300 leading-6 select-none">
+            {priorityNumber}.
+          </span>
+        )}
         <div className="flex-1 min-w-0">
           {/* Badge + action type inline */}
           <div className="flex items-center gap-1.5 flex-wrap mb-1">

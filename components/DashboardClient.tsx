@@ -7,8 +7,6 @@ import type { MembershipType } from '@/app/actions/membership-types'
 import { AddBusinessButton } from '@/components/AddBusinessButton'
 import { Input } from '@/components/ui/input'
 import { formatDateGB } from '@/lib/utils'
-import { InsightsPanel } from '@/components/InsightsPanel'
-import { useInsights } from '@/components/InsightsContext'
 
 type FilterType = 'all' | 'prospect' | string
 type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
@@ -41,8 +39,6 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
   // Check if bookmarklet is installed
   const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
 
-  const { open: openInsights } = useInsights()
-
   // Onboarding checklist
   const hasBusiness = businesses.length > 0
   const hasEntry = businesses.some((b) => b.last_contacted_at)
@@ -56,9 +52,6 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
       setChecklistDismissed(true)
     }
   }, [allDone, checklistDismissed])
-
-  // Insights sidebar collapsed state (default collapsed, persisted in localStorage)
-  const [insightsSidebarOpen, setInsightsSidebarOpen] = useState(false)
 
   // New entries badge: tracks which businesses have activity since last visit
   const [hasNewEntries, setHasNewEntries] = useState<Set<string>>(new Set())
@@ -84,10 +77,6 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
     } catch {
       // Ignore parse errors
     }
-
-    // Restore insights sidebar preference (defaults to collapsed)
-    const sidebarPref = localStorage.getItem('insights_sidebar_expanded')
-    if (sidebarPref === 'true') setInsightsSidebarOpen(true)
 
     // Compute new entries from already-available data
     const newSet = new Set<string>()
@@ -197,18 +186,9 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex gap-6 items-start">
-      {/* Left: business list */}
-      <div className="flex-1 min-w-0">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => openInsights()}
-            className="md:hidden px-3 py-1.5 text-sm font-medium text-white rounded-sm transition-colors bg-brand-navy hover:bg-brand-navy-hover"
-          >
-            Insights
-          </button>
           <Link href="/import" className="text-sm text-brand-navy hover:underline">
             Bulk import
           </Link>
@@ -674,46 +654,6 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
           )}
         </>
       )}
-      </div>{/* end left column */}
-
-      {/* Right: collapsible Insights sidebar */}
-      {insightsSidebarOpen ? (
-        <div className="hidden md:flex flex-col w-[380px] shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Insights</span>
-            <button
-              onClick={() => {
-                setInsightsSidebarOpen(false)
-                localStorage.setItem('insights_sidebar_expanded', 'false')
-              }}
-              className="text-gray-400 hover:text-gray-600 text-sm px-1.5 py-0.5 rounded transition-colors"
-              title="Collapse Insights"
-              aria-label="Collapse Insights sidebar"
-            >
-              ›
-            </button>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <InsightsPanel inline />
-          </div>
-        </div>
-      ) : (
-        <div className="hidden md:flex flex-col shrink-0 sticky top-16 h-[calc(100vh-4rem)]">
-          <button
-            onClick={() => {
-              setInsightsSidebarOpen(true)
-              localStorage.setItem('insights_sidebar_expanded', 'true')
-            }}
-            className="flex flex-col items-center justify-center gap-2 w-8 h-full text-gray-400 hover:text-brand-navy hover:bg-gray-50 transition-colors border-l border-gray-100"
-            title="Expand Insights"
-            aria-label="Expand Insights sidebar"
-          >
-            <span className="text-xs font-semibold uppercase tracking-widest [writing-mode:vertical-rl] rotate-180">Insights</span>
-            <span className="text-base">‹</span>
-          </button>
-        </div>
-      )}
-      </div>{/* end two-column flex */}
     </div>
   )
 }

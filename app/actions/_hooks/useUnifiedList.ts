@@ -2,11 +2,10 @@
 
 import { useMemo } from 'react'
 import { formatDateGB, daysAgoFn, daysUntilFn } from '../_utils'
-import type { CorrespondenceItem, BusinessItem, ContractItem, Badge, UnifiedItem } from '../_types'
+import type { CorrespondenceItem, ContractItem, Badge, UnifiedItem } from '../_types'
 
 function buildUnifiedList(
   needsReply: CorrespondenceItem[],
-  goneQuiet: BusinessItem[],
   flagged: CorrespondenceItem[],
   reminders: CorrespondenceItem[],
   contracts: ContractItem[],
@@ -54,7 +53,7 @@ function buildUnifiedList(
     items.push({ ...item, badge, urgencyScore, badgeLabel })
   }
 
-  // 3. Contract expiries — expired contracts first (EXPIRED badge), then upcoming (RENEWAL)
+  // 3. Contract expiries
   for (const item of contracts) {
     if (bizSeen.has(item.business_id)) continue
     bizSeen.add(item.business_id)
@@ -78,20 +77,7 @@ function buildUnifiedList(
     }
   }
 
-  // 4. Gone quiet businesses (skip if already shown as contract)
-  for (const item of goneQuiet) {
-    if (bizSeen.has(item.business_id)) continue
-    bizSeen.add(item.business_id)
-    const days = daysAgoFn(item.last_contacted_at)
-    items.push({
-      ...item,
-      badge: 'QUIET',
-      urgencyScore: 10,
-      badgeLabel: `Quiet · ${days} days`,
-    })
-  }
-
-  // 5. Reminders
+  // 4. Reminders — merged into the actions feed (urgencyScore 11, after contracts)
   for (const item of reminders) {
     if (corrSeen.has(item.id)) continue
     corrSeen.add(item.id)
@@ -126,26 +112,25 @@ function buildUnifiedList(
 
 export function useUnifiedList(
   needsReply: CorrespondenceItem[],
-  goneQuiet: BusinessItem[],
   flagged: CorrespondenceItem[],
   reminders: CorrespondenceItem[],
   contracts: ContractItem[],
 ) {
   const unifiedList = useMemo(
-    () => buildUnifiedList(needsReply, goneQuiet, flagged, reminders, contracts),
-    [needsReply, goneQuiet, flagged, reminders, contracts],
+    () => buildUnifiedList(needsReply, flagged, reminders, contracts),
+    [needsReply, flagged, reminders, contracts],
   )
 
+  const topPriority = useMemo(() => unifiedList.slice(0, 5), [unifiedList])
+
   const sections = useMemo(() => {
-    const reply     = unifiedList.filter(i => i.badge === 'REPLY')
-    const actions   = unifiedList.filter(i => ['OVERDUE', 'DUE_TODAY', 'DUE_TOMORROW', 'DUE_SOON', 'FLAG'].includes(i.badge))
-    const renewals  = unifiedList.filter(i => i.badge === 'RENEWAL' || i.badge === 'EXPIRED')
-    const quiet     = unifiedList.filter(i => i.badge === 'QUIET')
-    const reminderItems = unifiedList.filter(i => i.badge === 'REMINDER')
+    const reply    = unifiedList.filter(i => i.badge === 'REPLY')
+    const actions  = unifiedList.filter(i => ['OVERDUE', 'DUE_TODAY', 'DUE_TOMORROW', 'DUE_SOON', 'FLAG', 'REMINDER'].includes(i.badge))
+    const renewals = unifiedList.filter(i => i.badge === 'RENEWAL' || i.badge === 'EXPIRED')
 
     const urgentRenewal = renewals.some(i => {
       const c = i as ContractItem & { badge: Badge; urgencyScore: number; badgeLabel: string }
-      return daysUntilFn(c.contract_end) < 7 // includes negative (expired)
+      return daysUntilFn(c.contract_end) < 7
     })
 
     const oldestReply = reply.length ? Math.max(...reply.map(i => (i as CorrespondenceItem).daysAgo ?? 0)) : 0
@@ -153,13 +138,15 @@ export function useUnifiedList(
       ? `oldest ${oldestReply} days · ${reply.filter(i => ((i as CorrespondenceItem).daysAgo ?? 0) >= 7).length} overdue`
       : ''
 
-    const overdue   = actions.filter(i => i.badge === 'OVERDUE').length
-    const dueToday  = actions.filter(i => i.badge === 'DUE_TODAY').length
+    const overdue      = actions.filter(i => i.badge === 'OVERDUE').length
+    const dueToday     = actions.filter(i => i.badge === 'DUE_TODAY').length
     const flaggedCount = actions.filter(i => i.badge === 'FLAG').length
+    const reminderCount = actions.filter(i => i.badge === 'REMINDER').length
     const actParts: string[] = []
     if (overdue)       actParts.push(`${overdue} overdue`)
     if (dueToday)      actParts.push(`${dueToday} due today`)
     if (flaggedCount)  actParts.push(`${flaggedCount} flagged`)
+    if (reminderCount) actParts.push(`${reminderCount} ${reminderCount === 1 ? 'reminder' : 'reminders'}`)
     const actionsSubtitle = actParts.join(' · ')
 
     const renewalSubtitle = renewals.length
@@ -175,8 +162,6 @@ export function useUnifiedList(
       reply,
       actions,
       renewals,
-      quiet,
-      reminders: reminderItems,
       urgentRenewal,
       replySubtitle,
       actionsSubtitle,
@@ -191,5 +176,5 @@ export function useUnifiedList(
     return parts.join(' · ')
   }, [sections])
 
-  return { unifiedList, sections, urgentSummary }
+  return { unifiedList, topPriority, sections, urgentSummary }
 }
