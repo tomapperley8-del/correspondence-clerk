@@ -8,20 +8,17 @@ import { useActionsKeyboard } from '../_hooks/useActionsKeyboard'
 import { useActionHandlers } from '../_hooks/useActionHandlers'
 import { CollapsibleSection } from './CollapsibleSection'
 import { ItemRow } from './ItemRow'
-import { QuietRow } from './QuietRow'
-import type { BusinessItem, Badge } from '../_types'
 
 export function ActionsClient({ initial }: { initial: InitialActionsData }) {
   const {
-    needsReply, goneQuiet, flagged, reminders, contracts,
+    needsReply, flagged, reminders, contracts,
     error, removeItem,
   } = useActionsData(initial)
 
-  const { unifiedList, sections, urgentSummary } = useUnifiedList(
-    needsReply, goneQuiet, flagged, reminders, contracts,
+  const { unifiedList, topPriority, sections, urgentSummary } = useUnifiedList(
+    needsReply, flagged, reminders, contracts,
   )
 
-  // Break circular dependency: handlers need clearFocus, keyboard provides setFocusedId
   const clearFocusRef = useRef<(id: string) => void>(() => {})
 
   const {
@@ -43,10 +40,36 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
     setLogOpenId,
   })
 
-  // Wire focus cleanup — always reflects latest focusedId/setFocusedId
   clearFocusRef.current = (id) => { if (focusedId === id) setFocusedId(null) }
 
   const allEmpty = unifiedList.length === 0
+
+  function renderItemRow(item: typeof unifiedList[0], priorityNumber?: string) {
+    return (
+      <ItemRow
+        key={`${item.kind}-${item.id}`}
+        item={item}
+        focused={focusedId === item.id}
+        logOpen={logOpenId === item.id}
+        draftOpen={draftOpenId === item.id}
+        snoozeOpen={snoozeOpenId === item.id}
+        processing={processingId === item.id}
+        resolutionPending={resolutionPendingId === item.id}
+        logInitialText={logOpenId === item.id ? logInitialText : undefined}
+        priorityNumber={priorityNumber}
+        onFocus={() => setFocusedId(item.id)}
+        onDone={() => handleDone(item)}
+        onDoneWithResolution={res => handleDoneWithResolution(item, res)}
+        onResolutionCancel={() => handleResolutionCancel(item.id)}
+        onSnooze={days => handleSnooze(item.id, days)}
+        onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
+        onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
+        onLogSave={markDone => handleLogSave(item, markDone)}
+        onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
+        onUseInLog={draft => handleUseInLog(item.id, draft)}
+      />
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -94,130 +117,35 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
         </div>
       ) : (
         <>
+          {/* Top Priorities hero block */}
+          {topPriority.length > 0 && (
+            <div className="border border-gray-200 bg-white mb-4">
+              <div className="px-4 py-3 border-b border-gray-200">
+                <h2 className="font-semibold text-gray-800 text-sm">
+                  {topPriority.length >= 5
+                    ? 'Top priorities'
+                    : `Top ${topPriority.length} ${topPriority.length === 1 ? 'priority' : 'priorities'}`}
+                </h2>
+              </div>
+              <div className="divide-y divide-gray-200">
+                {topPriority.map((item, i) => renderItemRow(item, String(i + 1)))}
+              </div>
+            </div>
+          )}
+
           {/* Needs Reply */}
           <CollapsibleSection title="Needs Reply" count={sections.reply.length} subtitle={sections.replySubtitle} initialLimit={10}>
-            {sections.reply.map(item => (
-              <ItemRow
-                key={`${item.kind}-${item.id}`}
-                item={item}
-                focused={focusedId === item.id}
-                logOpen={logOpenId === item.id}
-                draftOpen={draftOpenId === item.id}
-                snoozeOpen={snoozeOpenId === item.id}
-                processing={processingId === item.id}
-                resolutionPending={resolutionPendingId === item.id}
-                logInitialText={logOpenId === item.id ? logInitialText : undefined}
-                onFocus={() => setFocusedId(item.id)}
-                onDone={() => handleDone(item)}
-                onDoneWithResolution={res => handleDoneWithResolution(item, res)}
-                onResolutionCancel={() => handleResolutionCancel(item.id)}
-                onSnooze={days => handleSnooze(item.id, days)}
-                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-                onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
-                onLogSave={markDone => handleLogSave(item, markDone)}
-                onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
-                onUseInLog={draft => handleUseInLog(item.id, draft)}
-              />
-            ))}
+            {sections.reply.map(item => renderItemRow(item))}
           </CollapsibleSection>
 
-          {/* Actions Due */}
+          {/* Actions Due (includes reminders) */}
           <CollapsibleSection title="Actions Due" count={sections.actions.length} subtitle={sections.actionsSubtitle}>
-            {sections.actions.map(item => (
-              <ItemRow
-                key={`${item.kind}-${item.id}`}
-                item={item}
-                focused={focusedId === item.id}
-                logOpen={logOpenId === item.id}
-                draftOpen={draftOpenId === item.id}
-                snoozeOpen={snoozeOpenId === item.id}
-                processing={processingId === item.id}
-                resolutionPending={resolutionPendingId === item.id}
-                logInitialText={logOpenId === item.id ? logInitialText : undefined}
-                onFocus={() => setFocusedId(item.id)}
-                onDone={() => handleDone(item)}
-                onDoneWithResolution={res => handleDoneWithResolution(item, res)}
-                onResolutionCancel={() => handleResolutionCancel(item.id)}
-                onSnooze={days => handleSnooze(item.id, days)}
-                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-                onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
-                onLogSave={markDone => handleLogSave(item, markDone)}
-                onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
-                onUseInLog={draft => handleUseInLog(item.id, draft)}
-              />
-            ))}
+            {sections.actions.map(item => renderItemRow(item))}
           </CollapsibleSection>
 
           {/* Renewals & Contracts */}
-          <CollapsibleSection title="Renewals & Contracts" count={sections.renewals.length} defaultExpanded={sections.urgentRenewal} subtitle={sections.renewalSubtitle}>
-            {sections.renewals.map(item => (
-              <ItemRow
-                key={`${item.kind}-${item.id}`}
-                item={item}
-                focused={focusedId === item.id}
-                logOpen={logOpenId === item.id}
-                draftOpen={draftOpenId === item.id}
-                snoozeOpen={snoozeOpenId === item.id}
-                processing={processingId === item.id}
-                resolutionPending={resolutionPendingId === item.id}
-                logInitialText={logOpenId === item.id ? logInitialText : undefined}
-                onFocus={() => setFocusedId(item.id)}
-                onDone={() => handleDone(item)}
-                onDoneWithResolution={res => handleDoneWithResolution(item, res)}
-                onResolutionCancel={() => handleResolutionCancel(item.id)}
-                onSnooze={days => handleSnooze(item.id, days)}
-                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-                onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
-                onLogSave={markDone => handleLogSave(item, markDone)}
-                onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
-                onUseInLog={draft => handleUseInLog(item.id, draft)}
-              />
-            ))}
-          </CollapsibleSection>
-
-          {/* Gone Quiet — compact rows */}
-          <CollapsibleSection
-            title="Gone Quiet"
-            count={sections.quiet.length}
-            subtitle="businesses not contacted in 60+ days"
-          >
-            {sections.quiet.map(item => (
-              <QuietRow
-                key={item.id}
-                item={item as BusinessItem & { badge: Badge; urgencyScore: number; badgeLabel: string }}
-                logOpen={logOpenId === item.id}
-                onLogToggle={() => setLogOpenId(id => id === item.id ? null : item.id)}
-                onLogSave={markDone => handleLogSave(item, markDone)}
-                onDone={() => handleDone(item)}
-              />
-            ))}
-          </CollapsibleSection>
-
-          {/* Reminders */}
-          <CollapsibleSection title="Reminders" count={sections.reminders.length}>
-            {sections.reminders.map(item => (
-              <ItemRow
-                key={`${item.kind}-${item.id}`}
-                item={item}
-                focused={focusedId === item.id}
-                logOpen={logOpenId === item.id}
-                draftOpen={draftOpenId === item.id}
-                snoozeOpen={snoozeOpenId === item.id}
-                processing={processingId === item.id}
-                resolutionPending={resolutionPendingId === item.id}
-                logInitialText={logOpenId === item.id ? logInitialText : undefined}
-                onFocus={() => setFocusedId(item.id)}
-                onDone={() => handleDone(item)}
-                onDoneWithResolution={res => handleDoneWithResolution(item, res)}
-                onResolutionCancel={() => handleResolutionCancel(item.id)}
-                onSnooze={days => handleSnooze(item.id, days)}
-                onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-                onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
-                onLogSave={markDone => handleLogSave(item, markDone)}
-                onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
-                onUseInLog={draft => handleUseInLog(item.id, draft)}
-              />
-            ))}
+          <CollapsibleSection title="Renewals & Contracts" count={sections.renewals.length} subtitle={sections.renewalSubtitle}>
+            {sections.renewals.map(item => renderItemRow(item))}
           </CollapsibleSection>
         </>
       )}

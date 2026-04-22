@@ -103,6 +103,25 @@ function getInsightActions(
 }
 
 // ---------------------------------------------------------------------------
+// Staleness sort helper
+// ---------------------------------------------------------------------------
+
+function sortByFreshness(
+  types: string[],
+  cacheStatus: Record<string, CacheStatus>,
+  cardStates: Record<string, CardState>,
+): string[] {
+  return [...types].sort((a, b) => {
+    const getMinutes = (type: string) => {
+      const cs = cardStates[type]
+      if (cs?.generatedAt) return Math.floor((Date.now() - new Date(cs.generatedAt).getTime()) / 60000)
+      return cacheStatus[type]?.ageMinutes ?? Infinity
+    }
+    return getMinutes(a) - getMinutes(b)
+  })
+}
+
+// ---------------------------------------------------------------------------
 // InsightCard
 // ---------------------------------------------------------------------------
 
@@ -188,7 +207,7 @@ function InsightCard({
 
   if (isExpanded && hasContent) {
     return (
-      <div className="border rounded-sm p-4 bg-white col-span-2" style={{ border: '1px solid rgba(0,0,0,0.1)' }}>
+      <div className="border rounded-sm p-4 bg-white" style={{ border: '1px solid rgba(0,0,0,0.1)' }}>
         <div className="flex items-start justify-between mb-3 gap-2">
           <div>
             <h4 className="font-semibold text-sm text-brand-dark">{label}</h4>
@@ -319,39 +338,39 @@ function InsightCard({
 
   return (
     <div
-      className="border rounded-sm p-3 bg-white flex flex-col gap-2 cursor-pointer hover:border-brand-navy transition-colors"
-      style={{ border: '1px solid rgba(0,0,0,0.08)' }}
+      className={`flex items-center gap-3 px-2 py-2.5 transition-colors ${hasContent && !isLoading ? 'cursor-pointer hover:bg-gray-50' : ''}`}
       onClick={() => hasContent && !isLoading && onExpand(insightType)}
     >
-      <div className="flex items-start justify-between gap-1">
-        <h4 className="font-semibold text-sm text-brand-dark leading-tight">{label}</h4>
-        {stalenessDot && (
-          <span className={`mt-0.5 shrink-0 w-2 h-2 rounded-full ${stalenessDot}`} title={ageText} />
+      {/* Staleness dot */}
+      <span
+        className={`shrink-0 w-2 h-2 rounded-full ${stalenessDot ?? 'bg-gray-200'}`}
+        title={ageText}
+      />
+
+      {/* Title + snippet/description */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-brand-dark leading-tight">{label}</p>
+        <p className="text-xs text-gray-400 truncate mt-0.5">
+          {contentSnippet ?? description}
+        </p>
+        {cardState.error && (
+          <p className="text-xs text-red-600 mt-0.5">{cardState.error}</p>
         )}
       </div>
-      {contentSnippet ? (
-        <p className="text-xs text-gray-500 leading-snug line-clamp-2">{contentSnippet}</p>
-      ) : (
-        <p className="text-xs text-gray-400 leading-snug">{description}</p>
-      )}
-      <div className="flex items-center justify-between gap-2 mt-auto">
-        <span className={`text-xs ${isExpired ? 'text-gray-400' : 'text-brand-olive'}`}>
+
+      {/* Age + generate button */}
+      <div className="shrink-0 flex items-center gap-3">
+        <span className={`text-xs hidden sm:block ${isExpired ? 'text-gray-400' : 'text-brand-olive'}`}>
           {isLoading ? 'Generating…' : ageText}
         </span>
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onGenerate(insightType)
-          }}
+          onClick={(e) => { e.stopPropagation(); onGenerate(insightType) }}
           disabled={isLoading}
-          className="text-xs font-semibold text-brand-navy hover:text-brand-dark transition-colors disabled:opacity-40 shrink-0"
+          className="text-xs font-semibold text-brand-navy hover:text-brand-dark transition-colors disabled:opacity-40 whitespace-nowrap"
         >
           {isLoading ? '…' : hasContent ? 'Regenerate' : 'Generate'}
         </button>
       </div>
-      {cardState.error && (
-        <p className="text-xs text-red-600">{cardState.error}</p>
-      )}
     </div>
   )
 }
@@ -474,11 +493,11 @@ export function InsightsPanel({ inline = false }: InsightsPanelProps = {}) {
 
         {/* Org-Wide section */}
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">
             Org-Wide
           </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {ORG_WIDE_TYPES.map((type) => (
+          <div className="border border-gray-100 rounded-sm bg-white divide-y divide-gray-100">
+            {sortByFreshness(ORG_WIDE_TYPES, cacheStatus, cardStates).map((type) => (
               <InsightCard
                 key={type}
                 insightType={type}
@@ -496,11 +515,11 @@ export function InsightsPanel({ inline = false }: InsightsPanelProps = {}) {
         {/* Business-Specific section */}
         {businessId && (
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">
               For {businessName ?? 'This Business'}
             </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {BUSINESS_TYPES.map((type) => (
+            <div className="border border-gray-100 rounded-sm bg-white divide-y divide-gray-100">
+              {sortByFreshness(BUSINESS_TYPES, cacheStatus, cardStates).map((type) => (
                 <InsightCard
                   key={type}
                   insightType={type}
@@ -519,12 +538,12 @@ export function InsightsPanel({ inline = false }: InsightsPanelProps = {}) {
         {/* Custom Presets */}
         {presets.length > 0 && (
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">
               Your Presets
             </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {presets.map((preset) => {
-                const typeKey = `custom_${preset.id}`
+            <div className="border border-gray-100 rounded-sm bg-white divide-y divide-gray-100">
+              {sortByFreshness(presets.map(p => `custom_${p.id}`), cacheStatus, cardStates).map((typeKey) => {
+                const preset = presets.find(p => `custom_${p.id}` === typeKey)!
                 return (
                   <InsightCard
                     key={typeKey}

@@ -1,6 +1,5 @@
 import {
   getNeedsReply,
-  getGoneQuiet,
   getOutstandingActions,
   getPureReminders,
   getContractExpiries,
@@ -19,9 +18,8 @@ async function safe(p: Promise<unknown>): Promise<Raw> {
 }
 
 export default async function ActionsPage() {
-  const [needsReply, goneQuiet, flagged, reminders, contracts] = await Promise.all([
+  const [needsReply, flagged, reminders, contracts] = await Promise.all([
     safe(getNeedsReply()),
-    safe(getGoneQuiet()),
     safe(getOutstandingActions()),
     safe(getPureReminders()),
     safe(getContractExpiries()),
@@ -31,7 +29,6 @@ export default async function ActionsPage() {
     <ActionsClient
       initial={{
         needsReply: needsReply as { data?: Record<string, unknown>[]; error?: string | null },
-        goneQuiet: goneQuiet as { data?: Record<string, unknown>[]; error?: string | null },
         flagged: flagged as { data?: Record<string, unknown>[]; error?: string | null },
         reminders: reminders as { data?: Record<string, unknown>[]; error?: string | null },
         contracts: contracts as { data?: Record<string, unknown>[]; error?: string | null },

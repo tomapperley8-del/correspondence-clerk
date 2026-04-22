@@ -33,7 +33,7 @@ export function CollapsibleSection({ title, count, defaultExpanded = false, subt
           <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-gray-100 border border-gray-200 text-gray-600 text-[11px] font-semibold rounded-sm shrink-0">
             {count}
           </span>
-          {subtitle && !open && (
+          {subtitle && (
             <span className="text-[11px] text-gray-400 truncate hidden sm:block">{subtitle}</span>
           )}
         </div>
