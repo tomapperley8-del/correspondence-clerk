@@ -370,7 +370,9 @@ async function applyFormattingBackground(
   // Apply high-confidence AI flags unconditionally.
   // Also apply medium-confidence for financial/obligation types — these are high-value
   // signals that matter even at medium confidence (better to over-flag than miss).
-  const MEDIUM_CONFIDENCE_TYPES = ['invoice', 'waiting_on_them', 'prospect']
+  // waiting_on_them is excluded: inbound emails are always received, so by
+  // definition you're not waiting on them — they just contacted you.
+  const MEDIUM_CONFIDENCE_TYPES = ['invoice', 'prospect']
   const shouldApply =
     ai.action_suggestion?.action_type &&
     (ai.action_suggestion.confidence === 'high' ||
