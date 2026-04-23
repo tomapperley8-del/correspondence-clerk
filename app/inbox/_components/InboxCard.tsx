@@ -17,6 +17,8 @@ import type { Contact } from '@/app/actions/contacts'
 interface Props {
   item: InboundQueueItem
   businesses: Business[]
+  isSelected?: boolean
+  onToggleSelect?: () => void
 }
 
 // Derive a human-readable business name from an email address domain.
@@ -55,7 +57,7 @@ function cleanPreview(text: string): string {
     .trim()
 }
 
-export default function InboxCard({ item, businesses: initialBusinesses }: Props) {
+export default function InboxCard({ item, businesses: initialBusinesses, isSelected, onToggleSelect }: Props) {
   const router = useRouter()
   const [businesses, setBusinesses] = useState<Business[]>(initialBusinesses)
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
@@ -174,7 +176,7 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
     const senderEmail = isSent ? (item.to_emails?.[0]?.email ?? '') : item.from_email
     if (!senderEmail) return
     setBlocking(true)
-    const result = await blockSenderEmail(senderEmail)
+    const result = await blockSenderEmail(senderEmail, item.id)
     setBlocking(false)
     if (result.error) {
       toast.error(`Failed to block: ${result.error}`)
@@ -210,9 +212,27 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
   return (
     <>
       <div
-        className="bg-white p-5 rounded"
-        style={{ border: '1px solid rgba(0,0,0,0.08)', boxShadow: 'var(--shadow-sm)' }}
+        className="bg-white rounded flex gap-3"
+        style={{
+          border: isSelected ? '1px solid rgba(44,74,110,0.35)' : '1px solid rgba(0,0,0,0.08)',
+          boxShadow: 'var(--shadow-sm)',
+          background: isSelected ? 'rgba(44,74,110,0.03)' : 'white',
+        }}
       >
+        {/* Checkbox column */}
+        {onToggleSelect && (
+          <div className="flex items-start pt-5 pl-4 pr-0">
+            <input
+              type="checkbox"
+              checked={!!isSelected}
+              onChange={onToggleSelect}
+              aria-label="Select email"
+              className="mt-0.5 cursor-pointer"
+              style={{ accentColor: 'var(--brand-navy)', width: 15, height: 15 }}
+            />
+          </div>
+        )}
+        <div className="flex-1 p-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="min-w-0 flex-1">
@@ -382,6 +402,7 @@ export default function InboxCard({ item, businesses: initialBusinesses }: Props
             )}
           </div>
         </div>
+        </div>{/* flex-1 p-5 */}
       </div>
 
       <AddBusinessModal
