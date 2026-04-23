@@ -86,6 +86,10 @@ export function stripQuotedContent(text: string): string {
     .replace(/^On .{5,80}wrote:\s*$/im, '')
     // "-----Original Message-----" and everything after
     .replace(/^-{3,}\s*Original Message\s*-{3,}[\s\S]*/im, '')
+    // Simple "---" separator line (Gmail, ProtonMail, Forward Email thread separator)
+    .replace(/^-{3,}\s*\n[\s\S]*/m, '')
+    // RFC 2822 signature separator "-- " on its own line
+    .replace(/^-- \n[\s\S]*/m, '')
     // "From: ... Sent: ... To: ..." header block at bottom of email
     .replace(/^From:\s.+\nSent:\s.+\nTo:\s.+(\nSubject:\s.+)?$/im, '')
     .trim()

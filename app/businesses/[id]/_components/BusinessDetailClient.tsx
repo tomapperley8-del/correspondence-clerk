@@ -262,14 +262,8 @@ export function BusinessDetailClient({
 
       let dateToSave: string | null = null
       if (fields.date) {
-        if (originalEntry?.entry_date) {
-          const orig = new Date(originalEntry.entry_date)
-          const [year, month, day] = fields.date.split('-').map(Number)
-          orig.setFullYear(year, month - 1, day)
-          dateToSave = orig.toISOString()
-        } else {
-          dateToSave = new Date(fields.date).toISOString()
-        }
+        const timeStr = fields.time || '00:00'
+        dateToSave = new Date(`${fields.date}T${timeStr}:00`).toISOString()
       }
 
       const directionValue = fields.direction === '' ? null : fields.direction as 'received' | 'sent' | null
