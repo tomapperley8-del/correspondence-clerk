@@ -1,6 +1,6 @@
 import { getInboundQueue, getAutoFiledRecent, getDiscardedQueue, getDeadLetters } from '@/app/actions/inbound-email'
 import { getBusinesses, type Business } from '@/app/actions/businesses'
-import InboxCard from './_components/InboxCard'
+import InboxListClient from './_components/InboxListClient'
 import AutoFiledSection from './_components/AutoFiledSection'
 import DiscardedSection from './_components/DiscardedSection'
 import FailedSection from './_components/FailedSection'
@@ -54,11 +54,7 @@ export default async function InboxPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {items.map((item) => (
-            <InboxCard key={item.id} item={item} businesses={businesses} />
-          ))}
-        </div>
+        <InboxListClient items={items} businesses={businesses} />
       )}
 
       <AutoFiledSection items={autoFiled} />
