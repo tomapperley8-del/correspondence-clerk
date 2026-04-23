@@ -87,45 +87,60 @@ export function likelyNeedsReply(item: CorrespondenceItem): boolean {
   const snippet = (item.snippet ?? '').toLowerCase()
   const subject = (item.subject ?? '').toLowerCase()
 
-  const autoSubjects = [
+  // Unambiguous auto-reply subjects — single signal is enough
+  const clearAutoSubjects = [
     'out of office', 'out of the office', 'auto-reply', 'auto reply',
     'automatic reply', 'autoreply', 'away from office', 'away from the office',
     'on holiday', 'on annual leave', 'on leave', 'on vacation', 'on maternity',
     'on paternity', 'do not reply', 'do not respond', 'noreply', 'no-reply',
     'delivery failed', 'undeliverable', 'mailer-daemon',
-    // Marketing automation / status updates
-    'list status update', 'campaign stats', 'email stats', 'mailchimp',
-    'email campaign report', 'campaign report',
   ]
-  if (autoSubjects.some(p => subject.includes(p))) return false
+  if (clearAutoSubjects.some(p => subject.includes(p))) return false
 
-  // Forwarded newsletter: "fw: [anything with newsletter/bulletin/digest]"
+  if (!snippet) return true
+
+  // Confidence scoring — need 3+ points before treating as automated
+  // Single ambiguous signals (e.g. "campaign stats") score low; combinations hit the threshold
+  let automatedScore = 0
+
+  // Highly specific multi-word platform phrases (unambiguous on their own)
+  if (subject.includes('list status update from mailchimp')) automatedScore += 4
+  if (subject.includes('daily list status update')) automatedScore += 4
+  if (subject.includes('email campaign report') || subject.includes('campaign performance report')) automatedScore += 4
+
+  // Forwarded newsletter — subject combo is enough alone
   if (subject.startsWith('fw:') && (
     subject.includes('newsletter') || subject.includes('bulletin') ||
     subject.includes('digest') || subject.includes('weekly update') ||
     subject.includes('monthly update')
-  )) return false
+  )) automatedScore += 4
 
-  if (!snippet) return true
+  // Weaker subject signals — ambiguous alone, count as supporting evidence
+  if (subject.includes('list status update')) automatedScore += 2
+  if (subject.includes('campaign stats') || subject.includes('email stats')) automatedScore += 1
+  if (subject.includes('mailchimp') || subject.includes('campaign report')) automatedScore += 1
 
-  // Automated/marketing email body signals — check before ? pattern (which fires on HTML boilerplate)
-  const automatedBodySignals = [
-    'view in your browser',
-    'view this email in your browser',
-    "can't see the images",
-    'cannot see the images',
-    'click here to view',
-    'to unsubscribe from',
-    'manage your preferences',
-    'manage your email preferences',
-    'email marketing powered',
-    "you're receiving this email because",
-    'you are receiving this email because',
-    'this email was sent to you',
-    'know anyone who would also like to get our regular',
-    'know anyone who would like to receive',
+  // Body content signals (check before ? pattern — HTML boilerplate triggers false positives)
+  const bodySignals: [string, number][] = [
+    ["you're receiving this email because", 4],
+    ['you are receiving this email because', 4],
+    ['email marketing powered', 4],
+    ['know anyone who would also like to get our regular', 4],
+    ['view in your browser', 2],
+    ['view this email in your browser', 2],
+    ["can't see the images", 2],
+    ['cannot see the images', 2],
+    ['to unsubscribe from', 2],
+    ['manage your preferences', 2],
+    ['manage your email preferences', 2],
+    ['this email was sent to you', 2],
+    ['click here to view', 1],
   ]
-  if (automatedBodySignals.some(s => snippet.includes(s))) return false
+  for (const [phrase, score] of bodySignals) {
+    if (snippet.includes(phrase)) automatedScore += score
+  }
+
+  if (automatedScore >= 3) return false
 
   const requestPatterns = [
     /\?(?!\s*click|\s*view|\s*unsubscribe)/,
