@@ -8,6 +8,7 @@ import { type Correspondence } from '@/app/actions/correspondence'
 export interface EditFields {
   text: string
   date: string
+  time: string
   direction: 'received' | 'sent' | ''
   contactId: string
   subject: string
@@ -36,6 +37,13 @@ export function CorrespondenceEditForm({
     if (entry.entry_date) return new Date(entry.entry_date).toISOString().split('T')[0]
     return ''
   })
+  const [editedTime, setEditedTime] = useState(() => {
+    if (entry.entry_date) {
+      const d = new Date(entry.entry_date)
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+    return '09:00'
+  })
   const [editedDirection, setEditedDirection] = useState<'received' | 'sent' | ''>(entry.direction || '')
   const [editedContactId, setEditedContactId] = useState(entry.contact_id || '')
   const [editedSubject, setEditedSubject] = useState(entry.subject || '')
@@ -54,6 +62,7 @@ export function CorrespondenceEditForm({
       await onSave({
         text: editedText,
         date: editedDate,
+        time: editedTime,
         direction: editedDirection,
         contactId: editedContactId,
         subject: editedSubject,
@@ -144,18 +153,27 @@ export function CorrespondenceEditForm({
         </select>
       </div>
 
-      {/* Date Input */}
+      {/* Date + Time Input */}
       <div className="mb-3">
-        <label htmlFor="edit-date" className="block text-sm font-semibold text-gray-900 mb-1">
-          Entry Date:
+        <label className="block text-sm font-semibold text-gray-900 mb-1">
+          Entry Date &amp; Time:
         </label>
-        <input
-          id="edit-date"
-          type="date"
-          value={editedDate}
-          onChange={(e) => setEditedDate(e.target.value)}
-          className="w-full max-w-xs px-3 py-2 border-2 border-gray-300 text-sm focus:border-brand-navy focus:outline-none"
-        />
+        <div className="flex gap-2">
+          <input
+            id="edit-date"
+            type="date"
+            value={editedDate}
+            onChange={(e) => setEditedDate(e.target.value)}
+            className="px-3 py-2 border-2 border-gray-300 text-sm focus:border-brand-navy focus:outline-none"
+          />
+          <input
+            id="edit-time"
+            type="time"
+            value={editedTime}
+            onChange={(e) => setEditedTime(e.target.value)}
+            className="px-3 py-2 border-2 border-gray-300 text-sm focus:border-brand-navy focus:outline-none"
+          />
+        </div>
       </div>
 
       {/* Action Needed */}
