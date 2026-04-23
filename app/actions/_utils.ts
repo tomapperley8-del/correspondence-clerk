@@ -68,7 +68,12 @@ export function daysUntilFn(dateStr: string): number {
 
 export function makeSnippet(text: string | null | undefined): string | null {
   if (!text) return null
-  const stripped = text.replace(/\*\*|__|[_*#>`~]/g, '').replace(/\s+/g, ' ').trim()
+  // Strip forwarding headers so content from "FW:" emails shows actual body
+  const withoutFwdHeader = text
+    .replace(/^-{3,}\s*(forwarded message|original message)\s*-{3,}[\s\S]*?(?:\n\n|\n(?=[A-Z]))/im, '')
+    .replace(/^(?:from|sent|to|subject|date):[ \t]*[^\n]*\n/gim, '')
+  const stripped = withoutFwdHeader.replace(/\*\*|__|[_*#>`~]/g, '').replace(/\s+/g, ' ').trim()
+  if (!stripped) return null
   if (stripped.length <= 150) return stripped
   return stripped.slice(0, 150).replace(/\s\S*$/, '') + '…'
 }
@@ -88,13 +93,42 @@ export function likelyNeedsReply(item: CorrespondenceItem): boolean {
     'on holiday', 'on annual leave', 'on leave', 'on vacation', 'on maternity',
     'on paternity', 'do not reply', 'do not respond', 'noreply', 'no-reply',
     'delivery failed', 'undeliverable', 'mailer-daemon',
+    // Marketing automation / status updates
+    'list status update', 'campaign stats', 'email stats', 'mailchimp',
+    'email campaign report', 'campaign report',
   ]
   if (autoSubjects.some(p => subject.includes(p))) return false
 
+  // Forwarded newsletter: "fw: [anything with newsletter/bulletin/digest]"
+  if (subject.startsWith('fw:') && (
+    subject.includes('newsletter') || subject.includes('bulletin') ||
+    subject.includes('digest') || subject.includes('weekly update') ||
+    subject.includes('monthly update')
+  )) return false
+
   if (!snippet) return true
 
+  // Automated/marketing email body signals — check before ? pattern (which fires on HTML boilerplate)
+  const automatedBodySignals = [
+    'view in your browser',
+    'view this email in your browser',
+    "can't see the images",
+    'cannot see the images',
+    'click here to view',
+    'to unsubscribe from',
+    'manage your preferences',
+    'manage your email preferences',
+    'email marketing powered',
+    "you're receiving this email because",
+    'you are receiving this email because',
+    'this email was sent to you',
+    'know anyone who would also like to get our regular',
+    'know anyone who would like to receive',
+  ]
+  if (automatedBodySignals.some(s => snippet.includes(s))) return false
+
   const requestPatterns = [
-    /\?/,
+    /\?(?!\s*click|\s*view|\s*unsubscribe)/,
     /\bplease\b/,
     /\bcould (you|we)\b/,
     /\bcan (you|we)\b/,
