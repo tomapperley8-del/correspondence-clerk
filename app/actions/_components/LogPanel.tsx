@@ -63,7 +63,7 @@ export function LogPanel({ businessId, contactId, showMarkDone, initialText, onS
   const placeholder = logType === 'Call' ? 'What was discussed…' : logType === 'Email' ? 'What did you send…' : 'Add a note…'
 
   return (
-    <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
+    <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 animate-in fade-in slide-in-from-top-1 duration-150">
       <div className="flex gap-2 mb-2 flex-wrap items-center">
         <select
           value={logType}

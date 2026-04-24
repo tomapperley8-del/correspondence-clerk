@@ -36,7 +36,7 @@ export function DraftPanel({ correspondenceId, onUseInLog, onClose }: DraftPanel
   }
 
   return (
-    <div className="px-4 py-3 bg-blue-50/40 border-t border-blue-100">
+    <div className="px-4 py-3 bg-blue-50/40 border-t border-blue-100 animate-in fade-in slide-in-from-top-1 duration-150">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-brand-dark">Draft reply</span>
         <button
