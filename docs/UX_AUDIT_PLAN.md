@@ -271,7 +271,7 @@ Do NOT apply optimistic updates to Log/Draft (those open input panels).
 - `UX: tighten Actions page transitions to ≤150ms`
 - `UX: optimistic Done and Snooze so mutations feel instant`
 
-### P10.3 — Actions: surface buried commitments in the feed
+### ✅ P10.3 — Actions: surface buried commitments in the feed
 **Goal:** `insight_history` rows with `insight_type = 'what_did_we_agree'` generated within 14 days appear as actionable cards in the Actions feed. If none exist, page looks exactly as before.
 
 **New type** (add to `app/actions/_types.ts`):
@@ -298,7 +298,7 @@ export interface CommitmentItem {
 
 **Commit:** `Feature: surface outstanding commitment alerts in Actions feed`
 
-### P10.4 — Actions: rationale slide-out panel
+### ✅ P10.4 — Actions: rationale slide-out panel
 **Goal:** click any item → 380px right panel slides in with plain-English explanation of *why* it's urgent. No AI calls — rule-based + cached insight content + lazy relationship_memory fetch.
 
 **New component** `app/actions/_components/RationalePanel.tsx`:
