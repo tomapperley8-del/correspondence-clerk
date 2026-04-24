@@ -8,11 +8,13 @@ export function useActionsKeyboard({
   handleDone,
   handleSnooze,
   setLogOpenId,
+  setRationalePanelId,
 }: {
   unifiedList: UnifiedItem[]
   handleDone: (item: UnifiedItem) => void
   handleSnooze: (item: UnifiedItem, days: number) => void
   setLogOpenId: Dispatch<SetStateAction<string | null>>
+  setRationalePanelId: Dispatch<SetStateAction<string | null>>
 }) {
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const focusedIndex = unifiedList.findIndex(i => i.id === focusedId)
@@ -37,9 +39,14 @@ export function useActionsKeyboard({
       handleSnooze(focused, 7)
     } else if ((e.key === 'l' || e.key === 'L') && focused) {
       setLogOpenId(id => id === focused.id ? null : focused.id)
+    } else if (e.key === 'Enter' && focused) {
+      e.preventDefault()
+      setRationalePanelId(id => id === focused.id ? null : focused.id)
+    } else if (e.key === 'Escape') {
+      setRationalePanelId(null)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusedId, focusedIndex, unifiedList, handleDone, handleSnooze, setLogOpenId])
+  }, [focusedId, focusedIndex, unifiedList, handleDone, handleSnooze, setLogOpenId, setRationalePanelId])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)

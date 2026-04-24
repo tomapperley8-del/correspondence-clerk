@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useActionsData, type InitialActionsData } from '../_hooks/useActionsData'
 import { useUnifiedList } from '../_hooks/useUnifiedList'
@@ -8,6 +8,8 @@ import { useActionsKeyboard } from '../_hooks/useActionsKeyboard'
 import { useActionHandlers } from '../_hooks/useActionHandlers'
 import { CollapsibleSection } from './CollapsibleSection'
 import { ItemRow } from './ItemRow'
+import { RationalePanel } from './RationalePanel'
+import { getRelationshipMemory } from '../rationaleContext'
 
 export function ActionsClient({ initial }: { initial: InitialActionsData }) {
   const {
@@ -20,6 +22,9 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
   )
 
   const clearFocusRef = useRef<(id: string) => void>(() => {})
+
+  const [rationalePanelId, setRationalePanelId] = useState<string | null>(null)
+  const [relationshipMemoryCache, setRelationshipMemoryCache] = useState<Map<string, string | null>>(new Map)
 
   const {
     processingId, logOpenId, setLogOpenId,
@@ -39,7 +44,23 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
     handleDone,
     handleSnooze,
     setLogOpenId,
+    setRationalePanelId,
   })
+
+  // Lazy-fetch relationship memory when panel opens for a new business
+  const rationalePanelItem = useMemo(
+    () => rationalePanelId ? unifiedList.find(i => i.id === rationalePanelId) ?? null : null,
+    [rationalePanelId, unifiedList],
+  )
+  useEffect(() => {
+    if (!rationalePanelItem) return
+    const bizId = rationalePanelItem.business_id
+    if (relationshipMemoryCache.has(bizId)) return
+    getRelationshipMemory(bizId).then(mem => {
+      setRelationshipMemoryCache(prev => new Map(prev).set(bizId, mem))
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rationalePanelItem?.business_id])
 
   clearFocusRef.current = (id) => { if (focusedId === id) setFocusedId(null) }
 
@@ -59,14 +80,15 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
         logInitialText={logOpenId === item.id ? logInitialText : undefined}
         priorityNumber={priorityNumber}
         onFocus={() => setFocusedId(item.id)}
+        onSelect={() => setRationalePanelId(id => id === item.id ? null : item.id)}
         onDone={() => handleDone(item)}
         onDoneWithResolution={res => handleDoneWithResolution(item, res)}
         onResolutionCancel={() => handleResolutionCancel(item.id)}
         onSnooze={days => handleSnooze(item, days)}
         onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
-        onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
+        onLogToggle={() => { setRationalePanelId(null); setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
         onLogSave={markDone => handleLogSave(item, markDone)}
-        onDraftToggle={() => { setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
+        onDraftToggle={() => { setRationalePanelId(null); setDraftOpenId(id => id === item.id ? null : item.id); setLogOpenId(null); setLogInitialText('') }}
         onUseInLog={draft => handleUseInLog(item.id, draft)}
       />
     )
@@ -86,7 +108,7 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
         </div>
         <div className="text-right text-xs text-gray-400 leading-relaxed hidden sm:block">
           <div className="font-medium text-gray-500 mb-0.5">Keyboard shortcuts</div>
-          <div><kbd className="bg-gray-100 border border-gray-300 px-1 rounded text-[10px]">↑ ↓</kbd> navigate</div>
+          <div><kbd className="bg-gray-100 border border-gray-300 px-1 rounded text-[10px]">↑ ↓</kbd> navigate &nbsp; <kbd className="bg-gray-100 border border-gray-300 px-1 rounded text-[10px]">Enter</kbd> why</div>
           <div>
             <kbd className="bg-gray-100 border border-gray-300 px-1 rounded text-[10px]">D</kbd> done &nbsp;
             <kbd className="bg-gray-100 border border-gray-300 px-1 rounded text-[10px]">S</kbd> snooze 7d &nbsp;
@@ -149,6 +171,22 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
             {sections.renewals.map(item => renderItemRow(item))}
           </CollapsibleSection>
         </>
+      )}
+
+      {/* Rationale slide-out panel */}
+      {rationalePanelItem && (
+        <RationalePanel
+          item={rationalePanelItem}
+          relationshipMemory={
+            relationshipMemoryCache.has(rationalePanelItem.business_id)
+              ? relationshipMemoryCache.get(rationalePanelItem.business_id) ?? null
+              : undefined
+          }
+          onClose={() => setRationalePanelId(null)}
+          onDone={() => { handleDone(rationalePanelItem); setRationalePanelId(null) }}
+          onLog={() => { setRationalePanelId(null); setLogOpenId(rationalePanelItem.id) }}
+          onDraft={() => { setRationalePanelId(null); setDraftOpenId(rationalePanelItem.id) }}
+        />
       )}
     </div>
   )
