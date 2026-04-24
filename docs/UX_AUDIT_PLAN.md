@@ -229,6 +229,112 @@ This phase reshapes both pages so the answer to "what matters today?" is on the 
 
 ---
 
+## Phase 10 — Actions Intelligence Upgrade
+
+Detailed implementation notes: `~/.claude/plans/thoughts-on-the-below-synchronous-newell.md`
+
+Background: after reviewing a proposal for an "Autonomous Executive Command Center", the genuinely new work was distilled to four items. Roughly 60% of the proposal already exists; the four items below are what's missing. Build in order — each is self-contained and safe to ship independently.
+
+**Hard rules for this phase:** read every file before editing, one file at a time, never rewrite existing behaviour — only extend. Commit after every sub-item.
+
+### ✅ P10.1 — Actions: presentation polish
+**Files:** `app/actions/_components/ItemRow.tsx`
+**What:** CSS/layout only — no AI, no new data, no schema changes.
+- Business name → `font-semibold text-base` (currently too light — it's the primary identifier)
+- Contact name + role → same line as business name, separated by `·`, `text-sm text-gray-500`
+- Subject → `text-sm text-gray-600 italic` (tertiary, visually distinct)
+- Timestamp chip → compact right-aligned context: "Received 8d ago" / "Due 3d ago" / "Expires in 12d" — derive from existing `badgeLabel` / `daysAgo` fields, no new fetches
+- Left border → `border-l-2` → `border-l-[3px]`, keep existing colour logic
+- Row padding → `py-3` → `py-3.5`
+- Snippet → confirm always `line-clamp-2` with click-to-expand
+**Do NOT change:** badge logic, action buttons, LogPanel, DraftPanel, keyboard nav, urgency scoring.
+**Commit:** `UX: richer card layout and typography polish on Actions items`
+
+### ✅ P10.2 — Actions: 100ms polish pass
+**Files:** action component CSS + `app/actions/_hooks/useActionHandlers.ts` (or wherever `handleDone`/`handleSnooze` live)
+
+**Layer A — CSS timings:**
+- Log/Draft panel open: → 150ms ease-out
+- Snooze dropdown: remove transition, instant
+- Keyboard focus highlight: remove transition, instant bg swap
+- Section expand/collapse: → 150ms
+- (Rationale panel added in P10.4 will use 150ms)
+
+**Layer B — Optimistic mutations (bigger win):** Done/Snooze currently wait for server action before removing the item — UI freezes 300–800ms per keypress.
+Pattern:
+1. Immediately `removeItem(id)` from local list
+2. Fire server action in background (no await in UI thread)
+3. On failure: `restoreItem(item)` + `toast.error('Could not mark done')`
+Check if `removeItem`/`restoreItem` already exist in `useUnifiedList` or `useActionsData` before adding.
+Do NOT apply optimistic updates to Log/Draft (those open input panels).
+**Commits:**
+- `UX: tighten Actions page transitions to ≤150ms`
+- `UX: optimistic Done and Snooze so mutations feel instant`
+
+### P10.3 — Actions: surface buried commitments in the feed
+**Goal:** `insight_history` rows with `insight_type = 'what_did_we_agree'` generated within 14 days appear as actionable cards in the Actions feed. If none exist, page looks exactly as before.
+
+**New type** (add to `app/actions/_types.ts`):
+```typescript
+export interface CommitmentItem {
+  id: string            // insight_history.id
+  type: 'commitment'
+  business_id: string
+  business_name: string
+  content_preview: string   // first 120 chars, markdown stripped
+  generated_at: string
+}
+```
+
+**New server action** `getCommitmentAlerts()`:
+- Query: `insight_history WHERE org_id=? AND insight_type='what_did_we_agree' AND generated_at > now()-'14 days' AND business_id IS NOT NULL`
+- Group by business_id, most recent per business; join businesses for name
+- Return `CommitmentItem[]`
+- Add to parallel fetch in `app/actions/page.tsx`, add `commitments` to `InitialActionsData`
+
+**Wire into `useUnifiedList.ts`:** badge `'COMMITMENT'`, urgencyScore `7.5`, badgeLabel `"Outstanding commitments"`, included in `sections.actions` slice.
+
+**Wire into `ItemRow.tsx`:** handle `item.type === 'commitment'`: business name bold, badge `bg-amber-100 text-amber-800`, content preview 2-line clamp italic, "Generated Xd ago" chip, no direction/contact indicator. Actions: Done + Snooze + Log. Dismissal: localStorage `dismissed_insights` key (no DB migration — items age out of 14-day window naturally).
+
+**Commit:** `Feature: surface outstanding commitment alerts in Actions feed`
+
+### P10.4 — Actions: rationale slide-out panel
+**Goal:** click any item → 380px right panel slides in with plain-English explanation of *why* it's urgent. No AI calls — rule-based + cached insight content + lazy relationship_memory fetch.
+
+**New component** `app/actions/_components/RationalePanel.tsx`:
+- Props: `item`, `insightCache` (business_id→content), `relationshipMemory` (business_id→string), `onClose`, `onDone`, `onSnooze`, `onLog`, `onDraft`
+- Animation: `translate-x-full` → `translate-x-0`, `transition-transform duration-150 ease-out`
+- Mobile (< md): full-width bottom sheet
+
+**Rationale text by badge:**
+- REPLY: "You received a message from [contact] at [business] [X] days ago. No reply sent since."
+- OVERDUE: "Flagged as [action type], due [date]. Now [X] days overdue."
+- DUE_TODAY/SOON: "This [action type] is due [today / in X days]."
+- FLAG: "Flagged for follow-up on [date]."
+- RENEWAL/EXPIRED: "Contract [expires/expired] [date] — [X] days [away/ago]. Value: [amount]."
+- COMMITMENT: render `insightCache[business_id]` content (markdown, scrollable)
+- REMINDER: "Reminder set — due [date]."
+- Source link for correspondence: `→ '[subject]' on [date]` → `/businesses/[id]`
+- Relationship memory: show below as subtle "Context" block with faint border-left (lazy fetch, cached in state Map)
+
+**New server action** `getRelationshipMemory(businessId)` in `app/actions/rationaleContext.ts`:
+- `SELECT relationship_memory FROM businesses WHERE id=? AND org_id=?`
+- Called lazily on panel open; result cached in `relationshipMemoryCache` state Map
+
+**Changes to `ActionsClient.tsx`:**
+- Add state: `rationalePanelId`, `relationshipMemoryCache`
+- `insightCache` = `useMemo` over commitments array
+- `ItemRow` gets new `onSelect` prop → sets `rationalePanelId`
+- Opening Log/Draft closes rationale panel; opening rationale does NOT close Log/Draft
+- Wrap list in `<div className="flex">` with `mr-[380px]` when panel open (150ms transition)
+- Keyboard: `Escape` closes panel; `↑↓` navigate + update panel content; `Enter` opens panel for focused item
+
+**Do NOT change:** Log panel, Draft panel, Snooze menu, D/S/L shortcuts, section collapse, urgency scoring, existing data fetches.
+
+**Commit:** `Feature: rationale slide-out panel on Actions page`
+
+---
+
 ## Implementation Order Summary
 
 | Phase | What | Why first |
