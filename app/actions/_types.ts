@@ -39,6 +39,15 @@ export type ContractItem = {
   last_correspondence_snippet: string | null
 }
 
+export type CommitmentItem = {
+  kind: 'commitment'
+  id: string
+  business_id: string
+  business_name: string
+  content_preview: string
+  generated_at: string
+}
+
 export type Badge =
   | 'REPLY'
   | 'OVERDUE'
@@ -50,8 +59,9 @@ export type Badge =
   | 'EXPIRED'
   | 'QUIET'
   | 'REMINDER'
+  | 'COMMITMENT'
 
-export type UnifiedItem = (CorrespondenceItem | BusinessItem | ContractItem) & {
+export type UnifiedItem = (CorrespondenceItem | BusinessItem | ContractItem | CommitmentItem) & {
   badge: Badge
   urgencyScore: number
   badgeLabel: string

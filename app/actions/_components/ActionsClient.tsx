@@ -11,12 +11,12 @@ import { ItemRow } from './ItemRow'
 
 export function ActionsClient({ initial }: { initial: InitialActionsData }) {
   const {
-    needsReply, flagged, reminders, contracts,
+    needsReply, flagged, reminders, contracts, commitments,
     error, removeItem, restoreItem,
   } = useActionsData(initial)
 
   const { unifiedList, topPriority, sections, urgentSummary } = useUnifiedList(
-    needsReply, flagged, reminders, contracts,
+    needsReply, flagged, reminders, contracts, commitments,
   )
 
   const clearFocusRef = useRef<(id: string) => void>(() => {})

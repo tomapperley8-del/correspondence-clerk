@@ -1491,3 +1491,44 @@ export async function getContractExpiries() {
 
   return { data: results }
 }
+
+export async function getCommitmentAlerts(): Promise<{ data?: Record<string, unknown>[]; error?: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: [], error: null }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { data: [], error: null }
+
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 14)
+
+  const { data, error } = await supabase
+    .from('insight_history')
+    .select('id, business_id, content, generated_at, businesses(name)')
+    .eq('org_id', orgId)
+    .eq('insight_type', 'what_did_we_agree')
+    .not('business_id', 'is', null)
+    .gte('generated_at', cutoff.toISOString())
+    .order('generated_at', { ascending: false })
+
+  if (error) return { data: [], error: null }
+
+  // Most recent per business
+  const seen = new Set<string>()
+  const result: Record<string, unknown>[] = []
+  for (const row of data ?? []) {
+    const rawBiz = row.businesses
+    const biz = (Array.isArray(rawBiz) ? rawBiz[0] : rawBiz) as { name: string } | null
+    if (!biz || seen.has(row.business_id as string)) continue
+    seen.add(row.business_id as string)
+    result.push({
+      id: row.id,
+      business_id: row.business_id,
+      business_name: biz.name,
+      content: row.content,
+      generated_at: row.generated_at,
+    })
+  }
+
+  return { data: result }
+}

@@ -30,6 +30,7 @@ export const BADGE_CLASSES: Record<Badge, string> = {
   EXPIRED:      'bg-red-50 border border-red-300 text-red-700',
   QUIET:        'bg-slate-50 border border-slate-300 text-slate-700',
   REMINDER:     'bg-gray-50 border border-gray-300 text-gray-600',
+  COMMITMENT:   'bg-amber-50 border border-amber-300 text-amber-800',
 }
 
 export function getBadgeClass(item: UnifiedItem): string {
@@ -53,6 +54,7 @@ export const LEFT_BORDER: Record<Badge, string> = {
   EXPIRED:      'border-l-[3px] border-red-400',
   QUIET:        'border-l-[3px] border-slate-300',
   REMINDER:     'border-l-[3px] border-transparent',
+  COMMITMENT:   'border-l-[3px] border-amber-400',
 }
 
 export function daysAgoFn(dateStr: string): number {

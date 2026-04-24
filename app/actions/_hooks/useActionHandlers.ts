@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { markCorrespondenceDone, snoozeCorrespondence } from '@/app/actions/correspondence'
 import { setContractRenewalType } from '@/app/actions/businesses'
+import { persistDismissedInsight } from './useActionsData'
 import { toast } from '@/lib/toast'
 import type { UnifiedItem } from '../_types'
 
@@ -43,8 +44,13 @@ export function useActionHandlers({
       // Fallback if called again without going through picker
       removeItem(item.id)
       onClearFocus(item.id)
+    } else if (item.kind === 'commitment') {
+      removeItem(item.id)
+      onClearFocus(item.id)
+      persistDismissedInsight(item.id)
+      toast.success('Dismissed')
     } else {
-      // Gone Quiet business — simple client-side dismiss
+      // Business (gone quiet) — simple client-side dismiss
       removeItem(item.id)
       onClearFocus(item.id)
       toast.success('Dismissed')

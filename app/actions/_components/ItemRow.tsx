@@ -6,7 +6,7 @@ import { LogPanel } from './LogPanel'
 import { DraftPanel } from './DraftPanel'
 import { SnoozeMenu } from './SnoozeMenu'
 import { getBadgeClass, LEFT_BORDER, ACTION_LABELS, ACTION_COLOURS, formatDateGB, daysAgoFn, daysUntilFn } from '../_utils'
-import type { UnifiedItem, CorrespondenceItem, ContractItem, BusinessItem } from '../_types'
+import type { UnifiedItem, CorrespondenceItem, ContractItem, BusinessItem, CommitmentItem } from '../_types'
 
 // Resolution options for invoice / waiting_on_them correspondence
 const RESOLUTION_OPTIONS = [
@@ -55,9 +55,11 @@ export function ItemRow({
   const isCorr = item.kind === 'correspondence'
   const isContract = item.kind === 'contract'
   const isBusiness = item.kind === 'business'
+  const isCommitment = item.kind === 'commitment'
   const corr = isCorr ? (item as CorrespondenceItem) : null
   const contract = isContract ? (item as ContractItem) : null
   const biz = isBusiness ? (item as BusinessItem) : null
+  const commitment = isCommitment ? (item as CommitmentItem) : null
 
   // Compact timestamp chip — derived from existing fields, no new fetches
   let timestampChip: string | null = null
@@ -80,6 +82,8 @@ export function ItemRow({
   } else if (item.badge === 'REMINDER' && corr?.due_at) {
     const d = daysUntilFn(corr.due_at)
     timestampChip = d <= 0 ? 'Due today' : `Due in ${d}d`
+  } else if (item.badge === 'COMMITMENT' && commitment?.generated_at) {
+    timestampChip = `Generated ${daysAgoFn(commitment.generated_at)}d ago`
   }
 
   // Which picker to show when resolutionPending
@@ -178,6 +182,13 @@ export function ItemRow({
                   : <span className="text-gray-400 italic">Consider discussing renewal before this date.</span>
               )}
             </div>
+          )}
+
+          {/* Commitment preview */}
+          {commitment?.content_preview && (
+            <p className="text-xs text-gray-500 italic line-clamp-2 mb-0.5">
+              &ldquo;{commitment.content_preview}&rdquo;
+            </p>
           )}
 
           {/* Gone quiet detail */}
