@@ -33,6 +33,7 @@ type ItemRowProps = {
   logInitialText?: string
   priorityNumber?: string
   onFocus: () => void
+  onSelect?: () => void
   onDone: () => void
   onDoneWithResolution: (resolution: string) => void
   onResolutionCancel: () => void
@@ -47,7 +48,7 @@ type ItemRowProps = {
 export function ItemRow({
   item, focused, logOpen, draftOpen, snoozeOpen, processing, resolutionPending,
   logInitialText, priorityNumber,
-  onFocus, onDone, onDoneWithResolution, onResolutionCancel,
+  onFocus, onSelect, onDone, onDoneWithResolution, onResolutionCancel,
   onSnooze, onSnoozeToggle, onLogToggle, onLogSave,
   onDraftToggle, onUseInLog,
 }: ItemRowProps) {
@@ -94,7 +95,7 @@ export function ItemRow({
     <div
       tabIndex={0}
       onFocus={onFocus}
-      onClick={onFocus}
+      onClick={() => { onFocus(); onSelect?.() }}
       className={`outline-none ${focused ? 'bg-brand-navy/[0.04]' : 'hover:bg-gray-50/60'} ${LEFT_BORDER[item.badge]}`}
     >
       <div className="flex items-start gap-3 px-4 py-3.5">
