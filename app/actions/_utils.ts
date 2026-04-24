@@ -43,16 +43,16 @@ export function getBadgeClass(item: UnifiedItem): string {
 }
 
 export const LEFT_BORDER: Record<Badge, string> = {
-  REPLY:        'border-l-2 border-amber-400',
-  OVERDUE:      'border-l-2 border-red-500',
-  DUE_TODAY:    'border-l-2 border-red-400',
-  DUE_TOMORROW: 'border-l-2 border-amber-400',
-  DUE_SOON:     'border-l-2 border-amber-300',
-  FLAG:         'border-l-2 border-brand-olive/60',
-  RENEWAL:      'border-l-2 border-brand-olive/60',
-  EXPIRED:      'border-l-2 border-red-400',
-  QUIET:        'border-l-2 border-slate-300',
-  REMINDER:     'border-l-2 border-transparent',
+  REPLY:        'border-l-[3px] border-amber-400',
+  OVERDUE:      'border-l-[3px] border-red-500',
+  DUE_TODAY:    'border-l-[3px] border-red-400',
+  DUE_TOMORROW: 'border-l-[3px] border-amber-400',
+  DUE_SOON:     'border-l-[3px] border-amber-300',
+  FLAG:         'border-l-[3px] border-brand-olive/60',
+  RENEWAL:      'border-l-[3px] border-brand-olive/60',
+  EXPIRED:      'border-l-[3px] border-red-400',
+  QUIET:        'border-l-[3px] border-slate-300',
+  REMINDER:     'border-l-[3px] border-transparent',
 }
 
 export function daysAgoFn(dateStr: string): number {

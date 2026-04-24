@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { LogPanel } from './LogPanel'
 import { DraftPanel } from './DraftPanel'
 import { SnoozeMenu } from './SnoozeMenu'
-import { getBadgeClass, LEFT_BORDER, ACTION_LABELS, ACTION_COLOURS, formatDateGB } from '../_utils'
+import { getBadgeClass, LEFT_BORDER, ACTION_LABELS, ACTION_COLOURS, formatDateGB, daysAgoFn, daysUntilFn } from '../_utils'
 import type { UnifiedItem, CorrespondenceItem, ContractItem, BusinessItem } from '../_types'
 
 // Resolution options for invoice / waiting_on_them correspondence
@@ -59,6 +59,29 @@ export function ItemRow({
   const contract = isContract ? (item as ContractItem) : null
   const biz = isBusiness ? (item as BusinessItem) : null
 
+  // Compact timestamp chip — derived from existing fields, no new fetches
+  let timestampChip: string | null = null
+  if (item.badge === 'REPLY' && corr?.daysAgo != null) {
+    timestampChip = `Received ${corr.daysAgo}d ago`
+  } else if (item.badge === 'OVERDUE' && corr?.due_at) {
+    timestampChip = `${daysAgoFn(corr.due_at)}d overdue`
+  } else if (item.badge === 'DUE_TODAY') {
+    timestampChip = 'Due today'
+  } else if (item.badge === 'DUE_TOMORROW') {
+    timestampChip = 'Due tomorrow'
+  } else if (item.badge === 'DUE_SOON' && corr?.due_at) {
+    timestampChip = `Due in ${daysUntilFn(corr.due_at)}d`
+  } else if (item.badge === 'FLAG' && corr?.entry_date) {
+    timestampChip = `${daysAgoFn(corr.entry_date)}d ago`
+  } else if (item.badge === 'RENEWAL' && contract?.contract_end) {
+    timestampChip = `Expires in ${daysUntilFn(contract.contract_end)}d`
+  } else if (item.badge === 'EXPIRED' && contract?.contract_end) {
+    timestampChip = `Expired ${daysAgoFn(contract.contract_end)}d ago`
+  } else if (item.badge === 'REMINDER' && corr?.due_at) {
+    const d = daysUntilFn(corr.due_at)
+    timestampChip = d <= 0 ? 'Due today' : `Due in ${d}d`
+  }
+
   // Which picker to show when resolutionPending
   const showCorrPicker = resolutionPending && isCorr && corr && RESOLUTION_OPTIONS.length > 0
   const showContractPicker = resolutionPending && isContract
@@ -70,7 +93,7 @@ export function ItemRow({
       onClick={onFocus}
       className={`outline-none transition-colors ${focused ? 'bg-brand-navy/[0.04]' : 'hover:bg-gray-50/60'} ${LEFT_BORDER[item.badge]}`}
     >
-      <div className="flex items-start gap-3 px-4 py-3">
+      <div className="flex items-start gap-3 px-4 py-3.5">
         {priorityNumber && (
           <span className="shrink-0 w-5 text-right text-sm font-semibold text-gray-300 leading-6 select-none">
             {priorityNumber}.
@@ -89,25 +112,30 @@ export function ItemRow({
             )}
           </div>
 
-          {/* Business + contact */}
-          <div className="flex items-center gap-2 flex-wrap mb-0.5">
-            <Link
-              href={`/businesses/${item.business_id}?from=actions${item.kind === 'correspondence' ? `#entry-${item.id}` : ''}`}
-              className="font-semibold text-gray-900 hover:text-brand-navy hover:underline text-sm"
-              onClick={e => e.stopPropagation()}
-            >
-              {item.business_name}
-            </Link>
-            {corr?.contact_name && (
-              <span className="text-xs text-gray-500">
-                — {corr.contact_name}{corr.contact_role && ` (${corr.contact_role})`}
-              </span>
+          {/* Business + contact + timestamp */}
+          <div className="flex items-center justify-between gap-2 mb-0.5">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <Link
+                href={`/businesses/${item.business_id}?from=actions${item.kind === 'correspondence' ? `#entry-${item.id}` : ''}`}
+                className="font-semibold text-gray-900 hover:text-brand-navy hover:underline text-base"
+                onClick={e => e.stopPropagation()}
+              >
+                {item.business_name}
+              </Link>
+              {corr?.contact_name && (
+                <span className="text-sm text-gray-500">
+                  · {corr.contact_name}{corr.contact_role && ` · ${corr.contact_role}`}
+                </span>
+              )}
+            </div>
+            {timestampChip && (
+              <span className="shrink-0 text-xs text-gray-400">{timestampChip}</span>
             )}
           </div>
 
           {/* Subject */}
           {corr?.subject && (
-            <p className="text-sm text-gray-800 mb-0.5">{corr.subject}</p>
+            <p className="text-sm text-gray-600 italic mb-0.5">{corr.subject}</p>
           )}
 
           {/* Direction + snippet */}
