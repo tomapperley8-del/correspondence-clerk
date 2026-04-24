@@ -95,7 +95,7 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className={`max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-[padding-right] duration-150 ${rationalePanelId ? 'md:pr-[396px]' : ''}`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
