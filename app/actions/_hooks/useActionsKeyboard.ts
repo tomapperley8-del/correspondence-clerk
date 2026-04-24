@@ -11,7 +11,7 @@ export function useActionsKeyboard({
 }: {
   unifiedList: UnifiedItem[]
   handleDone: (item: UnifiedItem) => void
-  handleSnooze: (id: string, days: number) => void
+  handleSnooze: (item: UnifiedItem, days: number) => void
   setLogOpenId: Dispatch<SetStateAction<string | null>>
 }) {
   const [focusedId, setFocusedId] = useState<string | null>(null)
@@ -34,7 +34,7 @@ export function useActionsKeyboard({
     } else if ((e.key === 'd' || e.key === 'D') && focused) {
       handleDone(focused)
     } else if ((e.key === 's' || e.key === 'S') && focused && focused.kind === 'correspondence') {
-      handleSnooze(focused.id, 7)
+      handleSnooze(focused, 7)
     } else if ((e.key === 'l' || e.key === 'L') && focused) {
       setLogOpenId(id => id === focused.id ? null : focused.id)
     }

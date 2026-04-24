@@ -12,7 +12,7 @@ import { ItemRow } from './ItemRow'
 export function ActionsClient({ initial }: { initial: InitialActionsData }) {
   const {
     needsReply, flagged, reminders, contracts,
-    error, removeItem,
+    error, removeItem, restoreItem,
   } = useActionsData(initial)
 
   const { unifiedList, topPriority, sections, urgentSummary } = useUnifiedList(
@@ -30,6 +30,7 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
     handleSnooze, handleLogSave, handleUseInLog,
   } = useActionHandlers({
     removeItem,
+    restoreItem,
     onClearFocus: (id) => clearFocusRef.current(id),
   })
 
@@ -61,7 +62,7 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
         onDone={() => handleDone(item)}
         onDoneWithResolution={res => handleDoneWithResolution(item, res)}
         onResolutionCancel={() => handleResolutionCancel(item.id)}
-        onSnooze={days => handleSnooze(item.id, days)}
+        onSnooze={days => handleSnooze(item, days)}
         onSnoozeToggle={() => setSnoozeOpenId(id => id === item.id ? null : item.id)}
         onLogToggle={() => { setLogOpenId(id => id === item.id ? null : item.id); setDraftOpenId(null) }}
         onLogSave={markDone => handleLogSave(item, markDone)}

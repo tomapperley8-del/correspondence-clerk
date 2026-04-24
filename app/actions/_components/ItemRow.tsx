@@ -91,7 +91,7 @@ export function ItemRow({
       tabIndex={0}
       onFocus={onFocus}
       onClick={onFocus}
-      className={`outline-none transition-colors ${focused ? 'bg-brand-navy/[0.04]' : 'hover:bg-gray-50/60'} ${LEFT_BORDER[item.badge]}`}
+      className={`outline-none ${focused ? 'bg-brand-navy/[0.04]' : 'hover:bg-gray-50/60'} ${LEFT_BORDER[item.badge]}`}
     >
       <div className="flex items-start gap-3 px-4 py-3.5">
         {priorityNumber && (

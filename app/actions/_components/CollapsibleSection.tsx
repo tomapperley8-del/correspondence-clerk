@@ -45,7 +45,7 @@ export function CollapsibleSection({ title, count, defaultExpanded = false, subt
         </svg>
       </button>
       {open && (
-        <div className="divide-y divide-gray-200 border-t border-gray-200">
+        <div className="divide-y divide-gray-200 border-t border-gray-200 animate-in fade-in duration-150">
           {visibleChildren}
           {hiddenCount > 0 && (
             <button

@@ -11,9 +11,11 @@ const RESOLUTION_ACTIONS = new Set(['invoice', 'waiting_on_them'])
 
 export function useActionHandlers({
   removeItem,
+  restoreItem,
   onClearFocus,
 }: {
   removeItem: (id: string) => void
+  restoreItem: (item: UnifiedItem) => void
   onClearFocus: (id: string) => void
 }) {
   const [processingId, setProcessingId] = useState<string | null>(null)
@@ -70,18 +72,19 @@ export function useActionHandlers({
 
   async function _markDone(item: UnifiedItem, resolution?: string) {
     if (item.kind !== 'correspondence') return
-    setProcessingId(item.id)
-    const result = await markCorrespondenceDone(item.id, resolution)
-    if ('error' in result && result.error) {
-      toast.error('Failed to mark done')
-    } else {
-      removeItem(item.id)
-      if (logOpenId === item.id) setLogOpenId(null)
-      if (draftOpenId === item.id) setDraftOpenId(null)
-      onClearFocus(item.id)
-      toast.success('Marked done')
-    }
-    setProcessingId(null)
+    // Optimistic: remove immediately, sync in background
+    removeItem(item.id)
+    if (logOpenId === item.id) setLogOpenId(null)
+    if (draftOpenId === item.id) setDraftOpenId(null)
+    onClearFocus(item.id)
+    markCorrespondenceDone(item.id, resolution).then(result => {
+      if ('error' in result && result.error) {
+        restoreItem(item)
+        toast.error('Could not mark done')
+      } else {
+        toast.success('Marked done')
+      }
+    })
   }
 
   async function _handleContractResolution(item: UnifiedItem, resolution: string) {
@@ -109,19 +112,20 @@ export function useActionHandlers({
     setProcessingId(null)
   }
 
-  async function handleSnooze(id: string, days: number) {
+  async function handleSnooze(item: UnifiedItem, days: number) {
     setSnoozeOpenId(null)
-    setProcessingId(id)
-    const result = await snoozeCorrespondence(id, days)
-    if ('error' in result && result.error) {
-      toast.error('Failed to snooze')
-    } else {
-      removeItem(id)
-      onClearFocus(id)
-      const label = days === 3 ? '3 days' : days === 7 ? '1 week' : '1 month'
-      toast.success(`Snoozed for ${label}`)
-    }
-    setProcessingId(null)
+    // Optimistic: remove immediately, sync in background
+    removeItem(item.id)
+    onClearFocus(item.id)
+    const label = days === 3 ? '3 days' : days === 7 ? '1 week' : '1 month'
+    snoozeCorrespondence(item.id, days).then(result => {
+      if ('error' in result && result.error) {
+        restoreItem(item)
+        toast.error('Could not snooze')
+      } else {
+        toast.success(`Snoozed for ${label}`)
+      }
+    })
   }
 
   function handleLogSave(item: UnifiedItem, markDone: boolean) {

@@ -8,7 +8,7 @@ import {
   getContractExpiries,
 } from '@/app/actions/correspondence'
 import { daysAgoFn, makeSnippet, likelyNeedsReply } from '../_utils'
-import type { CorrespondenceItem, ContractItem } from '../_types'
+import type { CorrespondenceItem, ContractItem, UnifiedItem } from '../_types'
 
 type RawResult<T> = { data?: T[]; error?: string | null }
 
@@ -109,6 +109,21 @@ export function useActionsData(initial?: InitialActionsData) {
     setContracts(prev => prev.filter(i => i.id !== id))
   }
 
+  function restoreItem(item: UnifiedItem) {
+    if (item.kind === 'contract') {
+      setContracts(prev => [...prev, item as ContractItem])
+    } else if (item.kind === 'correspondence') {
+      const corr = item as CorrespondenceItem
+      if (item.badge === 'REPLY') {
+        setNeedsReply(prev => [...prev, corr])
+      } else if (item.badge === 'REMINDER') {
+        setReminders(prev => [...prev, corr])
+      } else {
+        setFlagged(prev => [...prev, corr])
+      }
+    }
+  }
+
   return {
     needsReply,
     flagged,
@@ -118,5 +133,6 @@ export function useActionsData(initial?: InitialActionsData) {
     error,
     reload,
     removeItem,
+    restoreItem,
   }
 }
