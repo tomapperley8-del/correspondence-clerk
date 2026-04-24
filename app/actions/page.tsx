@@ -3,6 +3,7 @@ import {
   getOutstandingActions,
   getPureReminders,
   getContractExpiries,
+  getCommitmentAlerts,
 } from '@/app/actions/correspondence'
 import { ActionsClient } from './_components/ActionsClient'
 
@@ -18,11 +19,12 @@ async function safe(p: Promise<unknown>): Promise<Raw> {
 }
 
 export default async function ActionsPage() {
-  const [needsReply, flagged, reminders, contracts] = await Promise.all([
+  const [needsReply, flagged, reminders, contracts, commitments] = await Promise.all([
     safe(getNeedsReply()),
     safe(getOutstandingActions()),
     safe(getPureReminders()),
     safe(getContractExpiries()),
+    safe(getCommitmentAlerts()),
   ])
 
   return (
@@ -32,6 +34,7 @@ export default async function ActionsPage() {
         flagged: flagged as { data?: Record<string, unknown>[]; error?: string | null },
         reminders: reminders as { data?: Record<string, unknown>[]; error?: string | null },
         contracts: contracts as { data?: Record<string, unknown>[]; error?: string | null },
+        commitments: commitments as { data?: Record<string, unknown>[]; error?: string | null },
       }}
     />
   )
