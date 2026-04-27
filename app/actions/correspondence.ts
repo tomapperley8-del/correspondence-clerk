@@ -882,18 +882,7 @@ export async function getOutstandingActions() {
   }
 
   const { data, error } = await supabase
-    .from('correspondence')
-    .select(`
-      id, business_id, contact_id, subject, type, direction, entry_date, due_at, action_needed,
-      formatted_text_current,
-      businesses!inner(id, name),
-      contact:contacts(name, role)
-    `)
-    .eq('organization_id', organizationId)
-    .neq('action_needed', 'none')
-    .order('due_at', { ascending: true, nullsFirst: false })
-    .order('entry_date', { ascending: false })
-    .limit(200)
+    .rpc('get_outstanding_actions', { p_org_id: organizationId })
 
   if (error) {
     return { error: error.message }
