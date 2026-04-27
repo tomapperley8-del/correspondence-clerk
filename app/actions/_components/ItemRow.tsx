@@ -32,6 +32,7 @@ type ItemRowProps = {
   resolutionPending: boolean
   logInitialText?: string
   priorityNumber?: string
+  rationaleOpen?: boolean
   onFocus: () => void
   onSelect?: () => void
   onDone: () => void
@@ -47,7 +48,7 @@ type ItemRowProps = {
 
 export function ItemRow({
   item, focused, logOpen, draftOpen, snoozeOpen, processing, resolutionPending,
-  logInitialText, priorityNumber,
+  logInitialText, priorityNumber, rationaleOpen,
   onFocus, onSelect, onDone, onDoneWithResolution, onResolutionCancel,
   onSnooze, onSnoozeToggle, onLogToggle, onLogSave,
   onDraftToggle, onUseInLog,
@@ -203,6 +204,14 @@ export function ItemRow({
 
         {/* Action buttons */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {onSelect && (
+            <button
+              onClick={e => { e.stopPropagation(); onSelect() }}
+              className={`px-3 py-1 text-xs font-medium border transition-colors ${rationaleOpen ? 'bg-gray-800 border-gray-800 text-white' : 'border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600'}`}
+            >
+              Why
+            </button>
+          )}
           <button
             onClick={e => { e.stopPropagation(); onDone() }}
             disabled={processing}

@@ -79,6 +79,7 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
         resolutionPending={resolutionPendingId === item.id}
         logInitialText={logOpenId === item.id ? logInitialText : undefined}
         priorityNumber={priorityNumber}
+        rationaleOpen={rationalePanelId === item.id}
         onFocus={() => setFocusedId(item.id)}
         onSelect={() => setRationalePanelId(id => id === item.id ? null : item.id)}
         onDone={() => handleDone(item)}
