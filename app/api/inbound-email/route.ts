@@ -920,6 +920,15 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       })
     }
 
+    // They responded — clear any open waiting_on_them flags for this business
+    await supabase
+      .from('correspondence')
+      .update({ action_needed: 'none', due_at: null })
+      .eq('organization_id', orgId)
+      .eq('business_id', autoFiledBusinessId)
+      .eq('action_needed', 'waiting_on_them')
+    log('[inbound-email] waiting_on_them_cleared', { businessId: autoFiledBusinessId })
+
     return NextResponse.json({}, { status: 200 })
   }
 
