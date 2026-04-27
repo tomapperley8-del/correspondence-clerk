@@ -16,6 +16,7 @@ export type CorrespondenceItem = {
   type: string | null
   snippet: string | null
   daysAgo?: number
+  otherItemsCount?: number
 }
 
 export type BusinessItem = {

@@ -39,6 +39,7 @@ function mapCorrEntry(e: Record<string, unknown>): CorrespondenceItem {
     direction: e.direction as string | null,
     type: e.type as string | null,
     snippet: makeSnippet(e.formatted_text_current as string | null),
+    otherItemsCount: (e.other_items_count as number) ?? 0,
   }
 }
 

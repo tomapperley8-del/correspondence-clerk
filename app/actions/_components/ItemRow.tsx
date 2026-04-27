@@ -193,6 +193,17 @@ export function ItemRow({
             </p>
           )}
 
+          {/* Hidden siblings indicator */}
+          {corr && (corr.otherItemsCount ?? 0) > 0 && (
+            <Link
+              href={`/businesses/${item.business_id}?from=actions`}
+              onClick={e => e.stopPropagation()}
+              className="text-xs text-gray-400 hover:text-brand-navy transition-colors"
+            >
+              + {corr.otherItemsCount} more {corr.otherItemsCount === 1 ? 'item' : 'items'} →
+            </Link>
+          )}
+
           {/* Gone quiet detail */}
           {biz && (
             <div className="text-xs text-gray-500 mb-0.5">

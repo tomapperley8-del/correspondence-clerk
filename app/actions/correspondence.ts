@@ -1391,13 +1391,8 @@ export async function getOutstandingActionsCount(): Promise<number> {
   if (!user) return 0
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return 0
-  const [flagged, reminders] = await Promise.all([
-    supabase.from('correspondence').select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId).neq('action_needed', 'none'),
-    supabase.from('correspondence').select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId).eq('action_needed', 'none').not('due_at', 'is', null),
-  ])
-  return (flagged.count ?? 0) + (reminders.count ?? 0)
+  const { data } = await supabase.rpc('get_outstanding_actions', { p_org_id: orgId })
+  return data?.length ?? 0
 }
 
 // Language in recent correspondence that signals a one-off arrangement — auto-suppresses renewal signal
