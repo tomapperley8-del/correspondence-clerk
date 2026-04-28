@@ -488,22 +488,19 @@ export async function deleteCorrespondence(id: string) {
     return { error: 'No organization found' }
   }
 
-  // Get business_id before deleting
-  const { data: entry } = await supabase
+  const { data, error } = await supabase
     .from('correspondence')
-    .select('business_id')
+    .delete()
     .eq('id', id)
-    .single()
-
-  const { error } = await supabase.from('correspondence').delete().eq('id', id).eq('organization_id', organizationId)
+    .eq('organization_id', organizationId)
+    .select('business_id')
+    .maybeSingle()
 
   if (error) {
     return { error: error.message }
   }
 
-  if (entry) {
-    revalidatePath(`/businesses/${entry.business_id}`)
-  }
+  if (data) revalidatePath(`/businesses/${data.business_id}`)
   revalidatePath('/dashboard')
   revalidatePath('/search')
   revalidatePath('/actions')
@@ -533,20 +530,19 @@ export async function deleteMultipleCorrespondence(ids: string[]) {
     return { error: 'No organization found' }
   }
 
-  // Get business_ids before deleting (for path revalidation)
-  const { data: entries } = await supabase
+  const { data, error } = await supabase
     .from('correspondence')
-    .select('business_id')
+    .delete()
     .in('id', ids)
-
-  const { error } = await supabase.from('correspondence').delete().in('id', ids).eq('organization_id', organizationId)
+    .eq('organization_id', organizationId)
+    .select('business_id')
 
   if (error) {
     return { error: error.message }
   }
 
   // Revalidate all affected business pages
-  const businessIds = new Set((entries || []).map((e) => e.business_id))
+  const businessIds = new Set((data || []).map((e) => e.business_id))
   for (const bizId of businessIds) {
     revalidatePath(`/businesses/${bizId}`)
   }
@@ -711,23 +707,24 @@ export async function findDuplicatesInBusiness(businessId: string) {
     return { duplicates: [] }
   }
 
-  // Get recent correspondence with their hashes (limited to 500 for performance)
-  // Duplicates are typically recent, so limiting to last 500 entries is acceptable
-  const { data: entries } = await supabase
-    .from('correspondence')
-    .select('id, content_hash, subject, entry_date, contact:contacts(name)')
-    .eq('business_id', businessId)
-    .not('content_hash', 'is', null)
-    .order('entry_date', { ascending: false })
-    .limit(500)
+  // Both queries are independent — run in parallel
+  const [entriesResult, dismissalsResult] = await Promise.all([
+    supabase
+      .from('correspondence')
+      .select('id, content_hash, subject, entry_date, contact:contacts(name)')
+      .eq('business_id', businessId)
+      .not('content_hash', 'is', null)
+      .order('entry_date', { ascending: false })
+      .limit(500),
+    supabase
+      .from('duplicate_dismissals')
+      .select('entry_id_1, entry_id_2')
+      .eq('business_id', businessId),
+  ])
 
+  const entries = entriesResult.data
   if (!entries) return { duplicates: [] }
-
-  // Get dismissed pairs
-  const { data: dismissals } = await supabase
-    .from('duplicate_dismissals')
-    .select('entry_id_1, entry_id_2')
-    .eq('business_id', businessId)
+  const dismissals = dismissalsResult.data
 
   const dismissedPairs = new Set(
     (dismissals || []).map(d => [d.entry_id_1, d.entry_id_2].sort().join('|'))
@@ -896,44 +893,40 @@ export async function getOutstandingActions() {
  */
 export async function markCorrespondenceDone(id: string, resolution?: string) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
 
-  if (!user) {
-    return { error: 'Unauthorized' }
-  }
+  const dismissedAt = new Date().toISOString()
+  let businessId: string | null = null
 
-  const { data: entry } = await supabase
-    .from('correspondence')
-    .select('business_id, ai_metadata')
-    .eq('id', id)
-    .single()
-
-  const updatePayload: Record<string, unknown> = {
-    action_needed: 'none',
-    due_at: null,
-    reply_dismissed_at: new Date().toISOString(),
-  }
   if (resolution) {
+    // Rare path: need existing ai_metadata to merge — pre-fetch required
+    const { data: entry } = await supabase
+      .from('correspondence')
+      .select('business_id, ai_metadata')
+      .eq('id', id)
+      .single()
     const existingMeta = (entry?.ai_metadata as Record<string, unknown>) ?? {}
-    updatePayload.ai_metadata = { ...existingMeta, resolution }
+    const { error } = await supabase
+      .from('correspondence')
+      .update({ action_needed: 'none', due_at: null, reply_dismissed_at: dismissedAt, ai_metadata: { ...existingMeta, resolution } })
+      .eq('id', id)
+    if (error) return { error: error.message }
+    businessId = entry?.business_id ?? null
+  } else {
+    // Common path: single round trip — update and retrieve business_id together
+    const { data, error } = await supabase
+      .from('correspondence')
+      .update({ action_needed: 'none', due_at: null, reply_dismissed_at: dismissedAt })
+      .eq('id', id)
+      .select('business_id')
+      .maybeSingle()
+    if (error) return { error: error.message }
+    businessId = data?.business_id ?? null
   }
 
-  const { error } = await supabase
-    .from('correspondence')
-    .update(updatePayload)
-    .eq('id', id)
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  if (entry) {
-    revalidatePath(`/businesses/${entry.business_id}`)
-  }
+  if (businessId) revalidatePath(`/businesses/${businessId}`)
   revalidatePath('/actions')
-  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -943,12 +936,17 @@ export async function setCorrespondenceAction(id: string, actionNeeded: string, 
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
-  const { data: entry } = await supabase.from('correspondence').select('business_id').eq('id', id).single()
   const update: Record<string, string | null> = { action_needed: actionNeeded }
   if (dueAt !== undefined) update.due_at = dueAt
-  const { error } = await supabase.from('correspondence').update(update).eq('id', id).eq('organization_id', orgId)
+  const { data, error } = await supabase
+    .from('correspondence')
+    .update(update)
+    .eq('id', id)
+    .eq('organization_id', orgId)
+    .select('business_id')
+    .maybeSingle()
   if (error) return { error: error.message }
-  if (entry) revalidatePath(`/businesses/${entry.business_id}`)
+  if (data) revalidatePath(`/businesses/${data.business_id}`)
   revalidatePath('/actions')
   return { success: true }
 }
@@ -959,16 +957,17 @@ export async function snoozeCorrespondence(id: string, days: number) {
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
-  const { data: entry } = await supabase.from('correspondence').select('business_id').eq('id', id).single()
   const dueAt = new Date()
   dueAt.setDate(dueAt.getDate() + days)
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('correspondence')
     .update({ due_at: dueAt.toISOString() })
     .eq('id', id)
     .eq('organization_id', orgId)
+    .select('business_id')
+    .maybeSingle()
   if (error) return { error: error.message }
-  if (entry) revalidatePath(`/businesses/${entry.business_id}`)
+  if (data) revalidatePath(`/businesses/${data.business_id}`)
   revalidatePath('/actions')
   return { success: true }
 }

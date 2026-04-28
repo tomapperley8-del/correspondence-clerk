@@ -37,33 +37,23 @@ export async function getNavData(): Promise<NavData> {
   const orgs = profile.organizations as { id: string; name: string }[] | { id: string; name: string } | null
   const org = Array.isArray(orgs) ? orgs[0] ?? null : orgs
 
-  const now = new Date().toISOString()
-
-  const [urgent, overdue, inbound, anyCorrespondence] = await Promise.all([
-    // Urgent: flagged items due today or earlier (or no due date), not dismissed
-    supabase.from('correspondence').select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .neq('action_needed', 'none')
-      .is('reply_dismissed_at', null)
-      .or(`due_at.is.null,due_at.lte.${now}`),
-    // Overdue: strictly past-due flagged items (for red vs amber colour)
-    supabase.from('correspondence').select('*', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .neq('action_needed', 'none')
-      .is('reply_dismissed_at', null)
-      .lt('due_at', now),
+  const [actionCounts, inbound, anyCorrespondence] = await Promise.all([
+    // Single scan: urgent count (due_at IS NULL or past) + overdue count (strictly past)
+    supabase.rpc('get_action_counts', { p_org_id: orgId }),
     supabase.from('inbound_queue').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('status', 'pending'),
     supabase.from('correspondence').select('id', { count: 'exact', head: true })
       .eq('organization_id', orgId).limit(1),
   ])
 
+  const counts = actionCounts.data?.[0]
+
   return {
     displayName: profile.display_name,
     organizationId: orgId,
     organizationName: org?.name ?? null,
-    actionsCount: urgent.count ?? 0,
-    overdueCount: overdue.count ?? 0,
+    actionsCount: Number(counts?.urgent_count ?? 0),
+    overdueCount: Number(counts?.overdue_count ?? 0),
     inboundCount: inbound.count ?? 0,
     hasCorrespondence: (anyCorrespondence.count ?? 0) > 0,
   }
