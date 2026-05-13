@@ -690,8 +690,8 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // 6b. Blocked sender check
-  if (!fromSelf) {
+  // 6b. Blocked sender check — runs regardless of fromSelf since effectiveFromEmail is already the resolved real sender
+  if (effectiveFromEmail) {
     const { data: blocked } = await supabase
       .from('blocked_senders')
       .select('id')

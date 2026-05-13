@@ -28,6 +28,7 @@ export function AddBusinessModal({
   const [status, setStatus] = useState('')
   const [isClubCard, setIsClubCard] = useState(false)
   const [isAdvertiser, setIsAdvertiser] = useState(false)
+  const [isProspect, setIsProspect] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const modalRef = useModalKeyboard(isOpen, onClose)
@@ -54,6 +55,7 @@ export function AddBusinessModal({
       setStatus('')
       setIsClubCard(false)
       setIsAdvertiser(false)
+      setIsProspect(false)
       setIsLoading(false)
       appEvents.businessesChanged()
       toast.success('Business added')
@@ -148,6 +150,25 @@ export function AddBusinessModal({
                 className="mr-2"
               />
               <span className="text-sm">Advertiser</span>
+            </label>
+
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={isProspect}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  setIsProspect(checked)
+                  if (checked) {
+                    setStatus('Prospect')
+                  } else if (status === 'Prospect') {
+                    setStatus(isClubCard || isAdvertiser ? 'Active' : '')
+                  }
+                }}
+                disabled={isLoading}
+                className="mr-2"
+              />
+              <span className="text-sm">Prospect</span>
             </label>
           </div>
 

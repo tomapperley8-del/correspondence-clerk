@@ -25,6 +25,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
     status: business.status || '',
     notes: business.notes || '',
   })
+  const [isProspect, setIsProspect] = useState(business.status === 'Prospect')
 
   const handleCancel = () => {
     setFormData({
@@ -33,6 +34,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       status: business.status || '',
       notes: business.notes || '',
     })
+    setIsProspect(business.status === 'Prospect')
     setError(null)
     setIsOpen(false)
   }
@@ -48,11 +50,18 @@ export function EditBusinessButton({ business }: { business: Business }) {
     setSaving(true)
     setError(null)
 
+    let newStatus: string | null = formData.status || null
+    if (isProspect) {
+      newStatus = 'Prospect'
+    } else if (business.status === 'Prospect') {
+      newStatus = (business.is_club_card || business.is_advertiser) ? 'Active' : null
+    }
+
     const result = await updateBusiness(business.id, {
       name: formData.name,
-      category: formData.category || undefined,
-      status: formData.status || undefined,
-      notes: formData.notes || undefined,
+      category: formData.category || null,
+      status: newStatus,
+      notes: formData.notes || null,
     })
 
     if ('error' in result) {
@@ -167,6 +176,41 @@ export function EditBusinessButton({ business }: { business: Business }) {
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none resize-y"
               />
+            </div>
+
+            {/* Flags */}
+            <div className="mb-6 space-y-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isProspect}
+                  onChange={(e) => setIsProspect(e.target.checked)}
+                  disabled={saving}
+                />
+                <span className="text-sm font-medium">Prospect</span>
+              </label>
+
+              <label className="flex items-center gap-2 opacity-60" title="Controlled by contracts — add or remove a contract to change">
+                <input
+                  type="checkbox"
+                  checked={business.is_club_card}
+                  disabled
+                  readOnly
+                />
+                <span className="text-sm">Club Card member</span>
+                <span className="text-xs text-gray-400">(set via contracts)</span>
+              </label>
+
+              <label className="flex items-center gap-2 opacity-60" title="Controlled by contracts — add or remove a contract to change">
+                <input
+                  type="checkbox"
+                  checked={business.is_advertiser}
+                  disabled
+                  readOnly
+                />
+                <span className="text-sm">Advertiser</span>
+                <span className="text-xs text-gray-400">(set via contracts)</span>
+              </label>
             </div>
 
             {/* Buttons */}

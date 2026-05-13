@@ -360,7 +360,6 @@ export default function InboxCard({ item, businesses: initialBusinesses, isSelec
               selectedContactId={selectedContactId}
               onSelect={(id) => setSelectedContactId(id || null)}
               onAddNew={() => setShowAddContact(true)}
-              disabled={loadingContacts}
             />
           )}
 
