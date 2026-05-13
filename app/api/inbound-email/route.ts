@@ -413,13 +413,13 @@ async function matchBusinessFromEmail(
   supabase: ReturnType<typeof createServiceRoleClient>,
   orgId: string,
   email: string
-): Promise<{ businessId: string; contactId: string | null } | null> {
+): Promise<{ businessId: string; contactId: string | null; routeToInbox: boolean } | null> {
   if (!email) return null
 
   // 1. Check contacts.emails[]
   const { data: contactMatches } = await supabase
     .from('contacts')
-    .select('id, business_id')
+    .select('id, business_id, route_to_inbox')
     .filter('emails', 'cs', JSON.stringify([email]))
     .eq('is_active', true)
     .limit(5)
@@ -436,7 +436,7 @@ async function matchBusinessFromEmail(
 
     if (biz) {
       const contact = contactMatches.find(c => c.business_id === biz.id)!
-      return { businessId: biz.id, contactId: contact.id }
+      return { businessId: biz.id, contactId: contact.id, routeToInbox: contact.route_to_inbox ?? false }
     }
   }
 
@@ -449,7 +449,7 @@ async function matchBusinessFromEmail(
     .limit(1)
     .maybeSingle()
 
-  if (biz) return { businessId: biz.id, contactId: null }
+  if (biz) return { businessId: biz.id, contactId: null, routeToInbox: false }
 
   return null
 }
@@ -832,6 +832,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   const effectiveDomain = effectiveFromEmail.split('@')[1]?.toLowerCase() ?? ''
   let autoFiledBusinessId: string | null = null
   let autoFiledContactId: string | null = null
+  let skipAutoFile = false
 
   // Never auto-file when the (resolved) sender is on our own infrastructure —
   // either exactly one of our addresses, or any address on an own domain.
@@ -845,14 +846,20 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     //    Works for any sender, including personal-domain contacts.
     const emailMatch = await matchBusinessFromEmail(supabase, orgId, effectiveFromEmail)
     if (emailMatch) {
-      autoFiledBusinessId = emailMatch.businessId
-      autoFiledContactId = emailMatch.contactId
-      log('[inbound-email] auto_filed_received_email_match', { businessId: autoFiledBusinessId, email: effectiveFromEmail })
+      if (emailMatch.routeToInbox) {
+        // Contact has "Always route to inbox" set — queue for manual filing
+        skipAutoFile = true
+        log('[inbound-email] route_to_inbox_queued', { email: effectiveFromEmail })
+      } else {
+        autoFiledBusinessId = emailMatch.businessId
+        autoFiledContactId = emailMatch.contactId
+        log('[inbound-email] auto_filed_received_email_match', { businessId: autoFiledBusinessId, email: effectiveFromEmail })
+      }
     }
 
     // 2. Fall back to domain mapping (for business senders not yet in contacts).
     //    Skip personal domains and own domains — neither represents a business identity.
-    if (!autoFiledBusinessId && effectiveDomain && !isPersonalDomain(effectiveDomain) && !ownDomains.has(effectiveDomain)) {
+    if (!skipAutoFile && !autoFiledBusinessId && effectiveDomain && !isPersonalDomain(effectiveDomain) && !ownDomains.has(effectiveDomain)) {
       const { data: mapping } = await supabase
         .from('domain_mappings')
         .select('business_id')

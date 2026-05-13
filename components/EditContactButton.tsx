@@ -24,6 +24,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
   )
   const [notes, setNotes] = useState(contact.notes || '')
   const [isActive, setIsActive] = useState(contact.is_active ?? true)
+  const [routeToInbox, setRouteToInbox] = useState(contact.route_to_inbox ?? false)
 
   const handleCancel = () => {
     setName(contact.name)
@@ -32,6 +33,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
     setPhones(contact.phones && contact.phones.length > 0 ? contact.phones : [''])
     setNotes(contact.notes || '')
     setIsActive(contact.is_active ?? true)
+    setRouteToInbox(contact.route_to_inbox ?? false)
     setError(null)
     setIsOpen(false)
   }
@@ -82,6 +84,7 @@ export function EditContactButton({ contact }: { contact: Contact }) {
       phones: filteredPhones,
       notes: notes || undefined,
       is_active: isActive,
+      route_to_inbox: routeToInbox,
     })
 
     if ('error' in result) {
@@ -255,6 +258,29 @@ export function EditContactButton({ contact }: { contact: Contact }) {
             {!isActive && (
               <p className="text-xs text-gray-500 mt-1">This contact will be shown as "(Former)" throughout the app.</p>
             )}
+          </div>
+
+          {/* Route to inbox */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              Email routing
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={routeToInbox}
+                onChange={(e) => setRouteToInbox(e.target.checked)}
+                disabled={saving}
+                className="mt-0.5 cursor-pointer"
+                style={{ accentColor: 'var(--brand-navy)', width: 15, height: 15 }}
+              />
+              <span className="text-sm">
+                <span className="font-medium text-gray-900">Always route to inbox</span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  Emails from this contact will appear in your inbox for manual filing instead of being auto-filed.
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* Notes */}

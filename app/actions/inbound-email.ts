@@ -445,6 +445,7 @@ export async function findEmailMatch(email: string): Promise<{
   businessName: string
   contactId: string | null
   contactName: string | null
+  routeToInbox: boolean
 } | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -460,7 +461,7 @@ export async function findEmailMatch(email: string): Promise<{
   // Fetch matching contacts (any org), then cross-check business org_id.
   const { data: contactMatches } = await supabase
     .from('contacts')
-    .select('id, name, business_id')
+    .select('id, name, business_id, route_to_inbox')
     .filter('emails', 'cs', JSON.stringify([normalised]))
     .eq('is_active', true)
     .limit(5)
@@ -477,7 +478,13 @@ export async function findEmailMatch(email: string): Promise<{
 
     if (biz) {
       const contact = contactMatches.find(c => c.business_id === biz.id)!
-      return { businessId: biz.id, businessName: biz.name, contactId: contact.id, contactName: contact.name }
+      return {
+        businessId: biz.id,
+        businessName: biz.name,
+        contactId: contact.id,
+        contactName: contact.name,
+        routeToInbox: contact.route_to_inbox ?? false,
+      }
     }
   }
 
@@ -491,7 +498,7 @@ export async function findEmailMatch(email: string): Promise<{
     .maybeSingle()
 
   if (bizMatch) {
-    return { businessId: bizMatch.id, businessName: bizMatch.name, contactId: null, contactName: null }
+    return { businessId: bizMatch.id, businessName: bizMatch.name, contactId: null, contactName: null, routeToInbox: false }
   }
 
   return null

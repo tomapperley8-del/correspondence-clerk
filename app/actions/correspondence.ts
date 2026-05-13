@@ -1515,3 +1515,40 @@ export async function getCommitmentAlerts(): Promise<{ data?: Record<string, unk
 
   return { data: result }
 }
+
+export async function refileCorrespondence(
+  correspondenceId: string,
+  newBusinessId: string,
+  newContactId: string | null
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data: existing } = await supabase
+    .from('correspondence')
+    .select('business_id, organization_id')
+    .eq('id', correspondenceId)
+    .eq('organization_id', orgId)
+    .single()
+
+  if (!existing) return { error: 'Entry not found' }
+
+  const { error } = await supabase
+    .from('correspondence')
+    .update({ business_id: newBusinessId, contact_id: newContactId })
+    .eq('id', correspondenceId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/businesses/${existing.business_id}`)
+  revalidatePath(`/businesses/${newBusinessId}`)
+  revalidatePath('/inbox')
+  revalidatePath('/dashboard')
+
+  return {}
+}

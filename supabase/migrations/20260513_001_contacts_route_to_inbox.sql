@@ -1,0 +1,1 @@
+ALTER TABLE public.contacts ADD COLUMN IF NOT EXISTS route_to_inbox BOOLEAN NOT NULL DEFAULT false;

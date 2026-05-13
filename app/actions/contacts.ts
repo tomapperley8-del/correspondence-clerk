@@ -24,6 +24,7 @@ const updateContactSchema = z.object({
   phones: z.array(z.string().max(50)).optional(),
   notes: z.string().max(5000).optional(),
   is_active: z.boolean().optional(),
+  route_to_inbox: z.boolean().optional(),
 })
 
 export type Contact = {
@@ -36,6 +37,7 @@ export type Contact = {
   phones: string[]
   notes: string | null
   is_active: boolean
+  route_to_inbox: boolean
   organization_id: string
   created_at: string
   updated_at: string
@@ -69,7 +71,7 @@ export async function getContactsByBusiness(businessId: string) {
   // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
-    .select('id, business_id, name, normalized_email, role, emails, phones, notes, is_active, organization_id, created_at, updated_at')
+    .select('id, business_id, name, normalized_email, role, emails, phones, notes, is_active, route_to_inbox, organization_id, created_at, updated_at')
     .eq('business_id', businessId)
     .eq('organization_id', orgId)
     .order('is_active', { ascending: false }) // active contacts first
@@ -85,6 +87,7 @@ export async function getContactsByBusiness(businessId: string) {
     emails: parseJsonArray(contact.emails),
     phones: parseJsonArray(contact.phones),
     is_active: contact.is_active ?? true,
+    route_to_inbox: contact.route_to_inbox ?? false,
   })) || []
 
   return { data: parsedData }
@@ -106,7 +109,7 @@ export async function getContactById(id: string) {
   // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
-    .select('id, business_id, name, normalized_email, role, emails, phones, notes, is_active, organization_id, created_at, updated_at')
+    .select('id, business_id, name, normalized_email, role, emails, phones, notes, is_active, route_to_inbox, organization_id, created_at, updated_at')
     .eq('id', id)
     .eq('organization_id', orgId)
     .single()
@@ -121,6 +124,7 @@ export async function getContactById(id: string) {
     emails: parseJsonArray(data.emails),
     phones: parseJsonArray(data.phones),
     is_active: data.is_active ?? true,
+    route_to_inbox: data.route_to_inbox ?? false,
   }
 
   return { data: parsedData }
@@ -198,6 +202,7 @@ export async function updateContact(
     phones?: string[]
     notes?: string
     is_active?: boolean
+    route_to_inbox?: boolean
   }
 ) {
   const supabase = await createClient()
@@ -232,6 +237,7 @@ export async function updateContact(
   if (formData.role !== undefined) updateData.role = formData.role?.trim() || null
   if (formData.notes !== undefined) updateData.notes = formData.notes?.trim() || null
   if (formData.is_active !== undefined) updateData.is_active = formData.is_active
+  if (formData.route_to_inbox !== undefined) updateData.route_to_inbox = formData.route_to_inbox
 
   const organizationId = await getCurrentUserOrganizationId()
   if (!organizationId) {

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { type Correspondence } from '@/app/actions/correspondence'
 import { type Contact } from '@/app/actions/contacts'
@@ -9,6 +9,7 @@ import { formatDateGB, formatDateTimeGB } from '@/lib/utils'
 import { CopyButton } from '@/components/CopyButton'
 import { CorrespondenceEditForm, type EditFields } from './CorrespondenceEditForm'
 import { ThreadAssignPanel } from './ThreadAssignPanel'
+import { MoveCorrespondenceModal } from './MoveCorrespondenceModal'
 
 interface CorrespondenceEntryProps {
   entry: Correspondence
@@ -106,6 +107,7 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
   onCreateThread,
   setActionError,
 }: CorrespondenceEntryProps) {
+  const [showMoveModal, setShowMoveModal] = useState(false)
   const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
   const isUnformatted = entry.formatting_status !== 'formatted'
   const isEdited = entry.edited_at !== null
@@ -358,6 +360,12 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
             >
               Delete
             </Button>
+            <Button
+              onClick={() => setShowMoveModal(true)}
+              className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
+            >
+              Move
+            </Button>
             {/* Feature #9: View Original Email in Outlook */}
             {entry.ai_metadata && (entry.ai_metadata as any).email_source && (entry.ai_metadata as any).email_source.web_link && (
               <Button
@@ -431,6 +439,14 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
             </div>
           )}
         </div>
+      )}
+
+      {showMoveModal && (
+        <MoveCorrespondenceModal
+          correspondenceId={entry.id}
+          currentBusinessId={entry.business_id}
+          onClose={() => setShowMoveModal(false)}
+        />
       )}
     </div>
   )

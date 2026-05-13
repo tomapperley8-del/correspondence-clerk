@@ -87,7 +87,7 @@ export default function InboxCard({ item, businesses: initialBusinesses, isSelec
     findEmailMatch(emailToLookup).then(async match => {
       if (!match) return
 
-      if (match.contactId) {
+      if (match.contactId && !match.routeToInbox) {
         const result = await fileInboundEmail(item.id, match.businessId, match.contactId)
         if (!result.error) {
           toast.success(`Auto-filed to ${match.businessName}`)
