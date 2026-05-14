@@ -13,6 +13,7 @@ import {
   FormattingResult,
   SingleEntryResponse,
   ThreadSplitResponse,
+  isThreadSplitResponse,
 } from './types';
 
 /**
