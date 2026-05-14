@@ -529,6 +529,9 @@ RULES:
    - Start formatted_text with actual message content
 6. Preserve exact wording - no summarization
 7. Order chronologically (oldest first)
+8. CRITICAL: For each email's formatted_text, include ONLY the new content written in that email.
+   Do NOT include quoted/replied content from previous messages in the thread.
+   Stop at "---" separator lines, "> quoted lines", or "On [date] wrote:" attribution blocks.
 
 Text to process:
 ${cleanText}`
@@ -629,6 +632,17 @@ ${cleanText}`;
     } catch (validationError) {
       console.error('AI response validation failed. Response:', JSON.stringify(parsed, null, 2));
       throw validationError;
+    }
+
+    // Strip quoted/replied content from AI output — belt-and-suspenders since the AI
+    // prompt requests this but may not always honour it; stripQuotedContent is idempotent.
+    if (isThreadSplitResponse(validated)) {
+      validated.entries = validated.entries.map(entry => ({
+        ...entry,
+        formatted_text: stripQuotedContent(entry.formatted_text),
+      }))
+    } else {
+      validated.formatted_text = stripQuotedContent(validated.formatted_text)
     }
 
     return {
