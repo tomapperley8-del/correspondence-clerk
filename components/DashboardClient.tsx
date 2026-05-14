@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useDeferredValue } from 'react'
 import Link from 'next/link'
 import type { BusinessListItem } from '@/app/actions/businesses'
 import type { MembershipType } from '@/app/actions/membership-types'
+import type { BusinessType } from '@/app/actions/business-types'
 import { AddBusinessButton } from '@/components/AddBusinessButton'
 import { Input } from '@/components/ui/input'
 import { formatDateGB } from '@/lib/utils'
@@ -14,12 +15,14 @@ type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
 interface DashboardClientProps {
   initialBusinesses: BusinessListItem[]
   initialMembershipTypes: MembershipType[]
+  initialBusinessTypes: BusinessType[]
   hasContact: boolean
 }
 
-export function DashboardClient({ initialBusinesses, initialMembershipTypes, hasContact }: DashboardClientProps) {
+export function DashboardClient({ initialBusinesses, initialMembershipTypes, initialBusinessTypes, hasContact }: DashboardClientProps) {
   const [businesses] = useState<BusinessListItem[]>(initialBusinesses)
   const [membershipTypes] = useState<MembershipType[]>(initialMembershipTypes)
+  const [businessTypes] = useState<BusinessType[]>(initialBusinessTypes)
 
   // Filter and sort state
   const [searchQuery, setSearchQuery] = useState('')
@@ -27,6 +30,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const [filterType, setFilterType] = useState<FilterType>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [selectedBusinessType, setSelectedBusinessType] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortType>('recent')
 
   // View mode: grid or list
@@ -71,6 +75,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
         const prefs = JSON.parse(savedPrefs)
         if (prefs.filterType) setFilterType(prefs.filterType)
         if (prefs.selectedCategory) setSelectedCategory(prefs.selectedCategory)
+        if (prefs.selectedBusinessType) setSelectedBusinessType(prefs.selectedBusinessType)
         if (prefs.sortBy) setSortBy(prefs.sortBy)
         if (prefs.viewMode) setViewMode(prefs.viewMode)
       }
@@ -100,6 +105,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
       if (filterType === 'prospect' && business.membership_type) return false
       if (filterType !== 'all' && filterType !== 'prospect' && business.membership_type !== filterType) return false
       if (selectedCategory !== 'all' && business.category !== selectedCategory) return false
+      if (selectedBusinessType !== 'all' && business.business_type !== selectedBusinessType) return false
       return true
     })
 
@@ -107,13 +113,13 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1)
     }
-  }, [deferredSearchQuery, filterType, selectedCategory, businesses, currentPage, itemsPerPage])
+  }, [deferredSearchQuery, filterType, selectedCategory, selectedBusinessType, businesses, currentPage, itemsPerPage])
 
   // Persist filter preferences to localStorage
   useEffect(() => {
-    const prefs = { filterType, selectedCategory, sortBy, viewMode }
+    const prefs = { filterType, selectedCategory, selectedBusinessType, sortBy, viewMode }
     localStorage.setItem('dashboard_prefs', JSON.stringify(prefs))
-  }, [filterType, selectedCategory, sortBy, viewMode])
+  }, [filterType, selectedCategory, selectedBusinessType, sortBy, viewMode])
 
   // Get unique categories (memoized)
   const categories = useMemo(() =>
@@ -132,6 +138,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
       if (filterType === 'prospect' && business.membership_type) return false
       if (filterType !== 'all' && filterType !== 'prospect' && business.membership_type !== filterType) return false
       if (selectedCategory !== 'all' && business.category !== selectedCategory) return false
+      if (selectedBusinessType !== 'all' && business.business_type !== selectedBusinessType) return false
       return true
     })
 
@@ -155,7 +162,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
           return 0
       }
     })
-  }, [businesses, deferredSearchQuery, filterType, selectedCategory, sortBy])
+  }, [businesses, deferredSearchQuery, filterType, selectedCategory, selectedBusinessType, sortBy])
 
   // Pagination calculations
   const totalPages = Math.ceil(filtered.length / itemsPerPage)
@@ -386,6 +393,32 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, has
                 </FilterButton>
               </div>
             </div>
+
+            {/* Business Type Filter */}
+            {businessTypes.length > 0 && (
+              <div className="mb-4">
+                <label className="text-sm font-semibold text-gray-900 block mb-2">
+                  Filter by Business Type:
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <FilterButton
+                    active={selectedBusinessType === 'all'}
+                    onClick={() => setSelectedBusinessType('all')}
+                  >
+                    All Types
+                  </FilterButton>
+                  {businessTypes.map((t) => (
+                    <FilterButton
+                      key={t.value}
+                      active={selectedBusinessType === t.value}
+                      onClick={() => setSelectedBusinessType(t.value)}
+                    >
+                      {t.label}
+                    </FilterButton>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Category Filter */}
             {categories.length > 0 && (

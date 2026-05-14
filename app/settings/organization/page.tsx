@@ -26,6 +26,14 @@ import {
   deleteMembershipType,
   type MembershipType,
 } from '@/app/actions/membership-types'
+import {
+  getBusinessTypes,
+  createBusinessType,
+  updateBusinessTypeOrder,
+  toggleBusinessTypeActive,
+  deleteBusinessType,
+  type BusinessType,
+} from '@/app/actions/business-types'
 import { useRouter } from 'next/navigation'
 import { formatDateGB } from '@/lib/utils'
 import {
@@ -74,6 +82,10 @@ function OrganizationSettingsContent() {
   const [newTypeLabel, setNewTypeLabel] = useState('')
   const [isAddingType, setIsAddingType] = useState(false)
   const [typeActionError, setTypeActionError] = useState<string | null>(null)
+  const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([])
+  const [newBizTypeLabel, setNewBizTypeLabel] = useState('')
+  const [isAddingBizType, setIsAddingBizType] = useState(false)
+  const [bizTypeActionError, setBizTypeActionError] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [isLoadingOrg, setIsLoadingOrg] = useState(true)
@@ -120,6 +132,10 @@ function OrganizationSettingsContent() {
     // Load membership types
     const typesResult = await getMembershipTypes()
     if (typesResult.data) setMembershipTypes(typesResult.data)
+
+    // Load business types
+    const bizTypesResult = await getBusinessTypes()
+    if (bizTypesResult.data) setBusinessTypes(bizTypesResult.data)
 
     // Load members
     const membersResult = await getOrganizationMembers()
@@ -314,6 +330,55 @@ function OrganizationSettingsContent() {
     } else {
       const typesResult = await getMembershipTypes()
       if (typesResult.data) setMembershipTypes(typesResult.data)
+    }
+  }
+
+  async function handleAddBizType(e: React.FormEvent) {
+    e.preventDefault()
+    setBizTypeActionError(null)
+    if (!newBizTypeLabel.trim()) return
+    setIsAddingBizType(true)
+    const result = await createBusinessType(newBizTypeLabel)
+    if (result.error) {
+      setBizTypeActionError(result.error)
+    } else {
+      setNewBizTypeLabel('')
+      const r = await getBusinessTypes()
+      if (r.data) setBusinessTypes(r.data)
+    }
+    setIsAddingBizType(false)
+  }
+
+  async function handleMoveBizType(id: string, direction: 'up' | 'down') {
+    setBizTypeActionError(null)
+    const result = await updateBusinessTypeOrder(id, direction)
+    if (result.error) {
+      setBizTypeActionError(result.error)
+    } else {
+      const r = await getBusinessTypes()
+      if (r.data) setBusinessTypes(r.data)
+    }
+  }
+
+  async function handleToggleBizType(id: string) {
+    setBizTypeActionError(null)
+    const result = await toggleBusinessTypeActive(id)
+    if (result.error) {
+      setBizTypeActionError(result.error)
+    } else {
+      const r = await getBusinessTypes()
+      if (r.data) setBusinessTypes(r.data)
+    }
+  }
+
+  async function handleDeleteBizType(id: string) {
+    setBizTypeActionError(null)
+    const result = await deleteBusinessType(id)
+    if (result.error) {
+      setBizTypeActionError(result.error)
+    } else {
+      const r = await getBusinessTypes()
+      if (r.data) setBusinessTypes(r.data)
     }
   }
 
@@ -595,6 +660,99 @@ function OrganizationSettingsContent() {
             className="bg-brand-navy text-white hover:bg-brand-navy-hover shrink-0"
           >
             {isAddingType ? 'Adding...' : 'Add Type'}
+          </Button>
+        </form>
+      </div>
+
+      {/* Business Types */}
+      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-1 text-gray-900">Business Types</h2>
+        <p className="text-sm text-gray-500 mb-4">Define the business type classification tags used to categorise businesses.</p>
+
+        {bizTypeActionError && (
+          <div className="border-2 border-red-600 bg-red-50 px-3 py-2 mb-4">
+            <p className="text-red-800 text-sm">{bizTypeActionError}</p>
+          </div>
+        )}
+
+        <div className="space-y-2 mb-4">
+          {businessTypes.map((t, idx) => (
+            <div
+              key={t.id}
+              className={`flex items-center gap-3 border-2 border-gray-200 px-3 py-2 ${!t.is_active ? 'opacity-50' : ''}`}
+            >
+              <div className="flex-1 min-w-0">
+                <span className="font-semibold text-sm text-gray-900">{t.label}</span>
+                <span className="ml-2 text-xs text-gray-400">{t.value}</span>
+                {!t.is_active && <span className="ml-2 text-xs text-gray-400">(Inactive)</span>}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleMoveBizType(t.id, 'up')}
+                  disabled={idx === 0}
+                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-30"
+                  title="Move up"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMoveBizType(t.id, 'down')}
+                  disabled={idx === businessTypes.length - 1}
+                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-30"
+                  title="Move down"
+                >
+                  ▼
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleBizType(t.id)}
+                  className={`px-2 py-1 text-xs font-semibold border-2 ${t.is_active ? 'border-gray-300 text-gray-700 hover:border-gray-500' : 'border-green-600 text-green-700 hover:bg-green-50'}`}
+                >
+                  {t.is_active ? 'Deactivate' : 'Activate'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteBizType(t.id)}
+                  className="px-2 py-1 text-xs font-semibold border-2 border-red-300 text-red-700 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+          {businessTypes.length === 0 && (
+            <p className="text-sm text-gray-500">No business types defined yet.</p>
+          )}
+        </div>
+
+        <form onSubmit={handleAddBizType} className="flex gap-2 items-end">
+          <div className="flex-1">
+            <Label htmlFor="newBizTypeLabel" className="block mb-1 text-sm font-semibold">
+              Add new type
+            </Label>
+            <Input
+              id="newBizTypeLabel"
+              type="text"
+              value={newBizTypeLabel}
+              onChange={(e) => setNewBizTypeLabel(e.target.value)}
+              placeholder="e.g. Venue, Sponsor"
+              disabled={isAddingBizType}
+              className="w-full"
+            />
+            {newBizTypeLabel.trim() && (
+              <p className="text-xs text-gray-400 mt-1">
+                Value: {newBizTypeLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}
+              </p>
+            )}
+          </div>
+          <Button
+            type="submit"
+            disabled={isAddingBizType || !newBizTypeLabel.trim()}
+            className="bg-brand-navy text-white hover:bg-brand-navy-hover shrink-0"
+          >
+            {isAddingBizType ? 'Adding...' : 'Add Type'}
           </Button>
         </form>
       </div>

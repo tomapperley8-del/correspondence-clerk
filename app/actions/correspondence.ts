@@ -60,6 +60,7 @@ export type Correspondence = {
   thread_participants: string | null
   internal_sender: string | null
   thread_id: string | null
+  linked_business_ids: string[] | null
   contact: {
     name: string
     role: string | null
@@ -127,12 +128,12 @@ export async function getCorrespondenceByBusiness(
       raw_text_original, formatted_text_original, formatted_text_current,
       entry_date, subject, type, direction, formatting_status, action_needed,
       due_at, content_hash, ai_metadata, organization_id, created_at, updated_at, edited_at, edited_by,
-      is_pinned, thread_participants, internal_sender, thread_id,
+      is_pinned, thread_participants, internal_sender, thread_id, linked_business_ids,
       contact:contacts(name, role, is_active)
     `,
       { count: 'exact' }
     )
-    .eq('business_id', businessId)
+    .or(`business_id.eq.${businessId},linked_business_ids.cs.{${businessId}}`)
 
   if (contactId && contactId !== 'all') {
     query = query.eq('contact_id', contactId)
@@ -1514,6 +1515,140 @@ export async function getCommitmentAlerts(): Promise<{ data?: Record<string, unk
   }
 
   return { data: result }
+}
+
+export async function duplicateCorrespondence(
+  correspondenceId: string,
+  targetBusinessId: string,
+  targetContactId: string | null
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data: source } = await supabase
+    .from('correspondence')
+    .select('business_id, organization_id, raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, ai_metadata, thread_participants, internal_sender')
+    .eq('id', correspondenceId)
+    .eq('organization_id', orgId)
+    .single()
+
+  if (!source) return { error: 'Entry not found' }
+
+  // Compute hash for the copy
+  const { data: hashData } = await supabase.rpc('compute_content_hash', {
+    raw_text: source.raw_text_original,
+  })
+
+  const { data: copy, error } = await supabase
+    .from('correspondence')
+    .insert({
+      business_id: targetBusinessId,
+      contact_id: targetContactId,
+      user_id: user.id,
+      organization_id: orgId,
+      raw_text_original: source.raw_text_original,
+      formatted_text_original: source.formatted_text_original,
+      formatted_text_current: source.formatted_text_current,
+      entry_date: source.entry_date,
+      subject: source.subject,
+      type: source.type,
+      direction: source.direction,
+      formatting_status: source.formatting_status,
+      action_needed: 'none',
+      ai_metadata: source.ai_metadata,
+      thread_participants: source.thread_participants,
+      internal_sender: source.internal_sender,
+      content_hash: hashData ?? null,
+    })
+    .select('id')
+    .single()
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/businesses/${source.business_id}`)
+  revalidatePath(`/businesses/${targetBusinessId}`)
+  revalidatePath('/dashboard')
+
+  return {}
+}
+
+export async function linkCorrespondenceToBusiness(
+  correspondenceId: string,
+  targetBusinessId: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data: existing } = await supabase
+    .from('correspondence')
+    .select('business_id, organization_id, linked_business_ids')
+    .eq('id', correspondenceId)
+    .eq('organization_id', orgId)
+    .single()
+
+  if (!existing) return { error: 'Entry not found' }
+  if (existing.business_id === targetBusinessId) return { error: 'Already the primary business for this entry' }
+
+  const current: string[] = existing.linked_business_ids ?? []
+  if (current.includes(targetBusinessId)) return {} // already linked, idempotent
+
+  const { error } = await supabase
+    .from('correspondence')
+    .update({ linked_business_ids: [...current, targetBusinessId] })
+    .eq('id', correspondenceId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/businesses/${existing.business_id}`)
+  revalidatePath(`/businesses/${targetBusinessId}`)
+
+  return {}
+}
+
+export async function unlinkCorrespondenceFromBusiness(
+  correspondenceId: string,
+  businessId: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data: existing } = await supabase
+    .from('correspondence')
+    .select('business_id, organization_id, linked_business_ids')
+    .eq('id', correspondenceId)
+    .eq('organization_id', orgId)
+    .single()
+
+  if (!existing) return { error: 'Entry not found' }
+
+  const current: string[] = existing.linked_business_ids ?? []
+  const updated = current.filter((id) => id !== businessId)
+
+  const { error } = await supabase
+    .from('correspondence')
+    .update({ linked_business_ids: updated })
+    .eq('id', correspondenceId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/businesses/${existing.business_id}`)
+  revalidatePath(`/businesses/${businessId}`)
+
+  return {}
 }
 
 export async function refileCorrespondence(

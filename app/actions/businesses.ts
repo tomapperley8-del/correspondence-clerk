@@ -12,6 +12,7 @@ const createBusinessSchema = z.object({
   is_club_card: z.boolean().optional(),
   is_advertiser: z.boolean().optional(),
   membership_type: z.string().nullable().optional(),
+  business_type: z.string().nullable().optional(),
 })
 
 const updateBusinessSchema = z.object({
@@ -21,6 +22,7 @@ const updateBusinessSchema = z.object({
   is_club_card: z.boolean().optional(),
   is_advertiser: z.boolean().optional(),
   membership_type: z.string().nullable().optional(),
+  business_type: z.string().nullable().optional(),
   address: z.string().max(500).nullable().optional(),
   email: z.string().email('Invalid email format').max(254).or(z.literal('')).nullable().optional(),
   phone: z.string().max(50).nullable().optional(),
@@ -48,6 +50,7 @@ export type Business = {
   phone: string | null
   notes: string | null
   last_contacted_at: string | null
+  business_type: string | null
   relationship_memory: string | null
   relationship_memory_updated_at: string | null
   mastersheet_source_ids: string[] | null
@@ -59,7 +62,7 @@ export type Business = {
 // Subset of Business for dashboard list view (optimized query)
 export type BusinessListItem = Pick<
   Business,
-  'id' | 'name' | 'normalized_name' | 'category' | 'status' | 'is_club_card' | 'is_advertiser' | 'membership_type' | 'last_contacted_at'
+  'id' | 'name' | 'normalized_name' | 'category' | 'status' | 'is_club_card' | 'is_advertiser' | 'membership_type' | 'business_type' | 'last_contacted_at'
 >
 
 export async function getBusinesses(): Promise<{ data?: BusinessListItem[]; error?: string }> {
@@ -74,7 +77,7 @@ export async function getBusinesses(): Promise<{ data?: BusinessListItem[]; erro
 
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, last_contacted_at')
+    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, last_contacted_at')
     .order('name', { ascending: true })
 
   if (error) {
@@ -97,7 +100,7 @@ export async function getBusinessById(id: string) {
   // Select specific columns needed for detail page (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, mastersheet_source_ids, organization_id, created_at, updated_at')
+    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, mastersheet_source_ids, organization_id, created_at, updated_at')
     .eq('id', id)
     .single()
 
@@ -173,6 +176,7 @@ export async function updateBusiness(
     status?: string | null
     is_club_card?: boolean
     is_advertiser?: boolean
+    business_type?: string | null
     address?: string | null
     email?: string | null
     phone?: string | null
@@ -208,6 +212,7 @@ export async function updateBusiness(
   }
   if (formData.category !== undefined) updateData.category = formData.category
   if (formData.status !== undefined) updateData.status = formData.status
+  if (formData.business_type !== undefined) updateData.business_type = formData.business_type
   if (formData.is_club_card !== undefined)
     updateData.is_club_card = formData.is_club_card
   if (formData.is_advertiser !== undefined)

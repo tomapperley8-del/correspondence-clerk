@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { updateBusiness, deleteBusiness, type Business } from '@/app/actions/businesses'
+import { getActiveBusinessTypes, type BusinessType } from '@/app/actions/business-types'
 import { useRouter } from 'next/navigation'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
@@ -26,6 +27,20 @@ export function EditBusinessButton({ business }: { business: Business }) {
     notes: business.notes || '',
   })
   const [isProspect, setIsProspect] = useState(business.status === 'Prospect')
+  const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([])
+  const [businessTypeValue, setBusinessTypeValue] = useState(business.business_type ?? '')
+
+  // Load business types when modal opens
+  const [typesLoaded, setTypesLoaded] = useState(false)
+  const handleOpen = () => {
+    setIsOpen(true)
+    if (!typesLoaded) {
+      getActiveBusinessTypes().then(r => {
+        if (r.data) setBusinessTypes(r.data)
+        setTypesLoaded(true)
+      })
+    }
+  }
 
   const handleCancel = () => {
     setFormData({
@@ -35,6 +50,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       notes: business.notes || '',
     })
     setIsProspect(business.status === 'Prospect')
+    setBusinessTypeValue(business.business_type ?? '')
     setError(null)
     setIsOpen(false)
   }
@@ -62,6 +78,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       category: formData.category || null,
       status: newStatus,
       notes: formData.notes || null,
+      business_type: businessTypeValue || null,
     })
 
     if ('error' in result) {
@@ -109,7 +126,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
   if (!isOpen) {
     return (
       <Button
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-4 py-2 text-sm font-semibold"
       >
         Edit Business
@@ -162,6 +179,26 @@ export function EditBusinessButton({ business }: { business: Business }) {
                 className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
               />
             </div>
+
+            {/* Business Type */}
+            {businessTypes.length > 0 && (
+              <div className="mb-4">
+                <label htmlFor="editBusinessType" className="block text-sm font-semibold text-gray-900 mb-2">
+                  Business Type
+                </label>
+                <select
+                  id="editBusinessType"
+                  value={businessTypeValue}
+                  onChange={(e) => setBusinessTypeValue(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none bg-white"
+                >
+                  <option value="">— no type —</option>
+                  {businessTypes.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Notes */}
             <div className="mb-6">

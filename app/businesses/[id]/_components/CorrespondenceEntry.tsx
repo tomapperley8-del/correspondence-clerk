@@ -10,6 +10,10 @@ import { CopyButton } from '@/components/CopyButton'
 import { CorrespondenceEditForm, type EditFields } from './CorrespondenceEditForm'
 import { ThreadAssignPanel } from './ThreadAssignPanel'
 import { MoveCorrespondenceModal } from './MoveCorrespondenceModal'
+import { DuplicateCorrespondenceModal } from './DuplicateCorrespondenceModal'
+import { LinkCorrespondenceModal } from './LinkCorrespondenceModal'
+import { unlinkCorrespondenceFromBusiness } from '@/app/actions/correspondence'
+import { toast } from '@/lib/toast'
 
 interface CorrespondenceEntryProps {
   entry: Correspondence
@@ -42,6 +46,7 @@ interface CorrespondenceEntryProps {
   onAssignThread: (entryId: string, threadId: string | null) => Promise<void>
   onCreateThread: (entryId: string, name: string) => Promise<void>
   setActionError: (v: string) => void
+  pageBusinessId?: string
 }
 
 // Highlight matching text when searching
@@ -106,9 +111,40 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
   onAssignThread,
   onCreateThread,
   setActionError,
+  pageBusinessId,
 }: CorrespondenceEntryProps) {
   const [showMoveModal, setShowMoveModal] = useState(false)
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false)
+  const [showLinkModal, setShowLinkModal] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [unlinking, setUnlinking] = useState(false)
+  const moreMenuRef = React.useRef<HTMLDivElement>(null)
+  const isLinkedEntry = !!pageBusinessId && entry.business_id !== pageBusinessId
   const isOverdue = entry.due_at && new Date(entry.due_at) < new Date()
+
+  // Close More menu on outside click
+  React.useEffect(() => {
+    if (!showMoreMenu) return
+    function handleClickOutside(e: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMoreMenu])
+
+  async function handleUnlink() {
+    if (!pageBusinessId) return
+    setUnlinking(true)
+    const result = await unlinkCorrespondenceFromBusiness(entry.id, pageBusinessId)
+    setUnlinking(false)
+    if (result.error) {
+      toast.error(`Failed to unlink: ${result.error}`)
+    } else {
+      toast.success('Entry unlinked from this business')
+    }
+  }
   const isUnformatted = entry.formatting_status !== 'formatted'
   const isEdited = entry.edited_at !== null
   const isEditing = editingEntryId === entry.id
@@ -143,6 +179,12 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
             </Button>
           </div>
         )
+      )}
+
+      {isLinkedEntry && (
+        <div className="flex items-center gap-1.5 mb-2 px-2 py-1 bg-gray-50 border border-gray-200 text-xs text-gray-500 w-fit">
+          ↗ Linked entry
+        </div>
       )}
 
       {/* Subject line with edit indicator */}
@@ -360,12 +402,52 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
             >
               Delete
             </Button>
-            <Button
-              onClick={() => setShowMoveModal(true)}
-              className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
-            >
-              Move
-            </Button>
+            {/* More ▾ dropdown: Move / Copy to business / Link to business */}
+            <div className="relative" ref={moreMenuRef}>
+              <Button
+                onClick={() => setShowMoreMenu(v => !v)}
+                className="bg-gray-100 text-gray-900 hover:bg-gray-200 px-3 py-1 text-xs"
+              >
+                More ▾
+              </Button>
+              {showMoreMenu && (
+                <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 shadow-md z-10 min-w-[160px]" style={{ borderRadius: '2px' }}>
+                  <button
+                    type="button"
+                    className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    onClick={() => { setShowMoveModal(true); setShowMoreMenu(false) }}
+                  >
+                    Move to business
+                  </button>
+                  <button
+                    type="button"
+                    className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    onClick={() => { setShowDuplicateModal(true); setShowMoreMenu(false) }}
+                  >
+                    Copy to business
+                  </button>
+                  {!isLinkedEntry && (
+                    <button
+                      type="button"
+                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      onClick={() => { setShowLinkModal(true); setShowMoreMenu(false) }}
+                    >
+                      Link to business
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Unlink button — shown when viewing a linked entry on a secondary business page */}
+            {isLinkedEntry && (
+              <Button
+                onClick={handleUnlink}
+                disabled={unlinking}
+                className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1 text-xs"
+              >
+                {unlinking ? 'Unlinking…' : 'Unlink from this page'}
+              </Button>
+            )}
             {/* Feature #9: View Original Email in Outlook */}
             {entry.ai_metadata && (entry.ai_metadata as any).email_source && (entry.ai_metadata as any).email_source.web_link && (
               <Button
@@ -446,6 +528,21 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
           correspondenceId={entry.id}
           currentBusinessId={entry.business_id}
           onClose={() => setShowMoveModal(false)}
+        />
+      )}
+      {showDuplicateModal && (
+        <DuplicateCorrespondenceModal
+          correspondenceId={entry.id}
+          currentBusinessId={entry.business_id}
+          onClose={() => setShowDuplicateModal(false)}
+        />
+      )}
+      {showLinkModal && (
+        <LinkCorrespondenceModal
+          correspondenceId={entry.id}
+          currentBusinessId={entry.business_id}
+          linkedBusinessIds={entry.linked_business_ids ?? []}
+          onClose={() => setShowLinkModal(false)}
         />
       )}
     </div>
