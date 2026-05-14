@@ -104,7 +104,7 @@ export async function getBusinessById(id: string) {
   // Select specific columns needed for detail page (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, mastersheet_source_ids, organization_id, created_at, updated_at')
+    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, disposition, follow_up_after, mastersheet_source_ids, organization_id, created_at, updated_at')
     .eq('id', id)
     .single()
 
