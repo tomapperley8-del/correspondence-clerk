@@ -54,11 +54,6 @@ RULES:
 - If they're ready to try it, point them to correspondenceclerk.com/signup
 - You can ask clarifying questions if needed`
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-}
-
 export async function POST(request: NextRequest) {
   try {
     const { message, history, visitor_id } = await request.json()

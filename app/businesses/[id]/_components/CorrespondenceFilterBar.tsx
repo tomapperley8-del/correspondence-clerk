@@ -3,6 +3,26 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { type Contact } from '@/app/actions/contacts'
 
+function ToggleGroup({ children }: { children: React.ReactNode }) {
+  return <div className="inline-flex border border-gray-300 rounded overflow-hidden">{children}</div>
+}
+
+function ToggleBtn({
+  active, onClick, children,
+}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 text-xs font-medium border-l first:border-l-0 border-gray-300 transition-colors ${
+        active ? 'bg-brand-navy text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
 interface CorrespondenceFilterBarProps {
   sortOrder: 'oldest' | 'newest'
   setSortOrder: (v: 'oldest' | 'newest') => void
@@ -77,26 +97,6 @@ export const CorrespondenceFilterBar = React.memo(function CorrespondenceFilterB
     setDateRange('12m')
     setCustomDateFrom('')
     setCustomDateTo('')
-  }
-
-  function ToggleGroup({ children }: { children: React.ReactNode }) {
-    return <div className="inline-flex border border-gray-300 rounded overflow-hidden">{children}</div>
-  }
-
-  function ToggleBtn({
-    active, onClick, children,
-  }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`px-3 py-1.5 text-xs font-medium border-l first:border-l-0 border-gray-300 transition-colors ${
-          active ? 'bg-brand-navy text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-        }`}
-      >
-        {children}
-      </button>
-    )
   }
 
   return (

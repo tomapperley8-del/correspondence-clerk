@@ -116,7 +116,13 @@
       "Bash(set -a)",
       "Bash(source .env.local)",
       "Bash(DOTENV_CONFIG_PATH=.env.local npx tsx scripts/run-migrations.ts)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(vercel whoami *)",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=https://ayoiibrzkllerrwbhvda.supabase.co SUPABASE_SERVICE_ROLE_KEY=REDACTED npm run *)",
+      "mcp__claude_ai_Supabase__list_tables",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs '-I{}' python3 -c ' *)",
+      "mcp__claude_ai_Supabase__get_edge_function"
     ]
   }
 }

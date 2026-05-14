@@ -293,8 +293,8 @@ All features complete and deployed (unless noted):
 
 ## Known Issues
 
-- Google Docs export requires MCP setup with Google authentication (not yet user-tested)
-- ~27 lint errors remain (react-hooks false positives, docx library `any` types) - intentionally skipped
+- ~76 lint problems remain — two categories intentionally skipped: (1) `react-hooks/set-state-in-effect` false positives (async-fetch patterns, mount-time localStorage filter); (2) docx library `any` types in a single file. `CorrespondenceFilterBar` nested-component real bug was fixed May 2026.
+- Middleware deprecation warning in Vercel build: Next.js 16 prefers `proxy.ts` over `middleware.ts`. Not yet an error, deferred.
 
 ## Reference Docs
 

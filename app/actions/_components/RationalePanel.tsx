@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ACTION_LABELS, formatDateGB, daysAgoFn, daysUntilFn } from '../_utils'
+import { ACTION_LABELS, formatDateGB, daysUntilFn } from '../_utils'
 import type { UnifiedItem, CorrespondenceItem, ContractItem, CommitmentItem } from '../_types'
 
 // undefined = loading, null = loaded + empty, string = loaded + has content

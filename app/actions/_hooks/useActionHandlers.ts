@@ -66,7 +66,7 @@ export function useActionHandlers({
     }
   }
 
-  function handleResolutionCancel(id: string) {
+  function handleResolutionCancel(_id: string) {
     setResolutionPendingId(null)
   }
 

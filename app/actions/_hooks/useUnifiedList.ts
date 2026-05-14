@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { formatDateGB, daysAgoFn, daysUntilFn } from '../_utils'
+import { formatDateGB, daysUntilFn } from '../_utils'
 import type { CorrespondenceItem, ContractItem, CommitmentItem, Badge, UnifiedItem } from '../_types'
 
 function buildUnifiedList(

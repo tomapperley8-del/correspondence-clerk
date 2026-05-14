@@ -1543,7 +1543,7 @@ export async function duplicateCorrespondence(
     raw_text: source.raw_text_original,
   })
 
-  const { data: copy, error } = await supabase
+  const { error } = await supabase
     .from('correspondence')
     .insert({
       business_id: targetBusinessId,
