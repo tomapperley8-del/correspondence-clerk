@@ -42,7 +42,7 @@ These 10 rules override everything else:
 
 ## Architecture
 
-**Stack:** Next.js 15 (App Router, React 19) | Supabase (PostgreSQL + Auth) | Anthropic Claude (claude-sonnet-4-5) | Tailwind CSS v4 + shadcn/ui | Vercel
+**Stack:** Next.js 16 (App Router, React 19) | Supabase (PostgreSQL + Auth) | Anthropic Claude (Sonnet for premium, Haiku for economy — see `lib/ai/models.ts`) | Tailwind CSS v4 + shadcn/ui | Vercel
 
 **Data flow:** User pastes text -> thread detection (client) -> Anthropic API (structured outputs) -> validate JSON -> save to Supabase. If AI fails -> save unformatted (never blocks).
 
@@ -69,7 +69,7 @@ app/
                                ThreadsView, FilterBar, DuplicatesWarningBanner, ContactsList,
                                BusinessFiles
   new-entry/page.tsx           Add correspondence (forced filing + AI formatting + draft autosave)
-  actions/page.tsx             Unified smart list (replies first → overdue → due today → renewals → quiet → reminders)
+  actions/page.tsx             Top priorities hero + 3 collapsible sections (needs reply, actions due, renewals)
   daily-briefing/page.tsx      Full-page inline ChatPanel
   search/page.tsx              Full-text search results
   import/gmail/page.tsx        Gmail bulk import wizard
@@ -113,7 +113,7 @@ components/
   ExportToGoogleDocsButton.tsx  Export button
   import/ReviewWizard.tsx  Editable business/contact review before bulk import execute
 
-lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feature Status #19)
+lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feature Status #13)
 ```
 
 ### Key Patterns
@@ -128,41 +128,37 @@ lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feat
 
 ### Actions Architecture
 
-The Actions page (`app/actions/page.tsx`) uses **5 collapsible sections**. Needs Reply + Actions Due are expanded by default; Renewals, Gone Quiet, Reminders are collapsed. Data flows through `buildUnifiedList()` → `unifiedList` (also drives keyboard nav); sections are visual groupings filtering from `unifiedList`. Gone Quiet uses compact `QuietRow` components (not full cards).
+The Actions page (`app/actions/page.tsx`) has a **Top Priorities hero block** (top 5 items, numbered) above **3 collapsible sections** (all default-collapsed): Needs Reply, Actions Due (reminders merged in), Renewals. Data flows through `buildUnifiedList()` → `unifiedList` (also drives keyboard nav); sections are visual groupings filtering from `unifiedList`. COMMITMENT cards from `insight_history` (type=`what_did_we_agree`, last 14 days) surface in the feed. Rationale slide-out panel (380px) opens on item click or Enter; Escape closes.
 
-**Signal sources (5 server action fetches in parallel on load):**
+**Signal sources (parallel fetches on load):**
 1. `getNeedsReply()` — received correspondence where Tom has sent nothing to that business since; client-side `likelyNeedsReply()` heuristic filters closers/OOO/signatures
 2. `getOutstandingActions()` — `action_needed != 'none'` entries, ordered by due_at
-3. `getPureReminders()` — `action_needed = 'none'` but `due_at IS NOT NULL`
-4. `getGoneQuiet()` — businesses with `last_contacted_at < 60 days ago` and 3+ entries
-5. `getContractExpiries()` — businesses where `contract_end IS NOT NULL` and within 30 days (null-safe — only fires when data exists)
+3. `getPureReminders()` — `action_needed = 'none'` but `due_at IS NOT NULL` (displayed within Actions Due)
+4. `getContractExpiries()` — businesses where `contract_end IS NOT NULL` and within 30 days (null-safe)
+5. `insight_history` — `what_did_we_agree` entries last 14 days → COMMITMENT cards (localStorage dismissal via `dismissed_insights`)
 
 **"Needs Reply" logic:** fetches last 90 days; for each received entry checks `entries.some(other => other.direction === 'sent' && other.business_id === entry.business_id && otherDate > entryDate)` — any sent correspondence clears it. Also excludes: `reply_dismissed_at IS NOT NULL` (Done), `due_at > NOW()` (snoozed), `action_needed = 'waiting_on_them'`.
 
 **Done persistence:** `correspondence.reply_dismissed_at TIMESTAMPTZ` (migration 20260408_001). `markCorrespondenceDone()` sets it; `getNeedsReply()` filters it at DB level. Done = permanently done.
 
-**Badge urgency order:** REPLY (7+ days) → REPLY (3–6 days) → OVERDUE → DUE_TODAY → DUE_TOMORROW → DUE_SOON → RENEWAL (<7d) → FLAG → RENEWAL (7–30d) → QUIET → REMINDER
+**Badge urgency order:** REPLY (7+ days) → REPLY (3–6 days) → OVERDUE → DUE_TODAY → DUE_TOMORROW → DUE_SOON → RENEWAL (<7d) → FLAG → RENEWAL (7–30d) → REMINDER
 
 **How items enter the system (three paths):**
-1. **Manual one-click flag** — "Follow-up" button on `CorrespondenceEntry.tsx` calls `setCorrespondenceAction(id, 'follow_up', dueAt)` where `dueAt = today + 7 days`. `setCorrespondenceAction` in `app/actions/correspondence.ts` accepts optional `dueAt`.
-2. **AI auto-flag on inbound email** — `app/api/inbound-email/route.ts`: if `ai_result.action_suggestion.confidence === 'high'`, `action_needed` and `due_at` are set on the correspondence row at insert time. Completely automatic. If AI fails, falls back to `action_needed: 'none'` — never blocks.
-3. **Insights push** — "Add to Actions" button in `components/InsightsPanel.tsx` (shown for `call_prep`, `next_best_action`, `what_did_we_agree`, `outreach_draft`, `risk_check` insight types) calls `createCorrespondence` with `action_needed: 'follow_up'` on the business.
+1. **Manual one-click flag** — "Follow-up" button on `CorrespondenceEntry.tsx` calls `setCorrespondenceAction(id, 'follow_up', dueAt)` where `dueAt = today + 7 days`.
+2. **AI auto-flag on inbound email** — `app/api/inbound-email/route.ts`: if `ai_result.action_suggestion.confidence === 'high'`, `action_needed` and `due_at` are set at insert time. Falls back to `action_needed: 'none'` — never blocks.
+3. **Insights push** — "Add to Actions" button in `components/InsightsPanel.tsx` (for `call_prep`, `next_best_action`, `what_did_we_agree`, `outreach_draft`, `risk_check`) calls `createCorrespondence` with `action_needed: 'follow_up'`.
 
-**Actions vs Insights distinction:**
-- **Actions** = tactical, time-sensitive, clearable. Answers: "what do I do TODAY?"
-- **Insights** = strategic intelligence, relationship context. Answers: "what should I KNOW?"
-- Insights can push into Actions (one-way). Actions does not pull from Insights automatically.
-
-**Keyboard shortcuts:** `↑ ↓` navigate · `D` done · `S` snooze 7d · `L` reply/log
+**Keyboard shortcuts:** `↑ ↓` navigate · `D` done · `S` snooze 7d · `L` reply/log · `Enter` open rationale panel
 
 ### Database Tables
 
-- **businesses** - name, category, status, membership_type (string, now configurable per org), address, email, phone, notes, contract fields, last_contacted_at, relationship_memory (AI-distilled 3-sentence summary), relationship_memory_updated_at
+- **businesses** - name, category, status, membership_type, business_type (TEXT, per-org taxonomy), address, email, phone, notes, contract fields, last_contacted_at, relationship_memory (AI-distilled 3-sentence summary), relationship_memory_updated_at
 - **contacts** - business_id, name, emails[], phones[], role, notes, is_active (unique per business+email)
-- **correspondence** - business_id, contact_id (nullable — Notes have no contact), cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, reply_dismissed_at, edited_at, content_hash
+- **correspondence** - business_id, contact_id (nullable — Notes have no contact), cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), linked_business_ids (UUID[] — shared entry visible on multiple businesses), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, reply_dismissed_at, edited_at, content_hash
 - **duplicate_dismissals** - business_id, entry_id_1, entry_id_2, dismissed_by, dismissed_at
 - **organizations** - id, name, business_description, industry (used in Daily Briefing system prompt)
-- **org_membership_types** - id, org_id, label, value, sort_order, is_active (per-org configurable types)
+- **org_membership_types** - id, org_id, label, value, sort_order, is_active (per-org configurable membership types)
+- **org_business_types** - id, org_id, label, value, sort_order, is_active (per-org configurable business types — mirrors membership_types pattern)
 - **user_profiles** - id, organization_id, display_name, role (member/admin), google/microsoft OAuth tokens, inbound_email_token
 - **import_queue** - id, org_id, correspondence_id, status (pending/processing/done/failed), retry_count, error
 - **inbound_queue** - queued inbound emails awaiting manual filing
@@ -253,7 +249,7 @@ All features complete and deployed (unless noted):
 15. Daily Briefing (AI chat panel — inline page + slide-out overlay, org business context)
 16. Configurable Membership Types (per-org settings UI)
 17. Onboarding flow (4-step: org → describe business → first business+contact → first entry)
-18. Actions page (priority list, needs-reply, gone-quiet, flagged, reminders, keyboard shortcuts)
+18. Actions page (top priorities hero, needs-reply, flagged/reminders in Actions Due, renewals, keyboard nav, rationale panel, commitment alerts)
 19. Inbound Email Forwarding + BCC Capture — **live** (Forward Email $3/month, migrated from Postmark. Flat payload format — see project_forward_email_migration.md)
 20. Daily Briefing Email — **live** (Resend cron at 8am, opt-out toggle in Settings, smart cache reuse)
 21. API Cost Reduction — **live** (model tiering: Haiku for 9/11 call sites, Sonnet for Chat + strategic Insights only. Centralised in `lib/ai/models.ts`. Cache TTLs doubled. Prompt caching added to 6 endpoints. Regex bypass for trivial emails.)
@@ -262,8 +258,8 @@ All features complete and deployed (unless noted):
 24. UX Audit — **live** (P28: modal save mechanics, consistency pass, toast dismiss, onboarding steps, empty states, design token sweep across 25+ files)
 25. Insight History — **live** (P33: `insight_history` table, "View history" in expanded InsightCard, timeline of past snapshots, click to view previous versions)
 26. Relationship Memory — **live** (P34: Haiku distils 3-sentence summary per business after each insight, stored in `businesses.relationship_memory`. Reduces correspondence context 50→30 entries. Fire-and-forget.)
-27. Actions Page Redesign — **live** (P35: unified smart list. Replies always first. Contract expiries auto-surface (30-day window). AI high-confidence action suggestions applied on inbound auto-file. One-click flag on business page sets due_at +7 days. Enhanced quick log panel (type/date/time + mark done checkbox). Insights "Add to Actions" push button on 5 business insight types.)
-28. Actions Page v2 — **live** (P36: 5 collapsible sections replace flat list. Smarter "Needs Reply": checks if any sent correspondence to that business exists after the received email — no 7-day cap, direction-aware. Done = permanently done via `reply_dismissed_at` column. Snooze persists via `due_at` check. Signature stripping in likelyNeedsReply(). Gone Quiet uses compact rows. Header shows urgent counts only.)
+27. Correspondence Linking + Business Types — **live** (duplicate to another business creates independent copy; link creates shared single record visible on both; `business_type` per-org taxonomy on businesses; dashboard filter; migrations 20260514_001+002)
+28. Actions Page — **live** (unified smart list → top priorities hero + 3 collapsible sections. Needs Reply direction-aware, no 7-day cap. Done permanent via `reply_dismissed_at`. One-click flag sets due_at +7d. Commitment alerts from insight_history. Rationale slide-out panel. AI auto-flags high-confidence inbound emails. Insights "Add to Actions" push. Keyboard nav D/S/L/Enter.)
 
 ## Recent Changes
 
