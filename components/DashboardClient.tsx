@@ -394,11 +394,11 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
               </div>
             </div>
 
-            {/* Business Type Filter */}
+            {/* Contact Type Filter */}
             {businessTypes.length > 0 && (
               <div className="mb-4">
                 <label className="text-sm font-semibold text-gray-900 block mb-2">
-                  Filter by Business Type:
+                  Filter by Contact Type:
                 </label>
                 <div className="flex flex-wrap gap-2">
                   <FilterButton

@@ -186,11 +186,11 @@ export function EditBusinessButton({ business }: { business: Business }) {
               />
             </div>
 
-            {/* Business Type */}
+            {/* Contact Type */}
             {businessTypes.length > 0 && (
               <div className="mb-4">
                 <label htmlFor="editBusinessType" className="block text-sm font-semibold text-gray-900 mb-2">
-                  Business Type
+                  Contact Type
                 </label>
                 <select
                   id="editBusinessType"

@@ -664,10 +664,10 @@ function OrganizationSettingsContent() {
         </form>
       </div>
 
-      {/* Business Types */}
+      {/* Contact Types */}
       <div className="bg-white border-2 border-gray-800 p-6 mb-6">
-        <h2 className="text-xl font-bold mb-1 text-gray-900">Business Types</h2>
-        <p className="text-sm text-gray-500 mb-4">Define the business type classification tags used to categorise businesses.</p>
+        <h2 className="text-xl font-bold mb-1 text-gray-900">Contact Types</h2>
+        <p className="text-sm text-gray-500 mb-4">Define the contact type classification tags used to categorise businesses.</p>
 
         {bizTypeActionError && (
           <div className="border-2 border-red-600 bg-red-50 px-3 py-2 mb-4">
