@@ -337,6 +337,8 @@ export async function createCorrespondence(formData: {
     .from('businesses')
     .update({
       last_contacted_at: formData.entry_date || new Date().toISOString(),
+      disposition: null,
+      follow_up_after: null,
     })
     .eq('id', formData.business_id)
 

@@ -339,7 +339,7 @@ async function insertCorrespondenceServiceRole(
 
   await supabase
     .from('businesses')
-    .update({ last_contacted_at: opts.entryDate })
+    .update({ last_contacted_at: opts.entryDate, disposition: null, follow_up_after: null })
     .eq('id', opts.businessId)
 
   return inserted.id

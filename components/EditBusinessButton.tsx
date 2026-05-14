@@ -29,6 +29,8 @@ export function EditBusinessButton({ business }: { business: Business }) {
   const [isProspect, setIsProspect] = useState(business.status === 'Prospect')
   const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([])
   const [businessTypeValue, setBusinessTypeValue] = useState(business.business_type ?? '')
+  const [disposition, setDisposition] = useState<string>(business.disposition ?? '')
+  const [followUpAfter, setFollowUpAfter] = useState<string>(business.follow_up_after ?? '')
 
   // Load business types when modal opens
   const [typesLoaded, setTypesLoaded] = useState(false)
@@ -51,6 +53,8 @@ export function EditBusinessButton({ business }: { business: Business }) {
     })
     setIsProspect(business.status === 'Prospect')
     setBusinessTypeValue(business.business_type ?? '')
+    setDisposition(business.disposition ?? '')
+    setFollowUpAfter(business.follow_up_after ?? '')
     setError(null)
     setIsOpen(false)
   }
@@ -79,6 +83,8 @@ export function EditBusinessButton({ business }: { business: Business }) {
       status: newStatus,
       notes: formData.notes || null,
       business_type: businessTypeValue || null,
+      disposition: (disposition as 'follow_up_later' | 'not_interested') || null,
+      follow_up_after: (disposition === 'follow_up_later' && followUpAfter) ? followUpAfter : null,
     })
 
     if ('error' in result) {
@@ -197,6 +203,38 @@ export function EditBusinessButton({ business }: { business: Business }) {
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {/* Disposition */}
+            <div className="mb-4">
+              <label htmlFor="editDisposition" className="block text-sm font-semibold text-gray-900 mb-2">
+                Outreach Disposition
+              </label>
+              <select
+                id="editDisposition"
+                value={disposition}
+                onChange={(e) => setDisposition(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none bg-white"
+              >
+                <option value="">— none —</option>
+                <option value="follow_up_later">Follow up later</option>
+                <option value="not_interested">Not interested</option>
+              </select>
+            </div>
+
+            {disposition === 'follow_up_later' && (
+              <div className="mb-4">
+                <label htmlFor="editFollowUpAfter" className="block text-sm font-semibold text-gray-900 mb-2">
+                  Follow up after
+                </label>
+                <Input
+                  id="editFollowUpAfter"
+                  type="date"
+                  value={followUpAfter}
+                  onChange={(e) => setFollowUpAfter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
+                />
               </div>
             )}
 

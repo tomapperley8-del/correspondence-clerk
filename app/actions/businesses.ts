@@ -28,6 +28,8 @@ const updateBusinessSchema = z.object({
   phone: z.string().max(50).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
   last_contacted_at: z.string().optional(),
+  disposition: z.enum(['follow_up_later', 'not_interested']).nullable().optional(),
+  follow_up_after: z.string().nullable().optional(),
 })
 
 export type Business = {
@@ -53,6 +55,8 @@ export type Business = {
   business_type: string | null
   relationship_memory: string | null
   relationship_memory_updated_at: string | null
+  disposition: 'follow_up_later' | 'not_interested' | null
+  follow_up_after: string | null
   mastersheet_source_ids: string[] | null
   organization_id: string
   created_at: string
@@ -182,6 +186,8 @@ export async function updateBusiness(
     phone?: string | null
     notes?: string | null
     last_contacted_at?: string
+    disposition?: 'follow_up_later' | 'not_interested' | null
+    follow_up_after?: string | null
   }
 ) {
   const supabase = await createClient()
@@ -223,6 +229,8 @@ export async function updateBusiness(
   if (formData.notes !== undefined) updateData.notes = formData.notes
   if (formData.last_contacted_at !== undefined)
     updateData.last_contacted_at = formData.last_contacted_at
+  if (formData.disposition !== undefined) updateData.disposition = formData.disposition
+  if (formData.follow_up_after !== undefined) updateData.follow_up_after = formData.follow_up_after
 
   const { data, error } = await supabase
     .from('businesses')
