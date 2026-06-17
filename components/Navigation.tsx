@@ -234,6 +234,17 @@ export function Navigation() {
                 </Link>
               )}
 
+              <Link
+                href="/todos"
+                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
+                  pathname === '/todos'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
+                }`}
+              >
+                To-dos
+              </Link>
+
               {pathname !== '/insights' && <InsightsButton />}
             </div>
           </div>
@@ -326,6 +337,7 @@ export function Navigation() {
                 { href: '/search', label: 'Search' },
                 { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
                 ...(hasCorrespondence ? [{ href: '/actions', label: 'Actions', badge: actionsCount > 0 ? actionsCount : null, overdue: overdueCount > 0 }] : []),
+                { href: '/todos', label: 'To-dos' },
                 { href: '/insights', label: 'Insights' },
                 { href: '/help', label: 'Help' },
                 { href: '/settings', label: 'Settings' },
