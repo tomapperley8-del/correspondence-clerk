@@ -232,6 +232,48 @@ export async function migrateCrmRenewalDates(): Promise<{ migrated: number; erro
   return { migrated }
 }
 
+export async function createTaskFromCorrespondence(input: {
+  correspondenceId: string
+  businessId: string
+  businessName: string
+  subject: string | null
+}): Promise<{ data?: Task; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const dueDate = new Date()
+  dueDate.setDate(dueDate.getDate() + 7)
+
+  const title = input.subject
+    ? `Re: ${input.subject} (${input.businessName})`
+    : `Follow up with ${input.businessName}`
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({
+      title,
+      due_date: dueDate.toISOString().slice(0, 10),
+      category: 'work' as const,
+      notes: null,
+      status: 'open' as const,
+      is_priority: false,
+      source: 'manual' as const,
+      business_id: input.businessId,
+      organization_id: orgId,
+      position: 0,
+    })
+    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end)')
+    .single()
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  return { data: data as Task }
+}
+
 export async function refreshTaskCommitments(): Promise<{ count?: number; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

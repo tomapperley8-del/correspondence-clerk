@@ -47,6 +47,7 @@ interface CorrespondenceEntryProps {
   onCreateThread: (entryId: string, name: string) => Promise<void>
   setActionError: (v: string) => void
   pageBusinessId?: string
+  onCreateTodo?: (entry: Correspondence) => Promise<void>
 }
 
 // Highlight matching text when searching
@@ -112,7 +113,9 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
   onCreateThread,
   setActionError,
   pageBusinessId,
+  onCreateTodo,
 }: CorrespondenceEntryProps) {
+  const [creatingTodo, setCreatingTodo] = useState(false)
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [showDuplicateModal, setShowDuplicateModal] = useState(false)
   const [showLinkModal, setShowLinkModal] = useState(false)
@@ -345,6 +348,19 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
               >
                 Waiting on them
               </button>
+              {onCreateTodo && (
+                <button
+                  type="button"
+                  disabled={creatingTodo}
+                  onClick={async () => {
+                    setCreatingTodo(true)
+                    try { await onCreateTodo(entry) } finally { setCreatingTodo(false) }
+                  }}
+                  className="px-3 py-2 sm:py-1 text-xs border border-brand-olive text-brand-dark hover:bg-green-50 disabled:opacity-50"
+                >
+                  {creatingTodo ? 'Creating…' : 'Create to-do'}
+                </button>
+              )}
             </div>
           )}
           {entry.action_needed !== 'none' && (
@@ -357,6 +373,19 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
               >
                 Mark done
               </button>
+              {onCreateTodo && (
+                <button
+                  type="button"
+                  disabled={creatingTodo}
+                  onClick={async () => {
+                    setCreatingTodo(true)
+                    try { await onCreateTodo(entry) } finally { setCreatingTodo(false) }
+                  }}
+                  className="px-2 py-0.5 text-xs border border-brand-olive text-brand-dark hover:bg-green-50 disabled:opacity-50"
+                >
+                  {creatingTodo ? 'Creating…' : 'Create to-do'}
+                </button>
+              )}
             </div>
           )}
 

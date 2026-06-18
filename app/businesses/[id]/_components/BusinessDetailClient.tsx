@@ -21,6 +21,7 @@ import { SuccessBanner } from '@/components/SuccessBanner'
 import { OpenThreadsCard } from '@/components/OpenThreadsCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { retryFormatting } from '@/app/actions/ai-formatter'
+import { createTaskFromCorrespondence } from '@/app/actions/tasks'
 import { type MembershipType } from '@/app/actions/membership-types'
 import { formatDateGB } from '@/lib/utils'
 import { toast } from '@/lib/toast'
@@ -487,6 +488,20 @@ export function BusinessDetailClient({
     setThreads('error' in threadsRes ? [] : threadsRes.data || [])
   }, [businessId, refreshCorrespondence])
 
+  const handleCreateTodo = useCallback(async (entry: Correspondence) => {
+    const result = await createTaskFromCorrespondence({
+      correspondenceId: entry.id,
+      businessId: entry.business_id,
+      businessName: business.name,
+      subject: entry.subject,
+    })
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success('To-do created')
+    }
+  }, [business.name])
+
   // Common props passed to both AllEntriesView and ThreadsView
   const entryPassthroughProps = {
     contacts,
@@ -514,6 +529,7 @@ export function BusinessDetailClient({
     onAssignThread: handleAssignThread,
     onCreateThread: handleCreateThread,
     setActionError,
+    onCreateTodo: handleCreateTodo,
   }
 
   return (

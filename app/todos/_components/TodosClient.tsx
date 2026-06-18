@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { Task } from '@/app/actions/tasks'
 import {
   createTask,
@@ -10,14 +11,16 @@ import {
   setPriority,
   clearPriority,
   refreshTaskCommitments,
+  createTaskFromCorrespondence,
 } from '@/app/actions/tasks'
+import { markCorrespondenceDone } from '@/app/actions/correspondence'
 import { toast } from '@/lib/toast'
 import { formatDateShortGB } from '@/lib/utils'
-import Link from 'next/link'
 import { QuickAdd } from './QuickAdd'
 import { TaskRow } from './TaskRow'
 import { TaskEditModal } from './TaskEditModal'
 import { CalendarView } from './CalendarView'
+import type { NeedsReplyItem } from '../page'
 
 type ViewMode = 'list' | 'calendar'
 type CategoryFilter = 'all' | 'work' | 'personal'
@@ -117,7 +120,6 @@ type BatchedGroup = {
 }
 
 function batchCrmTasks(tasks: Task[]): BatchedGroup[] {
-  const result: BatchedGroup[] = []
   const crmByDate = new Map<string, Task[]>()
   const manualTasks: Task[] = []
 
@@ -170,12 +172,15 @@ function batchCrmTasks(tasks: Task[]): BatchedGroup[] {
 export function TodosClient({
   initialTasks,
   initialError,
+  initialNeedsReply,
 }: {
   initialTasks: Task[]
   initialError: string | null
+  initialNeedsReply: NeedsReplyItem[]
 }) {
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [needsReply, setNeedsReply] = useState<NeedsReplyItem[]>(initialNeedsReply)
   const [view, setView] = useState<ViewMode>('list')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('week')
@@ -338,6 +343,40 @@ export function TodosClient({
     [router]
   )
 
+  const handleDismissReply = useCallback(
+    async (correspondenceId: string) => {
+      setNeedsReply((prev) => prev.filter((r) => r.id !== correspondenceId))
+      const result = await markCorrespondenceDone(correspondenceId)
+      if (result && 'error' in result && result.error) {
+        toast.error(result.error)
+        router.refresh()
+      }
+    },
+    [router]
+  )
+
+  const handleCreateTodoFromReply = useCallback(
+    async (item: NeedsReplyItem) => {
+      const result = await createTaskFromCorrespondence({
+        correspondenceId: item.id,
+        businessId: item.business_id,
+        businessName: item.businesses.name,
+        subject: item.subject,
+      })
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      if (result.data) {
+        setTasks((prev) => [result.data!, ...prev])
+        setNeedsReply((prev) => prev.filter((r) => r.id !== item.id))
+        await markCorrespondenceDone(item.id)
+        toast.success('To-do created')
+      }
+    },
+    []
+  )
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Focus banner — always at very top */}
@@ -345,15 +384,7 @@ export function TodosClient({
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <h1>To-dos</h1>
-          <Link
-            href="/actions"
-            className="text-sm text-brand-navy hover:text-brand-olive transition-colors"
-          >
-            Actions →
-          </Link>
-        </div>
+        <h1>To-dos</h1>
         <div className="flex items-center gap-3">
           <button
             onClick={handleRefreshCRM}
@@ -369,6 +400,15 @@ export function TodosClient({
         <div className="border border-red-300 bg-red-50 px-4 py-3 mb-6 text-sm text-red-800">
           {initialError}
         </div>
+      )}
+
+      {/* Awaiting reply section */}
+      {needsReply.length > 0 && (
+        <NeedsReplySection
+          items={needsReply}
+          onDismiss={handleDismissReply}
+          onCreateTodo={handleCreateTodoFromReply}
+        />
       )}
 
       {/* View toggle + filters */}
@@ -445,7 +485,6 @@ export function TodosClient({
       {/* Views */}
       {view === 'list' ? (
         <div className="space-y-6 mt-6">
-          {/* Overdue */}
           {groups.overdue.length > 0 && (
             <BatchedTaskGroup
               label="Overdue"
@@ -458,7 +497,6 @@ export function TodosClient({
             />
           )}
 
-          {/* Today */}
           {groups.today.length > 0 && (
             <BatchedTaskGroup
               label="Today"
@@ -471,7 +509,6 @@ export function TodosClient({
             />
           )}
 
-          {/* Upcoming */}
           {groups.upcoming.length > 0 && (
             <BatchedTaskGroup
               label="Upcoming"
@@ -484,7 +521,6 @@ export function TodosClient({
             />
           )}
 
-          {/* No date */}
           {groups.noDate.length > 0 && (
             <BatchedTaskGroup
               label="No date"
@@ -497,7 +533,6 @@ export function TodosClient({
             />
           )}
 
-          {/* Done (collapsed) */}
           {groups.done.length > 0 && (
             <section>
               <button
@@ -524,7 +559,6 @@ export function TodosClient({
             </section>
           )}
 
-          {/* Empty state */}
           {filtered.length === 0 && !initialError && (
             <div className="text-center py-16 text-gray-400">
               <p className="text-lg mb-2">
@@ -549,7 +583,6 @@ export function TodosClient({
         />
       )}
 
-      {/* Edit modal */}
       {editingTask && (
         <TaskEditModal
           task={editingTask}
@@ -561,6 +594,73 @@ export function TodosClient({
         />
       )}
     </div>
+  )
+}
+
+function NeedsReplySection({
+  items,
+  onDismiss,
+  onCreateTodo,
+}: {
+  items: NeedsReplyItem[]
+  onDismiss: (id: string) => void
+  onCreateTodo: (item: NeedsReplyItem) => void
+}) {
+  const [expanded, setExpanded] = useState(items.length <= 3)
+
+  return (
+    <section className="mb-6">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-2 text-sm font-semibold text-red-700 hover:text-red-800 transition-colors mb-2"
+      >
+        <span className="text-xs">{expanded ? '▼' : '▶'}</span>
+        Awaiting your reply ({items.length})
+      </button>
+      {expanded && (
+        <div className="border border-red-200 bg-red-50/30 divide-y divide-red-100">
+          {items.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 px-3 py-2.5">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/businesses/${item.business_id}`}
+                    className="text-sm font-medium text-brand-navy hover:text-brand-olive transition-colors truncate"
+                  >
+                    {item.businesses.name}
+                  </Link>
+                  {item.contact && (
+                    <span className="text-xs text-gray-500 truncate">
+                      {item.contact.name}{item.contact.role ? ` · ${item.contact.role}` : ''}
+                    </span>
+                  )}
+                </div>
+                {item.subject && (
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{item.subject}</p>
+                )}
+              </div>
+              {item.entry_date && (
+                <span className="text-xs text-gray-400 flex-shrink-0">
+                  {formatDateShortGB(item.entry_date + 'T00:00:00')}
+                </span>
+              )}
+              <button
+                onClick={() => onCreateTodo(item)}
+                className="text-xs px-2 py-1 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors flex-shrink-0"
+              >
+                Create to-do
+              </button>
+              <button
+                onClick={() => onDismiss(item.id)}
+                className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+              >
+                Done
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 

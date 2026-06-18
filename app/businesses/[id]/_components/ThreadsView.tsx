@@ -44,6 +44,7 @@ interface ThreadsViewProps {
   onAssignThread: (entryId: string, threadId: string | null) => Promise<void>
   onCreateThread: (entryId: string, name: string) => Promise<void>
   setActionError: (v: string) => void
+  onCreateTodo?: (entry: Correspondence) => Promise<void>
 }
 
 export const ThreadsView = React.memo(function ThreadsView({
@@ -82,6 +83,7 @@ export const ThreadsView = React.memo(function ThreadsView({
   onAssignThread,
   onCreateThread,
   setActionError,
+  onCreateTodo,
 }: ThreadsViewProps) {
   const commonEntryProps = {
     contacts,
@@ -111,6 +113,7 @@ export const ThreadsView = React.memo(function ThreadsView({
     onAssignThread,
     onCreateThread,
     setActionError,
+    onCreateTodo,
   }
 
   return (

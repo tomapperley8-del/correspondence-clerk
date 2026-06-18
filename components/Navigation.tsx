@@ -213,36 +213,23 @@ export function Navigation() {
                 )}
               </Link>
 
-              {hasCorrespondence && (
-                <Link
-                  href="/actions"
-                  className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
-                    pathname === '/actions'
-                      ? 'text-white bg-brand-olive'
-                      : 'text-white hover:bg-brand-olive/20'
-                  }`}
-                >
-                  Actions
-                  {actionsCount > 0 && (
-                    <span
-                      title={`${actionsCount} urgent action${actionsCount === 1 ? '' : 's'}`}
-                      className={`min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center leading-none ${overdueCount > 0 ? 'bg-red-500' : 'bg-amber-500'}`}
-                    >
-                      {actionsCount > 20 ? '20+' : actionsCount}
-                    </span>
-                  )}
-                </Link>
-              )}
-
               <Link
                 href="/todos"
-                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
+                className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/todos'
                     ? 'text-white bg-brand-olive'
                     : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
                 To-dos
+                {actionsCount > 0 && (
+                  <span
+                    title={`${actionsCount} item${actionsCount === 1 ? '' : 's'} awaiting reply`}
+                    className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                  >
+                    {actionsCount > 20 ? '20+' : actionsCount}
+                  </span>
+                )}
               </Link>
 
               {pathname !== '/insights' && <InsightsButton />}
@@ -336,8 +323,7 @@ export function Navigation() {
                 { href: '/new-entry', label: 'New Entry' },
                 { href: '/search', label: 'Search' },
                 { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
-                ...(hasCorrespondence ? [{ href: '/actions', label: 'Actions', badge: actionsCount > 0 ? actionsCount : null, overdue: overdueCount > 0 }] : []),
-                { href: '/todos', label: 'To-dos' },
+                { href: '/todos', label: 'To-dos', badge: actionsCount > 0 ? actionsCount : null },
                 { href: '/insights', label: 'Insights' },
                 { href: '/help', label: 'Help' },
                 { href: '/settings', label: 'Settings' },
@@ -401,26 +387,24 @@ export function Navigation() {
           </svg>
           New Entry
         </Link>
-        {hasCorrespondence && (
-          <Link
-            href="/actions"
-            className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${
-              pathname === '/actions' ? 'text-white' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <span className="relative">
-              <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              {actionsCount > 0 && (
-                <span className={`absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full text-white text-[9px] font-bold flex items-center justify-center leading-none ${overdueCount > 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
-                  {actionsCount > 20 ? '20+' : actionsCount}
-                </span>
-              )}
-            </span>
-            Actions
-          </Link>
-        )}
+        <Link
+          href="/todos"
+          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${
+            pathname === '/todos' ? 'text-white' : 'text-white/60 hover:text-white'
+          }`}
+        >
+          <span className="relative">
+            <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            {actionsCount > 0 && (
+              <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                {actionsCount > 20 ? '20+' : actionsCount}
+              </span>
+            )}
+          </span>
+          To-dos
+        </Link>
         <Link
           href="/inbox"
           className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${

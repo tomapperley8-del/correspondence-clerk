@@ -56,6 +56,7 @@ interface AllEntriesViewProps {
   onAssignThread: (entryId: string, threadId: string | null) => Promise<void>
   onCreateThread: (entryId: string, name: string) => Promise<void>
   setActionError: (v: string) => void
+  onCreateTodo?: (entry: Correspondence) => Promise<void>
 }
 
 export const AllEntriesView = React.memo(function AllEntriesView({
@@ -100,6 +101,7 @@ export const AllEntriesView = React.memo(function AllEntriesView({
   onAssignThread,
   onCreateThread,
   setActionError,
+  onCreateTodo,
 }: AllEntriesViewProps) {
   const allVisibleIds = new Set([
     ...filteredCorrespondence.recent.map(e => e.id),
@@ -141,6 +143,7 @@ export const AllEntriesView = React.memo(function AllEntriesView({
     onAssignThread,
     onCreateThread,
     setActionError,
+    onCreateTodo,
   }
 
   return (
