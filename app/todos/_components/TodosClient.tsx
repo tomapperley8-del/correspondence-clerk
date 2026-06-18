@@ -14,6 +14,7 @@ import {
   createTaskFromCorrespondence,
 } from '@/app/actions/tasks'
 import { markCorrespondenceDone } from '@/app/actions/correspondence'
+import { updateBusiness } from '@/app/actions/businesses'
 import { toast } from '@/lib/toast'
 import { formatDateShortGB } from '@/lib/utils'
 import { QuickAdd } from './QuickAdd'
@@ -377,6 +378,20 @@ export function TodosClient({
     []
   )
 
+  const handleMuteBusiness = useCallback(
+    async (businessId: string) => {
+      setNeedsReply((prev) => prev.filter((r) => r.business_id !== businessId))
+      const result = await updateBusiness(businessId, { mute_replies: true })
+      if (result.error) {
+        toast.error(result.error)
+        router.refresh()
+      } else {
+        toast.success('Muted — won\'t appear in awaiting reply')
+      }
+    },
+    [router]
+  )
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Focus banner — always at very top */}
@@ -408,6 +423,7 @@ export function TodosClient({
           items={needsReply}
           onDismiss={handleDismissReply}
           onCreateTodo={handleCreateTodoFromReply}
+          onMute={handleMuteBusiness}
         />
       )}
 
@@ -601,10 +617,12 @@ function NeedsReplySection({
   items,
   onDismiss,
   onCreateTodo,
+  onMute,
 }: {
   items: NeedsReplyItem[]
   onDismiss: (id: string) => void
   onCreateTodo: (item: NeedsReplyItem) => void
+  onMute: (businessId: string) => void
 }) {
   const [expanded, setExpanded] = useState(items.length <= 3)
 
@@ -649,6 +667,13 @@ function NeedsReplySection({
                 className="text-xs px-2 py-1 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors flex-shrink-0"
               >
                 Create to-do
+              </button>
+              <button
+                onClick={() => onMute(item.business_id)}
+                className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+                title="Mute this business — never show in awaiting reply"
+              >
+                Mute
               </button>
               <button
                 onClick={() => onDismiss(item.id)}

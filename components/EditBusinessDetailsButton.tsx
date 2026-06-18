@@ -22,6 +22,7 @@ export function EditBusinessDetailsButton({
     email: business.email || '',
     phone: business.phone || '',
     notes: business.notes || '',
+    mute_replies: business.mute_replies ?? false,
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,6 +35,7 @@ export function EditBusinessDetailsButton({
       email: formData.email || null,
       phone: formData.phone || null,
       notes: formData.notes || null,
+      mute_replies: formData.mute_replies,
     })
 
     if ('error' in result) {
@@ -53,6 +55,7 @@ export function EditBusinessDetailsButton({
       email: business.email || '',
       phone: business.phone || '',
       notes: business.notes || '',
+      mute_replies: business.mute_replies ?? false,
     })
     setError(null)
     setIsOpen(false)
@@ -135,6 +138,22 @@ export function EditBusinessDetailsButton({
               rows={4}
               className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none resize-y"
             />
+          </div>
+
+          {/* Mute replies */}
+          <div className="mb-6">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.mute_replies}
+                onChange={(e) => setFormData({ ...formData, mute_replies: e.target.checked })}
+                className="w-4 h-4 accent-brand-navy"
+              />
+              <div>
+                <span className="text-sm font-semibold text-gray-900">Mute replies</span>
+                <p className="text-xs text-gray-500">Never show in &quot;Awaiting your reply&quot; — for newsletters and one-way senders</p>
+              </div>
+            </label>
           </div>
 
           {/* Buttons */}

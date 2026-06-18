@@ -30,6 +30,7 @@ const updateBusinessSchema = z.object({
   last_contacted_at: z.string().optional(),
   disposition: z.enum(['follow_up_later', 'not_interested']).nullable().optional(),
   follow_up_after: z.string().nullable().optional(),
+  mute_replies: z.boolean().optional(),
 })
 
 export type Business = {
@@ -57,6 +58,7 @@ export type Business = {
   relationship_memory_updated_at: string | null
   disposition: 'follow_up_later' | 'not_interested' | null
   follow_up_after: string | null
+  mute_replies: boolean
   mastersheet_source_ids: string[] | null
   organization_id: string
   created_at: string
@@ -104,7 +106,7 @@ export async function getBusinessById(id: string) {
   // Select specific columns needed for detail page (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, disposition, follow_up_after, mastersheet_source_ids, organization_id, created_at, updated_at')
+    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, disposition, follow_up_after, mute_replies, mastersheet_source_ids, organization_id, created_at, updated_at')
     .eq('id', id)
     .single()
 
@@ -188,6 +190,7 @@ export async function updateBusiness(
     last_contacted_at?: string
     disposition?: 'follow_up_later' | 'not_interested' | null
     follow_up_after?: string | null
+    mute_replies?: boolean
   }
 ) {
   const supabase = await createClient()
@@ -231,6 +234,7 @@ export async function updateBusiness(
     updateData.last_contacted_at = formData.last_contacted_at
   if (formData.disposition !== undefined) updateData.disposition = formData.disposition
   if (formData.follow_up_after !== undefined) updateData.follow_up_after = formData.follow_up_after
+  if (formData.mute_replies !== undefined) updateData.mute_replies = formData.mute_replies
 
   const { data, error } = await supabase
     .from('businesses')
