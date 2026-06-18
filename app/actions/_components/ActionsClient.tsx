@@ -100,9 +100,17 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: 'Lora, serif' }}>
-            Actions
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: 'Lora, serif' }}>
+              Actions
+            </h1>
+            <Link
+              href="/todos"
+              className="text-sm text-brand-navy hover:text-brand-olive transition-colors"
+            >
+              To-dos →
+            </Link>
+          </div>
           <p className="text-gray-500 text-sm mt-0.5">
             {allEmpty ? 'Nothing outstanding.' : urgentSummary || 'Nothing urgent right now.'}
           </p>
@@ -135,9 +143,14 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
             You&apos;re all caught up
           </h2>
           <p className="text-sm text-gray-400 mb-6">Nothing needs your attention right now.</p>
-          <Link href="/dashboard" className="text-sm text-brand-navy hover:underline">
-            Go to dashboard
-          </Link>
+          <div className="flex gap-4">
+            <Link href="/dashboard" className="text-sm text-brand-navy hover:underline">
+              Dashboard
+            </Link>
+            <Link href="/todos" className="text-sm text-brand-navy hover:underline">
+              To-dos
+            </Link>
+          </div>
         </div>
       ) : (
         <>
@@ -170,6 +183,11 @@ export function ActionsClient({ initial }: { initial: InitialActionsData }) {
           {/* Renewals & Contracts */}
           <CollapsibleSection title="Renewals & Contracts" count={sections.renewals.length} subtitle={sections.renewalSubtitle}>
             {sections.renewals.map(item => renderItemRow(item))}
+            <div className="px-4 py-2 border-t border-gray-100">
+              <Link href="/todos" className="text-xs text-brand-navy hover:text-brand-olive transition-colors">
+                Renewal reminders tracked on To-dos →
+              </Link>
+            </div>
           </CollapsibleSection>
         </>
       )}

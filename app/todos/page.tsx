@@ -1,7 +1,8 @@
-import { getTasks } from '@/app/actions/tasks'
+import { getTasks, migrateCrmRenewalDates } from '@/app/actions/tasks'
 import { TodosClient } from './_components/TodosClient'
 
 export default async function TodosPage() {
+  await migrateCrmRenewalDates()
   const result = await getTasks()
 
   return (

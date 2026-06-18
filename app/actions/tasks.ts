@@ -4,6 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
+export type TaskBusiness = {
+  id: string
+  name: string
+  is_club_card: boolean
+  is_advertiser: boolean
+  contract_renewal_type: string | null
+  contract_end: string | null
+}
+
 export type Task = {
   id: string
   organization_id: string
@@ -19,7 +28,7 @@ export type Task = {
   created_at: string
   updated_at: string
   completed_at: string | null
-  business?: { id: string; name: string } | null
+  business?: TaskBusiness | null
 }
 
 export async function getTasks(): Promise<{ data?: Task[]; error?: string }> {
@@ -32,7 +41,7 @@ export async function getTasks(): Promise<{ data?: Task[]; error?: string }> {
 
   const { data, error } = await supabase
     .from('tasks')
-    .select('*, business:businesses!tasks_business_id_fkey(id, name)')
+    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end)')
     .eq('organization_id', orgId)
     .order('position', { ascending: true })
     .order('created_at', { ascending: false })
@@ -67,7 +76,7 @@ export async function createTask(input: {
       organization_id: orgId,
       position: 0,
     })
-    .select('*, business:businesses!tasks_business_id_fkey(id, name)')
+    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end)')
     .single()
 
   if (error) return { error: error.message }
@@ -106,7 +115,7 @@ export async function updateTask(
     .update(updateData)
     .eq('id', id)
     .eq('organization_id', orgId)
-    .select('*, business:businesses!tasks_business_id_fkey(id, name)')
+    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end)')
     .single()
 
   if (error) return { error: error.message }
@@ -178,6 +187,49 @@ export async function clearPriority(id: string): Promise<{ error?: string | null
   if (error) return { error: error.message }
   revalidatePath('/todos')
   return { error: null }
+}
+
+export async function migrateCrmRenewalDates(): Promise<{ migrated: number; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { migrated: 0, error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { migrated: 0, error: 'No organisation found' }
+
+  const { data: rows, error: fetchErr } = await supabase
+    .from('tasks')
+    .select('id, due_date, business:businesses!tasks_business_id_fkey(id, contract_end, is_club_card, is_advertiser)')
+    .eq('organization_id', orgId)
+    .eq('source', 'contract_renewal')
+    .eq('status', 'open')
+    .not('business_id', 'is', null)
+
+  if (fetchErr || !rows) return { migrated: 0, error: fetchErr?.message }
+
+  let migrated = 0
+  for (const row of rows) {
+    const bizArr = row.business as unknown as { id: string; contract_end: string | null; is_club_card: boolean; is_advertiser: boolean }[] | null
+    const biz = Array.isArray(bizArr) ? bizArr[0] ?? null : bizArr
+    if (!biz?.contract_end) continue
+    if (row.due_date !== biz.contract_end) continue
+
+    const leadDays = biz.is_advertiser ? 28 : 21
+    const end = new Date(biz.contract_end + 'T00:00:00')
+    end.setDate(end.getDate() - leadDays)
+    const newDate = end.toISOString().slice(0, 10)
+
+    const { error: upErr } = await supabase
+      .from('tasks')
+      .update({ due_date: newDate })
+      .eq('id', row.id)
+      .eq('organization_id', orgId)
+
+    if (!upErr) migrated++
+  }
+
+  if (migrated > 0) revalidatePath('/todos')
+  return { migrated }
 }
 
 export async function refreshTaskCommitments(): Promise<{ count?: number; error?: string }> {

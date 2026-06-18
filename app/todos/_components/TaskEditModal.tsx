@@ -5,6 +5,26 @@ import Link from 'next/link'
 import type { Task } from '@/app/actions/tasks'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 
+function getSourceBadge(task: Task): string | null {
+  if (task.source === 'contract_renewal' && task.business) {
+    const b = task.business
+    if (b.is_club_card && b.is_advertiser) return 'Club Card + Advertiser'
+    if (b.is_club_card) return 'Club Card'
+    if (b.is_advertiser) return 'Advertiser'
+    return 'Renewal'
+  }
+  if (task.source === 'follow_up') return 'Follow-up'
+  return null
+}
+
+function getUrgencyLabel(task: Task): string | null {
+  if (task.source === 'contract_renewal' && task.business?.contract_renewal_type) {
+    const raw = task.business.contract_renewal_type
+    return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, ' ')
+  }
+  return null
+}
+
 export function TaskEditModal({
   task,
   onClose,
@@ -36,7 +56,8 @@ export function TaskEditModal({
 
   const modalRef = useModalKeyboard(true, onClose)
 
-  const isCRM = task.source === 'contract_renewal' || task.source === 'follow_up'
+  const badge = getSourceBadge(task)
+  const urgency = getUrgencyLabel(task)
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,14 +115,23 @@ export function TaskEditModal({
           </div>
         )}
 
-        {isCRM && (
-          <div className="flex items-center gap-2 mb-4 text-sm">
-            <span className="px-1.5 py-0.5 bg-brand-navy/10 text-brand-navy text-[10px] font-semibold">
-              CRM
-            </span>
-            <span className="text-gray-500">
-              From {task.source === 'contract_renewal' ? 'contract renewal' : 'follow-up'}
-            </span>
+        {(badge || task.business) && (
+          <div className="flex items-center gap-2 mb-4 text-sm flex-wrap">
+            {badge && (
+              <span className="px-1.5 py-0.5 bg-brand-navy/10 text-brand-navy text-[10px] font-semibold">
+                {badge}
+              </span>
+            )}
+            {urgency && (
+              <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-medium">
+                {urgency}
+              </span>
+            )}
+            {task.source !== 'manual' && (
+              <span className="text-gray-500">
+                From {task.source === 'contract_renewal' ? 'contract renewal' : 'follow-up'}
+              </span>
+            )}
             {task.business && (
               <>
                 <span className="text-gray-300">·</span>

@@ -4,13 +4,32 @@ import Link from 'next/link'
 import type { Task } from '@/app/actions/tasks'
 import { formatDateShortGB } from '@/lib/utils'
 
+function getSourceBadge(task: Task): string | null {
+  if (task.source === 'contract_renewal' && task.business) {
+    const b = task.business
+    if (b.is_club_card && b.is_advertiser) return 'Club Card + Advertiser'
+    if (b.is_club_card) return 'Club Card'
+    if (b.is_advertiser) return 'Advertiser'
+    return 'Renewal'
+  }
+  if (task.source === 'follow_up') return 'Follow-up'
+  return null
+}
+
+function getUrgencyLabel(task: Task): string | null {
+  if (task.source === 'contract_renewal' && task.business?.contract_renewal_type) {
+    const raw = task.business.contract_renewal_type
+    return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, ' ')
+  }
+  return null
+}
+
 export function TaskRow({
   task,
   onToggle,
   onEdit,
   onSetPriority,
   onClearPriority,
-  isCRM,
   compact,
 }: {
   task: Task
@@ -18,10 +37,11 @@ export function TaskRow({
   onEdit: (t: Task) => void
   onSetPriority: (id: string) => void
   onClearPriority: (id: string) => void
-  isCRM: boolean
   compact?: boolean
 }) {
   const isDone = task.status === 'done'
+  const badge = getSourceBadge(task)
+  const urgency = getUrgencyLabel(task)
 
   return (
     <div
@@ -63,9 +83,15 @@ export function TaskRow({
 
       {/* Badges */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        {isCRM && (
+        {badge && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-brand-navy/10 text-brand-navy">
-            CRM
+            {badge}
+          </span>
+        )}
+
+        {urgency && (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-600">
+            {urgency}
           </span>
         )}
 
@@ -85,7 +111,7 @@ export function TaskRow({
           </span>
         )}
 
-        {isCRM && task.business_id && task.business && (
+        {task.business_id && task.business && (
           <Link
             href={`/businesses/${task.business_id}`}
             onClick={(e) => e.stopPropagation()}

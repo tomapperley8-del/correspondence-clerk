@@ -10,7 +10,6 @@ type CalendarViewProps = {
   onEdit: (t: Task) => void
   onQuickAdd: (title: string, dueDate: string | null, category: 'work' | 'personal') => Promise<void>
   onDateChange: (taskId: string, newDate: string) => Promise<void>
-  isCRM: (t: Task) => boolean
 }
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -23,29 +22,21 @@ function getMonthDays(year: number, month: number) {
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
 
-  // Monday = 0, Sunday = 6 (ISO week)
   let startDow = firstDay.getDay() - 1
   if (startDow < 0) startDow = 6
 
   const days: { date: string; inMonth: boolean; day: number }[] = []
 
-  // Previous month fill
   for (let i = startDow - 1; i >= 0; i--) {
     const d = new Date(year, month, -i)
-    days.push({
-      date: fmt(d),
-      inMonth: false,
-      day: d.getDate(),
-    })
+    days.push({ date: fmt(d), inMonth: false, day: d.getDate() })
   }
 
-  // Current month
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const dt = new Date(year, month, d)
     days.push({ date: fmt(dt), inMonth: true, day: d })
   }
 
-  // Next month fill to complete grid
   const remaining = 7 - (days.length % 7)
   if (remaining < 7) {
     for (let i = 1; i <= remaining; i++) {
@@ -64,6 +55,19 @@ function fmt(d: Date) {
   return `${y}-${m}-${day}`
 }
 
+function isCRM(t: Task) {
+  return t.source === 'contract_renewal' || t.source === 'follow_up'
+}
+
+function getTaskTooltip(t: Task): string {
+  const parts = [t.title]
+  if (t.source === 'contract_renewal' && t.business?.contract_renewal_type) {
+    const raw = t.business.contract_renewal_type
+    parts.push('(' + raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, ' ') + ')')
+  }
+  return parts.join(' ')
+}
+
 export function CalendarView({
   tasks,
   today,
@@ -71,7 +75,6 @@ export function CalendarView({
   onEdit,
   onQuickAdd,
   onDateChange,
-  isCRM,
 }: CalendarViewProps) {
   const [year, setYear] = useState(() => parseInt(today.slice(0, 4)))
   const [month, setMonth] = useState(() => parseInt(today.slice(5, 7)) - 1)
@@ -270,7 +273,7 @@ export function CalendarView({
                         ? 'bg-brand-navy/5 text-brand-navy'
                         : 'bg-brand-warm text-gray-700 hover:bg-gray-100'
                     }`}
-                    title={t.title}
+                    title={getTaskTooltip(t)}
                   >
                     {t.is_priority && t.status !== 'done' && '★ '}
                     {isCRM(t) && '⟳ '}
@@ -321,7 +324,7 @@ export function CalendarView({
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-2 bg-brand-navy/5 border border-brand-navy/20" />
-          From CRM
+          CRM
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-2 bg-gray-50 border border-gray-200" />
