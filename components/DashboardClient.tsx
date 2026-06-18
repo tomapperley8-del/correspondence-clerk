@@ -215,14 +215,14 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
                 <p className="text-sm font-semibold text-gray-700 mb-1">You&apos;re set up</p>
                 <p className="text-sm text-gray-600 mb-3">
                   As you log correspondence, your{' '}
-                  <Link href="/actions" className="text-brand-navy hover:underline font-medium">Actions page</Link>
-                  {' '}will automatically surface replies that need sending, flagged follow-ups, contract renewals, and businesses that have gone quiet — all in one prioritised list.
+                  <Link href="/todos" className="text-brand-navy hover:underline font-medium">To-dos page</Link>
+                  {' '}will surface replies that need sending, flagged follow-ups, and contract renewals — all in one place.
                 </p>
                 <Link
-                  href="/actions"
+                  href="/todos"
                   className="inline-block px-4 py-1.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-navy-hover transition-colors"
                 >
-                  Go to Actions
+                  Go to To-dos
                 </Link>
               </div>
               <button

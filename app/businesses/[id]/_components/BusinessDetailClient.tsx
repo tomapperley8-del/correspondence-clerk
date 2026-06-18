@@ -62,7 +62,7 @@ interface Props {
   initialOpenThreads: import('@/app/actions/correspondence').OpenThread[]
   businessId: string
   saved?: string
-  fromActions: boolean
+  fromTodos: boolean
 }
 
 export function BusinessDetailClient({
@@ -74,7 +74,7 @@ export function BusinessDetailClient({
   initialOpenThreads,
   businessId,
   saved,
-  fromActions,
+  fromTodos,
 }: Props) {
   const router = useRouter()
   const { open: openInsights } = useInsights()
@@ -534,10 +534,9 @@ export function BusinessDetailClient({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumbs — "Back to Actions" when navigated from Actions page */}
       <Breadcrumbs items={[
-        fromActions
-          ? { label: 'Actions', href: '/actions' }
+        fromTodos
+          ? { label: 'To-dos', href: '/todos' }
           : { label: 'Dashboard', href: '/dashboard' },
         { label: business.name },
       ]} />

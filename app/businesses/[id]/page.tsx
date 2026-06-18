@@ -40,7 +40,7 @@ export default async function BusinessDetailPage({
       initialOpenThreads={'error' in openThreadsResult ? [] : (openThreadsResult.data ?? [])}
       businessId={id}
       saved={saved}
-      fromActions={from === 'actions'}
+      fromTodos={from === 'todos'}
     />
   )
 }

@@ -35,10 +35,8 @@ export function Navigation() {
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [actionsCount, setActionsCount] = useState(0)
-  const [overdueCount, setOverdueCount] = useState(0)
+  const [todosDueCount, setTodosDueCount] = useState(0)
   const [inboundCount, setInboundCount] = useState(0)
-  const [hasCorrespondence, setHasCorrespondence] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -49,10 +47,8 @@ export function Navigation() {
   async function loadNavData() {
     const nav = await getNavData()
     setDisplayName(nav.displayName)
-    setActionsCount(nav.actionsCount)
-    setOverdueCount(nav.overdueCount)
+    setTodosDueCount(nav.todosDueCount)
     setInboundCount(nav.inboundCount)
-    setHasCorrespondence(nav.hasCorrespondence)
     if (nav.organizationId) {
       setOrganization({ id: nav.organizationId, name: nav.organizationName ?? '' })
     } else {
@@ -81,9 +77,8 @@ export function Navigation() {
       } else {
         setOrganization(null)
         setDisplayName(null)
-        setActionsCount(0)
+        setTodosDueCount(0)
         setInboundCount(0)
-        setHasCorrespondence(false)
       }
     })
 
@@ -222,12 +217,12 @@ export function Navigation() {
                 }`}
               >
                 To-dos
-                {actionsCount > 0 && (
+                {todosDueCount > 0 && (
                   <span
-                    title={`${actionsCount} item${actionsCount === 1 ? '' : 's'} awaiting reply`}
-                    className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                    title={`${todosDueCount} to-do${todosDueCount === 1 ? '' : 's'} due`}
+                    className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
                   >
-                    {actionsCount > 20 ? '20+' : actionsCount}
+                    {todosDueCount > 20 ? '20+' : todosDueCount}
                   </span>
                 )}
               </Link>
@@ -323,11 +318,11 @@ export function Navigation() {
                 { href: '/new-entry', label: 'New Entry' },
                 { href: '/search', label: 'Search' },
                 { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
-                { href: '/todos', label: 'To-dos', badge: actionsCount > 0 ? actionsCount : null },
+                { href: '/todos', label: 'To-dos', badge: todosDueCount > 0 ? todosDueCount : null },
                 { href: '/insights', label: 'Insights' },
                 { href: '/help', label: 'Help' },
                 { href: '/settings', label: 'Settings' },
-              ].map(({ href, label, badge, overdue }: { href: string; label: string; badge?: number | null; overdue?: boolean }) => (
+              ].map(({ href, label, badge }: { href: string; label: string; badge?: number | null }) => (
                 <Link
                   key={href}
                   href={href}
@@ -339,7 +334,7 @@ export function Navigation() {
                 >
                   {label}
                   {badge != null && (
-                    <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center leading-none ${overdue ? 'bg-red-500' : 'bg-amber-500'}`}>
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center leading-none bg-amber-500">
                       {badge > 20 ? '20+' : badge}
                     </span>
                   )}
@@ -397,9 +392,9 @@ export function Navigation() {
             <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
-            {actionsCount > 0 && (
-              <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                {actionsCount > 20 ? '20+' : actionsCount}
+            {todosDueCount > 0 && (
+              <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                {todosDueCount > 20 ? '20+' : todosDueCount}
               </span>
             )}
           </span>

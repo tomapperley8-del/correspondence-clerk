@@ -10,20 +10,14 @@ export type NavData = {
   displayName: string | null
   organizationId: string | null
   organizationName: string | null
-  actionsCount: number   // urgent: flagged items due today or earlier (not future-snoozed)
-  overdueCount: number   // strictly past-due flagged items (drives red vs amber colour)
+  todosDueCount: number
   inboundCount: number
-  hasCorrespondence: boolean
 }
 
-/**
- * Single-round-trip fetch of everything the nav needs.
- * One getUser(), one profile+org join, two count queries in parallel.
- */
 export async function getNavData(): Promise<NavData> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, overdueCount: 0, inboundCount: 0, hasCorrespondence: false }
+  if (!user) return { displayName: null, organizationId: null, organizationName: null, todosDueCount: 0, inboundCount: 0 }
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -31,31 +25,27 @@ export async function getNavData(): Promise<NavData> {
     .eq('id', user.id)
     .single()
 
-  if (!profile) return { displayName: null, organizationId: null, organizationName: null, actionsCount: 0, overdueCount: 0, inboundCount: 0, hasCorrespondence: false }
+  if (!profile) return { displayName: null, organizationId: null, organizationName: null, todosDueCount: 0, inboundCount: 0 }
 
   const orgId = profile.organization_id
   const orgs = profile.organizations as { id: string; name: string }[] | { id: string; name: string } | null
   const org = Array.isArray(orgs) ? orgs[0] ?? null : orgs
 
-  const [actionCounts, inbound, anyCorrespondence] = await Promise.all([
-    // Single scan: urgent count (due_at IS NULL or past) + overdue count (strictly past)
-    supabase.rpc('get_action_counts', { p_org_id: orgId }),
+  const today = new Date().toISOString().slice(0, 10)
+
+  const [todosDue, inbound] = await Promise.all([
+    supabase.from('tasks').select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId).eq('status', 'open').lte('due_date', today),
     supabase.from('inbound_queue').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('status', 'pending'),
-    supabase.from('correspondence').select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId).limit(1),
   ])
-
-  const counts = actionCounts.data?.[0]
 
   return {
     displayName: profile.display_name,
     organizationId: orgId,
     organizationName: org?.name ?? null,
-    actionsCount: Number(counts?.urgent_count ?? 0),
-    overdueCount: Number(counts?.overdue_count ?? 0),
+    todosDueCount: todosDue.count ?? 0,
     inboundCount: inbound.count ?? 0,
-    hasCorrespondence: (anyCorrespondence.count ?? 0) > 0,
   }
 }
 

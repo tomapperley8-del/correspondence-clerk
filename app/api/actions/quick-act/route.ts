@@ -115,7 +115,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       `<div class="check">✗</div>
        <h1>Invalid link</h1>
        <p>This action link is missing its token.</p>
-       <a class="btn" href="${baseUrl}/actions">Open Actions</a>`
+       <a class="btn" href="${baseUrl}/todos">Open Actions</a>`
     )
   }
 
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
        <h1>Link expired</h1>
        <p>Action links are valid for 48 hours after the briefing email is sent.
           You can take action directly in the app.</p>
-       <a class="btn" href="${baseUrl}/actions">Open Actions</a>`
+       <a class="btn" href="${baseUrl}/todos">Open Actions</a>`
     )
   }
 
@@ -146,7 +146,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       `<div class="check">✓</div>
        <h1>Already cleared</h1>
        <p>This entry has already been removed or doesn't exist.</p>
-       <a class="btn" href="${baseUrl}/actions">Open Actions</a>`
+       <a class="btn" href="${baseUrl}/todos">Open Actions</a>`
     )
   }
 
@@ -165,7 +165,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       `<div class="check">✗</div>
        <h1>Not authorised</h1>
        <p>You are not authorised to perform this action.</p>
-       <a class="btn" href="${baseUrl}/actions">Open Actions</a>`
+       <a class="btn" href="${baseUrl}/todos">Open Actions</a>`
     )
   }
 
@@ -198,7 +198,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       `<div class="check">✓</div>
        <h1>Marked as done</h1>
        <p><strong>${businessName}</strong> has been cleared from your Actions list.</p>
-       <a class="btn" href="${baseUrl}/actions">Open Actions</a>`
+       <a class="btn" href="${baseUrl}/todos">Open Actions</a>`
     )
   }
 
@@ -226,7 +226,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       `<div class="check">✓</div>
        <h1>Snoozed</h1>
        <p><strong>${businessName}</strong> will reappear in your Actions on ${displayDate}.</p>
-       <a class="btn" href="${baseUrl}/actions">Open Actions</a>`
+       <a class="btn" href="${baseUrl}/todos">Open Actions</a>`
     )
   }
 
@@ -235,6 +235,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     `<div class="check">✗</div>
      <h1>Unknown action</h1>
      <p>This link contains an unrecognised action type.</p>
-     <a class="btn" href="${baseUrl}/actions">Open Actions</a>`
+     <a class="btn" href="${baseUrl}/todos">Open Actions</a>`
   )
 }
