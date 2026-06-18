@@ -22,6 +22,47 @@ export function isPersonalDomain(domain: string): boolean {
 }
 
 /**
+ * Normalise a domain or business name into comparable tokens.
+ * Strips TLDs, common suffixes (ltd, limited, inc, llc, the), punctuation,
+ * and lowercases. Returns sorted unique tokens.
+ */
+function normaliseForComparison(input: string): string[] {
+  const STOP_WORDS = new Set([
+    'ltd', 'limited', 'inc', 'llc', 'plc', 'co', 'uk', 'com', 'org', 'net',
+    'the', 'and', 'of', 'for', 'www',
+  ])
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(t => t.length > 1 && !STOP_WORDS.has(t))
+    .sort()
+}
+
+/**
+ * Score how well a domain name matches a business name.
+ * Returns a value between 0 and 1. A score >= 0.6 is a good match.
+ */
+export function domainBusinessNameScore(domain: string, businessName: string): number {
+  const domainBase = domain.split('.')[0] ?? ''
+  const domainTokens = normaliseForComparison(domainBase)
+  const bizTokens = normaliseForComparison(businessName)
+  if (domainTokens.length === 0 || bizTokens.length === 0) return 0
+
+  // Check if domain is a concatenated form of business tokens
+  // e.g. "smithplumbing" matches "Smith Plumbing"
+  const domainJoined = domainTokens.join('')
+  const bizJoined = bizTokens.join('')
+  if (domainJoined === bizJoined) return 1
+  if (domainJoined.includes(bizJoined) || bizJoined.includes(domainJoined)) return 0.9
+
+  // Token overlap
+  const matched = domainTokens.filter(t => bizTokens.some(b => b.includes(t) || t.includes(b)))
+  const overlapRatio = matched.length / Math.max(domainTokens.length, bizTokens.length)
+  return overlapRatio
+}
+
+/**
  * Derive the set of domains owned by the user from their own_email_addresses
  * (and optionally their auth email). Used to block domain_mapping creation
  * and lookup when the "sender" is really the user's own infrastructure

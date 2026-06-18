@@ -31,6 +31,7 @@ import {
   extractForwardedSender,
   extractContactFormSender,
   getOwnDomains,
+  domainBusinessNameScore,
 } from '@/lib/inbound/utils'
 
 export const maxDuration = 60
@@ -508,6 +509,46 @@ async function matchBusinessFromRecipients(
 }
 
 // ---------------------------------------------------------------------------
+// Fuzzy match: compare a sender's domain name against all business names.
+// Returns the best-scoring business if score >= 0.6 (strong resemblance).
+// Also learns the domain mapping so future emails auto-file instantly.
+// ---------------------------------------------------------------------------
+async function matchBusinessByDomainName(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  orgId: string,
+  domain: string
+): Promise<string | null> {
+  if (!domain) return null
+  const { data: businesses } = await supabase
+    .from('businesses')
+    .select('id, name')
+    .eq('organization_id', orgId)
+
+  if (!businesses || businesses.length === 0) return null
+
+  let bestId: string | null = null
+  let bestScore = 0
+  for (const biz of businesses) {
+    const score = domainBusinessNameScore(domain, biz.name)
+    if (score > bestScore) {
+      bestScore = score
+      bestId = biz.id
+    }
+  }
+
+  if (bestScore < 0.6 || !bestId) return null
+
+  await supabase
+    .from('domain_mappings')
+    .upsert(
+      { org_id: orgId, domain, business_id: bestId },
+      { onConflict: 'org_id,domain' }
+    )
+
+  return bestId
+}
+
+// ---------------------------------------------------------------------------
 // Match a contact by sender/recipient name when exact email lookup fails.
 // Normalises names, requires at least one token ≥4 chars, and only assigns
 // when exactly ONE contact matches (avoids ambiguous multi-contact businesses).
@@ -801,25 +842,44 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({}, { status: 200 })
     }
 
-    log('[inbound-email] queued_sent', { recipientDomains: recipientEmails.map(e => e.split('@')[1] ?? '') })
-    // No domain match → queue for manual triage
-    const { error: queueSentError } = await supabase.from('inbound_queue').insert({
-      org_id: orgId,
-      from_email: fromEmail,
-      from_name: fromName || null,
-      subject: payload.subject ?? null,
-      body_preview: bodyPreview || null,
-      body_text: strippedBody || null,
-      to_emails: toEmails.length > 0 ? toEmails : null,
-      direction: 'sent',
-      raw_payload: JSON.parse(rawBody),
-      status: 'pending',
-    })
-    if (queueSentError) {
-      log('[inbound-email] queue_sent_insert_failed', { error: queueSentError.message })
-      await saveDeadLetter(supabase, orgId, rawBody, queueSentError.message, 'queue_sent')
+    // Fuzzy match: try recipient domains against business names
+    for (const email of recipientEmails) {
+      const domain = email.split('@')[1]?.toLowerCase() ?? ''
+      if (!domain || isPersonalDomain(domain) || ownDomains.has(domain)) continue
+      const fuzzyBizId = await matchBusinessByDomainName(supabase, orgId, domain)
+      if (fuzzyBizId) {
+        log('[inbound-email] auto_filed_sent_fuzzy_match', { businessId: fuzzyBizId, domain })
+        const rawForAI = buildRawForAI(payload, strippedBody, 'sent')
+        const entryDate = payload.date ?? new Date().toISOString()
+        try {
+          const insertedId = await insertCorrespondenceServiceRole(supabase, {
+            orgId, userId,
+            businessId: fuzzyBizId,
+            contactId: null,
+            rawText: rawForAI,
+            subject: payload.subject || '(No subject)',
+            entryDate,
+            fromEmail,
+            direction: 'sent',
+          })
+          if (insertedId) {
+            after(async () => {
+              try {
+                await applyFormattingBackground(supabase, insertedId, rawForAI, entryDate, 'sent')
+              } catch (err) {
+                log('[inbound-email] bg_format_failed', { error: String(err), id: insertedId })
+              }
+            })
+          }
+        } catch (err) {
+          log('[inbound-email] auto_filed_sent_fuzzy_insert_failed', { error: String(err) })
+          await saveDeadLetter(supabase, orgId, rawBody, String(err), 'auto_file_sent_fuzzy')
+        }
+        return NextResponse.json({}, { status: 200 })
+      }
     }
 
+    log('[inbound-email] dropped_sent_no_match', { recipientDomains: recipientEmails.map(e => e.split('@')[1] ?? '') })
     return NextResponse.json({}, { status: 200 })
   }
 
@@ -868,6 +928,14 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
         .maybeSingle()
 
       autoFiledBusinessId = mapping?.business_id ?? null
+    }
+
+    // 3. Fuzzy match: compare domain name against business names
+    if (!skipAutoFile && !autoFiledBusinessId && effectiveDomain && !isPersonalDomain(effectiveDomain) && !ownDomains.has(effectiveDomain)) {
+      autoFiledBusinessId = await matchBusinessByDomainName(supabase, orgId, effectiveDomain)
+      if (autoFiledBusinessId) {
+        log('[inbound-email] auto_filed_received_fuzzy_match', { businessId: autoFiledBusinessId, domain: effectiveDomain })
+      }
     }
   }
 
@@ -939,24 +1007,6 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({}, { status: 200 })
   }
 
-  log('[inbound-email] queued_received', { domain: effectiveDomain || '(personal/unknown)' })
-  // No domain match → add to inbound_queue for manual triage
-  const { error: queueReceivedError } = await supabase.from('inbound_queue').insert({
-    org_id: orgId,
-    from_email: effectiveFromEmail,   // original sender if extracted, otherwise forwarder
-    from_name: effectiveFromName || null,
-    subject: payload.subject ?? null,
-    body_preview: bodyPreview || null,
-    body_text: strippedBody || null,
-    to_emails: null,
-    direction: 'received',
-    raw_payload: JSON.parse(rawBody),
-    status: 'pending',
-  })
-  if (queueReceivedError) {
-    log('[inbound-email] queue_received_insert_failed', { error: queueReceivedError.message })
-    await saveDeadLetter(supabase, orgId, rawBody, queueReceivedError.message, 'queue_received')
-  }
-
+  log('[inbound-email] dropped_received_no_match', { domain: effectiveDomain || '(personal/unknown)', from: effectiveFromEmail, subject: payload.subject ?? '' })
   return NextResponse.json({}, { status: 200 })
 }
