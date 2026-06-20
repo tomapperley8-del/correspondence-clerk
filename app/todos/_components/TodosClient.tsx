@@ -13,7 +13,7 @@ import {
   refreshTaskCommitments,
   createTaskFromCorrespondence,
 } from '@/app/actions/tasks'
-import { markCorrespondenceDone } from '@/app/actions/correspondence'
+import { markCorrespondenceDone, type GoneQuietItem } from '@/app/actions/correspondence'
 import { updateBusiness } from '@/app/actions/businesses'
 import { toast } from '@/lib/toast'
 import { formatDateShortGB } from '@/lib/utils'
@@ -174,20 +174,24 @@ export function TodosClient({
   initialTasks,
   initialError,
   initialNeedsReply,
+  initialGoneQuiet,
 }: {
   initialTasks: Task[]
   initialError: string | null
   initialNeedsReply: NeedsReplyItem[]
+  initialGoneQuiet: GoneQuietItem[]
 }) {
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [needsReply, setNeedsReply] = useState<NeedsReplyItem[]>(initialNeedsReply)
+  const [goneQuiet, setGoneQuiet] = useState<GoneQuietItem[]>(initialGoneQuiet)
   const [view, setView] = useState<ViewMode>('list')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('week')
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [doneExpanded, setDoneExpanded] = useState(false)
+  const [createdTodoIds, setCreatedTodoIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const saved = localStorage.getItem('todos_time_filter')
@@ -218,6 +222,15 @@ export function TodosClient({
   }, [tasks, categoryFilter, timeFilter, weekEnd])
 
   const groups = useMemo(() => groupTasks(filtered, today), [filtered, today])
+
+  const nrOverdue = useMemo(() =>
+    needsReply.filter((r) => r.entry_date && r.entry_date < today),
+    [needsReply, today]
+  )
+  const nrToday = useMemo(() =>
+    needsReply.filter((r) => !r.entry_date || r.entry_date >= today),
+    [needsReply, today]
+  )
 
   const focusTask = useMemo(() => getFocusTask(tasks.filter((t) => {
     if (categoryFilter !== 'all' && t.category !== categoryFilter) return false
@@ -370,8 +383,7 @@ export function TodosClient({
       }
       if (result.data) {
         setTasks((prev) => [result.data!, ...prev])
-        setNeedsReply((prev) => prev.filter((r) => r.id !== item.id))
-        await markCorrespondenceDone(item.id)
+        setCreatedTodoIds((prev) => new Set([...prev, item.id]))
         toast.success('To-do created')
       }
     },
@@ -415,16 +427,6 @@ export function TodosClient({
         <div className="border border-red-300 bg-red-50 px-4 py-3 mb-6 text-sm text-red-800">
           {initialError}
         </div>
-      )}
-
-      {/* Awaiting reply section */}
-      {needsReply.length > 0 && (
-        <NeedsReplySection
-          items={needsReply}
-          onDismiss={handleDismissReply}
-          onCreateTodo={handleCreateTodoFromReply}
-          onMute={handleMuteBusiness}
-        />
       )}
 
       {/* View toggle + filters */}
@@ -501,28 +503,68 @@ export function TodosClient({
       {/* Views */}
       {view === 'list' ? (
         <div className="space-y-6 mt-6">
-          {groups.overdue.length > 0 && (
-            <BatchedTaskGroup
-              label="Overdue"
-              labelClass="text-red-700"
-              tasks={groups.overdue}
-              onToggle={handleToggleStatus}
-              onEdit={setEditingTask}
-              onSetPriority={handleSetPriority}
-              onClearPriority={handleClearPriority}
-            />
+          {(groups.overdue.length > 0 || nrOverdue.length > 0) && (
+            <section>
+              <h3 className="text-sm font-semibold mb-2 text-red-700">
+                Overdue ({groups.overdue.length + nrOverdue.length})
+              </h3>
+              <div className="divide-y divide-gray-100">
+                {nrOverdue.map((item) => (
+                  <NeedsReplyRow
+                    key={`nr-${item.id}`}
+                    item={item}
+                    todoCreated={createdTodoIds.has(item.id)}
+                    onDismiss={handleDismissReply}
+                    onCreateTodo={handleCreateTodoFromReply}
+                    onMute={handleMuteBusiness}
+                  />
+                ))}
+              </div>
+              {groups.overdue.length > 0 && (
+                <BatchedTaskGroup
+                  label=""
+                  labelClass=""
+                  tasks={groups.overdue}
+                  onToggle={handleToggleStatus}
+                  onEdit={setEditingTask}
+                  onSetPriority={handleSetPriority}
+                  onClearPriority={handleClearPriority}
+                  hideHeader
+                />
+              )}
+            </section>
           )}
 
-          {groups.today.length > 0 && (
-            <BatchedTaskGroup
-              label="Today"
-              labelClass="text-brand-navy"
-              tasks={groups.today}
-              onToggle={handleToggleStatus}
-              onEdit={setEditingTask}
-              onSetPriority={handleSetPriority}
-              onClearPriority={handleClearPriority}
-            />
+          {(groups.today.length > 0 || nrToday.length > 0) && (
+            <section>
+              <h3 className="text-sm font-semibold mb-2 text-brand-navy">
+                Today ({groups.today.length + nrToday.length})
+              </h3>
+              <div className="divide-y divide-gray-100">
+                {nrToday.map((item) => (
+                  <NeedsReplyRow
+                    key={`nr-${item.id}`}
+                    item={item}
+                    todoCreated={createdTodoIds.has(item.id)}
+                    onDismiss={handleDismissReply}
+                    onCreateTodo={handleCreateTodoFromReply}
+                    onMute={handleMuteBusiness}
+                  />
+                ))}
+              </div>
+              {groups.today.length > 0 && (
+                <BatchedTaskGroup
+                  label=""
+                  labelClass=""
+                  tasks={groups.today}
+                  onToggle={handleToggleStatus}
+                  onEdit={setEditingTask}
+                  onSetPriority={handleSetPriority}
+                  onClearPriority={handleClearPriority}
+                  hideHeader
+                />
+              )}
+            </section>
           )}
 
           {groups.upcoming.length > 0 && (
@@ -546,6 +588,23 @@ export function TodosClient({
               onEdit={setEditingTask}
               onSetPriority={handleSetPriority}
               onClearPriority={handleClearPriority}
+            />
+          )}
+
+          {goneQuiet.length > 0 && (
+            <GoneQuietSection
+              items={goneQuiet}
+              onFollowUp={(item) => {
+                handleCreate(
+                  `Follow up with ${item.business_name}`,
+                  addDays(today, 0),
+                  'work'
+                )
+                setGoneQuiet((prev) => prev.filter((g) => g.business_id !== item.business_id))
+              }}
+              onDismiss={(businessId) => {
+                setGoneQuiet((prev) => prev.filter((g) => g.business_id !== businessId))
+              }}
             />
           )}
 
@@ -575,7 +634,7 @@ export function TodosClient({
             </section>
           )}
 
-          {filtered.length === 0 && !initialError && (
+          {filtered.length === 0 && needsReply.length === 0 && !initialError && (
             <div className="text-center py-16 text-gray-400">
               <p className="text-lg mb-2">
                 {timeFilter === 'week' ? 'Nothing due this week' : 'No to-dos yet'}
@@ -613,73 +672,131 @@ export function TodosClient({
   )
 }
 
-function NeedsReplySection({
-  items,
+function NeedsReplyRow({
+  item,
+  todoCreated,
   onDismiss,
   onCreateTodo,
   onMute,
 }: {
-  items: NeedsReplyItem[]
+  item: NeedsReplyItem
+  todoCreated: boolean
   onDismiss: (id: string) => void
   onCreateTodo: (item: NeedsReplyItem) => void
   onMute: (businessId: string) => void
 }) {
-  const [expanded, setExpanded] = useState(items.length <= 3)
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5 bg-red-50/40">
+      <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 flex-shrink-0">
+        Reply
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/businesses/${item.business_id}`}
+            className="text-sm font-medium text-brand-navy hover:text-brand-olive transition-colors truncate"
+          >
+            {item.businesses.name}
+          </Link>
+          {item.contact && (
+            <span className="text-xs text-gray-500 truncate">
+              {item.contact.name}{item.contact.role ? ` · ${item.contact.role}` : ''}
+            </span>
+          )}
+        </div>
+        {item.subject && (
+          <p className="text-xs text-gray-500 truncate mt-0.5">{item.subject}</p>
+        )}
+      </div>
+      {item.entry_date && (
+        <span className="text-xs text-gray-400 flex-shrink-0">
+          {formatDateShortGB(item.entry_date + 'T00:00:00')}
+        </span>
+      )}
+      {todoCreated ? (
+        <span className="text-xs px-2 py-1 bg-brand-olive/10 text-brand-olive font-medium flex-shrink-0">
+          Task created
+        </span>
+      ) : (
+        <button
+          onClick={() => onCreateTodo(item)}
+          className="text-xs px-2 py-1 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors flex-shrink-0"
+        >
+          Create to-do
+        </button>
+      )}
+      <button
+        onClick={() => onMute(item.business_id)}
+        className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+        title="Mute this business — never show in awaiting reply"
+      >
+        Mute
+      </button>
+      <button
+        onClick={() => onDismiss(item.id)}
+        className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+      >
+        Done
+      </button>
+    </div>
+  )
+}
+
+function GoneQuietSection({
+  items,
+  onFollowUp,
+  onDismiss,
+}: {
+  items: GoneQuietItem[]
+  onFollowUp: (item: GoneQuietItem) => void
+  onDismiss: (businessId: string) => void
+}) {
+  const [expanded, setExpanded] = useState(true)
 
   return (
-    <section className="mb-6">
+    <section>
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-2 text-sm font-semibold text-red-700 hover:text-red-800 transition-colors mb-2"
+        className="flex items-center gap-2 text-sm font-semibold text-amber-700 hover:text-amber-800 transition-colors mb-2"
       >
         <span className="text-xs">{expanded ? '▼' : '▶'}</span>
-        Awaiting your reply ({items.length})
+        Gone quiet ({items.length})
       </button>
       {expanded && (
-        <div className="border border-red-200 bg-red-50/30 divide-y divide-red-100">
+        <div className="border border-amber-200 bg-amber-50/30 divide-y divide-amber-100">
           {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 px-3 py-2.5">
+            <div key={item.business_id} className="flex items-center gap-3 px-3 py-2.5">
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-amber-100 text-amber-700 flex-shrink-0">
+                {item.days_since}d
+              </span>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/businesses/${item.business_id}`}
-                    className="text-sm font-medium text-brand-navy hover:text-brand-olive transition-colors truncate"
-                  >
-                    {item.businesses.name}
-                  </Link>
-                  {item.contact && (
-                    <span className="text-xs text-gray-500 truncate">
-                      {item.contact.name}{item.contact.role ? ` · ${item.contact.role}` : ''}
-                    </span>
-                  )}
-                </div>
+                <Link
+                  href={`/businesses/${item.business_id}`}
+                  className="text-sm font-medium text-brand-navy hover:text-brand-olive transition-colors truncate block"
+                >
+                  {item.business_name}
+                </Link>
                 {item.subject && (
-                  <p className="text-xs text-gray-500 truncate mt-0.5">{item.subject}</p>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">Last: {item.subject}</p>
                 )}
               </div>
-              {item.entry_date && (
-                <span className="text-xs text-gray-400 flex-shrink-0">
-                  {formatDateShortGB(item.entry_date + 'T00:00:00')}
-                </span>
-              )}
               <button
-                onClick={() => onCreateTodo(item)}
+                onClick={() => onFollowUp(item)}
+                className="text-xs px-2 py-1 border border-amber-600/30 text-amber-700 hover:bg-amber-100 transition-colors flex-shrink-0"
+              >
+                Follow up
+              </button>
+              <Link
+                href={`/new-entry?businessId=${item.business_id}`}
                 className="text-xs px-2 py-1 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors flex-shrink-0"
               >
-                Create to-do
-              </button>
+                + Entry
+              </Link>
               <button
-                onClick={() => onMute(item.business_id)}
-                className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
-                title="Mute this business — never show in awaiting reply"
-              >
-                Mute
-              </button>
-              <button
-                onClick={() => onDismiss(item.id)}
+                onClick={() => onDismiss(item.business_id)}
                 className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
               >
-                Done
+                Dismiss
               </button>
             </div>
           ))}
@@ -765,6 +882,7 @@ function BatchedTaskGroup({
   onEdit,
   onSetPriority,
   onClearPriority,
+  hideHeader,
 }: {
   label: string
   labelClass: string
@@ -773,14 +891,17 @@ function BatchedTaskGroup({
   onEdit: (t: Task) => void
   onSetPriority: (id: string) => void
   onClearPriority: (id: string) => void
+  hideHeader?: boolean
 }) {
   const batched = useMemo(() => batchCrmTasks(tasks), [tasks])
 
   return (
     <section>
-      <h3 className={`text-sm font-semibold mb-2 ${labelClass}`}>
-        {label} ({tasks.length})
-      </h3>
+      {!hideHeader && (
+        <h3 className={`text-sm font-semibold mb-2 ${labelClass}`}>
+          {label} ({tasks.length})
+        </h3>
+      )}
       <div className="divide-y divide-gray-100">
         {batched.map((group, i) => {
           if (group.type === 'single') {

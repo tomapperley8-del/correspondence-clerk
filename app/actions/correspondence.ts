@@ -1053,29 +1053,7 @@ export async function getNeedsReply() {
   return { data: reshaped }
 }
 
-/**
- * Get businesses gone quiet: last_contacted_at > 60 days ago AND at least 3 correspondence entries.
- */
-export async function getGoneQuiet() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
-  const orgId = await getCurrentUserOrganizationId()
-  if (!orgId) return { error: 'No organization found' }
 
-  const { data, error } = await supabase.rpc('get_gone_quiet', { p_org_id: orgId })
-  if (error) return { error: error.message }
-
-  // Shape result to match the prior { correspondence: [{ count }] } contract used by the hook
-  const shaped = (data || []).map((row: { id: string; name: string; last_contacted_at: string; correspondence_count: number }) => ({
-    id: row.id,
-    name: row.name,
-    last_contacted_at: row.last_contacted_at,
-    correspondence: [{ count: Number(row.correspondence_count) }],
-  }))
-
-  return { data: shaped }
-}
 
 /**
  * Get correspondence entries with due_at set and action_needed='none' (pure reminders).
@@ -1688,4 +1666,77 @@ export async function refileCorrespondence(
   revalidatePath('/dashboard')
 
   return {}
+}
+
+export type GoneQuietItem = {
+  business_id: string
+  business_name: string
+  correspondence_id: string
+  subject: string | null
+  entry_date: string | null
+  contact_name: string | null
+  contact_role: string | null
+  days_since: number
+}
+
+export async function getGoneQuiet(): Promise<{ data?: GoneQuietItem[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { data, error } = await supabase.rpc('get_gone_quiet_businesses', { org_id: orgId })
+  if (error) return { error: error.message }
+  return { data: (data ?? []) as GoneQuietItem[] }
+}
+
+export type RecentActivityItem = {
+  id: string
+  business_id: string
+  business_name: string
+  subject: string | null
+  entry_date: string | null
+  direction: 'received' | 'sent' | null
+  type: string | null
+  contact_name: string | null
+}
+
+export async function getRecentActivity(): Promise<{ data?: RecentActivityItem[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { data, error } = await supabase
+    .from('correspondence')
+    .select(`
+      id, business_id, subject, entry_date, direction, type,
+      businesses!inner(name, organization_id),
+      contact:contacts(name)
+    `)
+    .eq('businesses.organization_id', orgId)
+    .gte('entry_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
+    .order('entry_date', { ascending: false })
+    .limit(50)
+
+  if (error) return { error: error.message }
+
+  const items: RecentActivityItem[] = (data ?? []).map((row: Record<string, unknown>) => {
+    const biz = row.businesses as { name: string } | null
+    const ct = row.contact as { name: string } | null
+    return {
+      id: row.id as string,
+      business_id: row.business_id as string,
+      business_name: biz?.name ?? 'Unknown',
+      subject: row.subject as string | null,
+      entry_date: row.entry_date as string | null,
+      direction: row.direction as 'received' | 'sent' | null,
+      type: row.type as string | null,
+      contact_name: ct?.name ?? null,
+    }
+  })
+
+  return { data: items }
 }

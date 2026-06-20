@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { BusinessListItem } from '@/app/actions/businesses'
 import type { MembershipType } from '@/app/actions/membership-types'
 import type { BusinessType } from '@/app/actions/business-types'
+import type { RecentActivityItem } from '@/app/actions/correspondence'
 import { AddBusinessButton } from '@/components/AddBusinessButton'
 import { Input } from '@/components/ui/input'
 import { formatDateGB } from '@/lib/utils'
@@ -12,14 +13,17 @@ import { formatDateGB } from '@/lib/utils'
 type FilterType = 'all' | 'prospect' | string
 type SortType = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
 
+type DashboardTab = 'businesses' | 'activity'
+
 interface DashboardClientProps {
   initialBusinesses: BusinessListItem[]
   initialMembershipTypes: MembershipType[]
   initialBusinessTypes: BusinessType[]
   hasContact: boolean
+  initialActivity: RecentActivityItem[]
 }
 
-export function DashboardClient({ initialBusinesses, initialMembershipTypes, initialBusinessTypes, hasContact }: DashboardClientProps) {
+export function DashboardClient({ initialBusinesses, initialMembershipTypes, initialBusinessTypes, hasContact, initialActivity }: DashboardClientProps) {
   const [businesses] = useState<BusinessListItem[]>(initialBusinesses)
   const [membershipTypes] = useState<MembershipType[]>(initialMembershipTypes)
   const [businessTypes] = useState<BusinessType[]>(initialBusinessTypes)
@@ -32,6 +36,9 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedBusinessType, setSelectedBusinessType] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortType>('recent')
+
+  // Dashboard tab: businesses or activity
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('businesses')
 
   // View mode: grid or list
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -351,6 +358,73 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
         </div>
       ) : (
         <>
+          {/* Dashboard Tab Toggle */}
+          <div className="flex items-center gap-1 mb-6 bg-brand-warm border border-gray-200 p-0.5 w-fit">
+            <button
+              onClick={() => setDashboardTab('businesses')}
+              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                dashboardTab === 'businesses'
+                  ? 'bg-brand-navy text-white'
+                  : 'text-gray-600 hover:text-brand-navy'
+              }`}
+            >
+              Businesses
+            </button>
+            <button
+              onClick={() => setDashboardTab('activity')}
+              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                dashboardTab === 'activity'
+                  ? 'bg-brand-navy text-white'
+                  : 'text-gray-600 hover:text-brand-navy'
+              }`}
+            >
+              Activity {initialActivity.length > 0 && `(${initialActivity.length})`}
+            </button>
+          </div>
+
+          {dashboardTab === 'activity' ? (
+            <div className="border border-gray-200 bg-white divide-y divide-gray-100">
+              {initialActivity.length === 0 ? (
+                <div className="px-4 py-8 text-center text-gray-400 text-sm">No activity in the last 7 days</div>
+              ) : (
+                initialActivity.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 flex-shrink-0 ${
+                      item.direction === 'sent'
+                        ? 'bg-blue-100 text-blue-700'
+                        : item.direction === 'received'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {item.direction === 'sent' ? 'Sent' : item.direction === 'received' ? 'Received' : item.type || 'Entry'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/businesses/${item.business_id}`}
+                          className="text-sm font-medium text-brand-navy hover:text-brand-olive transition-colors truncate"
+                        >
+                          {item.business_name}
+                        </Link>
+                        {item.contact_name && (
+                          <span className="text-xs text-gray-500 truncate">{item.contact_name}</span>
+                        )}
+                      </div>
+                      {item.subject && (
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{item.subject}</p>
+                      )}
+                    </div>
+                    {item.entry_date && (
+                      <span className="text-xs text-gray-400 flex-shrink-0">
+                        {formatDateGB(item.entry_date)}
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+          <>
           {/* Search and Filters */}
           <div className="bg-white border-2 border-gray-300 p-4 mb-6">
             {/* Search Bar */}
@@ -684,6 +758,8 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
               </div>
             )}
             </>
+          )}
+          </>
           )}
         </>
       )}

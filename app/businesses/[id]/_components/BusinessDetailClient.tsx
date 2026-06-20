@@ -21,7 +21,8 @@ import { SuccessBanner } from '@/components/SuccessBanner'
 import { OpenThreadsCard } from '@/components/OpenThreadsCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { retryFormatting } from '@/app/actions/ai-formatter'
-import { createTaskFromCorrespondence } from '@/app/actions/tasks'
+import { createTask, createTaskFromCorrespondence } from '@/app/actions/tasks'
+import { createUnformattedCorrespondence } from '@/app/actions/ai-formatter'
 import { type MembershipType } from '@/app/actions/membership-types'
 import { formatDateGB } from '@/lib/utils'
 import { toast } from '@/lib/toast'
@@ -122,6 +123,13 @@ export function BusinessDetailClient({
 
   // AI summary refresh trigger (for after contract update)
   const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0)
+
+  // Quick actions state
+  const [quickTaskTitle, setQuickTaskTitle] = useState('')
+  const [quickTaskOpen, setQuickTaskOpen] = useState(false)
+  const [quickNoteText, setQuickNoteText] = useState('')
+  const [quickNoteOpen, setQuickNoteOpen] = useState(false)
+  const [quickSaving, setQuickSaving] = useState(false)
 
   // Thread UI state
   const [viewMode, setViewMode] = useState<'all' | 'threads'>('all')
@@ -625,6 +633,93 @@ export function BusinessDetailClient({
               return <span className={`text-xs px-2 py-1 ${colour}`}>{mt.label}</span>
             })()}
           </div>
+        )}
+      </div>
+
+      {/* Quick Actions Bar */}
+      <div className="sticky top-0 z-10 bg-white border border-gray-200 px-4 py-2.5 mb-6 flex items-center gap-3">
+        <Link
+          href={`/new-entry?businessId=${businessId}`}
+          className="text-xs font-semibold px-3 py-1.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
+        >
+          + Entry
+        </Link>
+        {!quickTaskOpen ? (
+          <button
+            onClick={() => setQuickTaskOpen(true)}
+            className="text-xs font-semibold px-3 py-1.5 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors"
+          >
+            + Task
+          </button>
+        ) : (
+          <form
+            className="flex items-center gap-2 flex-1"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!quickTaskTitle.trim()) return
+              setQuickSaving(true)
+              const result = await createTask({ title: `${quickTaskTitle.trim()} (${business.name})`, category: 'work' })
+              setQuickSaving(false)
+              if (result.error) toast.error(result.error)
+              else { toast.success('Task added'); setQuickTaskTitle(''); setQuickTaskOpen(false) }
+            }}
+          >
+            <input
+              autoFocus
+              type="text"
+              value={quickTaskTitle}
+              onChange={(e) => setQuickTaskTitle(e.target.value)}
+              placeholder="Task title..."
+              className="text-sm px-2 py-1 border border-gray-300 flex-1 min-w-0 focus:outline-none focus:border-brand-navy"
+            />
+            <button type="submit" disabled={quickSaving} className="text-xs font-semibold px-2 py-1 bg-brand-navy text-white">
+              {quickSaving ? '...' : 'Add'}
+            </button>
+            <button type="button" onClick={() => { setQuickTaskOpen(false); setQuickTaskTitle('') }} className="text-xs text-gray-500 hover:text-gray-700 px-1">
+              Cancel
+            </button>
+          </form>
+        )}
+        {!quickNoteOpen ? (
+          <button
+            onClick={() => setQuickNoteOpen(true)}
+            className="text-xs font-semibold px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            + Note
+          </button>
+        ) : (
+          <form
+            className="flex items-center gap-2 flex-1"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!quickNoteText.trim()) return
+              setQuickSaving(true)
+              const result = await createUnformattedCorrespondence({
+                business_id: businessId,
+                raw_text_original: quickNoteText.trim(),
+                type: 'Note',
+                entry_date: new Date().toISOString(),
+              })
+              setQuickSaving(false)
+              if ('error' in result) toast.error(result.error || 'Failed to save note')
+              else { toast.success('Note saved'); setQuickNoteText(''); setQuickNoteOpen(false); await refreshCorrespondence() }
+            }}
+          >
+            <input
+              autoFocus
+              type="text"
+              value={quickNoteText}
+              onChange={(e) => setQuickNoteText(e.target.value)}
+              placeholder="Quick note..."
+              className="text-sm px-2 py-1 border border-gray-300 flex-1 min-w-0 focus:outline-none focus:border-brand-navy"
+            />
+            <button type="submit" disabled={quickSaving} className="text-xs font-semibold px-2 py-1 bg-brand-navy text-white">
+              {quickSaving ? '...' : 'Save'}
+            </button>
+            <button type="button" onClick={() => { setQuickNoteOpen(false); setQuickNoteText('') }} className="text-xs text-gray-500 hover:text-gray-700 px-1">
+              Cancel
+            </button>
+          </form>
         )}
       </div>
 

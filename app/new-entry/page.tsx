@@ -12,6 +12,7 @@ import { ContactMatchPreviewModal } from '@/components/ContactMatchPreviewModal'
 import { DuplicateWarningModal } from '@/components/DuplicateWarningModal'
 import type { Business } from '@/app/actions/businesses'
 import type { Contact } from '@/app/actions/contacts'
+import { createTask } from '@/app/actions/tasks'
 import {
   formatCorrespondenceText,
   createFormattedCorrespondence,
@@ -89,6 +90,9 @@ function NewEntryPageContent() {
   const [suggestedBusinessEmail, setSuggestedBusinessEmail] = useState<string | null>(null)
   const [showBusinessEmailPrompt, setShowBusinessEmailPrompt] = useState(false)
   const [senderEmailData, setSenderEmailData] = useState<{ email: string; name: string } | null>(null)
+
+  // --- Follow-up reminder state ---
+  const [followUpReminder, setFollowUpReminder] = useState(false)
 
   // --- Duplicate detection state ---
   const [duplicateEntry, setDuplicateEntry] = useState<Correspondence | null>(null)
@@ -213,6 +217,13 @@ function NewEntryPageContent() {
     return () => window.removeEventListener('beforeunload', handle)
   }, [isDirty])
 
+  useEffect(() => {
+    if (direction !== 'sent') { setFollowUpReminder(false); return }
+    const lower = rawText.toLowerCase()
+    const hasPhrase = /look forward to hearing|hope to hear|let me know|get back to me|awaiting your|follow.?up/.test(lower)
+    setFollowUpReminder(hasPhrase)
+  }, [direction, rawText])
+
   // --- Validation ---
   const validate = () => {
     const errs: typeof errors = {}
@@ -248,9 +259,21 @@ function NewEntryPageContent() {
   })
 
   // --- Post-save navigation ---
-  const afterSave = (actionsResolved?: number, threadsPromoted?: number) => {
+  const afterSave = async (actionsResolved?: number, threadsPromoted?: number) => {
     if (actionsResolved) toast.info(`${actionsResolved} action${actionsResolved > 1 ? 's' : ''} auto-resolved`)
     if (threadsPromoted) toast.info(`${threadsPromoted} open thread${threadsPromoted > 1 ? 's' : ''} flagged`)
+
+    if (followUpReminder && selectedBusinessId) {
+      const biz = businesses.find((b) => b.id === selectedBusinessId)
+      const title = subject
+        ? `Follow up: ${subject} (${biz?.name ?? 'Unknown'})`
+        : `Follow up with ${biz?.name ?? 'Unknown'}`
+      const dueDate = new Date()
+      dueDate.setDate(dueDate.getDate() + 7)
+      await createTask({ title, due_date: dueDate.toISOString().slice(0, 10), category: 'work' })
+      toast.success('Follow-up reminder set for 7 days')
+    }
+
     setIsDirty(false)
     clearDraft()
     if (searchParams.get('onboarding') === 'true') {
@@ -634,6 +657,21 @@ function NewEntryPageContent() {
             )}
           </div>
         </div>
+
+        {direction === 'sent' && (
+          <label className="flex items-center gap-3 border border-brand-olive/30 bg-brand-olive/5 px-4 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={followUpReminder}
+              onChange={(e) => setFollowUpReminder(e.target.checked)}
+              className="w-4 h-4 accent-brand-olive"
+            />
+            <div>
+              <span className="text-sm font-semibold text-gray-900">Remind me to follow up in 7 days</span>
+              <p className="text-xs text-gray-500">Creates a to-do task on your Todos page</p>
+            </div>
+          </label>
+        )}
 
         <div className="flex gap-4">
           <Button
