@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import type { Task } from '@/app/actions/tasks'
 
 type CalendarViewProps = {
@@ -55,16 +56,24 @@ function fmt(d: Date) {
   return `${y}-${m}-${day}`
 }
 
-function isCRM(t: Task) {
-  return t.source === 'contract_renewal' || t.source === 'follow_up'
+function isContract(t: Task): boolean {
+  if (t.source === 'contract_renewal') return true
+  if (!t.business_id) return false
+  const tl = t.title.toLowerCase()
+  return /^renewal[: ]/.test(tl) || /^cc (expires|offer)/.test(tl) || /^club card offer/.test(tl)
+}
+
+function getTaskColor(t: Task): string {
+  if (t.status === 'done') return 'text-gray-400 line-through bg-gray-50'
+  if (t.is_priority) return 'bg-amber-100 text-amber-800 font-medium'
+  if (isContract(t)) return 'bg-purple-50 text-purple-700 border-l-2 border-purple-300'
+  if (t.source === 'follow_up') return 'bg-brand-navy/5 text-brand-navy'
+  return 'bg-brand-warm text-gray-700 hover:bg-gray-100'
 }
 
 function getTaskTooltip(t: Task): string {
   const parts = [t.title]
-  if (t.source === 'contract_renewal' && t.business?.contract_renewal_type) {
-    const raw = t.business.contract_renewal_type
-    parts.push('(' + raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, ' ') + ')')
-  }
+  if (isContract(t)) parts.push('(Contract)')
   return parts.join(' ')
 }
 
@@ -78,7 +87,7 @@ export function CalendarView({
 }: CalendarViewProps) {
   const [year, setYear] = useState(() => parseInt(today.slice(0, 4)))
   const [month, setMonth] = useState(() => parseInt(today.slice(5, 7)) - 1)
-  const [quickAddDate, setQuickAddDate] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [quickAddTitle, setQuickAddTitle] = useState('')
   const [adding, setAdding] = useState(false)
   const quickAddRef = useRef<HTMLInputElement>(null)
@@ -98,239 +107,239 @@ export function CalendarView({
     return map
   }, [tasks])
 
+  const selectedTasks = selectedDate ? (tasksByDate[selectedDate] ?? []) : []
+
   const prevMonth = useCallback(() => {
-    if (month === 0) {
-      setYear((y) => y - 1)
-      setMonth(11)
-    } else {
-      setMonth((m) => m - 1)
-    }
-    setQuickAddDate(null)
+    if (month === 0) { setYear((y) => y - 1); setMonth(11) }
+    else setMonth((m) => m - 1)
+    setSelectedDate(null)
   }, [month])
 
   const nextMonth = useCallback(() => {
-    if (month === 11) {
-      setYear((y) => y + 1)
-      setMonth(0)
-    } else {
-      setMonth((m) => m + 1)
-    }
-    setQuickAddDate(null)
+    if (month === 11) { setYear((y) => y + 1); setMonth(0) }
+    else setMonth((m) => m + 1)
+    setSelectedDate(null)
   }, [month])
 
   const goToday = useCallback(() => {
     setYear(parseInt(today.slice(0, 4)))
     setMonth(parseInt(today.slice(5, 7)) - 1)
-    setQuickAddDate(null)
+    setSelectedDate(today)
   }, [today])
 
-  const handleDayClick = useCallback(
-    (date: string, inMonth: boolean) => {
-      if (!inMonth) return
-      if (quickAddDate === date) {
-        setQuickAddDate(null)
-        setQuickAddTitle('')
-      } else {
-        setQuickAddDate(date)
-        setQuickAddTitle('')
-        requestAnimationFrame(() => quickAddRef.current?.focus())
-      }
-    },
-    [quickAddDate]
-  )
-
-  const handleQuickAddSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault()
-      if (!quickAddTitle.trim() || !quickAddDate) return
-      setAdding(true)
-      await onQuickAdd(quickAddTitle.trim(), quickAddDate, 'work')
-      setQuickAddTitle('')
-      setQuickAddDate(null)
-      setAdding(false)
-    },
-    [quickAddTitle, quickAddDate, onQuickAdd]
-  )
-
-  const handleDragStart = useCallback((taskId: string) => {
-    setDragId(taskId)
+  const handleDayClick = useCallback((date: string, inMonth: boolean) => {
+    if (!inMonth) return
+    setSelectedDate((prev) => prev === date ? null : date)
+    setQuickAddTitle('')
   }, [])
 
-  const handleDragOver = useCallback((e: React.DragEvent, date: string) => {
+  const handleQuickAddSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
-    setDragOverDate(date)
-  }, [])
+    if (!quickAddTitle.trim() || !selectedDate) return
+    setAdding(true)
+    await onQuickAdd(quickAddTitle.trim(), selectedDate, 'work')
+    setQuickAddTitle('')
+    setAdding(false)
+    quickAddRef.current?.focus()
+  }, [quickAddTitle, selectedDate, onQuickAdd])
 
-  const handleDrop = useCallback(
-    async (date: string) => {
-      if (dragId) {
-        await onDateChange(dragId, date)
-      }
-      setDragId(null)
-      setDragOverDate(null)
-    },
-    [dragId, onDateChange]
-  )
-
-  const handleDragEnd = useCallback(() => {
-    setDragId(null)
-    setDragOverDate(null)
+  const handleDragStart = useCallback((taskId: string) => { setDragId(taskId) }, [])
+  const handleDragOver = useCallback((e: React.DragEvent, date: string) => {
+    e.preventDefault(); setDragOverDate(date)
   }, [])
+  const handleDrop = useCallback(async (date: string) => {
+    if (dragId) await onDateChange(dragId, date)
+    setDragId(null); setDragOverDate(null)
+  }, [dragId, onDateChange])
+  const handleDragEnd = useCallback(() => { setDragId(null); setDragOverDate(null) }, [])
+
+  const selectedDateFormatted = selectedDate
+    ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : ''
 
   return (
     <div className="mt-6">
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <button
-            onClick={prevMonth}
-            className="text-sm px-2 py-1 text-gray-600 hover:text-brand-navy hover:bg-gray-100 transition-colors"
-            aria-label="Previous month"
-          >
-            ←
-          </button>
-          <h2 className="text-lg font-semibold min-w-[180px] text-center">
-            {MONTH_NAMES[month]} {year}
-          </h2>
-          <button
-            onClick={nextMonth}
-            className="text-sm px-2 py-1 text-gray-600 hover:text-brand-navy hover:bg-gray-100 transition-colors"
-            aria-label="Next month"
-          >
-            →
-          </button>
+          <button onClick={prevMonth} className="text-sm px-2 py-1 text-gray-600 hover:text-brand-navy hover:bg-gray-100 transition-colors" aria-label="Previous month">←</button>
+          <h2 className="text-lg font-semibold min-w-[180px] text-center">{MONTH_NAMES[month]} {year}</h2>
+          <button onClick={nextMonth} className="text-sm px-2 py-1 text-gray-600 hover:text-brand-navy hover:bg-gray-100 transition-colors" aria-label="Next month">→</button>
         </div>
-        <button
-          onClick={goToday}
-          className="text-sm px-3 py-1.5 border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-        >
-          Today
-        </button>
+        <button onClick={goToday} className="text-sm px-3 py-1.5 border border-gray-300 bg-white hover:bg-gray-50 transition-colors">Today</button>
       </div>
 
-      {/* Day headers */}
-      <div className="grid grid-cols-7 border-b border-gray-200 mb-px">
-        {DAY_NAMES.map((d) => (
-          <div
-            key={d}
-            className="text-xs font-medium text-gray-500 text-center py-2"
-          >
-            {d}
+      <div className="flex gap-4">
+        {/* Calendar grid */}
+        <div className="flex-1">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 border-b border-gray-200 mb-px">
+            {DAY_NAMES.map((d) => (
+              <div key={d} className="text-xs font-medium text-gray-500 text-center py-2">{d}</div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Day grid */}
-      <div className="grid grid-cols-7 border-l border-t border-gray-200">
-        {days.map(({ date, inMonth, day }) => {
-          const dateTasks = tasksByDate[date] ?? []
-          const isToday = date === today
-          const isDropTarget = dragOverDate === date
+          {/* Day grid */}
+          <div className="grid grid-cols-7 border-l border-t border-gray-200">
+            {days.map(({ date, inMonth, day }) => {
+              const dateTasks = tasksByDate[date] ?? []
+              const isToday = date === today
+              const isSelected = date === selectedDate
+              const isDropTarget = dragOverDate === date
+              const contractCount = dateTasks.filter(isContract).length
+              const taskCount = dateTasks.filter((t) => !isContract(t)).length
 
-          return (
-            <div
-              key={date}
-              className={`border-r border-b border-gray-200 min-h-[100px] p-1 transition-colors ${
-                inMonth ? 'bg-white' : 'bg-gray-50/50'
-              } ${isDropTarget ? 'bg-brand-olive/10' : ''}`}
-              onClick={() => handleDayClick(date, inMonth)}
-              onDragOver={(e) => handleDragOver(e, date)}
-              onDrop={() => handleDrop(date)}
-            >
-              {/* Day number */}
-              <div className="flex justify-end">
-                <span
-                  className={`text-xs w-6 h-6 flex items-center justify-center ${
-                    isToday
-                      ? 'bg-brand-navy text-white rounded-full font-bold'
-                      : inMonth
-                      ? 'text-gray-700'
-                      : 'text-gray-300'
-                  }`}
+              return (
+                <div
+                  key={date}
+                  className={`border-r border-b border-gray-200 min-h-[90px] p-1 transition-colors cursor-pointer ${
+                    inMonth ? 'bg-white' : 'bg-gray-50/50'
+                  } ${isDropTarget ? 'bg-brand-olive/10' : ''} ${isSelected ? 'ring-2 ring-inset ring-brand-navy/40' : ''}`}
+                  onClick={() => handleDayClick(date, inMonth)}
+                  onDragOver={(e) => handleDragOver(e, date)}
+                  onDrop={() => handleDrop(date)}
                 >
-                  {day}
-                </span>
-              </div>
+                  {/* Day number */}
+                  <div className="flex justify-end">
+                    <span className={`text-xs w-6 h-6 flex items-center justify-center ${
+                      isToday ? 'bg-brand-navy text-white rounded-full font-bold'
+                        : inMonth ? 'text-gray-700' : 'text-gray-300'
+                    }`}>{day}</span>
+                  </div>
 
-              {/* Tasks in cell */}
-              <div className="space-y-0.5 mt-0.5">
-                {dateTasks.slice(0, 3).map((t) => (
-                  <button
-                    key={t.id}
-                    draggable
-                    onDragStart={() => handleDragStart(t.id)}
-                    onDragEnd={handleDragEnd}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onEdit(t)
-                    }}
-                    className={`w-full text-left text-[11px] leading-tight px-1 py-0.5 truncate block transition-colors cursor-pointer ${
-                      t.status === 'done'
-                        ? 'text-gray-400 line-through bg-gray-50'
-                        : t.is_priority
-                        ? 'bg-amber-100 text-amber-800 font-medium'
-                        : isCRM(t)
-                        ? 'bg-brand-navy/5 text-brand-navy'
-                        : 'bg-brand-warm text-gray-700 hover:bg-gray-100'
-                    }`}
-                    title={getTaskTooltip(t)}
-                  >
-                    {t.is_priority && t.status !== 'done' && '★ '}
-                    {isCRM(t) && '⟳ '}
-                    {t.title}
-                  </button>
-                ))}
-                {dateTasks.length > 3 && (
-                  <span className="text-[10px] text-gray-400 px-1">
-                    +{dateTasks.length - 3} more
-                  </span>
-                )}
-              </div>
+                  {/* Task pills */}
+                  <div className="space-y-0.5 mt-0.5">
+                    {dateTasks.slice(0, 3).map((t) => (
+                      <button
+                        key={t.id}
+                        draggable
+                        onDragStart={() => handleDragStart(t.id)}
+                        onDragEnd={handleDragEnd}
+                        onClick={(e) => { e.stopPropagation(); onEdit(t) }}
+                        className={`w-full text-left text-[11px] leading-tight px-1 py-0.5 truncate block transition-colors cursor-pointer ${getTaskColor(t)}`}
+                        title={getTaskTooltip(t)}
+                      >
+                        {t.is_priority && t.status !== 'done' && '★ '}
+                        {t.title}
+                      </button>
+                    ))}
+                    {dateTasks.length > 3 && (
+                      <span className="text-[10px] text-gray-400 px-1">+{dateTasks.length - 3} more</span>
+                    )}
+                  </div>
 
-              {/* Quick-add inline form */}
-              {quickAddDate === date && (
-                <form
-                  onSubmit={handleQuickAddSubmit}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-1"
-                >
-                  <input
-                    ref={quickAddRef}
-                    type="text"
-                    value={quickAddTitle}
-                    onChange={(e) => setQuickAddTitle(e.target.value)}
-                    placeholder="New task…"
-                    disabled={adding}
-                    className="w-full text-[11px] px-1 py-0.5 border border-brand-navy/30 bg-white focus:border-brand-navy outline-none"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setQuickAddDate(null)
-                        setQuickAddTitle('')
-                      }
-                    }}
-                  />
-                </form>
+                  {/* Dot indicators when no room for text */}
+                  {dateTasks.length === 0 ? null : dateTasks.length <= 3 ? null : (
+                    <div className="flex gap-0.5 mt-0.5 px-1">
+                      {contractCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-purple-400" title={`${contractCount} contract${contractCount > 1 ? 's' : ''}`} />}
+                      {taskCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-brand-navy/40" title={`${taskCount} task${taskCount > 1 ? 's' : ''}`} />}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-4 mt-3 text-[11px] text-gray-500">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-2 bg-amber-100 border border-amber-200" />Focus
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-2 bg-purple-50 border-l-2 border-purple-300" />Contract
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-2 bg-brand-warm border border-gray-200" />Task
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-2 bg-gray-50 border border-gray-200" />Done
+            </span>
+            <span className="text-gray-400">· Click day to view · Drag to reschedule</span>
+          </div>
+        </div>
+
+        {/* Day detail panel */}
+        {selectedDate && (
+          <div className="w-[280px] flex-shrink-0 border border-gray-200 bg-white self-start">
+            <div className="px-3 py-2.5 border-b border-gray-200 bg-brand-warm">
+              <p className="text-sm font-semibold text-gray-800">{selectedDateFormatted}</p>
+              <p className="text-xs text-gray-500">{selectedTasks.length} item{selectedTasks.length !== 1 ? 's' : ''}</p>
+            </div>
+
+            {/* Tasks for this day */}
+            <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
+              {selectedTasks.length === 0 ? (
+                <p className="px-3 py-4 text-xs text-gray-400 text-center">Nothing scheduled</p>
+              ) : (
+                selectedTasks.map((t) => (
+                  <div key={t.id} className="px-3 py-2 hover:bg-brand-warm/50 transition-colors">
+                    <div className="flex items-start gap-2">
+                      <button
+                        onClick={() => onToggle(t)}
+                        className={`flex-shrink-0 w-4 h-4 mt-0.5 border-2 flex items-center justify-center transition-colors ${
+                          t.status === 'done' ? 'bg-brand-olive border-brand-olive text-white' : 'border-gray-300 hover:border-brand-navy'
+                        }`}
+                      >
+                        {t.status === 'done' && (
+                          <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <button
+                          onClick={() => onEdit(t)}
+                          className={`text-xs text-left block w-full ${t.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800'}`}
+                        >
+                          {t.title}
+                        </button>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {isContract(t) && (
+                            <span className="text-[9px] font-semibold px-1 py-0.5 bg-purple-100 text-purple-700">Contract</span>
+                          )}
+                          {t.source === 'follow_up' && (
+                            <span className="text-[9px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy">Follow-up</span>
+                          )}
+                          {t.business_id && t.business && (
+                            <Link
+                              href={`/businesses/${t.business_id}`}
+                              className="text-[10px] text-brand-navy hover:text-brand-olive transition-colors truncate"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {t.business.name}
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
-          )
-        })}
-      </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 mt-4 text-[11px] text-gray-500">
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-2 bg-amber-100 border border-amber-200" />
-          Focus
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-2 bg-brand-navy/5 border border-brand-navy/20" />
-          CRM
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-2 bg-gray-50 border border-gray-200" />
-          Done
-        </span>
-        <span className="text-gray-400">· Click empty day to add · Drag to reschedule</span>
+            {/* Quick add in panel */}
+            <form onSubmit={handleQuickAddSubmit} className="p-2 border-t border-gray-200">
+              <div className="flex gap-1">
+                <input
+                  ref={quickAddRef}
+                  type="text"
+                  value={quickAddTitle}
+                  onChange={(e) => setQuickAddTitle(e.target.value)}
+                  placeholder="Add task…"
+                  disabled={adding}
+                  className="flex-1 text-xs px-2 py-1.5 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={adding || !quickAddTitle.trim()}
+                  className="text-xs px-2 py-1.5 bg-brand-navy text-white disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   )

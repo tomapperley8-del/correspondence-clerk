@@ -13,7 +13,7 @@ export type TaskBusiness = {
   contract_end: string | null
 }
 
-export type RenewalStage = 'not_started' | 'contacted' | 'awaiting_reply' | 'agreed' | 'done'
+export type RenewalStage = 'not_started' | 'in_progress' | 'agreed' | 'not_renewing' | 'done'
 
 export type Task = {
   id: string
