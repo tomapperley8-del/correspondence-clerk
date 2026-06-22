@@ -13,6 +13,8 @@ export type TaskBusiness = {
   contract_end: string | null
 }
 
+export type RenewalStage = 'not_started' | 'contacted' | 'awaiting_reply' | 'agreed' | 'done'
+
 export type Task = {
   id: string
   organization_id: string
@@ -23,6 +25,7 @@ export type Task = {
   is_priority: boolean
   category: 'work' | 'personal'
   source: 'manual' | 'contract_renewal' | 'follow_up'
+  renewal_stage: RenewalStage
   business_id: string | null
   position: number
   created_at: string
@@ -93,6 +96,7 @@ export async function updateTask(
     is_priority?: boolean
     category?: 'work' | 'personal'
     notes?: string | null
+    renewal_stage?: RenewalStage
   }
 ): Promise<{ data?: Task; error?: string }> {
   const supabase = await createClient()
@@ -109,6 +113,7 @@ export async function updateTask(
   if (updates.is_priority !== undefined) updateData.is_priority = updates.is_priority
   if (updates.category !== undefined) updateData.category = updates.category
   if (updates.notes !== undefined) updateData.notes = updates.notes
+  if (updates.renewal_stage !== undefined) updateData.renewal_stage = updates.renewal_stage
 
   const { data, error } = await supabase
     .from('tasks')

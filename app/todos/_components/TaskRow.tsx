@@ -31,6 +31,7 @@ export function TaskRow({
   onSetPriority,
   onClearPriority,
   compact,
+  selected,
 }: {
   task: Task
   onToggle: (t: Task) => void
@@ -38,6 +39,7 @@ export function TaskRow({
   onSetPriority: (id: string) => void
   onClearPriority: (id: string) => void
   compact?: boolean
+  selected?: boolean
 }) {
   const isDone = task.status === 'done'
   const badge = getSourceBadge(task)
@@ -47,7 +49,7 @@ export function TaskRow({
     <div
       className={`flex items-center gap-3 py-2.5 px-3 group hover:bg-brand-warm/50 transition-colors ${
         compact ? 'py-1.5 px-2' : ''
-      }`}
+      } ${selected ? 'ring-2 ring-brand-navy/40 bg-brand-navy/5' : ''}`}
     >
       {/* Checkbox */}
       <button

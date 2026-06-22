@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Task } from '@/app/actions/tasks'
+import type { Task, RenewalStage } from '@/app/actions/tasks'
 import {
   createTask,
   updateTask,
@@ -21,9 +21,10 @@ import { QuickAdd } from './QuickAdd'
 import { TaskRow } from './TaskRow'
 import { TaskEditModal } from './TaskEditModal'
 import { CalendarView } from './CalendarView'
+import { ContractsView } from './ContractsView'
 import type { NeedsReplyItem } from '../page'
 
-type ViewMode = 'list' | 'calendar'
+type ViewMode = 'list' | 'calendar' | 'contracts'
 type CategoryFilter = 'all' | 'work' | 'personal'
 type TimeFilter = 'week' | 'all'
 
@@ -206,11 +207,23 @@ export function TodosClient({
   const today = todayStr()
   const weekEnd = addDays(today, 7)
 
+  const categoryFiltered = useMemo(() => {
+    if (categoryFilter === 'all') return tasks
+    return tasks.filter((t) => t.category === categoryFilter)
+  }, [tasks, categoryFilter])
+
+  const contractTasks = useMemo(() =>
+    categoryFiltered.filter((t) => t.source === 'contract_renewal'),
+    [categoryFiltered]
+  )
+
+  const nonContractTasks = useMemo(() =>
+    categoryFiltered.filter((t) => t.source !== 'contract_renewal'),
+    [categoryFiltered]
+  )
+
   const filtered = useMemo(() => {
-    let result = tasks
-    if (categoryFilter !== 'all') {
-      result = result.filter((t) => t.category === categoryFilter)
-    }
+    let result = nonContractTasks
     if (timeFilter === 'week') {
       result = result.filter((t) => {
         if (t.status === 'done') return true
@@ -219,7 +232,9 @@ export function TodosClient({
       })
     }
     return result
-  }, [tasks, categoryFilter, timeFilter, weekEnd])
+  }, [nonContractTasks, timeFilter, weekEnd])
+
+  const allForCalendar = useMemo(() => categoryFiltered, [categoryFiltered])
 
   const groups = useMemo(() => groupTasks(filtered, today), [filtered, today])
 
@@ -234,6 +249,7 @@ export function TodosClient({
 
   const focusTask = useMemo(() => getFocusTask(tasks.filter((t) => {
     if (categoryFilter !== 'all' && t.category !== categoryFilter) return false
+    if (t.source === 'contract_renewal') return false
     return true
   })), [tasks, categoryFilter])
 
@@ -404,6 +420,66 @@ export function TodosClient({
     [router]
   )
 
+  const handleStageChange = useCallback(
+    async (taskId: string, stage: RenewalStage) => {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, renewal_stage: stage } : t))
+      )
+      const updates: Parameters<typeof updateTask>[1] = { renewal_stage: stage }
+      if (stage === 'done') updates.status = 'done'
+      const result = await updateTask(taskId, updates)
+      if (result.error) {
+        toast.error(result.error)
+        router.refresh()
+      }
+    },
+    [router]
+  )
+
+  // Keyboard shortcuts: D=done, S=snooze 7d, ↑↓=navigate
+  const [selectedIdx, setSelectedIdx] = useState(-1)
+  const flatTasks = useMemo(() => {
+    if (view !== 'list') return []
+    const items: Task[] = []
+    items.push(...groups.overdue, ...groups.today, ...groups.upcoming, ...groups.noDate)
+    return items
+  }, [view, groups])
+
+  useEffect(() => {
+    if (view !== 'list') return
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault()
+        setSelectedIdx((i) => Math.min(i + 1, flatTasks.length - 1))
+      }
+      if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault()
+        setSelectedIdx((i) => Math.max(i - 1, 0))
+      }
+      if (e.key === 'd' && selectedIdx >= 0 && flatTasks[selectedIdx]) {
+        e.preventDefault()
+        handleToggleStatus(flatTasks[selectedIdx])
+      }
+      if (e.key === 's' && selectedIdx >= 0 && flatTasks[selectedIdx]) {
+        e.preventDefault()
+        const task = flatTasks[selectedIdx]
+        handleUpdate(task.id, { due_date: addDays(today, 7) })
+        toast.success('Snoozed 7 days')
+      }
+      if (e.key === 'e' && selectedIdx >= 0 && flatTasks[selectedIdx]) {
+        e.preventDefault()
+        setEditingTask(flatTasks[selectedIdx])
+      }
+      if (e.key === 'Escape') {
+        setSelectedIdx(-1)
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [view, flatTasks, selectedIdx, today, handleToggleStatus, handleUpdate])
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Focus banner — always at very top */}
@@ -453,6 +529,16 @@ export function TodosClient({
             >
               Calendar
             </button>
+            <button
+              onClick={() => setView('contracts')}
+              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                view === 'contracts'
+                  ? 'bg-brand-navy text-white'
+                  : 'text-gray-600 hover:text-brand-navy'
+              }`}
+            >
+              Contracts{contractTasks.length > 0 ? ` (${contractTasks.filter(t => t.status === 'open').length})` : ''}
+            </button>
           </div>
 
           <div className="flex bg-brand-warm border border-gray-200 p-0.5">
@@ -501,7 +587,7 @@ export function TodosClient({
       <QuickAdd onAdd={handleCreate} />
 
       {/* Views */}
-      {view === 'list' ? (
+      {view === 'list' && (
         <div className="space-y-6 mt-6">
           {(groups.overdue.length > 0 || nrOverdue.length > 0) && (
             <section>
@@ -529,6 +615,7 @@ export function TodosClient({
                   onEdit={setEditingTask}
                   onSetPriority={handleSetPriority}
                   onClearPriority={handleClearPriority}
+                  selectedTaskId={selectedIdx >= 0 ? flatTasks[selectedIdx]?.id : undefined}
                   hideHeader
                 />
               )}
@@ -561,6 +648,7 @@ export function TodosClient({
                   onEdit={setEditingTask}
                   onSetPriority={handleSetPriority}
                   onClearPriority={handleClearPriority}
+                  selectedTaskId={selectedIdx >= 0 ? flatTasks[selectedIdx]?.id : undefined}
                   hideHeader
                 />
               )}
@@ -576,6 +664,7 @@ export function TodosClient({
               onEdit={setEditingTask}
               onSetPriority={handleSetPriority}
               onClearPriority={handleClearPriority}
+              selectedTaskId={selectedIdx >= 0 ? flatTasks[selectedIdx]?.id : undefined}
             />
           )}
 
@@ -588,6 +677,7 @@ export function TodosClient({
               onEdit={setEditingTask}
               onSetPriority={handleSetPriority}
               onClearPriority={handleClearPriority}
+              selectedTaskId={selectedIdx >= 0 ? flatTasks[selectedIdx]?.id : undefined}
             />
           )}
 
@@ -646,15 +736,38 @@ export function TodosClient({
               </p>
             </div>
           )}
+
+          {/* Keyboard shortcut hint */}
+          {flatTasks.length > 0 && (
+            <div className="text-[10px] text-gray-400 flex gap-3 pt-2">
+              <span>↑↓ navigate</span>
+              <span>D done</span>
+              <span>S snooze</span>
+              <span>E edit</span>
+              <span>Esc deselect</span>
+            </div>
+          )}
         </div>
-      ) : (
+      )}
+
+      {view === 'calendar' && (
         <CalendarView
-          tasks={filtered}
+          tasks={allForCalendar}
           today={today}
           onToggle={handleToggleStatus}
           onEdit={setEditingTask}
           onQuickAdd={handleCreate}
           onDateChange={handleDateChange}
+        />
+      )}
+
+      {view === 'contracts' && (
+        <ContractsView
+          tasks={contractTasks}
+          today={today}
+          onStageChange={handleStageChange}
+          onToggle={handleToggleStatus}
+          onEdit={setEditingTask}
         />
       )}
 
@@ -883,6 +996,7 @@ function BatchedTaskGroup({
   onSetPriority,
   onClearPriority,
   hideHeader,
+  selectedTaskId,
 }: {
   label: string
   labelClass: string
@@ -892,6 +1006,7 @@ function BatchedTaskGroup({
   onSetPriority: (id: string) => void
   onClearPriority: (id: string) => void
   hideHeader?: boolean
+  selectedTaskId?: string
 }) {
   const batched = useMemo(() => batchCrmTasks(tasks), [tasks])
 
@@ -913,6 +1028,7 @@ function BatchedTaskGroup({
                 onEdit={onEdit}
                 onSetPriority={onSetPriority}
                 onClearPriority={onClearPriority}
+                selected={group.task.id === selectedTaskId}
               />
             )
           }
