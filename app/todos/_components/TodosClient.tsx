@@ -212,14 +212,21 @@ export function TodosClient({
     return tasks.filter((t) => t.category === categoryFilter)
   }, [tasks, categoryFilter])
 
+  const isContractTask = useCallback((t: Task) => {
+    if (t.source === 'contract_renewal') return true
+    if (!t.business_id) return false
+    const tl = t.title.toLowerCase()
+    return /^renewal[: ]/.test(tl) || /^cc (expires|offer)/.test(tl) || /^club card offer/.test(tl)
+  }, [])
+
   const contractTasks = useMemo(() =>
-    categoryFiltered.filter((t) => t.source === 'contract_renewal'),
-    [categoryFiltered]
+    categoryFiltered.filter(isContractTask),
+    [categoryFiltered, isContractTask]
   )
 
   const nonContractTasks = useMemo(() =>
-    categoryFiltered.filter((t) => t.source !== 'contract_renewal'),
-    [categoryFiltered]
+    categoryFiltered.filter((t) => !isContractTask(t)),
+    [categoryFiltered, isContractTask]
   )
 
   const filtered = useMemo(() => {
@@ -249,9 +256,9 @@ export function TodosClient({
 
   const focusTask = useMemo(() => getFocusTask(tasks.filter((t) => {
     if (categoryFilter !== 'all' && t.category !== categoryFilter) return false
-    if (t.source === 'contract_renewal') return false
+    if (isContractTask(t)) return false
     return true
-  })), [tasks, categoryFilter])
+  })), [tasks, categoryFilter, isContractTask])
 
   const handleCreate = useCallback(
     async (title: string, due_date: string | null, category: 'work' | 'personal') => {
