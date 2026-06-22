@@ -38,26 +38,6 @@ function addDays(dateStr: string, days: number) {
   return d.toISOString().slice(0, 10)
 }
 
-function getSourceBadge(task: Task): string | null {
-  if (task.source === 'contract_renewal' && task.business) {
-    const b = task.business
-    if (b.is_club_card && b.is_advertiser) return 'Club Card + Advertiser'
-    if (b.is_club_card) return 'Club Card'
-    if (b.is_advertiser) return 'Advertiser'
-    return 'Renewal'
-  }
-  if (task.source === 'follow_up') return 'Follow-up'
-  return null
-}
-
-function getUrgencyLabel(task: Task): string | null {
-  if (task.source === 'contract_renewal' && task.business?.contract_renewal_type) {
-    const raw = task.business.contract_renewal_type
-    return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, ' ')
-  }
-  return null
-}
-
 type TaskGroups = {
   overdue: Task[]
   today: Task[]
@@ -90,25 +70,6 @@ function groupTasks(tasks: Task[], today: string): TaskGroups {
   }
 
   return { overdue, today: todayTasks, upcoming, noDate, done }
-}
-
-function getFocusTask(tasks: Task[]): { task: Task; type: 'priority' | 'suggested' } | null {
-  const open = tasks.filter((t) => t.status === 'open')
-  if (open.length === 0) return null
-
-  const priority = open.find((t) => t.is_priority)
-  if (priority) return { task: priority, type: 'priority' }
-
-  const withDate = open.filter((t) => t.due_date).sort((a, b) => {
-    const cmp = a.due_date!.localeCompare(b.due_date!)
-    if (cmp !== 0) return cmp
-    if (a.business_id && !b.business_id) return -1
-    if (!a.business_id && b.business_id) return 1
-    return 0
-  })
-  if (withDate.length > 0) return { task: withDate[0], type: 'suggested' }
-
-  return { task: open[0], type: 'suggested' }
 }
 
 type BatchedGroup = {
@@ -254,11 +215,6 @@ export function TodosClient({
     [needsReply, today]
   )
 
-  const focusTask = useMemo(() => getFocusTask(tasks.filter((t) => {
-    if (categoryFilter !== 'all' && t.category !== categoryFilter) return false
-    if (isContractTask(t)) return false
-    return true
-  })), [tasks, categoryFilter, isContractTask])
 
   const handleCreate = useCallback(
     async (title: string, due_date: string | null, category: 'work' | 'personal') => {
@@ -407,7 +363,7 @@ export function TodosClient({
       if (result.data) {
         setTasks((prev) => [result.data!, ...prev])
         setCreatedTodoIds((prev) => new Set([...prev, item.id]))
-        toast.success('To-do created')
+        toast.success('Task created')
       }
     },
     []
@@ -489,21 +445,16 @@ export function TodosClient({
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Focus banner — always at very top */}
-      <FocusBanner focus={focusTask} onToggle={handleToggleStatus} />
-
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h1>To-dos</h1>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleRefreshCRM}
-            disabled={refreshing}
-            className="text-sm px-3 py-1.5 border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-          >
-            {refreshing ? 'Refreshing…' : 'Refresh from CRM'}
-          </button>
-        </div>
+      <div className="flex items-center justify-between mb-6">
+        <h1>Tasks</h1>
+        <button
+          onClick={handleRefreshCRM}
+          disabled={refreshing}
+          className="text-sm px-3 py-1.5 border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          {refreshing ? 'Refreshing…' : 'Refresh CRM'}
+        </button>
       </div>
 
       {initialError && (
@@ -513,75 +464,45 @@ export function TodosClient({
       )}
 
       {/* View toggle + filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="flex bg-brand-warm border border-gray-200 p-0.5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 border-b border-gray-200 pb-4">
+        <div className="flex items-center gap-1">
+          {(['list', 'calendar', 'contracts'] as const).map((v) => (
             <button
-              onClick={() => setView('list')}
-              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                view === 'list'
-                  ? 'bg-brand-navy text-white'
-                  : 'text-gray-600 hover:text-brand-navy'
+              key={v}
+              onClick={() => setView(v)}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                view === v
+                  ? 'text-brand-navy border-b-2 border-brand-navy'
+                  : 'text-gray-500 hover:text-brand-navy'
               }`}
             >
-              List
+              {v === 'list' ? 'List' : v === 'calendar' ? 'Calendar' : `Contracts${contractTasks.length > 0 ? ` (${contractTasks.filter(t => t.status === 'open').length})` : ''}`}
             </button>
-            <button
-              onClick={() => setView('calendar')}
-              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                view === 'calendar'
-                  ? 'bg-brand-navy text-white'
-                  : 'text-gray-600 hover:text-brand-navy'
-              }`}
-            >
-              Calendar
-            </button>
-            <button
-              onClick={() => setView('contracts')}
-              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                view === 'contracts'
-                  ? 'bg-brand-navy text-white'
-                  : 'text-gray-600 hover:text-brand-navy'
-              }`}
-            >
-              Contracts{contractTasks.length > 0 ? ` (${contractTasks.filter(t => t.status === 'open').length})` : ''}
-            </button>
-          </div>
+          ))}
 
-          <div className="flex bg-brand-warm border border-gray-200 p-0.5">
-            <button
-              onClick={() => handleTimeFilterChange('week')}
-              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                timeFilter === 'week'
-                  ? 'bg-brand-navy text-white'
-                  : 'text-gray-600 hover:text-brand-navy'
-              }`}
-            >
-              This week
-            </button>
-            <button
-              onClick={() => handleTimeFilterChange('all')}
-              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                timeFilter === 'all'
-                  ? 'bg-brand-navy text-white'
-                  : 'text-gray-600 hover:text-brand-navy'
-              }`}
-            >
-              All
-            </button>
-          </div>
+          <span className="mx-2 w-px h-5 bg-gray-200" />
+
+          <button
+            onClick={() => handleTimeFilterChange(timeFilter === 'week' ? 'all' : 'week')}
+            className={`px-2.5 py-1 text-xs font-medium transition-colors border ${
+              timeFilter === 'week'
+                ? 'bg-brand-navy/5 text-brand-navy border-brand-navy/20'
+                : 'bg-white text-gray-500 border-gray-200 hover:text-brand-navy'
+            }`}
+          >
+            {timeFilter === 'week' ? 'This week' : 'All dates'}
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">Show:</span>
+        <div className="flex items-center gap-1">
           {(['all', 'work', 'personal'] as const).map((cat) => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-1 text-sm font-medium transition-colors border ${
+              className={`px-2.5 py-1 text-xs font-medium transition-colors ${
                 categoryFilter === cat
-                  ? 'bg-brand-navy text-white border-brand-navy'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-brand-navy hover:text-brand-navy'
+                  ? 'text-brand-navy border-b-2 border-brand-navy'
+                  : 'text-gray-500 hover:text-brand-navy'
               }`}
             >
               {cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
@@ -734,7 +655,7 @@ export function TodosClient({
           {filtered.length === 0 && needsReply.length === 0 && !initialError && (
             <div className="text-center py-16 text-gray-400">
               <p className="text-lg mb-2">
-                {timeFilter === 'week' ? 'Nothing due this week' : 'No to-dos yet'}
+                {timeFilter === 'week' ? 'Nothing due this week' : 'No tasks yet'}
               </p>
               <p className="text-sm">
                 {timeFilter === 'week'
@@ -842,7 +763,7 @@ function NeedsReplyRow({
           onClick={() => onCreateTodo(item)}
           className="text-xs px-2 py-1 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors flex-shrink-0"
         >
-          Create to-do
+          Create task
         </button>
       )}
       <button
@@ -871,128 +792,70 @@ function GoneQuietSection({
   onFollowUp: (item: GoneQuietItem) => void
   onDismiss: (businessId: string) => void
 }) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+
+  const recent = useMemo(() => items.filter((i) => i.days_since <= 90), [items])
+  const visible = showAll ? recent : recent.slice(0, 10)
+
+  if (recent.length === 0) return null
 
   return (
     <section>
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-2 text-sm font-semibold text-amber-700 hover:text-amber-800 transition-colors mb-2"
+        className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors mb-2"
       >
         <span className="text-xs">{expanded ? '▼' : '▶'}</span>
-        Gone quiet ({items.length})
+        Gone quiet ({recent.length})
+        <span className="text-xs font-normal text-gray-400">last 90 days</span>
       </button>
       {expanded && (
-        <div className="border border-amber-200 bg-amber-50/30 divide-y divide-amber-100">
-          {items.map((item) => (
-            <div key={item.business_id} className="flex items-center gap-3 px-3 py-2.5">
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-amber-100 text-amber-700 flex-shrink-0">
+        <div className="border border-gray-200 bg-brand-warm divide-y divide-gray-100">
+          {visible.map((item) => (
+            <div key={item.business_id} className="flex items-center gap-3 px-3 py-2">
+              <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-500 flex-shrink-0">
                 {item.days_since}d
               </span>
               <div className="flex-1 min-w-0">
                 <Link
                   href={`/businesses/${item.business_id}`}
-                  className="text-sm font-medium text-brand-navy hover:text-brand-olive transition-colors truncate block"
+                  className="text-sm text-brand-navy hover:text-brand-olive transition-colors truncate block"
                 >
                   {item.business_name}
                 </Link>
                 {item.subject && (
-                  <p className="text-xs text-gray-500 truncate mt-0.5">Last: {item.subject}</p>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">Last: {item.subject}</p>
                 )}
               </div>
               <button
                 onClick={() => onFollowUp(item)}
-                className="text-xs px-2 py-1 border border-amber-600/30 text-amber-700 hover:bg-amber-100 transition-colors flex-shrink-0"
+                className="text-xs px-2 py-1 text-brand-navy hover:bg-brand-navy/5 transition-colors flex-shrink-0"
               >
                 Follow up
               </button>
-              <Link
-                href={`/new-entry?businessId=${item.business_id}`}
-                className="text-xs px-2 py-1 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors flex-shrink-0"
-              >
-                + Entry
-              </Link>
               <button
                 onClick={() => onDismiss(item.business_id)}
-                className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+                className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
               >
                 Dismiss
               </button>
             </div>
           ))}
+          {recent.length > 10 && !showAll && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="w-full text-center py-2 text-xs text-brand-navy hover:bg-brand-navy/5 transition-colors"
+            >
+              Show all {recent.length}
+            </button>
+          )}
         </div>
       )}
     </section>
   )
 }
 
-function FocusBanner({
-  focus,
-  onToggle,
-}: {
-  focus: { task: Task; type: 'priority' | 'suggested' } | null
-  onToggle: (t: Task) => void
-}) {
-  if (!focus) {
-    return (
-      <div className="mb-6 border border-gray-200 bg-brand-warm px-5 py-4">
-        <p className="text-sm font-medium text-gray-500">All clear</p>
-        <p className="text-sm text-gray-400 mt-0.5">No open tasks right now.</p>
-      </div>
-    )
-  }
-
-  const { task, type } = focus
-  const badge = getSourceBadge(task)
-  const urgency = getUrgencyLabel(task)
-
-  return (
-    <div className={`mb-6 border px-5 py-4 ${
-      type === 'priority'
-        ? 'border-amber-300 bg-amber-50/60'
-        : 'border-gray-200 bg-brand-warm'
-    }`}>
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${
-            type === 'priority' ? 'text-amber-700' : 'text-gray-500'
-          }`}>
-            {type === 'priority' ? '★ Your focus today' : 'Suggested focus'}
-          </p>
-          <p className="text-sm font-medium text-gray-800 truncate">{task.title}</p>
-          <div className="flex items-center gap-2 mt-1">
-            {task.due_date && (
-              <span className={`text-xs ${
-                task.due_date < todayStr() ? 'text-red-600 font-medium' : 'text-gray-500'
-              }`}>
-                {formatDateShortGB(task.due_date + 'T00:00:00')}
-              </span>
-            )}
-            {badge && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-brand-navy/10 text-brand-navy">
-                {badge}
-              </span>
-            )}
-            {urgency && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-600">
-                {urgency}
-              </span>
-            )}
-          </div>
-        </div>
-        <button
-          onClick={() => onToggle(task)}
-          className="flex-shrink-0 w-8 h-8 border-2 border-gray-300 hover:border-brand-olive hover:bg-brand-olive/10 flex items-center justify-center transition-colors"
-          aria-label="Mark as done"
-        >
-          <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function BatchedTaskGroup({
   label,

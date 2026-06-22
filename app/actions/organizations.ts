@@ -35,7 +35,7 @@ export async function getNavData(): Promise<NavData> {
 
   const [todosDue, inbound] = await Promise.all([
     supabase.from('tasks').select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId).eq('status', 'open').lte('due_date', today),
+      .eq('organization_id', orgId).eq('status', 'open').lte('due_date', today).neq('source', 'contract_renewal'),
     supabase.from('inbound_queue').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('status', 'pending'),
   ])

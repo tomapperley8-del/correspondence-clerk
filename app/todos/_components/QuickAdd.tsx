@@ -125,7 +125,7 @@ export function QuickAdd({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Add a to-do… (try &quot;call Tim next Tuesday&quot;)"
+          placeholder="Add a task… (try &quot;call Tim next Tuesday&quot;)"
           className="flex-1 text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
           disabled={adding}
         />

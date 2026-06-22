@@ -216,13 +216,13 @@ export function Navigation() {
                     : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
-                To-dos
+                Tasks
                 {todosDueCount > 0 && (
                   <span
-                    title={`${todosDueCount} to-do${todosDueCount === 1 ? '' : 's'} due`}
-                    className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                    title={`${todosDueCount} task${todosDueCount === 1 ? '' : 's'} due`}
+                    className="text-[10px] font-medium text-white/70"
                   >
-                    {todosDueCount > 20 ? '20+' : todosDueCount}
+                    {todosDueCount}
                   </span>
                 )}
               </Link>
@@ -318,7 +318,7 @@ export function Navigation() {
                 { href: '/new-entry', label: 'New Entry' },
                 { href: '/search', label: 'Search' },
                 { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
-                { href: '/todos', label: 'To-dos', badge: todosDueCount > 0 ? todosDueCount : null },
+                { href: '/todos', label: 'Tasks', badge: todosDueCount > 0 ? todosDueCount : null },
                 { href: '/insights', label: 'Insights' },
                 { href: '/help', label: 'Help' },
                 { href: '/settings', label: 'Settings' },
@@ -393,12 +393,12 @@ export function Navigation() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
             {todosDueCount > 0 && (
-              <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+              <span className="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-0.5 rounded-full bg-white/20 text-white text-[9px] font-medium flex items-center justify-center leading-none">
                 {todosDueCount > 20 ? '20+' : todosDueCount}
               </span>
             )}
           </span>
-          To-dos
+          Tasks
         </Link>
         <Link
           href="/inbox"
