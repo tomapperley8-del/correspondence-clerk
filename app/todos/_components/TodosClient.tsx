@@ -795,10 +795,9 @@ function GoneQuietSection({
   const [expanded, setExpanded] = useState(false)
   const [showAll, setShowAll] = useState(false)
 
-  const recent = useMemo(() => items.filter((i) => i.days_since <= 90), [items])
-  const visible = showAll ? recent : recent.slice(0, 10)
+  const visible = showAll ? items : items.slice(0, 10)
 
-  if (recent.length === 0) return null
+  if (items.length === 0) return null
 
   return (
     <section>
@@ -807,8 +806,7 @@ function GoneQuietSection({
         className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors mb-2"
       >
         <span className="text-xs">{expanded ? '▼' : '▶'}</span>
-        Gone quiet ({recent.length})
-        <span className="text-xs font-normal text-gray-400">last 90 days</span>
+        Gone quiet ({items.length})
       </button>
       {expanded && (
         <div className="border border-gray-200 bg-brand-warm divide-y divide-gray-100">
@@ -842,12 +840,12 @@ function GoneQuietSection({
               </button>
             </div>
           ))}
-          {recent.length > 10 && !showAll && (
+          {items.length > 10 && !showAll && (
             <button
               onClick={() => setShowAll(true)}
               className="w-full text-center py-2 text-xs text-brand-navy hover:bg-brand-navy/5 transition-colors"
             >
-              Show all {recent.length}
+              Show all {items.length}
             </button>
           )}
         </div>
