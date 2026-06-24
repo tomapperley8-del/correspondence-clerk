@@ -158,6 +158,7 @@ export function TodosClient({
   const [refreshing, setRefreshing] = useState(false)
   const [doneExpanded, setDoneExpanded] = useState(false)
   const [createdTodoIds, setCreatedTodoIds] = useState<Set<string>>(new Set())
+  const [activeCategoryIds, setActiveCategoryIds] = useState<Set<string>>(() => new Set(initialCategories.map((c) => c.id)))
 
   useEffect(() => {
     const saved = localStorage.getItem('todos_time_filter')
@@ -195,7 +196,7 @@ export function TodosClient({
   )
 
   const filtered = useMemo(() => {
-    let result = nonContractTasks
+    let result = nonContractTasks.filter((t) => !t.task_category_id || activeCategoryIds.has(t.task_category_id))
     if (timeFilter === 'week') {
       result = result.filter((t) => {
         if (t.status === 'done') return true
@@ -204,9 +205,12 @@ export function TodosClient({
       })
     }
     return result
-  }, [nonContractTasks, timeFilter, weekEnd])
+  }, [nonContractTasks, timeFilter, weekEnd, activeCategoryIds])
 
-  const allForCalendar = useMemo(() => categoryFiltered, [categoryFiltered])
+  const allForCalendar = useMemo(() =>
+    categoryFiltered.filter((t) => !t.task_category_id || activeCategoryIds.has(t.task_category_id)),
+    [categoryFiltered, activeCategoryIds]
+  )
 
   const groups = useMemo(() => groupTasks(filtered, today), [filtered, today])
 
@@ -234,20 +238,29 @@ export function TodosClient({
   }, [today])
 
   const overdueOpen = useMemo(() =>
-    tasks.filter((t) => t.status === 'open' && t.due_date && t.due_date < today),
-    [tasks, today]
+    tasks.filter((t) => t.status === 'open' && t.due_date && t.due_date < today && (!t.task_category_id || activeCategoryIds.has(t.task_category_id))),
+    [tasks, today, activeCategoryIds]
   )
+
+  const priorityCatNames = useMemo(() => new Set(['call', 'event', 'meeting']), [])
 
   const weekAheadTasks = useMemo(() => {
     const map: Record<string, Task[]> = {}
     for (const t of tasks) {
-      if (t.status === 'open' && t.due_date && t.due_date >= today && t.due_date <= weekEnd) {
+      if (t.status === 'open' && t.due_date && t.due_date >= today && t.due_date <= weekEnd && (!t.task_category_id || activeCategoryIds.has(t.task_category_id))) {
         if (!map[t.due_date]) map[t.due_date] = []
         map[t.due_date].push(t)
       }
     }
+    for (const date of Object.keys(map)) {
+      map[date].sort((a, b) => {
+        const aP = a.task_category?.name && priorityCatNames.has(a.task_category.name.toLowerCase()) ? 0 : 1
+        const bP = b.task_category?.name && priorityCatNames.has(b.task_category.name.toLowerCase()) ? 0 : 1
+        return aP - bP
+      })
+    }
     return map
-  }, [tasks, today, weekEnd])
+  }, [tasks, today, weekEnd, priorityCatNames, activeCategoryIds])
 
   const handleCreate = useCallback(
     async (title: string, due_date: string | null, category: 'work' | 'personal', task_category_id?: string) => {
@@ -542,6 +555,51 @@ export function TodosClient({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Category filter */}
+      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+        <button
+          onClick={() => {
+            if (activeCategoryIds.size === categories.length) {
+              setActiveCategoryIds(new Set())
+            } else {
+              setActiveCategoryIds(new Set(categories.map((c) => c.id)))
+            }
+          }}
+          className={`px-2 py-1 text-[11px] font-medium transition-colors border ${
+            activeCategoryIds.size === categories.length
+              ? 'bg-brand-navy text-white border-brand-navy'
+              : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          All
+        </button>
+        {categories.map((cat) => {
+          const col = getCategoryColor(cat.color)
+          const isActive = activeCategoryIds.has(cat.id)
+          return (
+            <button
+              key={cat.id}
+              onClick={() => {
+                setActiveCategoryIds((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(cat.id)) next.delete(cat.id)
+                  else next.add(cat.id)
+                  return next
+                })
+              }}
+              className={`px-2 py-1 text-[11px] font-medium transition-colors border flex items-center gap-1.5 ${
+                isActive
+                  ? `${col.pill} ${col.border}`
+                  : 'bg-white text-gray-400 border-gray-200'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-sm ${isActive ? col.dot : 'bg-gray-300'}`} />
+              {cat.name}
+            </button>
+          )
+        })}
       </div>
 
       {/* Quick add */}
