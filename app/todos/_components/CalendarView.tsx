@@ -2,10 +2,12 @@
 
 import { useState, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import type { Task } from '@/app/actions/tasks'
+import type { Task, TaskCategory } from '@/app/actions/tasks'
+import { getCategoryColor } from '@/lib/task-colors'
 
 type CalendarViewProps = {
   tasks: Task[]
+  categories: TaskCategory[]
   today: string
   onToggle: (t: Task) => void
   onEdit: (t: Task) => void
@@ -56,34 +58,16 @@ function fmt(d: Date) {
   return `${y}-${m}-${day}`
 }
 
-function isContract(t: Task): boolean {
-  if (t.source === 'contract_renewal') return true
-  if (!t.business_id) return false
-  const tl = t.title.toLowerCase()
-  return /^renewal[: ]/.test(tl) || /^cc (expires|offer)/.test(tl) || /^club card offer/.test(tl)
-}
-
-function getTaskColor(t: Task): string {
+function getTaskPillClass(t: Task): string {
   if (t.status === 'done') return 'text-gray-400 line-through bg-gray-50'
-  if (t.type === 'call') return 'bg-blue-50 text-blue-700 border-l-2 border-blue-300'
-  if (t.type === 'event') return 'bg-purple-100/60 text-purple-700 border-l-2 border-purple-400'
   if (t.is_priority) return 'bg-amber-100 text-amber-800 font-medium'
-  if (isContract(t)) return 'bg-purple-50 text-purple-700 border-l-2 border-purple-300'
-  if (t.source === 'follow_up') return 'bg-brand-navy/5 text-brand-navy'
-  return 'bg-brand-warm text-gray-700 hover:bg-gray-100'
-}
-
-function getTaskTooltip(t: Task): string {
-  const parts: string[] = []
-  if (t.type === 'call') parts.push('[Call]')
-  else if (t.type === 'event') parts.push('[Event]')
-  parts.push(t.title)
-  if (isContract(t)) parts.push('(Contract)')
-  return parts.join(' ')
+  const col = getCategoryColor(t.task_category?.color)
+  return col.pill
 }
 
 export function CalendarView({
   tasks,
+  categories,
   today,
   onToggle,
   onEdit,
@@ -191,8 +175,6 @@ export function CalendarView({
               const isToday = date === today
               const isSelected = date === selectedDate
               const isDropTarget = dragOverDate === date
-              const contractCount = dateTasks.filter(isContract).length
-              const taskCount = dateTasks.filter((t) => !isContract(t)).length
 
               return (
                 <div
@@ -221,8 +203,8 @@ export function CalendarView({
                         onDragStart={() => handleDragStart(t.id)}
                         onDragEnd={handleDragEnd}
                         onClick={(e) => { e.stopPropagation(); onEdit(t) }}
-                        className={`w-full text-left text-[11px] leading-tight px-1 py-0.5 truncate block transition-colors cursor-pointer ${getTaskColor(t)}`}
-                        title={getTaskTooltip(t)}
+                        className={`w-full text-left text-[11px] leading-tight px-1 py-0.5 truncate block transition-colors cursor-pointer ${getTaskPillClass(t)}`}
+                        title={t.title}
                       >
                         {t.is_priority && t.status !== 'done' && '★ '}
                         {t.title}
@@ -232,40 +214,29 @@ export function CalendarView({
                       <span className="text-[10px] text-gray-400 px-1">+{dateTasks.length - 3} more</span>
                     )}
                   </div>
-
-                  {/* Dot indicators when no room for text */}
-                  {dateTasks.length === 0 ? null : dateTasks.length <= 3 ? null : (
-                    <div className="flex gap-0.5 mt-0.5 px-1">
-                      {contractCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-purple-400" title={`${contractCount} contract${contractCount > 1 ? 's' : ''}`} />}
-                      {taskCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-brand-navy/40" title={`${taskCount} task${taskCount > 1 ? 's' : ''}`} />}
-                    </div>
-                  )}
                 </div>
               )
             })}
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 mt-3 text-[11px] text-gray-500 flex-wrap">
+          {/* Legend — from categories */}
+          <div className="flex items-center gap-3 mt-3 text-[11px] text-gray-500 flex-wrap">
+            {categories.map((cat) => {
+              const col = getCategoryColor(cat.color)
+              return (
+                <span key={cat.id} className="flex items-center gap-1">
+                  <span className={`inline-block w-2.5 h-2.5 rounded-sm ${col.dot}`} />
+                  {cat.name}
+                </span>
+              )
+            })}
             <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-2 bg-blue-50 border-l-2 border-blue-300" />Call
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-400" />Focus
             </span>
             <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-2 bg-purple-100/60 border-l-2 border-purple-400" />Event
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-gray-300" />Done
             </span>
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-2 bg-amber-100 border border-amber-200" />Focus
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-2 bg-purple-50 border-l-2 border-purple-300" />Contract
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-2 bg-brand-warm border border-gray-200" />Task
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-2 bg-gray-50 border border-gray-200" />Done
-            </span>
-            <span className="text-gray-400">· Click day to view · Drag to reschedule</span>
+            <span className="text-gray-400 ml-1">· Click day to view · Drag to reschedule</span>
           </div>
         </div>
 
@@ -283,30 +254,23 @@ export function CalendarView({
                 <p className="px-3 py-4 text-xs text-gray-400 text-center">Nothing scheduled</p>
               ) : (
                 selectedTasks.map((t) => {
-                  const isEventType = t.type === 'call' || t.type === 'event'
+                  const cat = t.task_category
+                  const catColor = getCategoryColor(cat?.color)
                   return (
                     <div key={t.id} className="px-3 py-2 hover:bg-brand-warm/50 transition-colors">
                       <div className="flex items-start gap-2">
-                        {isEventType ? (
-                          <span className={`flex-shrink-0 text-[9px] font-semibold px-1 py-0.5 mt-0.5 ${
-                            t.type === 'call' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                          }`}>
-                            {t.type === 'call' ? 'Call' : 'Event'}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => onToggle(t)}
-                            className={`flex-shrink-0 w-4 h-4 mt-0.5 border-2 flex items-center justify-center transition-colors ${
-                              t.status === 'done' ? 'bg-brand-olive border-brand-olive text-white' : 'border-gray-300 hover:border-brand-navy'
-                            }`}
-                          >
-                            {t.status === 'done' && (
-                              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </button>
-                        )}
+                        <button
+                          onClick={() => onToggle(t)}
+                          className={`flex-shrink-0 w-4 h-4 mt-0.5 border-2 flex items-center justify-center transition-colors ${
+                            t.status === 'done' ? 'bg-brand-olive border-brand-olive text-white' : 'border-gray-300 hover:border-brand-navy'
+                          }`}
+                        >
+                          {t.status === 'done' && (
+                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
                         <div className="flex-1 min-w-0">
                           <button
                             onClick={() => onEdit(t)}
@@ -315,11 +279,8 @@ export function CalendarView({
                             {t.title}
                           </button>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            {isContract(t) && (
-                              <span className="text-[9px] font-semibold px-1 py-0.5 bg-purple-100 text-purple-700">Contract</span>
-                            )}
-                            {t.source === 'follow_up' && (
-                              <span className="text-[9px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy">Follow-up</span>
+                            {cat && cat.name !== 'Task' && (
+                              <span className={`text-[9px] font-semibold px-1 py-0.5 ${catColor.pill}`}>{cat.name}</span>
                             )}
                             {t.business_id && t.business && (
                               <Link

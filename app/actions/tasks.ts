@@ -16,6 +16,15 @@ export type TaskBusiness = {
 export type RenewalStage = 'not_started' | 'in_progress' | 'agreed' | 'not_renewing' | 'done'
 export type TaskType = 'task' | 'call' | 'event'
 
+export type TaskCategory = {
+  id: string
+  organization_id: string
+  name: string
+  color: string
+  sort_order: number
+  is_active: boolean
+}
+
 export type Task = {
   id: string
   organization_id: string
@@ -27,6 +36,7 @@ export type Task = {
   category: 'work' | 'personal'
   source: 'manual' | 'contract_renewal' | 'follow_up'
   type: TaskType
+  task_category_id: string | null
   renewal_stage: RenewalStage
   business_id: string | null
   position: number
@@ -34,6 +44,7 @@ export type Task = {
   updated_at: string
   completed_at: string | null
   business?: TaskBusiness | null
+  task_category?: TaskCategory | null
 }
 
 export async function getTasks(): Promise<{ data?: Task[]; error?: string }> {
@@ -46,7 +57,7 @@ export async function getTasks(): Promise<{ data?: Task[]; error?: string }> {
 
   const { data, error } = await supabase
     .from('tasks')
-    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end)')
+    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end), task_category:task_categories(id, organization_id, name, color, sort_order, is_active)')
     .eq('organization_id', orgId)
     .order('position', { ascending: true })
     .order('created_at', { ascending: false })
@@ -61,6 +72,7 @@ export async function createTask(input: {
   category?: 'work' | 'personal'
   notes?: string | null
   type?: TaskType
+  task_category_id?: string | null
 }): Promise<{ data?: Task; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -77,13 +89,14 @@ export async function createTask(input: {
       category: input.category || 'work',
       notes: input.notes || null,
       type: input.type || 'task',
+      task_category_id: input.task_category_id || null,
       status: 'open',
       is_priority: false,
       source: 'manual',
       organization_id: orgId,
       position: 0,
     })
-    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end)')
+    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end), task_category:task_categories(id, organization_id, name, color, sort_order, is_active)')
     .single()
 
   if (error) return { error: error.message }
@@ -101,6 +114,7 @@ export async function updateTask(
     category?: 'work' | 'personal'
     notes?: string | null
     type?: TaskType
+    task_category_id?: string | null
     renewal_stage?: RenewalStage
   }
 ): Promise<{ data?: Task; error?: string }> {
@@ -119,6 +133,7 @@ export async function updateTask(
   if (updates.category !== undefined) updateData.category = updates.category
   if (updates.notes !== undefined) updateData.notes = updates.notes
   if (updates.type !== undefined) updateData.type = updates.type
+  if (updates.task_category_id !== undefined) updateData.task_category_id = updates.task_category_id
   if (updates.renewal_stage !== undefined) updateData.renewal_stage = updates.renewal_stage
 
   const { data, error } = await supabase
@@ -126,7 +141,7 @@ export async function updateTask(
     .update(updateData)
     .eq('id', id)
     .eq('organization_id', orgId)
-    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end)')
+    .select('*, business:businesses!tasks_business_id_fkey(id, name, is_club_card, is_advertiser, contract_renewal_type, contract_end), task_category:task_categories(id, organization_id, name, color, sort_order, is_active)')
     .single()
 
   if (error) return { error: error.message }
@@ -283,6 +298,108 @@ export async function createTaskFromCorrespondence(input: {
   if (error) return { error: error.message }
   revalidatePath('/todos')
   return { data: data as Task }
+}
+
+export async function getTaskCategories(): Promise<{ data?: TaskCategory[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data, error } = await supabase
+    .from('task_categories')
+    .select('*')
+    .eq('organization_id', orgId)
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+
+  if (error) return { error: error.message }
+  return { data: data as TaskCategory[] }
+}
+
+export async function createTaskCategory(input: {
+  name: string
+  color: string
+}): Promise<{ data?: TaskCategory; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { count } = await supabase
+    .from('task_categories')
+    .select('*', { count: 'exact', head: true })
+    .eq('organization_id', orgId)
+
+  const { data, error } = await supabase
+    .from('task_categories')
+    .insert({
+      organization_id: orgId,
+      name: input.name.trim(),
+      color: input.color,
+      sort_order: (count ?? 0),
+    })
+    .select('*')
+    .single()
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  revalidatePath('/settings')
+  return { data: data as TaskCategory }
+}
+
+export async function updateTaskCategory(
+  id: string,
+  updates: { name?: string; color?: string; sort_order?: number }
+): Promise<{ data?: TaskCategory; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const updateData: Record<string, unknown> = {}
+  if (updates.name !== undefined) updateData.name = updates.name.trim()
+  if (updates.color !== undefined) updateData.color = updates.color
+  if (updates.sort_order !== undefined) updateData.sort_order = updates.sort_order
+
+  const { data, error } = await supabase
+    .from('task_categories')
+    .update(updateData)
+    .eq('id', id)
+    .eq('organization_id', orgId)
+    .select('*')
+    .single()
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  revalidatePath('/settings')
+  return { data: data as TaskCategory }
+}
+
+export async function deleteTaskCategory(id: string): Promise<{ error?: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { error } = await supabase
+    .from('task_categories')
+    .update({ is_active: false })
+    .eq('id', id)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  revalidatePath('/settings')
+  return { error: null }
 }
 
 export async function refreshTaskCommitments(): Promise<{ count?: number; error?: string }> {

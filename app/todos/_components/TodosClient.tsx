@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Task, RenewalStage } from '@/app/actions/tasks'
+import type { Task, TaskCategory, RenewalStage } from '@/app/actions/tasks'
 import {
   createTask,
   updateTask,
@@ -13,6 +13,7 @@ import {
   refreshTaskCommitments,
   createTaskFromCorrespondence,
 } from '@/app/actions/tasks'
+import { getCategoryColor } from '@/lib/task-colors'
 import { markCorrespondenceDone, type GoneQuietItem } from '@/app/actions/correspondence'
 import { updateBusiness } from '@/app/actions/businesses'
 import { toast } from '@/lib/toast'
@@ -134,17 +135,20 @@ function batchCrmTasks(tasks: Task[]): BatchedGroup[] {
 
 export function TodosClient({
   initialTasks,
+  initialCategories,
   initialError,
   initialNeedsReply,
   initialGoneQuiet,
 }: {
   initialTasks: Task[]
+  initialCategories: TaskCategory[]
   initialError: string | null
   initialNeedsReply: NeedsReplyItem[]
   initialGoneQuiet: GoneQuietItem[]
 }) {
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [categories] = useState<TaskCategory[]>(initialCategories)
   const [needsReply, setNeedsReply] = useState<NeedsReplyItem[]>(initialNeedsReply)
   const [goneQuiet, setGoneQuiet] = useState<GoneQuietItem[]>(initialGoneQuiet)
   const [view, setView] = useState<ViewMode>('list')
@@ -215,16 +219,39 @@ export function TodosClient({
     [needsReply, today]
   )
 
-  const upcomingEvents = useMemo(() =>
-    nonContractTasks
-      .filter((t) => t.status === 'open' && (t.type === 'call' || t.type === 'event') && t.due_date && t.due_date >= today && t.due_date <= weekEnd)
-      .sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? '')),
-    [nonContractTasks, today, weekEnd]
+  const weekAheadDays = useMemo(() => {
+    const days: { date: string; label: string; isToday: boolean }[] = []
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(today, i)
+      const dt = new Date(d + 'T00:00:00')
+      days.push({
+        date: d,
+        label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : dt.toLocaleDateString('en-GB', { weekday: 'short' }),
+        isToday: i === 0,
+      })
+    }
+    return days
+  }, [today])
+
+  const overdueOpen = useMemo(() =>
+    tasks.filter((t) => t.status === 'open' && t.due_date && t.due_date < today),
+    [tasks, today]
   )
 
+  const weekAheadTasks = useMemo(() => {
+    const map: Record<string, Task[]> = {}
+    for (const t of tasks) {
+      if (t.status === 'open' && t.due_date && t.due_date >= today && t.due_date <= weekEnd) {
+        if (!map[t.due_date]) map[t.due_date] = []
+        map[t.due_date].push(t)
+      }
+    }
+    return map
+  }, [tasks, today, weekEnd])
+
   const handleCreate = useCallback(
-    async (title: string, due_date: string | null, category: 'work' | 'personal', type?: 'task' | 'call' | 'event') => {
-      const result = await createTask({ title, due_date, category, type: type || 'task' })
+    async (title: string, due_date: string | null, category: 'work' | 'personal', task_category_id?: string) => {
+      const result = await createTask({ title, due_date, category, task_category_id: task_category_id || null })
       if (result.error) {
         toast.error(result.error)
         return
@@ -518,33 +545,61 @@ export function TodosClient({
       </div>
 
       {/* Quick add */}
-      <QuickAdd onAdd={handleCreate} />
+      <QuickAdd onAdd={handleCreate} categories={categories} />
 
-      {/* Coming up — calls & events in the next 7 days */}
-      {upcomingEvents.length > 0 && view === 'list' && (
-        <div className="mt-4 border border-brand-navy/10 bg-brand-navy/[0.02] px-4 py-3">
-          <p className="text-xs font-semibold text-brand-navy uppercase tracking-wide mb-2">Coming up</p>
-          <div className="flex flex-wrap gap-3">
-            {upcomingEvents.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setEditingTask(t)}
-                className="flex items-center gap-2 text-sm text-gray-700 hover:text-brand-navy transition-colors"
-              >
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 ${
-                  t.type === 'call' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                }`}>
-                  {t.type === 'call' ? 'Call' : 'Event'}
-                </span>
-                <span className="truncate max-w-[200px]">{t.title}</span>
-                <span className="text-xs text-gray-400">
-                  {t.due_date === today ? 'Today' : new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                </span>
-              </button>
-            ))}
-          </div>
+      {/* Week-ahead rail */}
+      <div className="mt-4 border border-gray-200 bg-white">
+        <div className="flex">
+          {/* Overdue column */}
+          {overdueOpen.length > 0 && (
+            <div className="flex-shrink-0 w-24 border-r border-gray-200 bg-red-50/50">
+              <div className="px-2 py-1.5 border-b border-gray-200">
+                <p className="text-[10px] font-semibold text-red-600 uppercase">Overdue</p>
+                <p className="text-xs text-red-500">{overdueOpen.length}</p>
+              </div>
+              <div className="px-1.5 py-1 space-y-0.5 max-h-[100px] overflow-y-auto">
+                {overdueOpen.slice(0, 5).map((t) => {
+                  const col = getCategoryColor(t.task_category?.color)
+                  return (
+                    <button key={t.id} onClick={() => setEditingTask(t)} className={`w-full text-left text-[10px] leading-tight px-1 py-0.5 truncate ${col.pill}`} title={t.title}>
+                      {t.title}
+                    </button>
+                  )
+                })}
+                {overdueOpen.length > 5 && <span className="text-[9px] text-red-400 px-1">+{overdueOpen.length - 5} more</span>}
+              </div>
+            </div>
+          )}
+
+          {/* Day columns */}
+          {weekAheadDays.map(({ date, label, isToday }) => {
+            const dayTasks = weekAheadTasks[date] ?? []
+            const dayNum = new Date(date + 'T00:00:00').getDate()
+            return (
+              <div key={date} className={`flex-1 min-w-0 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-brand-navy/[0.03]' : ''}`}>
+                <div className="px-2 py-1.5 border-b border-gray-200">
+                  <p className={`text-[10px] font-semibold uppercase ${isToday ? 'text-brand-navy' : 'text-gray-500'}`}>{label}</p>
+                  <p className={`text-xs ${isToday ? 'text-brand-navy' : 'text-gray-400'}`}>{dayNum}</p>
+                </div>
+                <div className="px-1.5 py-1 space-y-0.5 min-h-[40px] max-h-[100px] overflow-y-auto">
+                  {dayTasks.length === 0 && (
+                    <span className="text-[9px] text-gray-300 block text-center py-2">—</span>
+                  )}
+                  {dayTasks.slice(0, 4).map((t) => {
+                    const col = getCategoryColor(t.task_category?.color)
+                    return (
+                      <button key={t.id} onClick={() => setEditingTask(t)} className={`w-full text-left text-[10px] leading-tight px-1 py-0.5 truncate ${col.pill}`} title={t.title}>
+                        {t.title}
+                      </button>
+                    )
+                  })}
+                  {dayTasks.length > 4 && <span className="text-[9px] text-gray-400 px-1">+{dayTasks.length - 4}</span>}
+                </div>
+              </div>
+            )
+          })}
         </div>
-      )}
+      </div>
 
       {/* Views */}
       {view === 'list' && (
@@ -713,6 +768,7 @@ export function TodosClient({
       {view === 'calendar' && (
         <CalendarView
           tasks={allForCalendar}
+          categories={categories}
           today={today}
           onToggle={handleToggleStatus}
           onEdit={setEditingTask}
@@ -734,6 +790,7 @@ export function TodosClient({
       {editingTask && (
         <TaskEditModal
           task={editingTask}
+          categories={categories}
           onClose={() => setEditingTask(null)}
           onUpdate={handleUpdate}
           onDelete={handleDelete}

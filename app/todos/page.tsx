@@ -1,12 +1,13 @@
-import { getTasks, migrateCrmRenewalDates } from '@/app/actions/tasks'
+import { getTasks, getTaskCategories, migrateCrmRenewalDates } from '@/app/actions/tasks'
 import { getNeedsReply, getGoneQuiet } from '@/app/actions/correspondence'
 import type { GoneQuietItem } from '@/app/actions/correspondence'
 import { TodosClient } from './_components/TodosClient'
 
 export default async function TodosPage() {
   await migrateCrmRenewalDates()
-  const [result, needsReply, goneQuiet] = await Promise.all([
+  const [result, categoriesResult, needsReply, goneQuiet] = await Promise.all([
     getTasks(),
+    getTaskCategories(),
     getNeedsReply().catch(() => ({ data: [] })),
     getGoneQuiet().catch(() => ({ data: [] })),
   ])
@@ -14,6 +15,7 @@ export default async function TodosPage() {
   return (
     <TodosClient
       initialTasks={result.data ?? []}
+      initialCategories={categoriesResult.data ?? []}
       initialError={result.error ?? null}
       initialNeedsReply={(needsReply as { data?: NeedsReplyItem[] }).data ?? []}
       initialGoneQuiet={(goneQuiet as { data?: GoneQuietItem[] }).data ?? []}

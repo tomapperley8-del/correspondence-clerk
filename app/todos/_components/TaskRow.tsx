@@ -3,26 +3,7 @@
 import Link from 'next/link'
 import type { Task } from '@/app/actions/tasks'
 import { formatDateShortGB } from '@/lib/utils'
-
-function getSourceBadge(task: Task): string | null {
-  if (task.source === 'contract_renewal' && task.business) {
-    const b = task.business
-    if (b.is_club_card && b.is_advertiser) return 'Club Card + Advertiser'
-    if (b.is_club_card) return 'Club Card'
-    if (b.is_advertiser) return 'Advertiser'
-    return 'Renewal'
-  }
-  if (task.source === 'follow_up') return 'Follow-up'
-  return null
-}
-
-function getUrgencyLabel(task: Task): string | null {
-  if (task.source === 'contract_renewal' && task.business?.contract_renewal_type) {
-    const raw = task.business.contract_renewal_type
-    return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, ' ')
-  }
-  return null
-}
+import { getCategoryColor } from '@/lib/task-colors'
 
 export function TaskRow({
   task,
@@ -42,9 +23,8 @@ export function TaskRow({
   selected?: boolean
 }) {
   const isDone = task.status === 'done'
-  const badge = getSourceBadge(task)
-  const urgency = getUrgencyLabel(task)
-  const isEvent = task.type === 'call' || task.type === 'event'
+  const cat = task.task_category
+  const catColor = getCategoryColor(cat?.color)
 
   return (
     <div
@@ -52,29 +32,28 @@ export function TaskRow({
         compact ? 'py-1.5 px-2' : ''
       } ${selected ? 'ring-2 ring-brand-navy/40 bg-brand-navy/5' : ''}`}
     >
-      {/* Checkbox or type indicator */}
-      {isEvent ? (
-        <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 ${
-          task.type === 'call' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-        }`}>
-          {task.type === 'call' ? 'Call' : 'Event'}
+      {/* Checkbox */}
+      <button
+        onClick={() => onToggle(task)}
+        className={`flex-shrink-0 w-5 h-5 border-2 flex items-center justify-center transition-colors ${
+          isDone
+            ? 'bg-brand-olive border-brand-olive text-white'
+            : 'border-gray-300 hover:border-brand-navy'
+        }`}
+        aria-label={isDone ? 'Mark as open' : 'Mark as done'}
+      >
+        {isDone && (
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+      </button>
+
+      {/* Category badge */}
+      {cat && cat.name !== 'Task' && (
+        <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 ${catColor.pill}`}>
+          {cat.name}
         </span>
-      ) : (
-        <button
-          onClick={() => onToggle(task)}
-          className={`flex-shrink-0 w-5 h-5 border-2 flex items-center justify-center transition-colors ${
-            isDone
-              ? 'bg-brand-olive border-brand-olive text-white'
-              : 'border-gray-300 hover:border-brand-navy'
-          }`}
-          aria-label={isDone ? 'Mark as open' : 'Mark as done'}
-        >
-          {isDone && (
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          )}
-        </button>
       )}
 
       {/* Content */}
@@ -94,18 +73,6 @@ export function TaskRow({
 
       {/* Badges */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        {badge && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-brand-navy/10 text-brand-navy">
-            {badge}
-          </span>
-        )}
-
-        {urgency && (
-          <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-600">
-            {urgency}
-          </span>
-        )}
-
         {task.category === 'personal' && (
           <span className="text-[10px] font-medium px-1.5 py-0.5 bg-purple-50 text-purple-600">
             Personal
@@ -133,8 +100,8 @@ export function TaskRow({
           </Link>
         )}
 
-        {/* Priority toggle — visible on hover, tasks only */}
-        {!isDone && !isEvent && (
+        {/* Priority toggle — visible on hover */}
+        {!isDone && (
           <button
             onClick={(e) => {
               e.stopPropagation()

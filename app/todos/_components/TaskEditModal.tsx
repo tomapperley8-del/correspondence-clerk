@@ -2,31 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import type { Task, TaskType } from '@/app/actions/tasks'
+import type { Task, TaskCategory } from '@/app/actions/tasks'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
-
-function getSourceBadge(task: Task): string | null {
-  if (task.source === 'contract_renewal' && task.business) {
-    const b = task.business
-    if (b.is_club_card && b.is_advertiser) return 'Club Card + Advertiser'
-    if (b.is_club_card) return 'Club Card'
-    if (b.is_advertiser) return 'Advertiser'
-    return 'Renewal'
-  }
-  if (task.source === 'follow_up') return 'Follow-up'
-  return null
-}
-
-function getUrgencyLabel(task: Task): string | null {
-  if (task.source === 'contract_renewal' && task.business?.contract_renewal_type) {
-    const raw = task.business.contract_renewal_type
-    return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, ' ')
-  }
-  return null
-}
+import { getCategoryColor } from '@/lib/task-colors'
 
 export function TaskEditModal({
   task,
+  categories,
   onClose,
   onUpdate,
   onDelete,
@@ -34,6 +16,7 @@ export function TaskEditModal({
   onClearPriority,
 }: {
   task: Task
+  categories: TaskCategory[]
   onClose: () => void
   onUpdate: (id: string, updates: {
     title?: string
@@ -41,7 +24,7 @@ export function TaskEditModal({
     status?: 'open' | 'done'
     category?: 'work' | 'personal'
     notes?: string | null
-    type?: TaskType
+    task_category_id?: string | null
   }) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onSetPriority: (id: string) => Promise<void>
@@ -50,7 +33,7 @@ export function TaskEditModal({
   const [title, setTitle] = useState(task.title)
   const [dueDate, setDueDate] = useState(task.due_date ?? '')
   const [category, setCategory] = useState(task.category)
-  const [type, setType] = useState<TaskType>(task.type || 'task')
+  const [selectedCategoryId, setSelectedCategoryId] = useState(task.task_category_id ?? categories[0]?.id ?? '')
   const [notes, setNotes] = useState(task.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -58,8 +41,8 @@ export function TaskEditModal({
 
   const modalRef = useModalKeyboard(true, onClose)
 
-  const badge = getSourceBadge(task)
-  const urgency = getUrgencyLabel(task)
+  const selectedCat = categories.find((c) => c.id === selectedCategoryId)
+  const catLabel = selectedCat?.name?.toLowerCase() ?? 'task'
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,7 +56,7 @@ export function TaskEditModal({
       title: title.trim(),
       due_date: dueDate || null,
       category,
-      type,
+      task_category_id: selectedCategoryId || null,
       notes: notes.trim() || null,
     })
     setSaving(false)
@@ -96,11 +79,11 @@ export function TaskEditModal({
       <div
         ref={modalRef}
         role="dialog"
-        aria-label="Edit task"
+        aria-label={`Edit ${catLabel}`}
         className="bg-white border border-gray-200 w-full max-w-lg p-6 shadow-[var(--shadow-lg)]"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg">Edit {type === 'call' ? 'call' : type === 'event' ? 'event' : 'task'}</h2>
+          <h2 className="text-lg">Edit {catLabel}</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors p-1"
@@ -118,34 +101,14 @@ export function TaskEditModal({
           </div>
         )}
 
-        {(badge || task.business) && (
-          <div className="flex items-center gap-2 mb-4 text-sm flex-wrap">
-            {badge && (
-              <span className="px-1.5 py-0.5 bg-brand-navy/10 text-brand-navy text-[10px] font-semibold">
-                {badge}
-              </span>
-            )}
-            {urgency && (
-              <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-medium">
-                {urgency}
-              </span>
-            )}
-            {task.source !== 'manual' && (
-              <span className="text-gray-500">
-                From {task.source === 'contract_renewal' ? 'contract renewal' : 'follow-up'}
-              </span>
-            )}
-            {task.business && (
-              <>
-                <span className="text-gray-300">·</span>
-                <Link
-                  href={`/businesses/${task.business_id}`}
-                  className="text-brand-navy hover:text-brand-olive transition-colors"
-                >
-                  {task.business.name}
-                </Link>
-              </>
-            )}
+        {task.business && (
+          <div className="flex items-center gap-2 mb-4 text-sm">
+            <Link
+              href={`/businesses/${task.business_id}`}
+              className="text-brand-navy hover:text-brand-olive transition-colors"
+            >
+              {task.business.name}
+            </Link>
           </div>
         )}
 
@@ -163,7 +126,32 @@ export function TaskEditModal({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          {/* Category selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((cat) => {
+                const col = getCategoryColor(cat.color)
+                const isSelected = cat.id === selectedCategoryId
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategoryId(cat.id)}
+                    className={`px-2.5 py-1.5 text-xs font-medium transition-colors border ${
+                      isSelected
+                        ? `${col.pill} ${col.border}`
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="task-date" className="block text-sm font-medium text-gray-700 mb-1">
                 Due date
@@ -177,23 +165,8 @@ export function TaskEditModal({
               />
             </div>
             <div>
-              <label htmlFor="task-type" className="block text-sm font-medium text-gray-700 mb-1">
-                Type
-              </label>
-              <select
-                id="task-type"
-                value={type}
-                onChange={(e) => setType(e.target.value as TaskType)}
-                className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
-              >
-                <option value="task">Task</option>
-                <option value="call">Call</option>
-                <option value="event">Event</option>
-              </select>
-            </div>
-            <div>
               <label htmlFor="task-category" className="block text-sm font-medium text-gray-700 mb-1">
-                Category
+                Work / Personal
               </label>
               <select
                 id="task-category"
@@ -234,21 +207,19 @@ export function TaskEditModal({
               {task.status === 'done' ? 'Reopen' : 'Mark done'}
             </button>
 
-            {type === 'task' && (
-              <button
-                type="button"
-                onClick={() =>
-                  task.is_priority ? onClearPriority(task.id) : onSetPriority(task.id)
-                }
-                className={`text-sm px-3 py-1.5 border transition-colors ${
-                  task.is_priority
-                    ? 'border-amber-400 text-amber-600 hover:bg-amber-50'
-                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {task.is_priority ? '★ Remove focus' : '☆ Set focus'}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() =>
+                task.is_priority ? onClearPriority(task.id) : onSetPriority(task.id)
+              }
+              className={`text-sm px-3 py-1.5 border transition-colors ${
+                task.is_priority
+                  ? 'border-amber-400 text-amber-600 hover:bg-amber-50'
+                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {task.is_priority ? '★ Remove focus' : '☆ Set focus'}
+            </button>
 
             <div className="flex-1" />
 

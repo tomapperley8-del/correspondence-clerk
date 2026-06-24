@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useMemo } from 'react'
-import type { TaskType } from '@/app/actions/tasks'
+import type { TaskCategory } from '@/app/actions/tasks'
+import { getCategoryColor } from '@/lib/task-colors'
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
@@ -81,27 +82,24 @@ function parseNaturalDate(text: string): { date: string; cleaned: string } | nul
   return null
 }
 
-const TYPE_OPTIONS: { value: TaskType; label: string }[] = [
-  { value: 'task', label: 'Task' },
-  { value: 'call', label: 'Call' },
-  { value: 'event', label: 'Event' },
-]
-
 export function QuickAdd({
   onAdd,
+  categories,
   defaultDate,
 }: {
-  onAdd: (title: string, dueDate: string | null, category: 'work' | 'personal', type: TaskType) => Promise<void>
+  onAdd: (title: string, dueDate: string | null, category: 'work' | 'personal', taskCategoryId?: string) => Promise<void>
+  categories: TaskCategory[]
   defaultDate?: string | null
 }) {
   const [title, setTitle] = useState('')
   const [dueDate, setDueDate] = useState(defaultDate ?? '')
-  const [category, setCategory] = useState<'work' | 'personal'>('work')
-  const [type, setType] = useState<TaskType>('task')
+  const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id ?? '')
   const [adding, setAdding] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const parsedDate = useMemo(() => parseNaturalDate(title), [title])
+
+  const selectedCategory = categories.find((c) => c.id === selectedCategoryId)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -110,7 +108,7 @@ export function QuickAdd({
     setAdding(true)
     const finalTitle = parsedDate && !dueDate ? parsedDate.cleaned : title.trim()
     const finalDate = dueDate || parsedDate?.date || null
-    await onAdd(finalTitle, finalDate, category, type)
+    await onAdd(finalTitle, finalDate, 'work', selectedCategoryId || undefined)
     setTitle('')
     setDueDate(defaultDate ?? '')
     setAdding(false)
@@ -120,28 +118,30 @@ export function QuickAdd({
   return (
     <div>
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 bg-white border border-gray-200 p-3 shadow-[var(--shadow-sm)]">
-        <div className="flex bg-brand-warm border border-gray-200 p-0.5 flex-shrink-0">
-          {TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setType(opt.value)}
-              className={`px-2 py-1.5 text-xs font-medium transition-colors ${
-                type === opt.value
-                  ? 'bg-brand-navy text-white'
-                  : 'text-gray-500 hover:text-brand-navy'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="flex bg-brand-warm border border-gray-200 p-0.5 flex-shrink-0 overflow-x-auto">
+          {categories.map((cat) => {
+            const col = getCategoryColor(cat.color)
+            const isSelected = cat.id === selectedCategoryId
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategoryId(cat.id)}
+                className={`px-2 py-1.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                  isSelected ? `${col.pill}` : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {cat.name}
+              </button>
+            )
+          })}
         </div>
         <input
           ref={inputRef}
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={type === 'call' ? 'Call with…' : type === 'event' ? 'Event name…' : 'Add a task… (try "call Tim next Tuesday")'}
+          placeholder={selectedCategory ? `Add ${selectedCategory.name.toLowerCase()}…` : 'Add a task…'}
           className="flex-1 text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
           disabled={adding}
         />
@@ -152,15 +152,6 @@ export function QuickAdd({
           className="text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none w-full sm:w-auto"
           disabled={adding}
         />
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value as 'work' | 'personal')}
-          className="text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none w-full sm:w-auto"
-          disabled={adding}
-        >
-          <option value="work">Work</option>
-          <option value="personal">Personal</option>
-        </select>
         <button
           type="submit"
           disabled={adding || !title.trim()}

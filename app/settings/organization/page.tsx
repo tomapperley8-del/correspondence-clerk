@@ -43,6 +43,14 @@ import {
   deleteUserPreset,
   type UserAIPreset,
 } from '@/app/actions/insights'
+import {
+  getTaskCategories,
+  createTaskCategory,
+  updateTaskCategory,
+  deleteTaskCategory,
+  type TaskCategory,
+} from '@/app/actions/tasks'
+import { COLOR_OPTIONS, getCategoryColor } from '@/lib/task-colors'
 
 
 type Member = {
@@ -103,6 +111,12 @@ function OrganizationSettingsContent() {
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [editPresetLabel, setEditPresetLabel] = useState('')
   const [editPresetPrompt, setEditPresetPrompt] = useState('')
+  const [taskCategories, setTaskCategories] = useState<TaskCategory[]>([])
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatColor, setNewCatColor] = useState('gray')
+  const [isAddingCat, setIsAddingCat] = useState(false)
+  const [catError, setCatError] = useState<string | null>(null)
+  const [editingCatId, setEditingCatId] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -154,6 +168,10 @@ function OrganizationSettingsContent() {
     // Load AI presets
     const presetsResult = await getUserPresets()
     if (presetsResult.data) setPresets(presetsResult.data)
+
+    // Load task categories
+    const catResult = await getTaskCategories()
+    if (catResult.data) setTaskCategories(catResult.data)
 
     setIsLoadingOrg(false)
   }
@@ -1031,6 +1049,139 @@ function OrganizationSettingsContent() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Task Categories */}
+      <div className="bg-white border-2 border-gray-800 p-6 mb-6">
+        <h2 className="text-xl font-bold mb-1 text-gray-900">Task Categories</h2>
+        <p className="text-sm text-gray-500 mb-4">Customise the categories used to colour-code tasks on your calendar.</p>
+
+        {catError && (
+          <div className="border-2 border-red-600 bg-red-50 px-3 py-2 mb-4">
+            <p className="text-red-800 text-sm">{catError}</p>
+          </div>
+        )}
+
+        <div className="space-y-2 mb-4">
+          {taskCategories.map((cat) => {
+            const col = getCategoryColor(cat.color)
+            const isEditing = editingCatId === cat.id
+            return (
+              <div key={cat.id} className="flex items-center gap-3 border-2 border-gray-200 px-3 py-2">
+                <span className={`w-4 h-4 rounded-sm flex-shrink-0 ${col.dot}`} />
+                <span className="font-semibold text-sm text-gray-900 flex-1">{cat.name}</span>
+                {isEditing ? (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {COLOR_OPTIONS.map((c) => {
+                      const swatch = getCategoryColor(c)
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={async () => {
+                            const result = await updateTaskCategory(cat.id, { color: c })
+                            if (result.error) { setCatError(result.error) }
+                            else if (result.data) {
+                              setTaskCategories((prev) => prev.map((tc) => tc.id === cat.id ? result.data! : tc))
+                            }
+                            setEditingCatId(null)
+                          }}
+                          className={`w-5 h-5 rounded-sm ${swatch.dot} ${c === cat.color ? 'ring-2 ring-offset-1 ring-gray-800' : ''}`}
+                          title={c}
+                        />
+                      )
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setEditingCatId(null)}
+                      className="text-xs text-gray-500 hover:text-gray-700 ml-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditingCatId(cat.id)}
+                      className="px-2 py-1 text-xs font-semibold border-2 border-gray-300 text-gray-700 hover:border-gray-500"
+                    >
+                      Change colour
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const result = await deleteTaskCategory(cat.id)
+                        if (result.error) { setCatError(result.error) }
+                        else { setTaskCategories((prev) => prev.filter((tc) => tc.id !== cat.id)) }
+                      }}
+                      className="px-2 py-1 text-xs font-semibold border-2 border-red-300 text-red-700 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {taskCategories.length === 0 && (
+            <p className="text-sm text-gray-500">No task categories defined yet.</p>
+          )}
+        </div>
+
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            if (!newCatName.trim()) return
+            setIsAddingCat(true)
+            setCatError(null)
+            const result = await createTaskCategory({ name: newCatName.trim(), color: newCatColor })
+            if (result.error) { setCatError(result.error) }
+            else if (result.data) {
+              setTaskCategories((prev) => [...prev, result.data!])
+              setNewCatName('')
+              setNewCatColor('gray')
+            }
+            setIsAddingCat(false)
+          }}
+          className="flex gap-2 items-end"
+        >
+          <div className="flex-1">
+            <Label htmlFor="newCatName" className="block mb-1 text-sm font-semibold">
+              Add new category
+            </Label>
+            <Input
+              id="newCatName"
+              type="text"
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              placeholder="e.g. Follow-up, Reminder"
+              disabled={isAddingCat}
+              className="w-full"
+            />
+          </div>
+          <div className="flex items-center gap-1 pb-0.5">
+            {COLOR_OPTIONS.slice(0, 6).map((c) => {
+              const swatch = getCategoryColor(c)
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setNewCatColor(c)}
+                  className={`w-5 h-5 rounded-sm ${swatch.dot} ${c === newCatColor ? 'ring-2 ring-offset-1 ring-gray-800' : ''}`}
+                  title={c}
+                />
+              )
+            })}
+          </div>
+          <Button
+            type="submit"
+            disabled={isAddingCat || !newCatName.trim()}
+            className="bg-brand-navy text-white hover:bg-brand-navy-hover shrink-0"
+          >
+            {isAddingCat ? 'Adding...' : 'Add Category'}
+          </Button>
+        </form>
       </div>
 
       {/* Back to Dashboard */}
