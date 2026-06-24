@@ -44,6 +44,7 @@ export function TaskRow({
   const isDone = task.status === 'done'
   const badge = getSourceBadge(task)
   const urgency = getUrgencyLabel(task)
+  const isEvent = task.type === 'call' || task.type === 'event'
 
   return (
     <div
@@ -51,22 +52,30 @@ export function TaskRow({
         compact ? 'py-1.5 px-2' : ''
       } ${selected ? 'ring-2 ring-brand-navy/40 bg-brand-navy/5' : ''}`}
     >
-      {/* Checkbox */}
-      <button
-        onClick={() => onToggle(task)}
-        className={`flex-shrink-0 w-5 h-5 border-2 flex items-center justify-center transition-colors ${
-          isDone
-            ? 'bg-brand-olive border-brand-olive text-white'
-            : 'border-gray-300 hover:border-brand-navy'
-        }`}
-        aria-label={isDone ? 'Mark as open' : 'Mark as done'}
-      >
-        {isDone && (
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        )}
-      </button>
+      {/* Checkbox or type indicator */}
+      {isEvent ? (
+        <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 ${
+          task.type === 'call' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+        }`}>
+          {task.type === 'call' ? 'Call' : 'Event'}
+        </span>
+      ) : (
+        <button
+          onClick={() => onToggle(task)}
+          className={`flex-shrink-0 w-5 h-5 border-2 flex items-center justify-center transition-colors ${
+            isDone
+              ? 'bg-brand-olive border-brand-olive text-white'
+              : 'border-gray-300 hover:border-brand-navy'
+          }`}
+          aria-label={isDone ? 'Mark as open' : 'Mark as done'}
+        >
+          {isDone && (
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </button>
+      )}
 
       {/* Content */}
       <button
@@ -124,8 +133,8 @@ export function TaskRow({
           </Link>
         )}
 
-        {/* Priority toggle — visible on hover */}
-        {!isDone && (
+        {/* Priority toggle — visible on hover, tasks only */}
+        {!isDone && !isEvent && (
           <button
             onClick={(e) => {
               e.stopPropagation()

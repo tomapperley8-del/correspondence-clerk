@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useMemo } from 'react'
+import type { TaskType } from '@/app/actions/tasks'
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
@@ -15,30 +16,25 @@ function parseNaturalDate(text: string): { date: string; cleaned: string } | nul
   const now = new Date()
   now.setHours(0, 0, 0, 0)
 
-  // "today"
   if (/\btoday\b/.test(lower)) {
     return { date: fmt(now), cleaned: text.replace(/\s*\btoday\b\s*/i, ' ').trim() }
   }
 
-  // "tomorrow"
   if (/\btomorrow\b/.test(lower)) {
     const d = new Date(now); d.setDate(d.getDate() + 1)
     return { date: fmt(d), cleaned: text.replace(/\s*\btomorrow\b\s*/i, ' ').trim() }
   }
 
-  // "next week" = next Monday
   if (/\bnext\s+week\b/.test(lower)) {
     const d = new Date(now); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7))
     return { date: fmt(d), cleaned: text.replace(/\s*\bnext\s+week\b\s*/i, ' ').trim() }
   }
 
-  // "end of month"
   if (/\bend\s+of\s+(the\s+)?month\b/.test(lower)) {
     const d = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     return { date: fmt(d), cleaned: text.replace(/\s*\bend\s+of\s+(the\s+)?month\b\s*/i, ' ').trim() }
   }
 
-  // "next <day>" e.g. "next tuesday"
   const nextDayMatch = lower.match(/\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)
   if (nextDayMatch) {
     const target = DAY_NAMES.indexOf(nextDayMatch[1])
@@ -49,7 +45,6 @@ function parseNaturalDate(text: string): { date: string; cleaned: string } | nul
     return { date: fmt(d), cleaned: text.replace(/\s*\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b\s*/i, ' ').trim() }
   }
 
-  // "on <day>" e.g. "on friday"
   const onDayMatch = lower.match(/\bon\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)
   if (onDayMatch) {
     const target = DAY_NAMES.indexOf(onDayMatch[1])
@@ -59,7 +54,6 @@ function parseNaturalDate(text: string): { date: string; cleaned: string } | nul
     return { date: fmt(d), cleaned: text.replace(/\s*\bon\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b\s*/i, ' ').trim() }
   }
 
-  // "on <ordinal> of <month>" or "<ordinal> <month>" or "<day> <month>" e.g. "10th of august", "10 august", "10th august"
   const dateMonthMatch = lower.match(/\b(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(\w+)\b/)
   if (dateMonthMatch) {
     const dayNum = parseInt(dateMonthMatch[1])
@@ -76,7 +70,6 @@ function parseNaturalDate(text: string): { date: string; cleaned: string } | nul
     }
   }
 
-  // "in N days/weeks"
   const inNMatch = lower.match(/\bin\s+(\d+)\s+(day|days|week|weeks)\b/)
   if (inNMatch) {
     const n = parseInt(inNMatch[1])
@@ -88,16 +81,23 @@ function parseNaturalDate(text: string): { date: string; cleaned: string } | nul
   return null
 }
 
+const TYPE_OPTIONS: { value: TaskType; label: string }[] = [
+  { value: 'task', label: 'Task' },
+  { value: 'call', label: 'Call' },
+  { value: 'event', label: 'Event' },
+]
+
 export function QuickAdd({
   onAdd,
   defaultDate,
 }: {
-  onAdd: (title: string, dueDate: string | null, category: 'work' | 'personal') => Promise<void>
+  onAdd: (title: string, dueDate: string | null, category: 'work' | 'personal', type: TaskType) => Promise<void>
   defaultDate?: string | null
 }) {
   const [title, setTitle] = useState('')
   const [dueDate, setDueDate] = useState(defaultDate ?? '')
   const [category, setCategory] = useState<'work' | 'personal'>('work')
+  const [type, setType] = useState<TaskType>('task')
   const [adding, setAdding] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -110,7 +110,7 @@ export function QuickAdd({
     setAdding(true)
     const finalTitle = parsedDate && !dueDate ? parsedDate.cleaned : title.trim()
     const finalDate = dueDate || parsedDate?.date || null
-    await onAdd(finalTitle, finalDate, category)
+    await onAdd(finalTitle, finalDate, category, type)
     setTitle('')
     setDueDate(defaultDate ?? '')
     setAdding(false)
@@ -120,12 +120,28 @@ export function QuickAdd({
   return (
     <div>
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 bg-white border border-gray-200 p-3 shadow-[var(--shadow-sm)]">
+        <div className="flex bg-brand-warm border border-gray-200 p-0.5 flex-shrink-0">
+          {TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setType(opt.value)}
+              className={`px-2 py-1.5 text-xs font-medium transition-colors ${
+                type === opt.value
+                  ? 'bg-brand-navy text-white'
+                  : 'text-gray-500 hover:text-brand-navy'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
         <input
           ref={inputRef}
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Add a task… (try &quot;call Tim next Tuesday&quot;)"
+          placeholder={type === 'call' ? 'Call with…' : type === 'event' ? 'Event name…' : 'Add a task… (try "call Tim next Tuesday")'}
           className="flex-1 text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
           disabled={adding}
         />
@@ -155,11 +171,10 @@ export function QuickAdd({
       </form>
       {parsedDate && !dueDate && (
         <div className="mt-1 text-xs text-brand-olive flex items-center gap-1.5 px-1">
-          <span>📅</span>
           <span>
             Detected date: <strong>{new Date(parsedDate.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</strong>
           </span>
-          <span className="text-gray-400">· Task: &quot;{parsedDate.cleaned}&quot;</span>
+          <span className="text-gray-400">· &quot;{parsedDate.cleaned}&quot;</span>
         </div>
       )}
     </div>

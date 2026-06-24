@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import type { Task } from '@/app/actions/tasks'
+import type { Task, TaskType } from '@/app/actions/tasks'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 
 function getSourceBadge(task: Task): string | null {
@@ -41,6 +41,7 @@ export function TaskEditModal({
     status?: 'open' | 'done'
     category?: 'work' | 'personal'
     notes?: string | null
+    type?: TaskType
   }) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onSetPriority: (id: string) => Promise<void>
@@ -49,6 +50,7 @@ export function TaskEditModal({
   const [title, setTitle] = useState(task.title)
   const [dueDate, setDueDate] = useState(task.due_date ?? '')
   const [category, setCategory] = useState(task.category)
+  const [type, setType] = useState<TaskType>(task.type || 'task')
   const [notes, setNotes] = useState(task.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -71,13 +73,14 @@ export function TaskEditModal({
       title: title.trim(),
       due_date: dueDate || null,
       category,
+      type,
       notes: notes.trim() || null,
     })
     setSaving(false)
   }
 
   const handleDelete = async () => {
-    if (!confirm('Delete this to-do?')) return
+    if (!confirm('Delete this item?')) return
     setDeleting(true)
     await onDelete(task.id)
     setDeleting(false)
@@ -93,11 +96,11 @@ export function TaskEditModal({
       <div
         ref={modalRef}
         role="dialog"
-        aria-label="Edit to-do"
+        aria-label="Edit task"
         className="bg-white border border-gray-200 w-full max-w-lg p-6 shadow-[var(--shadow-lg)]"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg">Edit to-do</h2>
+          <h2 className="text-lg">Edit {type === 'call' ? 'call' : type === 'event' ? 'event' : 'task'}</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors p-1"
@@ -160,7 +163,7 @@ export function TaskEditModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label htmlFor="task-date" className="block text-sm font-medium text-gray-700 mb-1">
                 Due date
@@ -172,6 +175,21 @@ export function TaskEditModal({
                 onChange={(e) => setDueDate(e.target.value)}
                 className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
               />
+            </div>
+            <div>
+              <label htmlFor="task-type" className="block text-sm font-medium text-gray-700 mb-1">
+                Type
+              </label>
+              <select
+                id="task-type"
+                value={type}
+                onChange={(e) => setType(e.target.value as TaskType)}
+                className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+              >
+                <option value="task">Task</option>
+                <option value="call">Call</option>
+                <option value="event">Event</option>
+              </select>
             </div>
             <div>
               <label htmlFor="task-category" className="block text-sm font-medium text-gray-700 mb-1">
@@ -216,19 +234,21 @@ export function TaskEditModal({
               {task.status === 'done' ? 'Reopen' : 'Mark done'}
             </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                task.is_priority ? onClearPriority(task.id) : onSetPriority(task.id)
-              }
-              className={`text-sm px-3 py-1.5 border transition-colors ${
-                task.is_priority
-                  ? 'border-amber-400 text-amber-600 hover:bg-amber-50'
-                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {task.is_priority ? '★ Remove focus' : '☆ Set focus'}
-            </button>
+            {type === 'task' && (
+              <button
+                type="button"
+                onClick={() =>
+                  task.is_priority ? onClearPriority(task.id) : onSetPriority(task.id)
+                }
+                className={`text-sm px-3 py-1.5 border transition-colors ${
+                  task.is_priority
+                    ? 'border-amber-400 text-amber-600 hover:bg-amber-50'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {task.is_priority ? '★ Remove focus' : '☆ Set focus'}
+              </button>
+            )}
 
             <div className="flex-1" />
 

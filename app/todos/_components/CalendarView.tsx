@@ -65,6 +65,8 @@ function isContract(t: Task): boolean {
 
 function getTaskColor(t: Task): string {
   if (t.status === 'done') return 'text-gray-400 line-through bg-gray-50'
+  if (t.type === 'call') return 'bg-blue-50 text-blue-700 border-l-2 border-blue-300'
+  if (t.type === 'event') return 'bg-purple-100/60 text-purple-700 border-l-2 border-purple-400'
   if (t.is_priority) return 'bg-amber-100 text-amber-800 font-medium'
   if (isContract(t)) return 'bg-purple-50 text-purple-700 border-l-2 border-purple-300'
   if (t.source === 'follow_up') return 'bg-brand-navy/5 text-brand-navy'
@@ -72,7 +74,10 @@ function getTaskColor(t: Task): string {
 }
 
 function getTaskTooltip(t: Task): string {
-  const parts = [t.title]
+  const parts: string[] = []
+  if (t.type === 'call') parts.push('[Call]')
+  else if (t.type === 'event') parts.push('[Event]')
+  parts.push(t.title)
   if (isContract(t)) parts.push('(Contract)')
   return parts.join(' ')
 }
@@ -241,7 +246,13 @@ export function CalendarView({
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 mt-3 text-[11px] text-gray-500">
+          <div className="flex items-center gap-4 mt-3 text-[11px] text-gray-500 flex-wrap">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-2 bg-blue-50 border-l-2 border-blue-300" />Call
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-2 bg-purple-100/60 border-l-2 border-purple-400" />Event
+            </span>
             <span className="flex items-center gap-1">
               <span className="inline-block w-3 h-2 bg-amber-100 border border-amber-200" />Focus
             </span>
@@ -271,49 +282,60 @@ export function CalendarView({
               {selectedTasks.length === 0 ? (
                 <p className="px-3 py-4 text-xs text-gray-400 text-center">Nothing scheduled</p>
               ) : (
-                selectedTasks.map((t) => (
-                  <div key={t.id} className="px-3 py-2 hover:bg-brand-warm/50 transition-colors">
-                    <div className="flex items-start gap-2">
-                      <button
-                        onClick={() => onToggle(t)}
-                        className={`flex-shrink-0 w-4 h-4 mt-0.5 border-2 flex items-center justify-center transition-colors ${
-                          t.status === 'done' ? 'bg-brand-olive border-brand-olive text-white' : 'border-gray-300 hover:border-brand-navy'
-                        }`}
-                      >
-                        {t.status === 'done' && (
-                          <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
+                selectedTasks.map((t) => {
+                  const isEventType = t.type === 'call' || t.type === 'event'
+                  return (
+                    <div key={t.id} className="px-3 py-2 hover:bg-brand-warm/50 transition-colors">
+                      <div className="flex items-start gap-2">
+                        {isEventType ? (
+                          <span className={`flex-shrink-0 text-[9px] font-semibold px-1 py-0.5 mt-0.5 ${
+                            t.type === 'call' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                          }`}>
+                            {t.type === 'call' ? 'Call' : 'Event'}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => onToggle(t)}
+                            className={`flex-shrink-0 w-4 h-4 mt-0.5 border-2 flex items-center justify-center transition-colors ${
+                              t.status === 'done' ? 'bg-brand-olive border-brand-olive text-white' : 'border-gray-300 hover:border-brand-navy'
+                            }`}
+                          >
+                            {t.status === 'done' && (
+                              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
                         )}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <button
-                          onClick={() => onEdit(t)}
-                          className={`text-xs text-left block w-full ${t.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800'}`}
-                        >
-                          {t.title}
-                        </button>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {isContract(t) && (
-                            <span className="text-[9px] font-semibold px-1 py-0.5 bg-purple-100 text-purple-700">Contract</span>
-                          )}
-                          {t.source === 'follow_up' && (
-                            <span className="text-[9px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy">Follow-up</span>
-                          )}
-                          {t.business_id && t.business && (
-                            <Link
-                              href={`/businesses/${t.business_id}`}
-                              className="text-[10px] text-brand-navy hover:text-brand-olive transition-colors truncate"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {t.business.name}
-                            </Link>
-                          )}
+                        <div className="flex-1 min-w-0">
+                          <button
+                            onClick={() => onEdit(t)}
+                            className={`text-xs text-left block w-full ${t.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800'}`}
+                          >
+                            {t.title}
+                          </button>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {isContract(t) && (
+                              <span className="text-[9px] font-semibold px-1 py-0.5 bg-purple-100 text-purple-700">Contract</span>
+                            )}
+                            {t.source === 'follow_up' && (
+                              <span className="text-[9px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy">Follow-up</span>
+                            )}
+                            {t.business_id && t.business && (
+                              <Link
+                                href={`/businesses/${t.business_id}`}
+                                className="text-[10px] text-brand-navy hover:text-brand-olive transition-colors truncate"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {t.business.name}
+                              </Link>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
 

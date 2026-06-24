@@ -215,10 +215,16 @@ export function TodosClient({
     [needsReply, today]
   )
 
+  const upcomingEvents = useMemo(() =>
+    nonContractTasks
+      .filter((t) => t.status === 'open' && (t.type === 'call' || t.type === 'event') && t.due_date && t.due_date >= today && t.due_date <= weekEnd)
+      .sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? '')),
+    [nonContractTasks, today, weekEnd]
+  )
 
   const handleCreate = useCallback(
-    async (title: string, due_date: string | null, category: 'work' | 'personal') => {
-      const result = await createTask({ title, due_date, category })
+    async (title: string, due_date: string | null, category: 'work' | 'personal', type?: 'task' | 'call' | 'event') => {
+      const result = await createTask({ title, due_date, category, type: type || 'task' })
       if (result.error) {
         toast.error(result.error)
         return
@@ -513,6 +519,32 @@ export function TodosClient({
 
       {/* Quick add */}
       <QuickAdd onAdd={handleCreate} />
+
+      {/* Coming up — calls & events in the next 7 days */}
+      {upcomingEvents.length > 0 && view === 'list' && (
+        <div className="mt-4 border border-brand-navy/10 bg-brand-navy/[0.02] px-4 py-3">
+          <p className="text-xs font-semibold text-brand-navy uppercase tracking-wide mb-2">Coming up</p>
+          <div className="flex flex-wrap gap-3">
+            {upcomingEvents.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setEditingTask(t)}
+                className="flex items-center gap-2 text-sm text-gray-700 hover:text-brand-navy transition-colors"
+              >
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 ${
+                  t.type === 'call' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                }`}>
+                  {t.type === 'call' ? 'Call' : 'Event'}
+                </span>
+                <span className="truncate max-w-[200px]">{t.title}</span>
+                <span className="text-xs text-gray-400">
+                  {t.due_date === today ? 'Today' : new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Views */}
       {view === 'list' && (
