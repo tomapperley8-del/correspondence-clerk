@@ -26,7 +26,6 @@ import { ContractsView } from './ContractsView'
 import type { NeedsReplyItem } from '../page'
 
 type ViewMode = 'list' | 'calendar' | 'contracts'
-type CategoryFilter = 'all' | 'work' | 'personal'
 type TimeFilter = 'week' | 'all'
 
 function todayStr() {
@@ -152,7 +151,6 @@ export function TodosClient({
   const [needsReply, setNeedsReply] = useState<NeedsReplyItem[]>(initialNeedsReply)
   const [goneQuiet, setGoneQuiet] = useState<GoneQuietItem[]>(initialGoneQuiet)
   const [view, setView] = useState<ViewMode>('list')
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('week')
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -173,11 +171,6 @@ export function TodosClient({
   const today = todayStr()
   const weekEnd = addDays(today, 7)
 
-  const categoryFiltered = useMemo(() => {
-    if (categoryFilter === 'all') return tasks
-    return tasks.filter((t) => t.category === categoryFilter)
-  }, [tasks, categoryFilter])
-
   const isContractTask = useCallback((t: Task) => {
     if (t.source === 'contract_renewal') return true
     if (!t.business_id) return false
@@ -186,13 +179,13 @@ export function TodosClient({
   }, [])
 
   const contractTasks = useMemo(() =>
-    categoryFiltered.filter(isContractTask),
-    [categoryFiltered, isContractTask]
+    tasks.filter(isContractTask),
+    [tasks, isContractTask]
   )
 
   const nonContractTasks = useMemo(() =>
-    categoryFiltered.filter((t) => !isContractTask(t)),
-    [categoryFiltered, isContractTask]
+    tasks.filter((t) => !isContractTask(t)),
+    [tasks, isContractTask]
   )
 
   const filtered = useMemo(() => {
@@ -208,8 +201,8 @@ export function TodosClient({
   }, [nonContractTasks, timeFilter, weekEnd, activeCategoryIds])
 
   const allForCalendar = useMemo(() =>
-    categoryFiltered.filter((t) => !t.task_category_id || activeCategoryIds.has(t.task_category_id)),
-    [categoryFiltered, activeCategoryIds]
+    tasks.filter((t) => !t.task_category_id || activeCategoryIds.has(t.task_category_id)),
+    [tasks, activeCategoryIds]
   )
 
   const groups = useMemo(() => groupTasks(filtered, today), [filtered, today])
@@ -492,7 +485,7 @@ export function TodosClient({
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h1>Tasks</h1>
         <button
           onClick={handleRefreshCRM}
@@ -504,13 +497,16 @@ export function TodosClient({
       </div>
 
       {initialError && (
-        <div className="border border-red-300 bg-red-50 px-4 py-3 mb-6 text-sm text-red-800">
+        <div className="border border-red-300 bg-red-50 px-4 py-3 mb-4 text-sm text-red-800">
           {initialError}
         </div>
       )}
 
-      {/* View toggle + filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 border-b border-gray-200 pb-4">
+      {/* Quick add — primary action, always visible at top */}
+      <QuickAdd onAdd={handleCreate} categories={categories} />
+
+      {/* Tabs + category filter — single line */}
+      <div className="flex items-center justify-between mt-4 border-b border-gray-200 pb-3">
         <div className="flex items-center gap-1">
           {(['list', 'calendar', 'contracts'] as const).map((v) => (
             <button
@@ -525,125 +521,80 @@ export function TodosClient({
               {v === 'list' ? 'List' : v === 'calendar' ? 'Calendar' : `Contracts${contractTasks.length > 0 ? ` (${contractTasks.filter(t => t.status === 'open').length})` : ''}`}
             </button>
           ))}
+          {view === 'list' && (
+            <>
+              <span className="mx-1.5 w-px h-4 bg-gray-200" />
+              <button
+                onClick={() => handleTimeFilterChange(timeFilter === 'week' ? 'all' : 'week')}
+                className={`px-2 py-1 text-[11px] font-medium transition-colors border ${
+                  timeFilter === 'week'
+                    ? 'bg-brand-navy/5 text-brand-navy border-brand-navy/20'
+                    : 'bg-white text-gray-500 border-gray-200 hover:text-brand-navy'
+                }`}
+              >
+                {timeFilter === 'week' ? 'This week' : 'All dates'}
+              </button>
+            </>
+          )}
+        </div>
 
-          <span className="mx-2 w-px h-5 bg-gray-200" />
-
+        <div className="flex items-center gap-1 flex-wrap justify-end">
           <button
-            onClick={() => handleTimeFilterChange(timeFilter === 'week' ? 'all' : 'week')}
-            className={`px-2.5 py-1 text-xs font-medium transition-colors border ${
-              timeFilter === 'week'
-                ? 'bg-brand-navy/5 text-brand-navy border-brand-navy/20'
-                : 'bg-white text-gray-500 border-gray-200 hover:text-brand-navy'
+            onClick={() => {
+              if (activeCategoryIds.size === categories.length) {
+                setActiveCategoryIds(new Set())
+              } else {
+                setActiveCategoryIds(new Set(categories.map((c) => c.id)))
+              }
+            }}
+            className={`px-1.5 py-0.5 text-[11px] font-medium transition-colors border ${
+              activeCategoryIds.size === categories.length
+                ? 'bg-brand-navy text-white border-brand-navy'
+                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
             }`}
           >
-            {timeFilter === 'week' ? 'This week' : 'All dates'}
+            All
           </button>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {(['all', 'work', 'personal'] as const).map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                categoryFilter === cat
-                  ? 'text-brand-navy border-b-2 border-brand-navy'
-                  : 'text-gray-500 hover:text-brand-navy'
-              }`}
-            >
-              {cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Category filter */}
-      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-        <button
-          onClick={() => {
-            if (activeCategoryIds.size === categories.length) {
-              setActiveCategoryIds(new Set())
-            } else {
-              setActiveCategoryIds(new Set(categories.map((c) => c.id)))
-            }
-          }}
-          className={`px-2 py-1 text-[11px] font-medium transition-colors border ${
-            activeCategoryIds.size === categories.length
-              ? 'bg-brand-navy text-white border-brand-navy'
-              : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-          }`}
-        >
-          All
-        </button>
-        {categories.map((cat) => {
-          const col = getCategoryColor(cat.color)
-          const isActive = activeCategoryIds.has(cat.id)
-          return (
-            <button
-              key={cat.id}
-              onClick={() => {
-                setActiveCategoryIds((prev) => {
-                  const next = new Set(prev)
-                  if (next.has(cat.id)) next.delete(cat.id)
-                  else next.add(cat.id)
-                  return next
-                })
-              }}
-              className={`px-2 py-1 text-[11px] font-medium transition-colors border flex items-center gap-1.5 ${
-                isActive
-                  ? `${col.pill} ${col.border}`
-                  : 'bg-white text-gray-400 border-gray-200'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-sm ${isActive ? col.dot : 'bg-gray-300'}`} />
-              {cat.name}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Quick add */}
-      <QuickAdd onAdd={handleCreate} categories={categories} />
-
-      {/* Week-ahead rail */}
-      <div className="mt-4 border border-gray-200 bg-white">
-        <div className="flex">
-          {/* Overdue column */}
-          {overdueOpen.length > 0 && (
-            <div className="flex-shrink-0 w-24 border-r border-gray-200 bg-red-50/50">
-              <div className="px-2 py-1.5 border-b border-gray-200">
-                <p className="text-[10px] font-semibold text-red-600 uppercase">Overdue</p>
-                <p className="text-xs text-red-500">{overdueOpen.length}</p>
-              </div>
-              <div className="px-1.5 py-1 space-y-0.5 max-h-[100px] overflow-y-auto">
-                {overdueOpen.slice(0, 5).map((t) => {
-                  const col = getCategoryColor(t.task_category?.color)
-                  return (
-                    <button key={t.id} onClick={() => setEditingTask(t)} className={`w-full text-left text-[10px] leading-tight px-1 py-0.5 truncate ${col.pill}`} title={t.title}>
-                      {t.title}
-                    </button>
-                  )
-                })}
-                {overdueOpen.length > 5 && <span className="text-[9px] text-red-400 px-1">+{overdueOpen.length - 5} more</span>}
-              </div>
-            </div>
-          )}
-
-          {/* Day columns */}
-          {weekAheadDays.map(({ date, label, isToday }) => {
-            const dayTasks = weekAheadTasks[date] ?? []
-            const dayNum = new Date(date + 'T00:00:00').getDate()
+          {categories.map((cat) => {
+            const col = getCategoryColor(cat.color)
+            const isActive = activeCategoryIds.has(cat.id)
             return (
-              <div key={date} className={`flex-1 min-w-0 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-brand-navy/[0.03]' : ''}`}>
+              <button
+                key={cat.id}
+                onClick={() => {
+                  setActiveCategoryIds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(cat.id)) next.delete(cat.id)
+                    else next.add(cat.id)
+                    return next
+                  })
+                }}
+                className={`px-1.5 py-0.5 text-[11px] font-medium transition-colors border flex items-center gap-1 ${
+                  isActive
+                    ? `${col.pill} ${col.border}`
+                    : 'bg-white text-gray-400 border-gray-200'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-sm ${isActive ? col.dot : 'bg-gray-300'}`} />
+                {cat.name}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Week-ahead rail — list view only */}
+      {view === 'list' && (
+        <div className="mt-3 border border-gray-200 bg-white">
+          <div className="flex">
+            {overdueOpen.length > 0 && (
+              <div className="flex-shrink-0 w-24 border-r border-gray-200 bg-red-50/50">
                 <div className="px-2 py-1.5 border-b border-gray-200">
-                  <p className={`text-[10px] font-semibold uppercase ${isToday ? 'text-brand-navy' : 'text-gray-500'}`}>{label}</p>
-                  <p className={`text-xs ${isToday ? 'text-brand-navy' : 'text-gray-400'}`}>{dayNum}</p>
+                  <p className="text-[10px] font-semibold text-red-600 uppercase">Overdue</p>
+                  <p className="text-xs text-red-500">{overdueOpen.length}</p>
                 </div>
-                <div className="px-1.5 py-1 space-y-0.5 min-h-[40px] max-h-[100px] overflow-y-auto">
-                  {dayTasks.length === 0 && (
-                    <span className="text-[9px] text-gray-300 block text-center py-2">—</span>
-                  )}
-                  {dayTasks.slice(0, 4).map((t) => {
+                <div className="px-1.5 py-1 space-y-0.5 max-h-[100px] overflow-y-auto">
+                  {overdueOpen.slice(0, 5).map((t) => {
                     const col = getCategoryColor(t.task_category?.color)
                     return (
                       <button key={t.id} onClick={() => setEditingTask(t)} className={`w-full text-left text-[10px] leading-tight px-1 py-0.5 truncate ${col.pill}`} title={t.title}>
@@ -651,17 +602,41 @@ export function TodosClient({
                       </button>
                     )
                   })}
-                  {dayTasks.length > 4 && <span className="text-[9px] text-gray-400 px-1">+{dayTasks.length - 4}</span>}
+                  {overdueOpen.length > 5 && <span className="text-[9px] text-red-400 px-1">+{overdueOpen.length - 5} more</span>}
                 </div>
               </div>
-            )
-          })}
+            )}
+            {weekAheadDays.map(({ date, label, isToday }) => {
+              const dayTasks = weekAheadTasks[date] ?? []
+              const dayNum = new Date(date + 'T00:00:00').getDate()
+              return (
+                <div key={date} className={`flex-1 min-w-0 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-brand-navy/[0.03]' : ''}`}>
+                  <div className="px-2 py-1.5 border-b border-gray-200">
+                    <p className={`text-[10px] font-semibold uppercase ${isToday ? 'text-brand-navy' : 'text-gray-500'}`}>{label}</p>
+                    <p className={`text-xs ${isToday ? 'text-brand-navy' : 'text-gray-400'}`}>{dayNum}</p>
+                  </div>
+                  <div className="px-1.5 py-1 space-y-0.5 min-h-[40px] max-h-[100px] overflow-y-auto">
+                    {dayTasks.length === 0 && <span className="text-[9px] text-gray-300 block text-center py-2">—</span>}
+                    {dayTasks.slice(0, 4).map((t) => {
+                      const col = getCategoryColor(t.task_category?.color)
+                      return (
+                        <button key={t.id} onClick={() => setEditingTask(t)} className={`w-full text-left text-[10px] leading-tight px-1 py-0.5 truncate ${col.pill}`} title={t.title}>
+                          {t.title}
+                        </button>
+                      )
+                    })}
+                    {dayTasks.length > 4 && <span className="text-[9px] text-gray-400 px-1">+{dayTasks.length - 4}</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Views */}
       {view === 'list' && (
-        <div className="space-y-6 mt-6">
+        <div className="space-y-6 mt-4">
           {(groups.overdue.length > 0 || nrOverdue.length > 0) && (
             <section>
               <h3 className="text-sm font-semibold mb-2 text-red-700">

@@ -115,56 +115,51 @@ export function QuickAdd({
     inputRef.current?.focus()
   }
 
+  const catColor = getCategoryColor(selectedCategory?.color)
+
   return (
     <div>
-      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 bg-white border border-gray-200 p-3 shadow-[var(--shadow-sm)]">
-        <div className="flex bg-brand-warm border border-gray-200 p-0.5 flex-shrink-0 overflow-x-auto">
-          {categories.map((cat) => {
-            const col = getCategoryColor(cat.color)
-            const isSelected = cat.id === selectedCategoryId
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCategoryId(cat.id)}
-                className={`px-2 py-1.5 text-xs font-medium transition-colors whitespace-nowrap ${
-                  isSelected ? `${col.pill}` : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {cat.name}
-              </button>
-            )
-          })}
+      <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-white border border-gray-200 p-2 shadow-[var(--shadow-sm)]">
+        <div className="relative flex items-center flex-shrink-0">
+          <span className={`absolute left-2.5 w-2.5 h-2.5 rounded-sm ${catColor.dot} pointer-events-none z-10`} />
+          <select
+            value={selectedCategoryId}
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
+            className="text-sm pl-7 pr-6 py-2 border border-gray-200 bg-white focus:border-brand-navy outline-none cursor-pointer"
+            disabled={adding}
+          >
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
         </div>
         <input
           ref={inputRef}
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={selectedCategory ? `Add ${selectedCategory.name.toLowerCase()}…` : 'Add a task…'}
-          className="flex-1 text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+          placeholder={selectedCategory ? `Add ${selectedCategory.name.toLowerCase()}…` : 'Add task…'}
+          className="flex-1 text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none min-w-0"
           disabled={adding}
         />
         <input
           type="date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
-          className="text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none w-full sm:w-auto"
+          className="text-sm px-2 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none flex-shrink-0"
           disabled={adding}
         />
         <button
           type="submit"
           disabled={adding || !title.trim()}
-          className="px-4 py-2 bg-brand-navy text-white text-sm font-medium hover:bg-brand-navy-hover disabled:opacity-50 transition-colors whitespace-nowrap"
+          className="px-4 py-2 bg-brand-navy text-white text-sm font-medium hover:bg-brand-navy-hover disabled:opacity-50 transition-colors flex-shrink-0"
         >
           {adding ? 'Adding…' : 'Add'}
         </button>
       </form>
       {parsedDate && !dueDate && (
         <div className="mt-1 text-xs text-brand-olive flex items-center gap-1.5 px-1">
-          <span>
-            Detected date: <strong>{new Date(parsedDate.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</strong>
-          </span>
+          <span>Detected: <strong>{new Date(parsedDate.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</strong></span>
           <span className="text-gray-400">· &quot;{parsedDate.cleaned}&quot;</span>
         </div>
       )}

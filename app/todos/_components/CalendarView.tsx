@@ -11,7 +11,7 @@ type CalendarViewProps = {
   today: string
   onToggle: (t: Task) => void
   onEdit: (t: Task) => void
-  onQuickAdd: (title: string, dueDate: string | null, category: 'work' | 'personal') => Promise<void>
+  onQuickAdd: (title: string, dueDate: string | null, category: 'work' | 'personal', taskCategoryId?: string) => Promise<void>
   onDateChange: (taskId: string, newDate: string) => Promise<void>
 }
 
@@ -78,6 +78,7 @@ export function CalendarView({
   const [month, setMonth] = useState(() => parseInt(today.slice(5, 7)) - 1)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [quickAddTitle, setQuickAddTitle] = useState('')
+  const [quickAddCategoryId, setQuickAddCategoryId] = useState(categories[0]?.id ?? '')
   const [adding, setAdding] = useState(false)
   const quickAddRef = useRef<HTMLInputElement>(null)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -126,11 +127,11 @@ export function CalendarView({
     e.preventDefault()
     if (!quickAddTitle.trim() || !selectedDate) return
     setAdding(true)
-    await onQuickAdd(quickAddTitle.trim(), selectedDate, 'work')
+    await onQuickAdd(quickAddTitle.trim(), selectedDate, 'work', quickAddCategoryId || undefined)
     setQuickAddTitle('')
     setAdding(false)
     quickAddRef.current?.focus()
-  }, [quickAddTitle, selectedDate, onQuickAdd])
+  }, [quickAddTitle, selectedDate, onQuickAdd, quickAddCategoryId])
 
   const handleDragStart = useCallback((taskId: string) => { setDragId(taskId) }, [])
   const handleDragOver = useCallback((e: React.DragEvent, date: string) => {
@@ -301,16 +302,29 @@ export function CalendarView({
             </div>
 
             {/* Quick add in panel */}
-            <form onSubmit={handleQuickAddSubmit} className="p-2 border-t border-gray-200">
+            <form onSubmit={handleQuickAddSubmit} className="p-2 border-t border-gray-200 space-y-1">
               <div className="flex gap-1">
+                <div className="relative flex items-center flex-shrink-0">
+                  <span className={`absolute left-1.5 w-2 h-2 rounded-sm ${getCategoryColor(categories.find(c => c.id === quickAddCategoryId)?.color).dot} pointer-events-none z-10`} />
+                  <select
+                    value={quickAddCategoryId}
+                    onChange={(e) => setQuickAddCategoryId(e.target.value)}
+                    className="text-xs pl-5 pr-4 py-1.5 border border-gray-200 bg-white focus:border-brand-navy outline-none cursor-pointer"
+                    disabled={adding}
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <input
                   ref={quickAddRef}
                   type="text"
                   value={quickAddTitle}
                   onChange={(e) => setQuickAddTitle(e.target.value)}
-                  placeholder="Add task…"
+                  placeholder={`Add ${categories.find(c => c.id === quickAddCategoryId)?.name.toLowerCase() ?? 'task'}…`}
                   disabled={adding}
-                  className="flex-1 text-xs px-2 py-1.5 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+                  className="flex-1 text-xs px-2 py-1.5 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none min-w-0"
                 />
                 <button
                   type="submit"
