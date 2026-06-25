@@ -428,14 +428,16 @@ export function TodosClient({
       setContractBusinesses((prev) =>
         prev.map((b) => (b.id === businessId ? {
           ...b,
-          renewal_stage: stage,
-          renewal_contacted_at: stage === 'contacted' ? todayStr() : b.renewal_contacted_at,
+          renewal_stage: stage === 'renewed' ? 'not_started' : stage,
+          renewal_contacted_at: stage === 'contacted' ? todayStr() : stage === 'renewed' ? null : b.renewal_contacted_at,
         } : b))
       )
       const result = await updateBusinessRenewalStage(businessId, stage)
       if (result.error) {
         toast.error(result.error)
         router.refresh()
+      } else if (stage === 'renewed') {
+        toast.success('Marked as renewed — moved back to To Contact')
       }
     },
     [router]

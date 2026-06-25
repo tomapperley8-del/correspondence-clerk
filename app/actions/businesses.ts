@@ -349,9 +349,12 @@ export async function updateBusinessRenewalStage(
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const update: Record<string, unknown> = { renewal_stage: stage }
+  const isRenewed = stage === 'renewed'
+  const update: Record<string, unknown> = { renewal_stage: isRenewed ? 'not_started' : stage }
   if (stage === 'contacted') {
     update.renewal_contacted_at = new Date().toISOString().slice(0, 10)
+  } else if (isRenewed) {
+    update.renewal_contacted_at = null
   }
 
   const { error } = await supabase
