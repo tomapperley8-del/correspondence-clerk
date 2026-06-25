@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Task, TaskCategory, RenewalStage } from '@/app/actions/tasks'
+import type { Task, TaskCategory } from '@/app/actions/tasks'
 import {
   createTask,
   updateTask,
@@ -424,9 +424,13 @@ export function TodosClient({
   )
 
   const handleStageChange = useCallback(
-    async (businessId: string, stage: RenewalStage) => {
+    async (businessId: string, stage: string) => {
       setContractBusinesses((prev) =>
-        prev.map((b) => (b.id === businessId ? { ...b, renewal_stage: stage } : b))
+        prev.map((b) => (b.id === businessId ? {
+          ...b,
+          renewal_stage: stage,
+          renewal_contacted_at: stage === 'contacted' ? todayStr() : b.renewal_contacted_at,
+        } : b))
       )
       const result = await updateBusinessRenewalStage(businessId, stage)
       if (result.error) {

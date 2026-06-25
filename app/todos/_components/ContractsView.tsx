@@ -5,21 +5,36 @@ import Link from 'next/link'
 import type { ContractBusiness } from '@/app/actions/businesses'
 import { formatDateShortGB } from '@/lib/utils'
 
-type RenewalStage = 'not_started' | 'in_progress' | 'agreed' | 'not_renewing' | 'done'
+type RenewalStage = 'not_started' | 'contacted' | 'in_discussion' | 'agreed' | 'not_renewing' | 'renewed'
 
 const STAGES: { key: RenewalStage; label: string; color: string; bg: string; borderColor: string }[] = [
-  { key: 'not_started', label: 'Not started', color: 'text-gray-700', bg: 'bg-gray-50', borderColor: 'border-gray-200' },
-  { key: 'in_progress', label: 'In progress', color: 'text-blue-700', bg: 'bg-blue-50/50', borderColor: 'border-blue-200' },
+  { key: 'not_started', label: 'To contact', color: 'text-gray-700', bg: 'bg-gray-50', borderColor: 'border-gray-200' },
+  { key: 'contacted', label: 'Contacted', color: 'text-blue-700', bg: 'bg-blue-50/50', borderColor: 'border-blue-200' },
+  { key: 'in_discussion', label: 'In discussion', color: 'text-amber-700', bg: 'bg-amber-50/50', borderColor: 'border-amber-200' },
   { key: 'agreed', label: 'Agreed', color: 'text-green-700', bg: 'bg-green-50/50', borderColor: 'border-green-200' },
   { key: 'not_renewing', label: 'Not renewing', color: 'text-red-700', bg: 'bg-red-50/30', borderColor: 'border-red-200' },
-  { key: 'done', label: 'Renewed', color: 'text-brand-olive', bg: 'bg-brand-olive/5', borderColor: 'border-brand-olive/20' },
+  { key: 'renewed', label: 'Renewed', color: 'text-brand-olive', bg: 'bg-brand-olive/5', borderColor: 'border-brand-olive/20' },
 ]
+
+function mapLegacyStage(stage: string): RenewalStage {
+  if (stage === 'in_progress') return 'contacted'
+  if (stage === 'done') return 'renewed'
+  if (STAGES.some(s => s.key === stage)) return stage as RenewalStage
+  return 'not_started'
+}
 
 function getTypeBadge(b: ContractBusiness): string {
   if (b.is_club_card && b.is_advertiser) return 'CC + Ad'
   if (b.is_club_card) return 'Club Card'
   if (b.is_advertiser) return 'Advertiser'
   return ''
+}
+
+function daysRemaining(contractEnd: string | null, today: string): number | null {
+  if (!contractEnd) return null
+  const end = new Date(contractEnd + 'T00:00:00')
+  const now = new Date(today + 'T00:00:00')
+  return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 type TypeFilter = 'all' | 'club_card' | 'advertiser'
@@ -33,7 +48,7 @@ type ContractsViewProps = {
 }
 
 export function ContractsView({ businesses, today, onStageChange, onAddBusiness, allBusinessNames }: ContractsViewProps) {
-  const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('list')
+  const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline')
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -56,12 +71,11 @@ export function ContractsView({ businesses, today, onStageChange, onAddBusiness,
 
   const byStage = useMemo(() => {
     const map: Record<RenewalStage, ContractBusiness[]> = {
-      not_started: [], in_progress: [], agreed: [], not_renewing: [], done: [],
+      not_started: [], contacted: [], in_discussion: [], agreed: [], not_renewing: [], renewed: [],
     }
     for (const b of filtered) {
-      const stage = (b.renewal_stage as RenewalStage) || 'not_started'
-      if (map[stage]) map[stage].push(b)
-      else map.not_started.push(b)
+      const stage = mapLegacyStage(b.renewal_stage || 'not_started')
+      map[stage].push(b)
     }
     return map
   }, [filtered])
@@ -115,20 +129,20 @@ export function ContractsView({ businesses, today, onStageChange, onAddBusiness,
 
         <div className="flex bg-brand-warm border border-gray-200 p-0.5 text-xs">
           <button
-            onClick={() => setViewMode('list')}
-            className={`px-2.5 py-1 font-medium transition-colors ${
-              viewMode === 'list' ? 'bg-brand-navy text-white' : 'text-gray-600 hover:text-brand-navy'
-            }`}
-          >
-            List
-          </button>
-          <button
             onClick={() => setViewMode('pipeline')}
             className={`px-2.5 py-1 font-medium transition-colors ${
               viewMode === 'pipeline' ? 'bg-brand-navy text-white' : 'text-gray-600 hover:text-brand-navy'
             }`}
           >
             Pipeline
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-2.5 py-1 font-medium transition-colors ${
+              viewMode === 'list' ? 'bg-brand-navy text-white' : 'text-gray-600 hover:text-brand-navy'
+            }`}
+          >
+            List
           </button>
         </div>
 
@@ -183,15 +197,15 @@ export function ContractsView({ businesses, today, onStageChange, onAddBusiness,
         </div>
       )}
 
-      {viewMode === 'list' ? (
-        <ListView
-          businesses={filtered}
+      {viewMode === 'pipeline' ? (
+        <PipelineView
+          byStage={byStage}
           today={today}
           onStageChange={onStageChange}
         />
       ) : (
-        <PipelineView
-          byStage={byStage}
+        <ListView
+          businesses={filtered}
           today={today}
           onStageChange={onStageChange}
         />
@@ -238,7 +252,7 @@ function PipelineView({
   }, [])
 
   return (
-    <div className="grid grid-cols-5 gap-2 min-h-[400px]">
+    <div className="grid grid-cols-6 gap-1.5 min-h-[400px]">
       {STAGES.map((stage) => {
         const items = byStage[stage.key]
         const isDragOver = dragOverStage === stage.key
@@ -250,13 +264,13 @@ function PipelineView({
             onDragLeave={() => setDragOverStage(null)}
             onDrop={(e) => handleDrop(e, stage.key)}
           >
-            <div className={`px-2.5 py-2 border-b ${stage.borderColor}`}>
+            <div className={`px-2 py-1.5 border-b ${stage.borderColor}`}>
               <span className={`text-[10px] font-bold uppercase tracking-wide ${stage.color}`}>
                 {stage.label}
               </span>
               <span className="text-[10px] text-gray-400 ml-1">({items.length})</span>
             </div>
-            <div className="p-1.5 space-y-1.5 max-h-[600px] overflow-y-auto">
+            <div className="p-1 space-y-1 max-h-[600px] overflow-y-auto">
               {items.map((b) => (
                 <BusinessCard
                   key={b.id}
@@ -291,8 +305,10 @@ function BusinessCard({
   onDragEnd: () => void
   isDragging: boolean
 }) {
-  const isExpired = business.contract_end && business.contract_end < today
+  const days = daysRemaining(business.current_contract_end, today)
+  const isExpired = days !== null && days < 0
   const badge = getTypeBadge(business)
+  const stage = mapLegacyStage(business.renewal_stage)
 
   return (
     <div
@@ -306,22 +322,30 @@ function BusinessCard({
       <div className="flex items-start justify-between gap-1 mb-1">
         <Link
           href={`/businesses/${business.id}`}
-          className="text-xs font-medium text-brand-navy hover:text-brand-olive transition-colors text-left leading-tight"
+          className="text-[11px] font-medium text-brand-navy hover:text-brand-olive transition-colors text-left leading-tight"
         >
           {business.name}
         </Link>
-        <span className="text-[9px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy flex-shrink-0">
+        <span className="text-[8px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy flex-shrink-0">
           {badge}
         </span>
       </div>
 
-      {business.contract_end && (
-        <p className={`text-[10px] ${isExpired ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
-          {isExpired ? 'Expired: ' : 'Expires: '}{formatDateShortGB(business.contract_end + 'T00:00:00')}
+      {business.current_contract_end && (
+        <p className={`text-[10px] ${isExpired ? 'text-red-600 font-semibold' : days !== null && days <= 30 ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
+          {isExpired
+            ? `Expired: ${formatDateShortGB(business.current_contract_end + 'T00:00:00')}`
+            : `Expires: ${formatDateShortGB(business.current_contract_end + 'T00:00:00')}`}
         </p>
       )}
-      {!business.contract_end && (
+      {!business.current_contract_end && (
         <p className="text-[10px] text-gray-300 italic">No contract date</p>
+      )}
+
+      {stage === 'contacted' && business.renewal_contacted_at && (
+        <p className="text-[9px] text-blue-500 mt-0.5">
+          Emailed: {formatDateShortGB(business.renewal_contacted_at + 'T00:00:00')}
+        </p>
       )}
     </div>
   )
@@ -338,17 +362,17 @@ function ListView({
 }) {
   const sorted = useMemo(() =>
     [...businesses].sort((a, b) => {
-      if (!a.contract_end && !b.contract_end) return a.name.localeCompare(b.name)
-      if (!a.contract_end) return 1
-      if (!b.contract_end) return -1
-      return a.contract_end.localeCompare(b.contract_end)
+      if (!a.current_contract_end && !b.current_contract_end) return a.name.localeCompare(b.name)
+      if (!a.current_contract_end) return 1
+      if (!b.current_contract_end) return -1
+      return a.current_contract_end.localeCompare(b.current_contract_end)
     }),
     [businesses]
   )
 
   return (
     <div className="border border-gray-200 divide-y divide-gray-100">
-      <div className="grid grid-cols-[1fr_80px_100px_100px_60px] gap-2 px-3 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+      <div className="grid grid-cols-[1fr_80px_100px_110px_60px] gap-2 px-3 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500">
         <span>Business</span>
         <span>Type</span>
         <span>Contract ends</span>
@@ -381,13 +405,14 @@ function BusinessListRow({
   today: string
   onStageChange: (businessId: string, stage: RenewalStage) => void
 }) {
-  const isExpired = business.contract_end && business.contract_end < today
+  const days = daysRemaining(business.current_contract_end, today)
+  const isExpired = days !== null && days < 0
   const badge = getTypeBadge(business)
-  const stage = (business.renewal_stage as RenewalStage) || 'not_started'
+  const stage = mapLegacyStage(business.renewal_stage)
   const stageInfo = STAGES.find(s => s.key === stage)!
 
   return (
-    <div className="grid grid-cols-[1fr_80px_100px_100px_60px] gap-2 items-center px-3 py-2.5 hover:bg-brand-warm/50 transition-colors">
+    <div className="grid grid-cols-[1fr_80px_100px_110px_60px] gap-2 items-center px-3 py-2.5 hover:bg-brand-warm/50 transition-colors">
       <Link
         href={`/businesses/${business.id}`}
         className="text-sm text-brand-navy hover:text-brand-olive transition-colors truncate font-medium"
@@ -399,8 +424,8 @@ function BusinessListRow({
         {badge}
       </span>
 
-      <span className={`text-xs whitespace-nowrap ${isExpired ? 'text-red-600 font-medium' : business.contract_end ? 'text-gray-500' : 'text-gray-300 italic'}`}>
-        {business.contract_end ? formatDateShortGB(business.contract_end + 'T00:00:00') : 'Not set'}
+      <span className={`text-xs whitespace-nowrap ${isExpired ? 'text-red-600 font-medium' : business.current_contract_end ? 'text-gray-500' : 'text-gray-300 italic'}`}>
+        {business.current_contract_end ? formatDateShortGB(business.current_contract_end + 'T00:00:00') : 'Not set'}
       </span>
 
       <select

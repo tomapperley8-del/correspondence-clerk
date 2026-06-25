@@ -279,10 +279,19 @@ export async function setContractRenewalType(
   return { success: true }
 }
 
-export type ContractBusiness = Pick<
-  Business,
-  'id' | 'name' | 'is_club_card' | 'is_advertiser' | 'contract_start' | 'contract_end' | 'contract_amount' | 'contract_currency' | 'deal_terms' | 'payment_structure'
-> & { renewal_stage: string }
+export type ContractBusiness = {
+  id: string
+  name: string
+  is_club_card: boolean
+  is_advertiser: boolean
+  renewal_stage: string
+  renewal_contacted_at: string | null
+  current_contract_end: string | null
+  current_contract_start: string | null
+  current_contract_amount: number | null
+  current_contract_currency: string | null
+  current_invoice_paid: boolean
+}
 
 export async function getContractBusinesses(): Promise<{ data?: ContractBusiness[]; error?: string }> {
   const supabase = await createClient()
@@ -294,14 +303,39 @@ export async function getContractBusinesses(): Promise<{ data?: ContractBusiness
 
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, is_club_card, is_advertiser, contract_start, contract_end, contract_amount, contract_currency, deal_terms, payment_structure, renewal_stage')
+    .select('id, name, is_club_card, is_advertiser, renewal_stage, renewal_contacted_at, contracts(contract_start, contract_end, contract_amount, contract_currency, invoice_paid, is_current)')
     .eq('organization_id', orgId)
     .or('is_club_card.eq.true,is_advertiser.eq.true')
-    .order('contract_end', { ascending: true, nullsFirst: false })
     .order('name', { ascending: true })
 
   if (error) return { error: error.message }
-  return { data: data as ContractBusiness[] }
+
+  const mapped: ContractBusiness[] = (data ?? []).map((b: Record<string, unknown>) => {
+    const contracts = (b.contracts as { contract_start: string | null; contract_end: string | null; contract_amount: number | null; contract_currency: string | null; invoice_paid: boolean; is_current: boolean }[]) || []
+    const current = contracts.find(c => c.is_current) || contracts[0] || null
+    return {
+      id: b.id as string,
+      name: b.name as string,
+      is_club_card: b.is_club_card as boolean,
+      is_advertiser: b.is_advertiser as boolean,
+      renewal_stage: (b.renewal_stage as string) || 'not_started',
+      renewal_contacted_at: b.renewal_contacted_at as string | null,
+      current_contract_end: current?.contract_end ?? null,
+      current_contract_start: current?.contract_start ?? null,
+      current_contract_amount: current?.contract_amount ?? null,
+      current_contract_currency: current?.contract_currency ?? null,
+      current_invoice_paid: current?.invoice_paid ?? false,
+    }
+  })
+
+  mapped.sort((a, b) => {
+    if (!a.current_contract_end && !b.current_contract_end) return a.name.localeCompare(b.name)
+    if (!a.current_contract_end) return 1
+    if (!b.current_contract_end) return -1
+    return a.current_contract_end.localeCompare(b.current_contract_end)
+  })
+
+  return { data: mapped }
 }
 
 export async function updateBusinessRenewalStage(
@@ -315,9 +349,14 @@ export async function updateBusinessRenewalStage(
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
+  const update: Record<string, unknown> = { renewal_stage: stage }
+  if (stage === 'contacted') {
+    update.renewal_contacted_at = new Date().toISOString().slice(0, 10)
+  }
+
   const { error } = await supabase
     .from('businesses')
-    .update({ renewal_stage: stage })
+    .update(update)
     .eq('id', businessId)
     .eq('organization_id', orgId)
 
