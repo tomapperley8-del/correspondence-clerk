@@ -15,7 +15,8 @@ import {
 } from '@/app/actions/tasks'
 import { getCategoryColor } from '@/lib/task-colors'
 import { markCorrespondenceDone, type GoneQuietItem } from '@/app/actions/correspondence'
-import { updateBusiness } from '@/app/actions/businesses'
+import { updateBusiness, updateBusinessRenewalStage, addBusinessToContracts } from '@/app/actions/businesses'
+import type { ContractBusiness } from '@/app/actions/businesses'
 import { toast } from '@/lib/toast'
 import { formatDateShortGB } from '@/lib/utils'
 import { QuickAdd } from './QuickAdd'
@@ -138,18 +139,23 @@ export function TodosClient({
   initialError,
   initialNeedsReply,
   initialGoneQuiet,
+  initialContractBusinesses,
+  allBusinessNames,
 }: {
   initialTasks: Task[]
   initialCategories: TaskCategory[]
   initialError: string | null
   initialNeedsReply: NeedsReplyItem[]
   initialGoneQuiet: GoneQuietItem[]
+  initialContractBusinesses: ContractBusiness[]
+  allBusinessNames: { id: string; name: string }[]
 }) {
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [categories] = useState<TaskCategory[]>(initialCategories)
   const [needsReply, setNeedsReply] = useState<NeedsReplyItem[]>(initialNeedsReply)
   const [goneQuiet, setGoneQuiet] = useState<GoneQuietItem[]>(initialGoneQuiet)
+  const [contractBusinesses, setContractBusinesses] = useState<ContractBusiness[]>(initialContractBusinesses)
   const [view, setView] = useState<ViewMode>('list')
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('week')
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -177,11 +183,6 @@ export function TodosClient({
     const tl = t.title.toLowerCase()
     return /^renewal[: ]/.test(tl) || /^cc (expires|offer)/.test(tl) || /^club card offer/.test(tl)
   }, [])
-
-  const contractTasks = useMemo(() =>
-    tasks.filter(isContractTask),
-    [tasks, isContractTask]
-  )
 
   const nonContractTasks = useMemo(() =>
     tasks.filter((t) => !isContractTask(t)),
@@ -423,15 +424,26 @@ export function TodosClient({
   )
 
   const handleStageChange = useCallback(
-    async (taskId: string, stage: RenewalStage) => {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, renewal_stage: stage } : t))
+    async (businessId: string, stage: RenewalStage) => {
+      setContractBusinesses((prev) =>
+        prev.map((b) => (b.id === businessId ? { ...b, renewal_stage: stage } : b))
       )
-      const updates: Parameters<typeof updateTask>[1] = { renewal_stage: stage }
-      if (stage === 'done') updates.status = 'done'
-      const result = await updateTask(taskId, updates)
+      const result = await updateBusinessRenewalStage(businessId, stage)
       if (result.error) {
         toast.error(result.error)
+        router.refresh()
+      }
+    },
+    [router]
+  )
+
+  const handleAddBusinessToContracts = useCallback(
+    async (businessId: string, type: 'club_card' | 'advertiser') => {
+      const result = await addBusinessToContracts(businessId, type)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('Business added to contracts')
         router.refresh()
       }
     },
@@ -518,7 +530,7 @@ export function TodosClient({
                   : 'text-gray-500 hover:text-brand-navy'
               }`}
             >
-              {v === 'list' ? 'List' : v === 'calendar' ? 'Calendar' : `Contracts${contractTasks.length > 0 ? ` (${contractTasks.filter(t => t.status === 'open').length})` : ''}`}
+              {v === 'list' ? 'List' : v === 'calendar' ? 'Calendar' : `CC/Advertising (${contractBusinesses.length})`}
             </button>
           ))}
           {view === 'list' && (
@@ -812,11 +824,11 @@ export function TodosClient({
 
       {view === 'contracts' && (
         <ContractsView
-          tasks={contractTasks}
+          businesses={contractBusinesses}
           today={today}
           onStageChange={handleStageChange}
-          onToggle={handleToggleStatus}
-          onEdit={setEditingTask}
+          onAddBusiness={handleAddBusinessToContracts}
+          allBusinessNames={allBusinessNames}
         />
       )}
 

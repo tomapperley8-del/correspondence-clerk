@@ -279,6 +279,80 @@ export async function setContractRenewalType(
   return { success: true }
 }
 
+export type ContractBusiness = Pick<
+  Business,
+  'id' | 'name' | 'is_club_card' | 'is_advertiser' | 'contract_start' | 'contract_end' | 'contract_amount' | 'contract_currency' | 'deal_terms' | 'payment_structure'
+> & { renewal_stage: string }
+
+export async function getContractBusinesses(): Promise<{ data?: ContractBusiness[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('id, name, is_club_card, is_advertiser, contract_start, contract_end, contract_amount, contract_currency, deal_terms, payment_structure, renewal_stage')
+    .eq('organization_id', orgId)
+    .or('is_club_card.eq.true,is_advertiser.eq.true')
+    .order('contract_end', { ascending: true, nullsFirst: false })
+    .order('name', { ascending: true })
+
+  if (error) return { error: error.message }
+  return { data: data as ContractBusiness[] }
+}
+
+export async function updateBusinessRenewalStage(
+  businessId: string,
+  stage: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update({ renewal_stage: stage })
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  return {}
+}
+
+export async function addBusinessToContracts(
+  businessId: string,
+  type: 'club_card' | 'advertiser'
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const update = type === 'club_card'
+    ? { is_club_card: true }
+    : { is_advertiser: true }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update(update)
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  revalidatePath('/dashboard')
+  return {}
+}
+
 export async function deleteBusiness(id: string) {
   const supabase = await createClient()
   const {
