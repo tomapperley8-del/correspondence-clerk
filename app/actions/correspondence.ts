@@ -1026,9 +1026,34 @@ export async function getNeedsReply() {
     return !latestNonReceived || latestNonReceived < entryDate
   })
 
+  // Filter out items that don't genuinely need a reply
+  const genuine = needsReply.filter(entry => {
+    const text = (entry.snippet_text || '').toLowerCase()
+    const subj = (entry.subject || '').toLowerCase()
+
+    // Forwarded emails are informational, not reply-worthy
+    if (subj.startsWith('fw:') || subj.startsWith('fwd:')) return false
+
+    // Very short content is likely auto-generated or signature-only
+    const words = text.split(/\s+/).filter(w => w.length > 1)
+    if (words.length < 8) return false
+
+    // Newsletter/alert/notification patterns
+    const autoPatterns = [
+      'unsubscribe', 'click here to view', 'view in browser',
+      'no-reply', 'noreply', 'do not reply', 'do-not-reply',
+      'this email was sent', 'you are receiving this',
+      'manage your preferences', 'email preferences',
+      'automated message', 'auto-generated',
+    ]
+    if (autoPatterns.some(p => text.includes(p))) return false
+
+    return true
+  })
+
   // Keep only the most recent unreplied received entry per business
   const seen = new Set<string>()
-  const deduped = needsReply.filter(entry => {
+  const deduped = genuine.filter(entry => {
     if (seen.has(entry.business_id)) return false
     seen.add(entry.business_id)
     return true
