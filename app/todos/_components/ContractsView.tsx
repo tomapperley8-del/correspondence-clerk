@@ -342,9 +342,9 @@ function BusinessCard({
         <p className="text-[10px] text-gray-300 italic">No contract date</p>
       )}
 
-      {stage === 'contacted' && business.renewal_contacted_at && (
+      {business.renewal_contacted_at && stage !== 'not_started' && (
         <p className="text-[9px] text-blue-500 mt-0.5">
-          Emailed: {formatDateShortGB(business.renewal_contacted_at + 'T00:00:00')}
+          Contacted: {formatDateShortGB(business.renewal_contacted_at + 'T00:00:00')}
         </p>
       )}
     </div>
