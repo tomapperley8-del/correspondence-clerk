@@ -1,18 +1,19 @@
 import { getTasks, getTaskCategories, migrateCrmRenewalDates } from '@/app/actions/tasks'
 import { getNeedsReply, getGoneQuiet } from '@/app/actions/correspondence'
 import type { GoneQuietItem } from '@/app/actions/correspondence'
-import { getContractBusinesses, getBusinesses } from '@/app/actions/businesses'
+import { getContractBusinesses, getBusinesses, getOutreachBusinesses } from '@/app/actions/businesses'
 import { TodosClient } from './_components/TodosClient'
 
 export default async function TodosPage() {
   await migrateCrmRenewalDates()
-  const [result, categoriesResult, needsReply, goneQuiet, contractBiz, allBiz] = await Promise.all([
+  const [result, categoriesResult, needsReply, goneQuiet, contractBiz, allBiz, outreachBiz] = await Promise.all([
     getTasks(),
     getTaskCategories(),
     getNeedsReply().catch(() => ({ data: [] })),
     getGoneQuiet().catch(() => ({ data: [] })),
     getContractBusinesses().catch(() => ({ data: [] })),
     getBusinesses().catch(() => ({ data: [] })),
+    getOutreachBusinesses().catch(() => ({ data: [] })),
   ])
 
   const allBusinessNames = (allBiz.data ?? []).map(b => ({ id: b.id, name: b.name }))
@@ -25,6 +26,7 @@ export default async function TodosPage() {
       initialNeedsReply={(needsReply as { data?: NeedsReplyItem[] }).data ?? []}
       initialGoneQuiet={(goneQuiet as { data?: GoneQuietItem[] }).data ?? []}
       initialContractBusinesses={contractBiz.data ?? []}
+      initialOutreachBusinesses={outreachBiz.data ?? []}
       allBusinessNames={allBusinessNames}
     />
   )

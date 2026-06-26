@@ -40,7 +40,7 @@ AS $$
          c.entry_date,
          c.action_needed,
          c.due_at,
-         LEFT(c.formatted_text_current, 600) AS snippet_text,
+         LEFT(COALESCE(c.formatted_text_current, c.raw_text_original), 600) AS snippet_text,
          b.name AS business_name,
          ct.name AS contact_name,
          ct.role AS contact_role

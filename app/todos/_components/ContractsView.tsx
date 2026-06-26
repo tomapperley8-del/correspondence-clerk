@@ -56,9 +56,10 @@ type ContractsViewProps = {
   onRenew: (businessId: string, contract: RenewalContractFields) => Promise<void>
   onAddBusiness: (businessId: string, type: 'club_card' | 'advertiser') => Promise<void>
   allBusinessNames: { id: string; name: string }[]
+  onMoveToOutreach?: (businessId: string) => void
 }
 
-export function ContractsView({ businesses, today, onStageChange, onRenew, onAddBusiness, allBusinessNames }: ContractsViewProps) {
+export function ContractsView({ businesses, today, onStageChange, onRenew, onAddBusiness, allBusinessNames, onMoveToOutreach }: ContractsViewProps) {
   const [renewingBusiness, setRenewingBusiness] = useState<ContractBusiness | null>(null)
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline')
   const [search, setSearch] = useState('')
@@ -229,6 +230,7 @@ export function ContractsView({ businesses, today, onStageChange, onRenew, onAdd
           byStage={byStage}
           today={today}
           onStageChange={handleStageChangeOrRenew}
+          onMoveToOutreach={onMoveToOutreach}
         />
       ) : (
         <ListView
@@ -253,10 +255,12 @@ function PipelineView({
   byStage,
   today,
   onStageChange,
+  onMoveToOutreach,
 }: {
   byStage: Record<RenewalStage, ContractBusiness[]>
   today: string
   onStageChange: (businessId: string, stage: RenewalStage) => void
+  onMoveToOutreach?: (businessId: string) => void
 }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<RenewalStage | null>(null)
@@ -315,6 +319,7 @@ function PipelineView({
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
                   isDragging={dragId === b.id}
+                  onMoveToOutreach={stage.key === 'not_renewing' ? onMoveToOutreach : undefined}
                 />
               ))}
               {items.length === 0 && (
@@ -335,12 +340,14 @@ function BusinessCard({
   onDragStart,
   onDragEnd,
   isDragging,
+  onMoveToOutreach,
 }: {
   business: ContractBusiness
   today: string
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void
   isDragging: boolean
+  onMoveToOutreach?: (businessId: string) => void
 }) {
   const days = daysRemaining(business.current_contract_end, today)
   const isExpired = days !== null && days < 0
@@ -383,6 +390,15 @@ function BusinessCard({
         <p className="text-[9px] text-blue-500 mt-0.5">
           Contacted: {formatDateShortGB(business.renewal_contacted_at + 'T00:00:00')}
         </p>
+      )}
+
+      {onMoveToOutreach && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveToOutreach(business.id) }}
+          className="text-[9px] text-brand-navy hover:text-brand-olive transition-colors mt-1 font-medium"
+        >
+          Move to outreach →
+        </button>
       )}
     </div>
   )

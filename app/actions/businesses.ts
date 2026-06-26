@@ -402,6 +402,107 @@ export async function addBusinessToContracts(
   return {}
 }
 
+export type OutreachBusiness = {
+  id: string
+  name: string
+  is_club_card: boolean
+  is_advertiser: boolean
+  outreach_stage: string
+  outreach_contacted_at: string | null
+  outreach_followed_up_at: string | null
+}
+
+export async function getOutreachBusinesses(): Promise<{ data?: OutreachBusiness[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('id, name, is_club_card, is_advertiser, outreach_stage, outreach_contacted_at, outreach_followed_up_at')
+    .eq('organization_id', orgId)
+    .not('outreach_stage', 'is', null)
+    .order('name', { ascending: true })
+
+  if (error) return { error: error.message }
+
+  return { data: (data ?? []) as OutreachBusiness[] }
+}
+
+export async function updateOutreachStage(
+  businessId: string,
+  stage: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const update: Record<string, unknown> = { outreach_stage: stage }
+  if (stage === 'contacted') {
+    update.outreach_contacted_at = new Date().toISOString().slice(0, 10)
+  } else if (stage === 'followed_up') {
+    update.outreach_followed_up_at = new Date().toISOString().slice(0, 10)
+  }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update(update)
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  return {}
+}
+
+export async function addBusinessToOutreach(
+  businessId: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update({ outreach_stage: 'identified' })
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  return {}
+}
+
+export async function removeBusinessFromOutreach(
+  businessId: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update({ outreach_stage: null, outreach_contacted_at: null, outreach_followed_up_at: null })
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  return {}
+}
+
 export async function deleteBusiness(id: string) {
   const supabase = await createClient()
   const {

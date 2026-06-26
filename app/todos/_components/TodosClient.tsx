@@ -15,8 +15,8 @@ import {
 } from '@/app/actions/tasks'
 import { getCategoryColor } from '@/lib/task-colors'
 import { markCorrespondenceDone, type GoneQuietItem } from '@/app/actions/correspondence'
-import { updateBusiness, updateBusinessRenewalStage, addBusinessToContracts } from '@/app/actions/businesses'
-import type { ContractBusiness } from '@/app/actions/businesses'
+import { updateBusiness, updateBusinessRenewalStage, addBusinessToContracts, updateOutreachStage, addBusinessToOutreach, removeBusinessFromOutreach } from '@/app/actions/businesses'
+import type { ContractBusiness, OutreachBusiness } from '@/app/actions/businesses'
 import { createContract, updateContract, getContractsByBusiness } from '@/app/actions/contracts'
 import { toast } from '@/lib/toast'
 import { formatDateShortGB } from '@/lib/utils'
@@ -25,9 +25,10 @@ import { TaskRow } from './TaskRow'
 import { TaskEditModal } from './TaskEditModal'
 import { CalendarView } from './CalendarView'
 import { ContractsView } from './ContractsView'
+import { OutreachView } from './OutreachView'
 import type { NeedsReplyItem } from '../page'
 
-type ViewMode = 'list' | 'calendar' | 'contracts'
+type ViewMode = 'list' | 'calendar' | 'contracts' | 'outreach'
 type TimeFilter = 'week' | 'all'
 
 function todayStr() {
@@ -141,6 +142,7 @@ export function TodosClient({
   initialNeedsReply,
   initialGoneQuiet,
   initialContractBusinesses,
+  initialOutreachBusinesses,
   allBusinessNames,
 }: {
   initialTasks: Task[]
@@ -149,6 +151,7 @@ export function TodosClient({
   initialNeedsReply: NeedsReplyItem[]
   initialGoneQuiet: GoneQuietItem[]
   initialContractBusinesses: ContractBusiness[]
+  initialOutreachBusinesses: OutreachBusiness[]
   allBusinessNames: { id: string; name: string }[]
 }) {
   const router = useRouter()
@@ -157,6 +160,7 @@ export function TodosClient({
   const [needsReply, setNeedsReply] = useState<NeedsReplyItem[]>(initialNeedsReply)
   const [goneQuiet, setGoneQuiet] = useState<GoneQuietItem[]>(initialGoneQuiet)
   const [contractBusinesses, setContractBusinesses] = useState<ContractBusiness[]>(initialContractBusinesses)
+  const [outreachBusinesses, setOutreachBusinesses] = useState<OutreachBusiness[]>(initialOutreachBusinesses)
   const [view, setView] = useState<ViewMode>('list')
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('week')
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -499,6 +503,64 @@ export function TodosClient({
     [router]
   )
 
+  const handleOutreachStageChange = useCallback(
+    async (businessId: string, stage: string) => {
+      setOutreachBusinesses((prev) =>
+        prev.map((b) => (b.id === businessId ? {
+          ...b,
+          outreach_stage: stage,
+          outreach_contacted_at: stage === 'contacted' ? todayStr() : b.outreach_contacted_at,
+          outreach_followed_up_at: stage === 'followed_up' ? todayStr() : b.outreach_followed_up_at,
+        } : b))
+      )
+      const result = await updateOutreachStage(businessId, stage)
+      if (result.error) {
+        toast.error(result.error)
+        router.refresh()
+      }
+    },
+    [router]
+  )
+
+  const handleAddOutreachBusiness = useCallback(
+    async (businessId: string) => {
+      const biz = allBusinessNames.find(b => b.id === businessId)
+      if (biz) {
+        setOutreachBusinesses((prev) => [...prev, {
+          id: biz.id,
+          name: biz.name,
+          is_club_card: false,
+          is_advertiser: false,
+          outreach_stage: 'identified',
+          outreach_contacted_at: null,
+          outreach_followed_up_at: null,
+        }])
+      }
+      const result = await addBusinessToOutreach(businessId)
+      if (result.error) {
+        toast.error(result.error)
+        router.refresh()
+      } else {
+        toast.success('Added to outreach pipeline')
+      }
+    },
+    [allBusinessNames, router]
+  )
+
+  const handleRemoveOutreachBusiness = useCallback(
+    async (businessId: string) => {
+      setOutreachBusinesses((prev) => prev.filter((b) => b.id !== businessId))
+      const result = await removeBusinessFromOutreach(businessId)
+      if (result.error) {
+        toast.error(result.error)
+        router.refresh()
+      } else {
+        toast.success('Removed from outreach')
+      }
+    },
+    [router]
+  )
+
   // Keyboard shortcuts: D=done, S=snooze 7d, ↑↓=navigate
   const [selectedIdx, setSelectedIdx] = useState(-1)
   const flatTasks = useMemo(() => {
@@ -569,7 +631,7 @@ export function TodosClient({
       {/* Tabs + category filter — single line */}
       <div className="flex items-center justify-between mt-4 border-b border-gray-200 pb-3">
         <div className="flex items-center gap-1">
-          {(['list', 'calendar', 'contracts'] as const).map((v) => (
+          {(['list', 'calendar', 'contracts', 'outreach'] as const).map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
@@ -579,7 +641,7 @@ export function TodosClient({
                   : 'text-gray-500 hover:text-brand-navy'
               }`}
             >
-              {v === 'list' ? 'List' : v === 'calendar' ? 'Calendar' : `CC/Advertising (${contractBusinesses.length})`}
+              {v === 'list' ? 'List' : v === 'calendar' ? 'Calendar' : v === 'contracts' ? `CC/Advertising (${contractBusinesses.length})` : `Outreach (${outreachBusinesses.length})`}
             </button>
           ))}
           {view === 'list' && (
@@ -878,6 +940,19 @@ export function TodosClient({
           onStageChange={handleStageChange}
           onRenew={handleRenew}
           onAddBusiness={handleAddBusinessToContracts}
+          allBusinessNames={allBusinessNames}
+          onMoveToOutreach={(businessId) => {
+            handleAddOutreachBusiness(businessId)
+          }}
+        />
+      )}
+
+      {view === 'outreach' && (
+        <OutreachView
+          businesses={outreachBusinesses}
+          onStageChange={handleOutreachStageChange}
+          onAddBusiness={handleAddOutreachBusiness}
+          onRemoveBusiness={handleRemoveOutreachBusiness}
           allBusinessNames={allBusinessNames}
         />
       )}
