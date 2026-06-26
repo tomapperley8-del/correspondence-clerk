@@ -11,7 +11,7 @@ type CalendarViewProps = {
   today: string
   onToggle: (t: Task) => void
   onEdit: (t: Task) => void
-  onQuickAdd: (title: string, dueDate: string | null, category: 'work' | 'personal', taskCategoryId?: string) => Promise<void>
+  onQuickAdd: (title: string, dueDate: string | null, category: 'work' | 'personal', taskCategoryId?: string, dueTime?: string | null) => Promise<void>
   onDateChange: (taskId: string, newDate: string) => Promise<void>
 }
 
@@ -78,6 +78,7 @@ export function CalendarView({
   const [month, setMonth] = useState(() => parseInt(today.slice(5, 7)) - 1)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [quickAddTitle, setQuickAddTitle] = useState('')
+  const [quickAddTime, setQuickAddTime] = useState('')
   const [quickAddCategoryId, setQuickAddCategoryId] = useState(categories[0]?.id ?? '')
   const [adding, setAdding] = useState(false)
   const quickAddRef = useRef<HTMLInputElement>(null)
@@ -127,11 +128,12 @@ export function CalendarView({
     e.preventDefault()
     if (!quickAddTitle.trim() || !selectedDate) return
     setAdding(true)
-    await onQuickAdd(quickAddTitle.trim(), selectedDate, 'work', quickAddCategoryId || undefined)
+    await onQuickAdd(quickAddTitle.trim(), selectedDate, 'work', quickAddCategoryId || undefined, quickAddTime || null)
     setQuickAddTitle('')
+    setQuickAddTime('')
     setAdding(false)
     quickAddRef.current?.focus()
-  }, [quickAddTitle, selectedDate, onQuickAdd, quickAddCategoryId])
+  }, [quickAddTitle, selectedDate, onQuickAdd, quickAddCategoryId, quickAddTime])
 
   const handleDragStart = useCallback((taskId: string) => { setDragId(taskId) }, [])
   const handleDragOver = useCallback((e: React.DragEvent, date: string) => {
@@ -277,6 +279,7 @@ export function CalendarView({
                             onClick={() => onEdit(t)}
                             className={`text-xs text-left block w-full ${t.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800'}`}
                           >
+                            {t.due_time && <span className="text-brand-navy font-medium">{t.due_time} </span>}
                             {t.title}
                           </button>
                           <div className="flex items-center gap-1.5 mt-0.5">
@@ -325,6 +328,13 @@ export function CalendarView({
                   placeholder={`Add ${categories.find(c => c.id === quickAddCategoryId)?.name.toLowerCase() ?? 'task'}…`}
                   disabled={adding}
                   className="flex-1 text-xs px-2 py-1.5 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none min-w-0"
+                />
+                <input
+                  type="time"
+                  value={quickAddTime}
+                  onChange={(e) => setQuickAddTime(e.target.value)}
+                  className="text-xs px-1.5 py-1.5 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none w-[75px] flex-shrink-0"
+                  disabled={adding}
                 />
                 <button
                   type="submit"

@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import type { ContractBusiness } from '@/app/actions/businesses'
 import { formatDateShortGB } from '@/lib/utils'
+import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 
 type RenewalStage = 'not_started' | 'contacted' | 'in_discussion' | 'agreed' | 'not_renewing' | 'renewed'
 
@@ -39,15 +40,25 @@ function daysRemaining(contractEnd: string | null, today: string): number | null
 
 type TypeFilter = 'all' | 'club_card' | 'advertiser'
 
+type RenewalContractFields = {
+  contract_start: string
+  contract_end: string
+  contract_amount: number | null
+  contract_currency: string
+  billing_frequency: 'monthly' | 'annual'
+}
+
 type ContractsViewProps = {
   businesses: ContractBusiness[]
   today: string
   onStageChange: (businessId: string, stage: RenewalStage) => void
+  onRenew: (businessId: string, contract: RenewalContractFields) => Promise<void>
   onAddBusiness: (businessId: string, type: 'club_card' | 'advertiser') => Promise<void>
   allBusinessNames: { id: string; name: string }[]
 }
 
-export function ContractsView({ businesses, today, onStageChange, onAddBusiness, allBusinessNames }: ContractsViewProps) {
+export function ContractsView({ businesses, today, onStageChange, onRenew, onAddBusiness, allBusinessNames }: ContractsViewProps) {
+  const [renewingBusiness, setRenewingBusiness] = useState<ContractBusiness | null>(null)
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline')
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
@@ -95,6 +106,21 @@ export function ContractsView({ businesses, today, onStageChange, onAddBusiness,
     setAdding(false)
     setShowAddForm(false)
   }, [onAddBusiness, addType])
+
+  const handleStageChangeOrRenew = useCallback((businessId: string, stage: RenewalStage) => {
+    if (stage === 'renewed') {
+      const biz = businesses.find(b => b.id === businessId)
+      if (biz) setRenewingBusiness(biz)
+      return
+    }
+    onStageChange(businessId, stage)
+  }, [businesses, onStageChange])
+
+  const handleRenewSubmit = useCallback(async (fields: RenewalContractFields) => {
+    if (!renewingBusiness) return
+    await onRenew(renewingBusiness.id, fields)
+    setRenewingBusiness(null)
+  }, [renewingBusiness, onRenew])
 
   const ccCount = businesses.filter(b => b.is_club_card).length
   const adCount = businesses.filter(b => b.is_advertiser).length
@@ -201,13 +227,21 @@ export function ContractsView({ businesses, today, onStageChange, onAddBusiness,
         <PipelineView
           byStage={byStage}
           today={today}
-          onStageChange={onStageChange}
+          onStageChange={handleStageChangeOrRenew}
         />
       ) : (
         <ListView
           businesses={filtered}
           today={today}
-          onStageChange={onStageChange}
+          onStageChange={handleStageChangeOrRenew}
+        />
+      )}
+
+      {renewingBusiness && (
+        <RenewalContractModal
+          business={renewingBusiness}
+          onSubmit={handleRenewSubmit}
+          onClose={() => setRenewingBusiness(null)}
         />
       )}
     </div>
@@ -252,7 +286,8 @@ function PipelineView({
   }, [])
 
   return (
-    <div className="grid grid-cols-6 gap-1.5 min-h-[400px]">
+    <div className="overflow-x-auto pb-2">
+    <div className="grid gap-2 min-h-[400px]" style={{ gridTemplateColumns: 'repeat(6, minmax(150px, 1fr))' }}>
       {STAGES.map((stage) => {
         const items = byStage[stage.key]
         const isDragOver = dragOverStage === stage.key
@@ -288,6 +323,7 @@ function PipelineView({
           </div>
         )
       })}
+    </div>
     </div>
   )
 }
@@ -444,6 +480,152 @@ function BusinessListRow({
       >
         View →
       </Link>
+    </div>
+  )
+}
+
+function RenewalContractModal({
+  business,
+  onSubmit,
+  onClose,
+}: {
+  business: ContractBusiness
+  onSubmit: (fields: RenewalContractFields) => Promise<void>
+  onClose: () => void
+}) {
+  const modalRef = useModalKeyboard(true, onClose)
+  const [contractStart, setContractStart] = useState('')
+  const [contractEnd, setContractEnd] = useState('')
+  const [amount, setAmount] = useState(business.current_contract_amount?.toString() ?? '')
+  const [currency, setCurrency] = useState(business.current_contract_currency ?? 'GBP')
+  const [frequency, setFrequency] = useState<'monthly' | 'annual'>('annual')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!contractStart || !contractEnd) {
+      setError('Start and end dates are required')
+      return
+    }
+    if (contractEnd <= contractStart) {
+      setError('End date must be after start date')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    await onSubmit({
+      contract_start: contractStart,
+      contract_end: contractEnd,
+      contract_amount: amount ? parseFloat(amount) : null,
+      contract_currency: currency,
+      billing_frequency: frequency,
+    })
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-label="New contract details"
+        className="bg-white border border-gray-200 w-full max-w-md p-6 shadow-[var(--shadow-lg)]"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Renew — {business.name}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1" aria-label="Close">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <p className="text-sm text-gray-500 mb-4">Enter the new contract details before marking as renewed.</p>
+
+        {error && (
+          <div className="border border-red-300 bg-red-50 px-4 py-3 mb-4 text-sm text-red-800">{error}</div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="renew-start" className="block text-sm font-medium text-gray-700 mb-1">Contract start</label>
+              <input
+                id="renew-start"
+                type="date"
+                value={contractStart}
+                onChange={(e) => setContractStart(e.target.value)}
+                className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label htmlFor="renew-end" className="block text-sm font-medium text-gray-700 mb-1">Contract end</label>
+              <input
+                id="renew-end"
+                type="date"
+                value={contractEnd}
+                onChange={(e) => setContractEnd(e.target.value)}
+                className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="renew-amount" className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+              <input
+                id="renew-amount"
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+              />
+            </div>
+            <div>
+              <label htmlFor="renew-currency" className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+              <select
+                id="renew-currency"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+              >
+                <option value="GBP">GBP</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="renew-frequency" className="block text-sm font-medium text-gray-700 mb-1">Billing</label>
+              <select
+                id="renew-frequency"
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value as 'monthly' | 'annual')}
+                className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+              >
+                <option value="annual">Annual</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+            <button type="button" onClick={onClose} className="text-sm px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="text-sm px-4 py-2 bg-brand-olive text-white font-medium hover:bg-brand-olive/90 disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Saving…' : 'Mark as renewed'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

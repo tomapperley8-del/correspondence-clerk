@@ -31,6 +31,7 @@ export type Task = {
   title: string
   notes: string | null
   due_date: string | null
+  due_time: string | null
   status: 'open' | 'done'
   is_priority: boolean
   category: 'work' | 'personal'
@@ -69,6 +70,7 @@ export async function getTasks(): Promise<{ data?: Task[]; error?: string }> {
 export async function createTask(input: {
   title: string
   due_date?: string | null
+  due_time?: string | null
   category?: 'work' | 'personal'
   notes?: string | null
   type?: TaskType
@@ -86,6 +88,7 @@ export async function createTask(input: {
     .insert({
       title: input.title.trim(),
       due_date: input.due_date || null,
+      due_time: input.due_time || null,
       category: input.category || 'work',
       notes: input.notes || null,
       type: input.type || 'task',
@@ -109,6 +112,7 @@ export async function updateTask(
   updates: {
     title?: string
     due_date?: string | null
+    due_time?: string | null
     status?: 'open' | 'done'
     is_priority?: boolean
     category?: 'work' | 'personal'
@@ -128,6 +132,7 @@ export async function updateTask(
   const updateData: Record<string, unknown> = {}
   if (updates.title !== undefined) updateData.title = updates.title.trim()
   if (updates.due_date !== undefined) updateData.due_date = updates.due_date
+  if (updates.due_time !== undefined) updateData.due_time = updates.due_time
   if (updates.status !== undefined) updateData.status = updates.status
   if (updates.is_priority !== undefined) updateData.is_priority = updates.is_priority
   if (updates.category !== undefined) updateData.category = updates.category

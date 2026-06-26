@@ -35,6 +35,7 @@ export type NeedsReplyItem = {
   business_id: string
   subject: string | null
   entry_date: string | null
+  formatted_text_current: string | null
   businesses: { id: string; name: string }
   contact: { name: string; role: string | null } | null
 }

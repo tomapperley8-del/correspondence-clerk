@@ -85,6 +85,7 @@ export function TaskRow({
               ? 'text-red-600 font-medium'
               : 'text-gray-400'
           }`}>
+            {task.due_time && <span className="font-medium">{task.due_time} </span>}
             {formatDateShortGB(task.due_date + 'T00:00:00')}
           </span>
         )}

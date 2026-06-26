@@ -87,12 +87,13 @@ export function QuickAdd({
   categories,
   defaultDate,
 }: {
-  onAdd: (title: string, dueDate: string | null, category: 'work' | 'personal', taskCategoryId?: string) => Promise<void>
+  onAdd: (title: string, dueDate: string | null, category: 'work' | 'personal', taskCategoryId?: string, dueTime?: string | null) => Promise<void>
   categories: TaskCategory[]
   defaultDate?: string | null
 }) {
   const [title, setTitle] = useState('')
   const [dueDate, setDueDate] = useState(defaultDate ?? '')
+  const [dueTime, setDueTime] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id ?? '')
   const [adding, setAdding] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -108,9 +109,10 @@ export function QuickAdd({
     setAdding(true)
     const finalTitle = parsedDate && !dueDate ? parsedDate.cleaned : title.trim()
     const finalDate = dueDate || parsedDate?.date || null
-    await onAdd(finalTitle, finalDate, 'work', selectedCategoryId || undefined)
+    await onAdd(finalTitle, finalDate, 'work', selectedCategoryId || undefined, dueTime || null)
     setTitle('')
     setDueDate(defaultDate ?? '')
+    setDueTime('')
     setAdding(false)
     inputRef.current?.focus()
   }
@@ -147,6 +149,13 @@ export function QuickAdd({
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
           className="text-sm px-2 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none flex-shrink-0"
+          disabled={adding}
+        />
+        <input
+          type="time"
+          value={dueTime}
+          onChange={(e) => setDueTime(e.target.value)}
+          className="text-sm px-2 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none flex-shrink-0 w-[100px]"
           disabled={adding}
         />
         <button

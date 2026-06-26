@@ -17,6 +17,7 @@ import { getCategoryColor } from '@/lib/task-colors'
 import { markCorrespondenceDone, type GoneQuietItem } from '@/app/actions/correspondence'
 import { updateBusiness, updateBusinessRenewalStage, addBusinessToContracts } from '@/app/actions/businesses'
 import type { ContractBusiness } from '@/app/actions/businesses'
+import { createContract, updateContract, getContractsByBusiness } from '@/app/actions/contracts'
 import { toast } from '@/lib/toast'
 import { formatDateShortGB } from '@/lib/utils'
 import { QuickAdd } from './QuickAdd'
@@ -257,8 +258,8 @@ export function TodosClient({
   }, [tasks, today, weekEnd, priorityCatNames, activeCategoryIds])
 
   const handleCreate = useCallback(
-    async (title: string, due_date: string | null, category: 'work' | 'personal', task_category_id?: string) => {
-      const result = await createTask({ title, due_date, category, task_category_id: task_category_id || null })
+    async (title: string, due_date: string | null, category: 'work' | 'personal', task_category_id?: string, due_time?: string | null) => {
+      const result = await createTask({ title, due_date, due_time: due_time || null, category, task_category_id: task_category_id || null })
       if (result.error) {
         toast.error(result.error)
         return
@@ -441,6 +442,47 @@ export function TodosClient({
       }
     },
     [router]
+  )
+
+  const handleRenew = useCallback(
+    async (businessId: string, contract: { contract_start: string; contract_end: string; contract_amount: number | null; contract_currency: string; billing_frequency: 'monthly' | 'annual' }) => {
+      const existingResult = await getContractsByBusiness(businessId)
+      if (existingResult.data) {
+        const current = existingResult.data.find(c => c.is_current)
+        if (current) {
+          await updateContract(current.id, businessId, { is_current: false })
+        }
+      }
+
+      const createResult = await createContract(businessId, {
+        contract_start: contract.contract_start,
+        contract_end: contract.contract_end,
+        contract_amount: contract.contract_amount,
+        contract_currency: contract.contract_currency,
+        billing_frequency: contract.billing_frequency,
+        is_current: true,
+      })
+
+      if (createResult.error) {
+        toast.error(createResult.error)
+        return
+      }
+
+      setContractBusinesses((prev) =>
+        prev.map((b) => (b.id === businessId ? {
+          ...b,
+          renewal_stage: 'not_started',
+          renewal_contacted_at: null,
+          current_contract_start: contract.contract_start,
+          current_contract_end: contract.contract_end,
+          current_contract_amount: contract.contract_amount,
+          current_contract_currency: contract.contract_currency,
+        } : b))
+      )
+      await updateBusinessRenewalStage(businessId, 'renewed')
+      toast.success('Contract renewed — moved back to To Contact')
+    },
+    []
   )
 
   const handleAddBusinessToContracts = useCallback(
@@ -833,6 +875,7 @@ export function TodosClient({
           businesses={contractBusinesses}
           today={today}
           onStageChange={handleStageChange}
+          onRenew={handleRenew}
           onAddBusiness={handleAddBusinessToContracts}
           allBusinessNames={allBusinessNames}
         />
@@ -866,59 +909,80 @@ function NeedsReplyRow({
   onCreateTodo: (item: NeedsReplyItem) => void
   onMute: (businessId: string) => void
 }) {
+  const [expanded, setExpanded] = useState(false)
+
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 bg-red-50/40">
-      <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 flex-shrink-0">
-        Reply
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/businesses/${item.business_id}`}
-            className="text-sm font-medium text-brand-navy hover:text-brand-olive transition-colors truncate"
-          >
-            {item.businesses.name}
-          </Link>
-          {item.contact && (
-            <span className="text-xs text-gray-500 truncate">
-              {item.contact.name}{item.contact.role ? ` · ${item.contact.role}` : ''}
-            </span>
+    <div className="bg-red-50/40">
+      <div
+        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-red-50/70 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 flex-shrink-0">
+          Reply
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/businesses/${item.business_id}`}
+              className="text-sm font-medium text-brand-navy hover:text-brand-olive transition-colors truncate"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {item.businesses.name}
+            </Link>
+            {item.contact && (
+              <span className="text-xs text-gray-500 truncate">
+                {item.contact.name}{item.contact.role ? ` · ${item.contact.role}` : ''}
+              </span>
+            )}
+          </div>
+          {item.subject && (
+            <p className="text-xs text-gray-500 truncate mt-0.5">{item.subject}</p>
           )}
         </div>
-        {item.subject && (
-          <p className="text-xs text-gray-500 truncate mt-0.5">{item.subject}</p>
+        {item.entry_date && (
+          <span className="text-xs text-gray-400 flex-shrink-0">
+            {formatDateShortGB(item.entry_date + 'T00:00:00')}
+          </span>
         )}
-      </div>
-      {item.entry_date && (
-        <span className="text-xs text-gray-400 flex-shrink-0">
-          {formatDateShortGB(item.entry_date + 'T00:00:00')}
-        </span>
-      )}
-      {todoCreated ? (
-        <span className="text-xs px-2 py-1 bg-brand-olive/10 text-brand-olive font-medium flex-shrink-0">
-          Task created
-        </span>
-      ) : (
+        <span className="text-[10px] text-gray-400 flex-shrink-0">{expanded ? '▲' : '▼'}</span>
+        {todoCreated ? (
+          <span className="text-xs px-2 py-1 bg-brand-olive/10 text-brand-olive font-medium flex-shrink-0">
+            Task created
+          </span>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); onCreateTodo(item) }}
+            className="text-xs px-2 py-1 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors flex-shrink-0"
+          >
+            Create task
+          </button>
+        )}
         <button
-          onClick={() => onCreateTodo(item)}
-          className="text-xs px-2 py-1 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors flex-shrink-0"
+          onClick={(e) => { e.stopPropagation(); onMute(item.business_id) }}
+          className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+          title="Mute this business — never show in awaiting reply"
         >
-          Create task
+          Mute
         </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDismiss(item.id) }}
+          className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+        >
+          Done
+        </button>
+      </div>
+      {expanded && item.formatted_text_current && (
+        <div className="px-4 pb-3 pt-1 border-t border-red-100/50 ml-10">
+          <div className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed bg-white border border-gray-100 p-3 max-h-[300px] overflow-y-auto">
+            {item.formatted_text_current}
+          </div>
+        </div>
       )}
-      <button
-        onClick={() => onMute(item.business_id)}
-        className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
-        title="Mute this business — never show in awaiting reply"
-      >
-        Mute
-      </button>
-      <button
-        onClick={() => onDismiss(item.id)}
-        className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
-      >
-        Done
-      </button>
+      {expanded && !item.formatted_text_current && (
+        <div className="px-4 pb-3 pt-1 border-t border-red-100/50 ml-10">
+          <p className="text-xs text-gray-400 italic">No email content available</p>
+        </div>
+      )}
     </div>
   )
 }

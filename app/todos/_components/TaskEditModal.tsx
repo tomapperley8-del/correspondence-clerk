@@ -21,6 +21,7 @@ export function TaskEditModal({
   onUpdate: (id: string, updates: {
     title?: string
     due_date?: string | null
+    due_time?: string | null
     status?: 'open' | 'done'
     category?: 'work' | 'personal'
     notes?: string | null
@@ -32,6 +33,7 @@ export function TaskEditModal({
 }) {
   const [title, setTitle] = useState(task.title)
   const [dueDate, setDueDate] = useState(task.due_date ?? '')
+  const [dueTime, setDueTime] = useState(task.due_time ?? '')
   const [category, setCategory] = useState(task.category)
   const [selectedCategoryId, setSelectedCategoryId] = useState(task.task_category_id ?? categories[0]?.id ?? '')
   const [notes, setNotes] = useState(task.notes ?? '')
@@ -55,6 +57,7 @@ export function TaskEditModal({
     await onUpdate(task.id, {
       title: title.trim(),
       due_date: dueDate || null,
+      due_time: dueTime || null,
       category,
       task_category_id: selectedCategoryId || null,
       notes: notes.trim() || null,
@@ -151,7 +154,7 @@ export function TaskEditModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label htmlFor="task-date" className="block text-sm font-medium text-gray-700 mb-1">
                 Due date
@@ -161,6 +164,18 @@ export function TaskEditModal({
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
+                className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+              />
+            </div>
+            <div>
+              <label htmlFor="task-time" className="block text-sm font-medium text-gray-700 mb-1">
+                Time
+              </label>
+              <input
+                id="task-time"
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
                 className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
               />
             </div>
