@@ -46,6 +46,7 @@ type RenewalContractFields = {
   contract_amount: number | null
   contract_currency: string
   billing_frequency: 'monthly' | 'annual'
+  membership_type: string
 }
 
 type ContractsViewProps = {
@@ -494,6 +495,8 @@ function RenewalContractModal({
   onClose: () => void
 }) {
   const modalRef = useModalKeyboard(true, onClose)
+  const defaultType = business.is_club_card ? 'club_card' : 'advertiser'
+  const [membershipType, setMembershipType] = useState(defaultType)
   const [contractStart, setContractStart] = useState('')
   const [contractEnd, setContractEnd] = useState('')
   const [amount, setAmount] = useState(business.current_contract_amount?.toString() ?? '')
@@ -501,6 +504,8 @@ function RenewalContractModal({
   const [frequency, setFrequency] = useState<'monthly' | 'annual'>('annual')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const isBoth = business.is_club_card && business.is_advertiser
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -520,6 +525,7 @@ function RenewalContractModal({
       contract_amount: amount ? parseFloat(amount) : null,
       contract_currency: currency,
       billing_frequency: frequency,
+      membership_type: membershipType,
     })
     setSaving(false)
   }
@@ -548,6 +554,25 @@ function RenewalContractModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isBoth ? (
+            <div>
+              <label htmlFor="renew-type" className="block text-sm font-medium text-gray-700 mb-1">Contract type</label>
+              <select
+                id="renew-type"
+                value={membershipType}
+                onChange={(e) => setMembershipType(e.target.value)}
+                className="w-full text-sm px-3 py-2 border border-gray-200 bg-brand-paper focus:border-brand-navy outline-none"
+              >
+                <option value="club_card">Club Card</option>
+                <option value="advertiser">Advertiser</option>
+              </select>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400">
+              {business.is_club_card ? 'Club Card' : 'Advertiser'} contract
+            </p>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="renew-start" className="block text-sm font-medium text-gray-700 mb-1">Contract start</label>

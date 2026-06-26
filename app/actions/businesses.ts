@@ -312,7 +312,14 @@ export async function getContractBusinesses(): Promise<{ data?: ContractBusiness
 
   const mapped: ContractBusiness[] = (data ?? []).map((b: Record<string, unknown>) => {
     const contracts = (b.contracts as { contract_start: string | null; contract_end: string | null; contract_amount: number | null; contract_currency: string | null; invoice_paid: boolean; is_current: boolean }[]) || []
-    const current = contracts.find(c => c.is_current) || contracts[0] || null
+    const currentContracts = contracts.filter(c => c.is_current)
+    const current = currentContracts.length > 0
+      ? currentContracts.reduce((earliest, c) => {
+          if (!earliest.contract_end) return c
+          if (!c.contract_end) return earliest
+          return c.contract_end < earliest.contract_end ? c : earliest
+        })
+      : contracts[0] || null
     return {
       id: b.id as string,
       name: b.name as string,

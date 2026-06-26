@@ -404,7 +404,7 @@ export function TodosClient({
       if (result.data) {
         setTasks((prev) => [result.data!, ...prev])
         setCreatedTodoIds((prev) => new Set([...prev, item.id]))
-        toast.success('Task created')
+        setEditingTask(result.data)
       }
     },
     []
@@ -445,12 +445,12 @@ export function TodosClient({
   )
 
   const handleRenew = useCallback(
-    async (businessId: string, contract: { contract_start: string; contract_end: string; contract_amount: number | null; contract_currency: string; billing_frequency: 'monthly' | 'annual' }) => {
+    async (businessId: string, contract: { contract_start: string; contract_end: string; contract_amount: number | null; contract_currency: string; billing_frequency: 'monthly' | 'annual'; membership_type: string }) => {
       const existingResult = await getContractsByBusiness(businessId)
       if (existingResult.data) {
-        const current = existingResult.data.find(c => c.is_current)
-        if (current) {
-          await updateContract(current.id, businessId, { is_current: false })
+        const sametype = existingResult.data.filter(c => c.is_current && c.membership_type === contract.membership_type)
+        for (const old of sametype) {
+          await updateContract(old.id, businessId, { is_current: false })
         }
       }
 
@@ -460,6 +460,7 @@ export function TodosClient({
         contract_amount: contract.contract_amount,
         contract_currency: contract.contract_currency,
         billing_frequency: contract.billing_frequency,
+        membership_type: contract.membership_type,
         is_current: true,
       })
 

@@ -78,7 +78,17 @@ export async function createContract(businessId: string, fields: {
     .single()
 
   if (error) return { error: error.message }
+
+  if (fields.is_current !== false) {
+    await supabase
+      .from('businesses')
+      .update({ renewal_stage: 'not_started', renewal_contacted_at: null })
+      .eq('id', businessId)
+      .eq('organization_id', orgId)
+  }
+
   revalidatePath(`/businesses/${businessId}`)
+  revalidatePath('/todos')
   return { data: data as Contract }
 }
 
