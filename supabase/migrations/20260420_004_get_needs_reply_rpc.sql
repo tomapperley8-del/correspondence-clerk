@@ -50,6 +50,7 @@ AS $$
   WHERE c.organization_id = p_org_id
     AND c.entry_date >= (NOW() - INTERVAL '365 days')
     AND c.reply_dismissed_at IS NULL
+    AND (b.mute_replies IS NULL OR b.mute_replies = false)
   ORDER BY c.entry_date DESC
   LIMIT 500;
 $$;
