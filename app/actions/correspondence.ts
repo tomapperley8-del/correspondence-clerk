@@ -1042,7 +1042,7 @@ export async function getNeedsReply() {
     subject: e.subject,
     type: e.type,
     direction: e.direction,
-    entry_date: e.entry_date,
+    entry_date: e.entry_date ? e.entry_date.slice(0, 10) : null,
     action_needed: e.action_needed,
     due_at: e.due_at,
     formatted_text_current: e.snippet_text,
