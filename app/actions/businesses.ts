@@ -482,6 +482,46 @@ export async function addBusinessToOutreach(
   return {}
 }
 
+export async function promoteOutreachToContracts(
+  businessId: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { data: biz } = await supabase
+    .from('businesses')
+    .select('is_club_card, is_advertiser')
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+    .single()
+
+  const update: Record<string, unknown> = {
+    outreach_stage: null,
+    outreach_contacted_at: null,
+    outreach_followed_up_at: null,
+    renewal_stage: 'not_started',
+  }
+
+  if (!biz?.is_club_card && !biz?.is_advertiser) {
+    update.is_club_card = true
+  }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update(update)
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  revalidatePath('/dashboard')
+  return {}
+}
+
 export async function removeBusinessFromOutreach(
   businessId: string
 ): Promise<{ error?: string }> {

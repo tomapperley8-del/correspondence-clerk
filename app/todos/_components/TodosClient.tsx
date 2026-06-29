@@ -15,7 +15,7 @@ import {
 } from '@/app/actions/tasks'
 import { getCategoryColor } from '@/lib/task-colors'
 import { markCorrespondenceDone, type GoneQuietItem } from '@/app/actions/correspondence'
-import { updateBusiness, updateBusinessRenewalStage, addBusinessToContracts, updateOutreachStage, addBusinessToOutreach, removeBusinessFromOutreach } from '@/app/actions/businesses'
+import { updateBusiness, updateBusinessRenewalStage, addBusinessToContracts, updateOutreachStage, addBusinessToOutreach, removeBusinessFromOutreach, promoteOutreachToContracts } from '@/app/actions/businesses'
 import type { ContractBusiness, OutreachBusiness } from '@/app/actions/businesses'
 import { createContract, updateContract, getContractsByBusiness } from '@/app/actions/contracts'
 import { toast } from '@/lib/toast'
@@ -505,6 +505,34 @@ export function TodosClient({
 
   const handleOutreachStageChange = useCallback(
     async (businessId: string, stage: string) => {
+      if (stage === 'won') {
+        const biz = outreachBusinesses.find(b => b.id === businessId)
+        setOutreachBusinesses((prev) => prev.filter((b) => b.id !== businessId))
+        if (biz) {
+          const isCC = biz.is_club_card || (!biz.is_club_card && !biz.is_advertiser)
+          setContractBusinesses((prev) => [...prev, {
+            id: biz.id,
+            name: biz.name,
+            is_club_card: isCC,
+            is_advertiser: biz.is_advertiser,
+            renewal_stage: 'not_started',
+            renewal_contacted_at: null,
+            current_contract_end: null,
+            current_contract_start: null,
+            current_contract_amount: null,
+            current_contract_currency: null,
+            current_invoice_paid: false,
+          }])
+        }
+        const result = await promoteOutreachToContracts(businessId)
+        if (result.error) {
+          toast.error(result.error)
+          router.refresh()
+        } else {
+          toast.success('Won! Moved to CC/Advertising pipeline')
+        }
+        return
+      }
       setOutreachBusinesses((prev) =>
         prev.map((b) => (b.id === businessId ? {
           ...b,
@@ -519,7 +547,7 @@ export function TodosClient({
         router.refresh()
       }
     },
-    [router]
+    [router, outreachBusinesses]
   )
 
   const handleAddOutreachBusiness = useCallback(
