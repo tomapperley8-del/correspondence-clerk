@@ -43,7 +43,7 @@ export default function ImportClient() {
           href="/dashboard"
           className="text-brand-navy hover:text-brand-dark hover:underline text-sm mb-2 inline-block"
         >
-          &larr; Back to Dashboard
+          &larr; Back to Businesses
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">
           Mastersheet Import

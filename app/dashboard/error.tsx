@@ -13,7 +13,7 @@ export default function DashboardError({
         Something went wrong
       </h2>
       <p className="text-gray-600 mb-6">
-        The dashboard couldn&apos;t load. Your data is safe — this is a temporary issue.
+        This page couldn&apos;t load. Your data is safe — this is a temporary issue.
       </p>
       {error.digest && (
         <p className="text-xs text-gray-400 mb-6 font-mono">{error.digest}</p>

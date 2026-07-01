@@ -95,7 +95,7 @@ export default function ImportGoogleDocsClient() {
         href="/dashboard"
         className="text-brand-navy hover:text-brand-dark hover:underline text-sm mb-4 inline-block"
       >
-        &larr; Back to Dashboard
+        &larr; Back to Businesses
       </Link>
 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">

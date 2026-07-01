@@ -201,7 +201,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold">Businesses</h1>
         <div className="flex items-center gap-3">
           <Link href="/import" className="text-sm text-brand-navy hover:underline">
             Bulk import
@@ -358,7 +358,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
         </div>
       ) : (
         <>
-          {/* Dashboard Tab Toggle */}
+          {/* Businesses Tab Toggle */}
           <div className="flex items-center gap-1 mb-6 bg-brand-warm border border-gray-200 p-0.5 w-fit">
             <button
               onClick={() => setDashboardTab('businesses')}

@@ -11,13 +11,13 @@ export default function NotFound() {
           Page not found
         </h1>
         <p className="text-gray-600 mb-8">
-          That page doesn&rsquo;t exist or has moved. Head back to your dashboard.
+          That page doesn&rsquo;t exist or has moved.
         </p>
         <Link
-          href="/dashboard"
+          href="/todos"
           className="inline-block px-6 py-3 bg-brand-navy text-white font-semibold hover:bg-brand-navy-hover transition-colors"
         >
-          Back to Dashboard
+          Back to Home
         </Link>
       </div>
     </div>

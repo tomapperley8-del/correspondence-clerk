@@ -40,7 +40,7 @@ Welcome to Correspondence Clerk. Your 14-day free trial has started.
 Here's how to get the most out of your trial:
 
 1. Add your first business
-   Go to Dashboard > Add Business and enter a company you correspond with.
+   Go to Businesses > Add Business and enter a company you correspond with.
 
 2. Log your first piece of correspondence
    Click "New Entry" and paste any email or letter text. Our AI will format it automatically.

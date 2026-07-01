@@ -68,7 +68,7 @@ export default function BookmarkletPage() {
           href="/dashboard"
           className="text-brand-navy hover:text-brand-dark hover:underline"
         >
-          &larr; Back to Dashboard
+          &larr; Back to Businesses
         </Link>
       </div>
 

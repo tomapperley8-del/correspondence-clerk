@@ -5,7 +5,7 @@
 **What is this?** A digital filing system for business correspondence - emails, calls, and meetings.
 
 **How to add an entry:**
-1. Click **New Entry**
+1. Go to **Inbox** and click **+ New Entry** (or navigate directly to /new-entry)
 2. Select a business (or add one)
 3. Select a contact (or add one)
 4. Paste or type your content
@@ -27,7 +27,7 @@ After selecting the primary contact, check the boxes next to any additional cont
 
 ## Search
 
-Use the search bar to find past correspondence by business name or keyword.
+Press **Ctrl+K** (or **Cmd+K** on Mac) to open the search overlay. Find past correspondence by business name or keyword.
 
 ## Troubleshooting
 
@@ -63,39 +63,38 @@ Receive emails directly into Correspondence Clerk without copying and pasting.
 - Each queued email shows SENT or RECEIVED badge, a preview, and suggested contact
 - Click to file — select or confirm the business and contact, then save
 
-## Actions
+## To-dos
 
-The [Actions page](/actions) is a single sorted list of everything that needs your attention. Replies always appear first, then urgency-ordered flags, renewals, quiet relationships, and reminders.
+Your home page. A single view of everything that needs your attention, organised by urgency.
 
-**What appears and why:**
+**Top Priorities** — the 5 most urgent items, shown at the top.
 
-- **No reply · X days** — a received email has had no response logged within 7 days. Amber for 3–6 days, red for 7+.
-- **Overdue / Due today / Due tomorrow / Due soon** — a flagged entry has a due date approaching or past.
-- **Contract renewal** — a business has a contract ending within the next 30 days. Only appears if a contract end date is set.
-- **Gone quiet** — a business you haven't been in contact with for 60+ days (with at least 3 prior entries).
-- **Reminder** — an entry with an upcoming due date but no specific action flag.
+**Sections (collapsed by default):**
+
+- **Needs Reply** — received emails where you haven't logged a response yet. Amber for 3–6 days, red for 7+.
+- **Actions Due** — flagged entries with due dates approaching or past, plus reminders.
+- **Renewals** — businesses with contracts ending within 30 days.
 
 **How items get here:**
 
 - Flag any email as "Follow-up" from the business page — one click sets a 7-day due date automatically.
-- When the AI formats a received email and detects a high-confidence action (e.g. a question requiring a response, an invoice), it flags it automatically. No manual step needed.
-- From Insights, click "Add to Actions" on any business insight card to push it into your action list.
+- When the AI formats a received email and detects a high-confidence action (e.g. a question requiring a response), it flags it automatically.
+- From Insights, click "Add to Actions" on any business insight card.
 
 **Taking action:**
 
-- **Done** — marks the item resolved and removes it from the list.
+- **Done** — marks the item resolved and removes it permanently.
 - **Snooze** — push it back 3 days, 1 week, or 1 month.
 - **Reply / Log** — opens an inline panel. Choose type (Call, Email, or Note), set date and time, write what happened. Check "Mark original as done" to close the source item in one step.
 
 **Keyboard shortcuts:** `↑ ↓` navigate · `D` done · `S` snooze 7 days · `L` reply / log
 
-## AI Assistant (Daily Briefing)
+## Insights
 
-The AI Assistant is an AI chat panel that knows your business context.
+The AI Insights panel on each business page generates contextual analysis — call prep, next best actions, risk checks, and more.
 
-- Click **Daily Briefing** in the nav, or open it as a slide-out from any page
-- Ask things like "What needs chasing?", "Any expiring contracts?", or "Summarise my week"
-- The AI uses your organisation's business description and industry for context
+- Click **Generate** on any insight card to create a fresh analysis
+- The AI uses your organisation's business description and correspondence history for context
 
 ## Bulk Email Import
 

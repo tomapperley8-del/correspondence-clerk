@@ -545,7 +545,7 @@ export function BusinessDetailClient({
       <Breadcrumbs items={[
         fromTodos
           ? { label: 'To-dos', href: '/todos' }
-          : { label: 'Dashboard', href: '/dashboard' },
+          : { label: 'Businesses', href: '/dashboard' },
         { label: business.name },
       ]} />
 

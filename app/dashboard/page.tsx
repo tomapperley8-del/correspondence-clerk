@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { getBusinesses } from '@/app/actions/businesses'
 
 export const metadata: Metadata = {
-  title: 'Dashboard — Correspondence Clerk',
+  title: 'Businesses — Correspondence Clerk',
 }
 import { getActiveMembershipTypes } from '@/app/actions/membership-types'
 import { getActiveBusinessTypes } from '@/app/actions/business-types'

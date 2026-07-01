@@ -122,7 +122,7 @@ export default function GmailImportPage() {
               href="/dashboard"
               className="inline-block text-center px-5 py-2.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-dark transition-colors"
             >
-              Go to Dashboard
+              Go to Businesses
             </Link>
             <button
               onClick={() => { setStep('configure'); setDoneStats(null); setScanResult(null) }}
