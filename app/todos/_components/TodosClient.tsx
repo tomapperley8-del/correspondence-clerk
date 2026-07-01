@@ -509,7 +509,7 @@ export function TodosClient({
 
   const handleOutreachStageChange = useCallback(
     async (businessId: string, stage: string) => {
-      if (stage === 'won') {
+      if (stage === 'invoice_paid') {
         const biz = outreachBusinesses.find(b => b.id === businessId)
         setOutreachBusinesses((prev) => prev.filter((b) => b.id !== businessId))
         if (biz) {
@@ -533,7 +533,7 @@ export function TodosClient({
           toast.error(result.error)
           router.refresh()
         } else {
-          toast.success('Won! Moved to CC/Advertising pipeline')
+          toast.success('Invoice paid! Moved to CC/Advertising pipeline')
         }
         return
       }

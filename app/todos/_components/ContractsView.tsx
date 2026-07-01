@@ -6,13 +6,14 @@ import type { ContractBusiness } from '@/app/actions/businesses'
 import { formatDateShortGB } from '@/lib/utils'
 import { useModalKeyboard } from '@/lib/hooks/useModalKeyboard'
 
-type RenewalStage = 'not_started' | 'contacted' | 'in_discussion' | 'agreed' | 'not_renewing' | 'renewed'
+type RenewalStage = 'not_started' | 'contacted' | 'in_discussion' | 'agreed' | 'invoice_paid' | 'not_renewing' | 'renewed'
 
 const STAGES: { key: RenewalStage; label: string; color: string; bg: string; borderColor: string }[] = [
   { key: 'not_started', label: 'To contact', color: 'text-gray-700', bg: 'bg-gray-50', borderColor: 'border-gray-200' },
   { key: 'contacted', label: 'Contacted', color: 'text-blue-700', bg: 'bg-blue-50/50', borderColor: 'border-blue-200' },
   { key: 'in_discussion', label: 'In discussion', color: 'text-amber-700', bg: 'bg-amber-50/50', borderColor: 'border-amber-200' },
   { key: 'agreed', label: 'Agreed', color: 'text-green-700', bg: 'bg-green-50/50', borderColor: 'border-green-200' },
+  { key: 'invoice_paid', label: 'Invoice paid', color: 'text-emerald-700', bg: 'bg-emerald-50/50', borderColor: 'border-emerald-200' },
   { key: 'not_renewing', label: 'Not renewing', color: 'text-red-700', bg: 'bg-red-50/30', borderColor: 'border-red-200' },
   { key: 'renewed', label: 'Renewed', color: 'text-brand-olive', bg: 'bg-brand-olive/5', borderColor: 'border-brand-olive/20' },
 ]
@@ -84,7 +85,7 @@ export function ContractsView({ businesses, today, onStageChange, onRenew, onAdd
 
   const byStage = useMemo(() => {
     const map: Record<RenewalStage, ContractBusiness[]> = {
-      not_started: [], contacted: [], in_discussion: [], agreed: [], not_renewing: [], renewed: [],
+      not_started: [], contacted: [], in_discussion: [], agreed: [], invoice_paid: [], not_renewing: [], renewed: [],
     }
     for (const b of filtered) {
       const stage = mapLegacyStage(b.renewal_stage || 'not_started')

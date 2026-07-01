@@ -5,7 +5,7 @@ import Link from 'next/link'
 import type { OutreachBusiness } from '@/app/actions/businesses'
 import { formatDateShortGB } from '@/lib/utils'
 
-type OutreachStage = 'identified' | 'contacted' | 'followed_up' | 'in_discussion' | 'won' | 'not_interested'
+type OutreachStage = 'identified' | 'contacted' | 'followed_up' | 'in_discussion' | 'won' | 'invoice_paid' | 'not_interested'
 
 const STAGES: { key: OutreachStage; label: string; color: string; bg: string; borderColor: string }[] = [
   { key: 'identified', label: 'Identified', color: 'text-gray-700', bg: 'bg-gray-50', borderColor: 'border-gray-200' },
@@ -13,6 +13,7 @@ const STAGES: { key: OutreachStage; label: string; color: string; bg: string; bo
   { key: 'followed_up', label: 'Followed up', color: 'text-purple-700', bg: 'bg-purple-50/50', borderColor: 'border-purple-200' },
   { key: 'in_discussion', label: 'In discussion', color: 'text-amber-700', bg: 'bg-amber-50/50', borderColor: 'border-amber-200' },
   { key: 'won', label: 'Won', color: 'text-green-700', bg: 'bg-green-50/50', borderColor: 'border-green-200' },
+  { key: 'invoice_paid', label: 'Invoice paid', color: 'text-emerald-700', bg: 'bg-emerald-50/50', borderColor: 'border-emerald-200' },
   { key: 'not_interested', label: 'Not interested', color: 'text-red-700', bg: 'bg-red-50/30', borderColor: 'border-red-200' },
 ]
 
@@ -48,7 +49,7 @@ export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemov
 
   const byStage = useMemo(() => {
     const map: Record<OutreachStage, OutreachBusiness[]> = {
-      identified: [], contacted: [], followed_up: [], in_discussion: [], won: [], not_interested: [],
+      identified: [], contacted: [], followed_up: [], in_discussion: [], won: [], invoice_paid: [], not_interested: [],
     }
     for (const b of filtered) {
       const stage = (b.outreach_stage || 'identified') as OutreachStage
