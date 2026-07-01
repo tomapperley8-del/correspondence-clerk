@@ -124,10 +124,10 @@ export default function EmailForwardingOnboardingPage() {
 
           <div className="flex flex-col gap-2">
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/todos')}
               className="w-full bg-brand-navy hover:bg-brand-navy-hover text-white font-semibold py-3 rounded-sm transition-colors"
             >
-              Go to dashboard
+              Get started
             </button>
             <Link
               href="/settings"

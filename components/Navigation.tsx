@@ -148,12 +148,20 @@ export function Navigation() {
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">
             <Link
-              href="/dashboard"
-              className="text-xl font-bold text-white"
+              href="/todos"
+              className="text-xl font-bold text-white flex items-center gap-2"
               style={{ fontFamily: 'Lora, Georgia, serif' }}
             >
               <span className="hidden sm:inline">Correspondence Clerk</span>
               <span className="sm:hidden">Clerk</span>
+              {todosDueCount > 0 && (
+                <span
+                  title={`${todosDueCount} task${todosDueCount === 1 ? '' : 's'} due`}
+                  className="text-[10px] font-medium text-white/60"
+                >
+                  {todosDueCount}
+                </span>
+              )}
             </Link>
 
             <div className="hidden md:flex h-16">
@@ -165,34 +173,13 @@ export function Navigation() {
                     : 'text-white hover:bg-brand-olive/20'
                 }`}
               >
-                Dashboard
+                Businesses
               </Link>
-
-              <Link
-                href="/new-entry"
-                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/new-entry'
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
-              >
-                New Entry
-              </Link>
-
-              <button
-                onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'k', bubbles: true }))}
-                className="px-4 h-16 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 text-white hover:bg-brand-olive/20"
-              >
-                Search
-                <kbd className="hidden lg:inline-block text-[10px] px-1.5 py-0.5 bg-white/10 rounded text-white/60 font-mono">
-                  Ctrl+K
-                </kbd>
-              </button>
 
               <Link
                 href="/inbox"
                 className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/inbox'
+                  pathname === '/inbox' || pathname === '/new-entry'
                     ? 'text-white bg-brand-olive'
                     : 'text-white hover:bg-brand-olive/20'
                 }`}
@@ -204,25 +191,6 @@ export function Navigation() {
                     className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
                   >
                     {inboundCount > 99 ? '99+' : inboundCount}
-                  </span>
-                )}
-              </Link>
-
-              <Link
-                href="/todos"
-                className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/todos'
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
-              >
-                Tasks
-                {todosDueCount > 0 && (
-                  <span
-                    title={`${todosDueCount} task${todosDueCount === 1 ? '' : 's'} due`}
-                    className="text-[10px] font-medium text-white/70"
-                  >
-                    {todosDueCount}
                   </span>
                 )}
               </Link>
@@ -314,11 +282,9 @@ export function Navigation() {
             {/* Nav items */}
             <div className="flex-1 overflow-y-auto py-2">
               {[
-                { href: '/dashboard', label: 'Dashboard' },
-                { href: '/new-entry', label: 'New Entry' },
-                { href: '/search', label: 'Search' },
+                { href: '/dashboard', label: 'Businesses' },
                 { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
-                { href: '/todos', label: 'Tasks', badge: todosDueCount > 0 ? todosDueCount : null },
+                { href: '/new-entry', label: 'New Entry' },
                 { href: '/insights', label: 'Insights' },
                 { href: '/help', label: 'Help' },
                 { href: '/settings', label: 'Settings' },
@@ -361,28 +327,6 @@ export function Navigation() {
       {/* Mobile bottom bar — primary actions always accessible */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-brand-dark border-t border-white/20 flex">
         <Link
-          href="/dashboard"
-          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors ${
-            pathname === '/dashboard' ? 'text-white' : 'text-white/60 hover:text-white'
-          }`}
-        >
-          <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-          Home
-        </Link>
-        <Link
-          href="/new-entry"
-          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors ${
-            pathname === '/new-entry' ? 'text-white' : 'text-white/60 hover:text-white'
-          }`}
-        >
-          <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          New Entry
-        </Link>
-        <Link
           href="/todos"
           className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${
             pathname === '/todos' ? 'text-white' : 'text-white/60 hover:text-white'
@@ -390,7 +334,7 @@ export function Navigation() {
         >
           <span className="relative">
             <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
             {todosDueCount > 0 && (
               <span className="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-0.5 rounded-full bg-white/20 text-white text-[9px] font-medium flex items-center justify-center leading-none">
@@ -398,7 +342,18 @@ export function Navigation() {
               </span>
             )}
           </span>
-          Tasks
+          Home
+        </Link>
+        <Link
+          href="/dashboard"
+          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors ${
+            pathname === '/dashboard' ? 'text-white' : 'text-white/60 hover:text-white'
+          }`}
+        >
+          <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+          Businesses
         </Link>
         <Link
           href="/inbox"

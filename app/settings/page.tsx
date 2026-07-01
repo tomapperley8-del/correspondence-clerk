@@ -838,10 +838,10 @@ function SettingsPageContent() {
 
       <Button
         variant="outline"
-        onClick={() => router.push('/dashboard')}
+        onClick={() => router.push('/todos')}
         className="border border-gray-200"
       >
-        Back to Dashboard
+        Back to Home
       </Button>
     </div>
   )

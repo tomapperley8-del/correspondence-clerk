@@ -114,7 +114,7 @@ function SignupPageContent() {
           return
         }
       }
-      router.push(invitationToken ? '/dashboard' : '/onboarding/create-organization')
+      router.push(invitationToken ? '/todos' : '/onboarding/create-organization')
       return
     }
 

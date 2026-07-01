@@ -31,14 +31,18 @@ import type { NeedsReplyItem } from '../page'
 type ViewMode = 'list' | 'calendar' | 'contracts' | 'outreach'
 type TimeFilter = 'week' | 'all'
 
+function toLocalDateStr(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function todayStr() {
-  return new Date().toISOString().slice(0, 10)
+  return toLocalDateStr(new Date())
 }
 
 function addDays(dateStr: string, days: number) {
-  const d = new Date(dateStr + 'T00:00:00')
+  const d = new Date(dateStr + 'T12:00:00')
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  return toLocalDateStr(d)
 }
 
 type TaskGroups = {

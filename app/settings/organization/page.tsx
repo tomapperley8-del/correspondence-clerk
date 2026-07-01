@@ -1184,13 +1184,12 @@ function OrganizationSettingsContent() {
         </form>
       </div>
 
-      {/* Back to Dashboard */}
       <Button
         variant="outline"
-        onClick={() => router.push('/dashboard')}
+        onClick={() => router.push('/todos')}
         className="border-2 border-gray-800"
       >
-        Back to Dashboard
+        Back to Home
       </Button>
     </div>
   )

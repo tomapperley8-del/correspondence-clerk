@@ -34,8 +34,7 @@ export async function GET(request: Request) {
                 `${origin}/auth/auth-code-error?error=${encodeURIComponent(result.error)}`
               )
             }
-            // Invitation accepted successfully, redirect to dashboard
-            return NextResponse.redirect(`${origin}/dashboard`)
+            return NextResponse.redirect(`${origin}/todos`)
           }
         } else {
           // No invitation token, redirect to create organization

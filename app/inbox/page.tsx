@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { getInboundQueue, getAutoFiledRecent, getDiscardedQueue, getDeadLetters } from '@/app/actions/inbound-email'
 import { getBusinesses, type Business } from '@/app/actions/businesses'
 import InboxListClient from './_components/InboxListClient'
@@ -26,16 +27,24 @@ export default async function InboxPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <div className="mb-8">
-        <h1
-          className="text-3xl font-bold mb-1"
-          style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--brand-dark)' }}
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1
+            className="text-3xl font-bold mb-1"
+            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--brand-dark)' }}
+          >
+            Inbox
+          </h1>
+          <p className="text-sm" style={{ color: 'rgba(0,0,0,0.5)' }}>
+            Emails forwarded to your inbound address that need filing.
+          </p>
+        </div>
+        <Link
+          href="/new-entry"
+          className="text-sm px-4 py-2 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors flex-shrink-0"
         >
-          Inbox
-        </h1>
-        <p className="text-sm" style={{ color: 'rgba(0,0,0,0.5)' }}>
-          Emails forwarded to your inbound address that need filing.
-        </p>
+          + New Entry
+        </Link>
       </div>
 
       {items.length === 0 ? (
