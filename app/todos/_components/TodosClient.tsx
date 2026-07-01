@@ -521,11 +521,13 @@ export function TodosClient({
             is_advertiser: biz.is_advertiser,
             renewal_stage: 'not_started',
             renewal_contacted_at: null,
+            renewal_declined_at: null,
             current_contract_end: null,
             current_contract_start: null,
             current_contract_amount: null,
             current_contract_currency: null,
             current_invoice_paid: false,
+            total_contract_count: 0,
           }])
         }
         const result = await promoteOutreachToContracts(businessId)
@@ -543,6 +545,7 @@ export function TodosClient({
           outreach_stage: stage,
           outreach_contacted_at: stage === 'contacted' ? todayStr() : b.outreach_contacted_at,
           outreach_followed_up_at: stage === 'followed_up' ? todayStr() : b.outreach_followed_up_at,
+          outreach_declined_at: stage === 'not_interested' ? new Date().toISOString() : stage !== 'not_interested' ? null : b.outreach_declined_at,
         } : b))
       )
       const result = await updateOutreachStage(businessId, stage)
@@ -566,6 +569,7 @@ export function TodosClient({
           outreach_stage: 'identified',
           outreach_contacted_at: null,
           outreach_followed_up_at: null,
+          outreach_declined_at: null,
         }])
       }
       const result = await addBusinessToOutreach(businessId)

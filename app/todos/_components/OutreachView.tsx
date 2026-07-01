@@ -7,21 +7,34 @@ import { formatDateShortGB } from '@/lib/utils'
 
 type OutreachStage = 'identified' | 'contacted' | 'followed_up' | 'in_discussion' | 'won' | 'invoice_paid' | 'not_interested'
 
-const STAGES: { key: OutreachStage; label: string; color: string; bg: string; borderColor: string }[] = [
+const PIPELINE_STAGES: { key: OutreachStage; label: string; color: string; bg: string; borderColor: string }[] = [
   { key: 'identified', label: 'Identified', color: 'text-gray-700', bg: 'bg-gray-50', borderColor: 'border-gray-200' },
   { key: 'contacted', label: 'Contacted', color: 'text-blue-700', bg: 'bg-blue-50/50', borderColor: 'border-blue-200' },
   { key: 'followed_up', label: 'Followed up', color: 'text-purple-700', bg: 'bg-purple-50/50', borderColor: 'border-purple-200' },
   { key: 'in_discussion', label: 'In discussion', color: 'text-amber-700', bg: 'bg-amber-50/50', borderColor: 'border-amber-200' },
   { key: 'won', label: 'Won', color: 'text-green-700', bg: 'bg-green-50/50', borderColor: 'border-green-200' },
   { key: 'invoice_paid', label: 'Invoice paid', color: 'text-emerald-700', bg: 'bg-emerald-50/50', borderColor: 'border-emerald-200' },
-  { key: 'not_interested', label: 'Not interested', color: 'text-red-700', bg: 'bg-red-50/30', borderColor: 'border-red-200' },
 ]
+
+const ALL_STAGES = [
+  ...PIPELINE_STAGES,
+  { key: 'not_interested' as OutreachStage, label: 'Not interested', color: 'text-red-700', bg: 'bg-red-50/30', borderColor: 'border-red-200' },
+]
+
+const RE_ENGAGE_MONTHS = 6
 
 function getTypeBadge(b: OutreachBusiness): string | null {
   if (b.is_club_card && b.is_advertiser) return 'CC + Ad'
   if (b.is_club_card) return 'CC'
   if (b.is_advertiser) return 'Ad'
   return null
+}
+
+function monthsAgo(dateStr: string | null): number | null {
+  if (!dateStr) return null
+  const d = new Date(dateStr)
+  const now = new Date()
+  return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
 }
 
 type OutreachViewProps = {
@@ -38,6 +51,7 @@ export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemov
   const [showAddForm, setShowAddForm] = useState(false)
   const [addSearch, setAddSearch] = useState('')
   const [adding, setAdding] = useState(false)
+  const [showNotInterested, setShowNotInterested] = useState(false)
 
   const existingIds = useMemo(() => new Set(businesses.map(b => b.id)), [businesses])
 
@@ -57,6 +71,22 @@ export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemov
       else map.identified.push(b)
     }
     return map
+  }, [filtered])
+
+  const reEngageList = useMemo(() => {
+    const result: OutreachBusiness[] = []
+    for (const b of filtered) {
+      const stage = (b.outreach_stage || 'identified') as OutreachStage
+      if (stage === 'not_interested') {
+        const months = monthsAgo(b.outreach_declined_at)
+        if (months !== null && months >= RE_ENGAGE_MONTHS) result.push(b)
+      } else if (stage === 'contacted' || stage === 'followed_up') {
+        const lastActivity = b.outreach_followed_up_at || b.outreach_contacted_at
+        const months = monthsAgo(lastActivity)
+        if (months !== null && months >= RE_ENGAGE_MONTHS) result.push(b)
+      }
+    }
+    return result
   }, [filtered])
 
   const addCandidates = useMemo(() => {
@@ -159,6 +189,86 @@ export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemov
           onRemove={onRemoveBusiness}
         />
       )}
+
+      {/* Re-engage section */}
+      {reEngageList.length > 0 && (
+        <div className="mt-4 border border-amber-200 bg-amber-50/30">
+          <div className="px-3 py-2 border-b border-amber-200 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700">
+              Ready to re-engage ({reEngageList.length})
+            </span>
+            <span className="text-[9px] text-amber-600">6+ months since last activity</span>
+          </div>
+          <div className="p-2 space-y-1">
+            {reEngageList.map(b => (
+              <div key={b.id} className="flex items-center justify-between bg-white border border-gray-200 px-2.5 py-1.5">
+                <Link
+                  href={`/businesses/${b.id}`}
+                  className="text-[11px] font-medium text-brand-navy hover:text-brand-olive transition-colors"
+                >
+                  {b.name}
+                </Link>
+                <button
+                  onClick={() => onStageChange(b.id, 'identified')}
+                  className="text-[9px] px-2 py-0.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
+                >
+                  Restart outreach
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Not interested — collapsed */}
+      {byStage.not_interested.length > 0 && (
+        <div className="mt-4 border border-gray-200">
+          <button
+            onClick={() => setShowNotInterested(!showNotInterested)}
+            className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-wide text-red-700">
+              Not interested ({byStage.not_interested.length})
+            </span>
+            <span className="text-[10px] text-gray-400">{showNotInterested ? '▲' : '▼'}</span>
+          </button>
+          {showNotInterested && (
+            <div className="p-2 space-y-1 border-t border-gray-200">
+              {byStage.not_interested.map(b => (
+                <div key={b.id} className="flex items-center justify-between bg-white border border-gray-200 px-2.5 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/businesses/${b.id}`}
+                      className="text-[11px] font-medium text-brand-navy hover:text-brand-olive transition-colors"
+                    >
+                      {b.name}
+                    </Link>
+                    {b.outreach_declined_at && (
+                      <span className="text-[9px] text-gray-400">
+                        {formatDateShortGB(b.outreach_declined_at)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onStageChange(b.id, 'identified')}
+                      className="text-[9px] text-brand-navy hover:underline"
+                    >
+                      Restart
+                    </button>
+                    <button
+                      onClick={() => onRemoveBusiness(b.id)}
+                      className="text-[9px] text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -202,8 +312,8 @@ function OutreachPipeline({
 
   return (
     <div className="overflow-x-auto pb-2">
-    <div className="grid gap-2 min-h-[400px]" style={{ gridTemplateColumns: 'repeat(6, minmax(150px, 1fr))' }}>
-      {STAGES.map((stage) => {
+    <div className="grid gap-2 min-h-[400px]" style={{ gridTemplateColumns: `repeat(${PIPELINE_STAGES.length}, minmax(150px, 1fr))` }}>
+      {PIPELINE_STAGES.map((stage) => {
         const items = byStage[stage.key]
         const isDragOver = dragOverStage === stage.key
         return (
@@ -324,7 +434,7 @@ function OutreachList({
       {businesses.map((b) => {
         const badge = getTypeBadge(b)
         const stage = (b.outreach_stage || 'identified') as OutreachStage
-        const stageInfo = STAGES.find(s => s.key === stage) ?? STAGES[0]
+        const stageInfo = ALL_STAGES.find(s => s.key === stage) ?? ALL_STAGES[0]
 
         return (
           <div key={b.id} className="grid grid-cols-[1fr_80px_100px_100px_110px_60px] gap-2 items-center px-3 py-2.5 hover:bg-brand-warm/50 transition-colors">
@@ -352,7 +462,7 @@ function OutreachList({
               onChange={(e) => onStageChange(b.id, e.target.value as OutreachStage)}
               className={`text-[10px] font-medium px-1.5 py-0.5 border border-gray-200 ${stageInfo.bg} ${stageInfo.color} outline-none cursor-pointer`}
             >
-              {STAGES.map(s => (
+              {ALL_STAGES.map(s => (
                 <option key={s.key} value={s.key}>{s.label}</option>
               ))}
             </select>

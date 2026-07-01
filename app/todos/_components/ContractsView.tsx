@@ -25,6 +25,15 @@ function mapLegacyStage(stage: string): RenewalStage {
   return 'not_started'
 }
 
+const RE_ENGAGE_MONTHS = 6
+
+function monthsAgo(dateStr: string | null): number | null {
+  if (!dateStr) return null
+  const d = new Date(dateStr)
+  const now = new Date()
+  return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
+}
+
 function getTypeBadge(b: ContractBusiness): string {
   if (b.is_club_card && b.is_advertiser) return 'CC + Ad'
   if (b.is_club_card) return 'Club Card'
@@ -124,6 +133,15 @@ export function ContractsView({ businesses, today, onStageChange, onRenew, onAdd
     await onRenew(renewingBusiness.id, fields)
     setRenewingBusiness(null)
   }, [renewingBusiness, onRenew])
+
+  const reEngageList = useMemo(() => {
+    return filtered.filter(b => {
+      const stage = mapLegacyStage(b.renewal_stage || 'not_started')
+      if (stage !== 'not_renewing') return false
+      const months = monthsAgo(b.renewal_declined_at)
+      return months !== null && months >= RE_ENGAGE_MONTHS
+    })
+  }, [filtered])
 
   const ccCount = businesses.filter(b => b.is_club_card).length
   const adCount = businesses.filter(b => b.is_advertiser).length
@@ -241,6 +259,41 @@ export function ContractsView({ businesses, today, onStageChange, onRenew, onAdd
         />
       )}
 
+      {/* Re-engage section */}
+      {reEngageList.length > 0 && (
+        <div className="mt-4 border border-amber-200 bg-amber-50/30">
+          <div className="px-3 py-2 border-b border-amber-200 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700">
+              Ready to re-engage ({reEngageList.length})
+            </span>
+            <span className="text-[9px] text-amber-600">6+ months since declining</span>
+          </div>
+          <div className="p-2 space-y-1">
+            {reEngageList.map(b => (
+              <div key={b.id} className="flex items-center justify-between bg-white border border-gray-200 px-2.5 py-1.5">
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/businesses/${b.id}`}
+                    className="text-[11px] font-medium text-brand-navy hover:text-brand-olive transition-colors"
+                  >
+                    {b.name}
+                  </Link>
+                  <span className="text-[8px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy">
+                    {getTypeBadge(b)}
+                  </span>
+                </div>
+                <button
+                  onClick={() => onStageChange(b.id, 'not_started' as RenewalStage)}
+                  className="text-[9px] px-2 py-0.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
+                >
+                  Restart renewal
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {renewingBusiness && (
         <RenewalContractModal
           business={renewingBusiness}
@@ -293,7 +346,7 @@ function PipelineView({
 
   return (
     <div className="overflow-x-auto pb-2">
-    <div className="grid gap-2 min-h-[400px]" style={{ gridTemplateColumns: 'repeat(6, minmax(150px, 1fr))' }}>
+    <div className="grid gap-2 min-h-[400px]" style={{ gridTemplateColumns: `repeat(${STAGES.length}, minmax(140px, 1fr))` }}>
       {STAGES.map((stage) => {
         const items = byStage[stage.key]
         const isDragOver = dragOverStage === stage.key
@@ -371,9 +424,16 @@ function BusinessCard({
         >
           {business.name}
         </Link>
-        <span className="text-[8px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy flex-shrink-0">
-          {badge}
-        </span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {business.total_contract_count > 1 && (
+            <span className="text-[8px] font-semibold px-1 py-0.5 bg-brand-olive/15 text-brand-olive" title={`${business.total_contract_count} contracts on record`}>
+              ×{business.total_contract_count}
+            </span>
+          )}
+          <span className="text-[8px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy">
+            {badge}
+          </span>
+        </div>
       </div>
 
       {business.current_contract_end && (

@@ -286,11 +286,13 @@ export type ContractBusiness = {
   is_advertiser: boolean
   renewal_stage: string
   renewal_contacted_at: string | null
+  renewal_declined_at: string | null
   current_contract_end: string | null
   current_contract_start: string | null
   current_contract_amount: number | null
   current_contract_currency: string | null
   current_invoice_paid: boolean
+  total_contract_count: number
 }
 
 export async function getContractBusinesses(): Promise<{ data?: ContractBusiness[]; error?: string }> {
@@ -303,7 +305,7 @@ export async function getContractBusinesses(): Promise<{ data?: ContractBusiness
 
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, is_club_card, is_advertiser, renewal_stage, renewal_contacted_at, contracts(contract_start, contract_end, contract_amount, contract_currency, invoice_paid, is_current)')
+    .select('id, name, is_club_card, is_advertiser, renewal_stage, renewal_contacted_at, renewal_declined_at, contracts(id, contract_start, contract_end, contract_amount, contract_currency, invoice_paid, is_current)')
     .eq('organization_id', orgId)
     .or('is_club_card.eq.true,is_advertiser.eq.true')
     .order('name', { ascending: true })
@@ -311,7 +313,7 @@ export async function getContractBusinesses(): Promise<{ data?: ContractBusiness
   if (error) return { error: error.message }
 
   const mapped: ContractBusiness[] = (data ?? []).map((b: Record<string, unknown>) => {
-    const contracts = (b.contracts as { contract_start: string | null; contract_end: string | null; contract_amount: number | null; contract_currency: string | null; invoice_paid: boolean; is_current: boolean }[]) || []
+    const contracts = (b.contracts as { id: string; contract_start: string | null; contract_end: string | null; contract_amount: number | null; contract_currency: string | null; invoice_paid: boolean; is_current: boolean }[]) || []
     const currentContracts = contracts.filter(c => c.is_current)
     const current = currentContracts.length > 0
       ? currentContracts.reduce((earliest, c) => {
@@ -327,11 +329,13 @@ export async function getContractBusinesses(): Promise<{ data?: ContractBusiness
       is_advertiser: b.is_advertiser as boolean,
       renewal_stage: (b.renewal_stage as string) || 'not_started',
       renewal_contacted_at: b.renewal_contacted_at as string | null,
+      renewal_declined_at: b.renewal_declined_at as string | null,
       current_contract_end: current?.contract_end ?? null,
       current_contract_start: current?.contract_start ?? null,
       current_contract_amount: current?.contract_amount ?? null,
       current_contract_currency: current?.contract_currency ?? null,
       current_invoice_paid: current?.invoice_paid ?? false,
+      total_contract_count: contracts.length,
     }
   })
 
@@ -362,6 +366,11 @@ export async function updateBusinessRenewalStage(
     update.renewal_contacted_at = new Date().toISOString().slice(0, 10)
   } else if (isRenewed) {
     update.renewal_contacted_at = null
+  }
+  if (stage === 'not_renewing') {
+    update.renewal_declined_at = new Date().toISOString()
+  } else if (stage !== 'not_renewing') {
+    update.renewal_declined_at = null
   }
 
   const { error } = await supabase
@@ -410,6 +419,7 @@ export type OutreachBusiness = {
   outreach_stage: string
   outreach_contacted_at: string | null
   outreach_followed_up_at: string | null
+  outreach_declined_at: string | null
 }
 
 export async function getOutreachBusinesses(): Promise<{ data?: OutreachBusiness[]; error?: string }> {
@@ -422,7 +432,7 @@ export async function getOutreachBusinesses(): Promise<{ data?: OutreachBusiness
 
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, is_club_card, is_advertiser, outreach_stage, outreach_contacted_at, outreach_followed_up_at')
+    .select('id, name, is_club_card, is_advertiser, outreach_stage, outreach_contacted_at, outreach_followed_up_at, outreach_declined_at')
     .eq('organization_id', orgId)
     .not('outreach_stage', 'is', null)
     .order('name', { ascending: true })
@@ -448,6 +458,11 @@ export async function updateOutreachStage(
     update.outreach_contacted_at = new Date().toISOString().slice(0, 10)
   } else if (stage === 'followed_up') {
     update.outreach_followed_up_at = new Date().toISOString().slice(0, 10)
+  }
+  if (stage === 'not_interested') {
+    update.outreach_declined_at = new Date().toISOString()
+  } else {
+    update.outreach_declined_at = null
   }
 
   const { error } = await supabase
