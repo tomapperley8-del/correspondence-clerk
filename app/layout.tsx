@@ -4,16 +4,24 @@ import { Navigation } from '@/components/Navigation'
 import { InsightsProvider } from '@/components/InsightsContext'
 import { ToastContainer } from '@/components/Toast'
 import { DynamicPanels } from '@/components/DynamicPanels'
+import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  themeColor: '#1E293B',
 }
 
 export const metadata: Metadata = {
   title: 'Correspondence Clerk',
   description: 'Know exactly what needs your attention today. An AI assistant that reads your business correspondence and tells you who to reply to, which contracts are expiring, and which follow-ups have gone cold.',
-  icons: { icon: '/icon.svg' },
+  icons: { icon: '/icon.svg', apple: '/icons/icon-192.png' },
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Clerk',
+  },
 }
 
 export default function RootLayout({
@@ -46,6 +54,7 @@ export default function RootLayout({
           <DynamicPanels />
           <ToastContainer />
           <main id="main-content" className="pb-16 md:pb-0">{children}</main>
+          <ServiceWorkerRegistration />
         </InsightsProvider>
 </body>
     </html>
