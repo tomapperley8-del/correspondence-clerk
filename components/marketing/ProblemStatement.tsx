@@ -19,7 +19,7 @@ export function ProblemStatement() {
       <div className="max-w-5xl mx-auto">
         <h2
           className="text-3xl text-center text-brand-dark mb-14"
-          style={{ fontFamily: 'Lora, Georgia, serif' }}
+          style={{ fontFamily: 'var(--font-serif)' }}
         >
           Sound familiar?
         </h2>

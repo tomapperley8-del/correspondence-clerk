@@ -6,7 +6,7 @@ export function CTASection() {
       <div className="container mx-auto px-6 max-w-2xl">
         <h2
           className="text-3xl font-bold mb-4"
-          style={{ fontFamily: 'Lora, Georgia, serif', color: '#fff' }}
+          style={{ fontFamily: 'var(--font-serif)', color: '#fff' }}
         >
           Start knowing what needs your attention
         </h2>

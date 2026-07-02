@@ -181,7 +181,7 @@ The Actions page (`app/actions/page.tsx`) has a **Top Priorities hero block** (t
   - `bg-brand-paper` = #FAFAF8 (page background)
   - `bg-brand-warm` = #F8F7F4 (card backgrounds)
   - CSS vars for inline styles: `var(--link-blue)`, `var(--header-bg)`, `var(--main-bg)`
-- Fonts: Lora (serif) for h1/h2 headings, Open Sans (sans) for body text
+- Fonts: Cormorant Garamond (serif) for h1/h2 headings, Open Sans (sans) for body text
 - Gentle transitions (0.2s ease-out on interactive elements)
 - Very soft borders: rgba(0,0,0,0.06) - confident, not cramped
 

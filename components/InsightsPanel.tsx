@@ -473,7 +473,7 @@ export function InsightsPanel({ inline = false }: InsightsPanelProps = {}) {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-brand-paper shrink-0">
-        <h2 className="font-[Lora,serif] text-lg font-semibold text-brand-dark">
+        <h2 className="font-serif text-lg font-semibold text-brand-dark">
           Insights
         </h2>
         {!inline && (

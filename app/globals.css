@@ -9,7 +9,7 @@
 
   /* Warm, professional fonts — loaded via Google Fonts CDN in layout.tsx */
   --font-sans: 'Open Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
+  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
   --font-mono: "Courier New", monospace;
 
   /* Consistent rounded corners - matches button styling for cohesive look */

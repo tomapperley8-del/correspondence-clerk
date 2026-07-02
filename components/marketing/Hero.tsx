@@ -13,7 +13,7 @@ export function Hero() {
             </p>
             <h1
               className="text-5xl md:text-6xl font-bold leading-tight mb-7"
-              style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.02em' }}
+              style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)', letterSpacing: '-0.02em' }}
             >
               Know exactly what needs your attention today
             </h1>

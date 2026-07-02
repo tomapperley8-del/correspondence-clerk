@@ -27,7 +27,7 @@ export function WhoItsFor() {
       <div className="container mx-auto px-6">
         <h2
           className="text-3xl md:text-4xl font-bold mb-16 text-center"
-          style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.01em' }}
+          style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)', letterSpacing: '-0.01em' }}
         >
           Built for anyone managing ongoing business relationships
         </h2>
@@ -45,7 +45,7 @@ export function WhoItsFor() {
             >
               <h3
                 className="text-base font-semibold mb-3"
-                style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
+                style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)' }}
               >
                 {item.title}
               </h3>

@@ -68,7 +68,7 @@ export default function OutlookImportPage() {
           </Link>
         </div>
         <div className="bg-white border border-gray-200 rounded p-8 shadow-[var(--shadow-sm,0_1px_3px_rgba(0,0,0,0.06))]">
-          <h1 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-2">Connect Outlook</h1>
+          <h1 className="font-serif text-2xl font-semibold text-brand-dark mb-2">Connect Outlook</h1>
           <p className="text-gray-500 text-sm mb-6">
             Connect your Outlook or Microsoft 365 account to import your email history. We only read your emails —
             we never send, delete, or modify anything.
@@ -107,7 +107,7 @@ export default function OutlookImportPage() {
           <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600 text-xl">
             ✓
           </div>
-          <h2 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-2">Import complete</h2>
+          <h2 className="font-serif text-2xl font-semibold text-brand-dark mb-2">Import complete</h2>
           <p className="text-gray-500 text-sm mb-2">
             <span className="font-medium text-brand-dark">{doneStats.imported}</span> email{doneStats.imported !== 1 ? 's' : ''} imported
             {doneStats.skipped > 0 && `, ${doneStats.skipped} skipped (duplicates)`}
@@ -142,7 +142,7 @@ export default function OutlookImportPage() {
         </Link>
       </div>
 
-      <h1 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-1">Import from Outlook</h1>
+      <h1 className="font-serif text-2xl font-semibold text-brand-dark mb-1">Import from Outlook</h1>
       <p className="text-gray-500 text-sm mb-8">
         Scan your Outlook or Microsoft 365 inbox and choose which emails to import. We&apos;ll suggest business and contact names — you review everything before anything is saved.
       </p>

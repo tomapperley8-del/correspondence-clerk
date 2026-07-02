@@ -10,7 +10,7 @@ export function Pricing() {
         <div className="mb-16">
           <h2
             className="text-3xl md:text-4xl font-bold mb-4"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.01em' }}
+            style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)', letterSpacing: '-0.01em' }}
           >
             Pricing
           </h2>
@@ -44,7 +44,7 @@ export function Pricing() {
                     <div>
                       <span
                         className="text-4xl font-bold"
-                        style={{ fontFamily: 'Lora, Georgia, serif', color: isHighlighted ? '#fff' : 'var(--header-bg)' }}
+                        style={{ fontFamily: 'var(--font-serif)', color: isHighlighted ? '#fff' : 'var(--header-bg)' }}
                       >
                         £{plan.priceMonthly}
                       </span>
@@ -53,7 +53,7 @@ export function Pricing() {
                   ) : (
                     <span
                       className="text-4xl font-bold"
-                      style={{ fontFamily: 'Lora, Georgia, serif', color: isHighlighted ? '#fff' : 'var(--header-bg)' }}
+                      style={{ fontFamily: 'var(--font-serif)', color: isHighlighted ? '#fff' : 'var(--header-bg)' }}
                     >
                       Free
                     </span>

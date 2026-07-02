@@ -321,7 +321,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
 
       {businesses.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded p-10 max-w-lg mx-auto mt-8 shadow-[var(--shadow-md,0_2px_8px_rgba(0,0,0,0.08))]">
-          <h1 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-2">
+          <h1 className="font-serif text-2xl font-semibold text-brand-dark mb-2">
             Welcome to Correspondence Clerk
           </h1>
           <p className="text-gray-500 text-sm mb-8">Get set up in three steps.</p>

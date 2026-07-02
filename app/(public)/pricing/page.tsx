@@ -19,7 +19,7 @@ export default function PricingPage() {
         <div className="text-center mb-16">
           <h1
             className="text-4xl font-bold mb-4"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
+            style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)' }}
           >
             Simple, transparent pricing
           </h1>
@@ -50,7 +50,7 @@ export default function PricingPage() {
               >
                 <h2
                   className="text-xl font-bold mb-2"
-                  style={{ fontFamily: 'Lora, Georgia, serif' }}
+                  style={{ fontFamily: 'var(--font-serif)' }}
                 >
                   {plan.name}
                 </h2>
@@ -117,7 +117,7 @@ export default function PricingPage() {
         <div className="max-w-2xl mx-auto mt-24">
           <h2
             className="text-2xl font-bold mb-10 text-center"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
+            style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)' }}
           >
             Frequently asked questions
           </h2>

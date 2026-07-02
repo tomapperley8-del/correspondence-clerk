@@ -129,7 +129,7 @@ export function Navigation() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <span className="text-xl font-bold text-white" style={{ fontFamily: 'Lora, Georgia, serif' }}>Correspondence Clerk</span>
+              <span className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-serif)' }}>Correspondence Clerk</span>
             </div>
           </div>
         </div>
@@ -150,7 +150,7 @@ export function Navigation() {
             <Link
               href="/todos"
               className="text-xl font-bold text-white flex items-center gap-2"
-              style={{ fontFamily: 'Lora, Georgia, serif' }}
+              style={{ fontFamily: 'var(--font-serif)' }}
             >
               <span className="hidden sm:inline">Correspondence Clerk</span>
               <span className="sm:hidden">Clerk</span>
@@ -266,7 +266,7 @@ export function Navigation() {
           <div className="md:hidden fixed top-0 right-0 z-50 h-full w-72 bg-brand-dark flex flex-col shadow-xl">
             {/* Drawer header */}
             <div className="flex items-center justify-between h-16 px-4 border-b border-white/20">
-              <span className="text-base font-semibold text-white" style={{ fontFamily: 'Lora, Georgia, serif' }}>
+              <span className="text-base font-semibold text-white" style={{ fontFamily: 'var(--font-serif)' }}>
                 Menu
               </span>
               <button

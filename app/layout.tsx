@@ -39,7 +39,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&family=Lora:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&family=Cormorant+Garamond:wght@400;500;600;700&display=swap"
         />
         {supabaseUrl && <link rel="preconnect" href={supabaseUrl} />}
       </head>

@@ -7,7 +7,7 @@ export function SocialProof() {
           <div>
             <p
               className="text-3xl font-bold mb-1"
-              style={{ fontFamily: 'Lora, Georgia, serif', color: '#fff' }}
+              style={{ fontFamily: 'var(--font-serif)', color: '#fff' }}
             >
               500+
             </p>
@@ -28,7 +28,7 @@ export function SocialProof() {
           <div>
             <p
               className="text-3xl font-bold mb-1"
-              style={{ fontFamily: 'Lora, Georgia, serif', color: '#fff' }}
+              style={{ fontFamily: 'var(--font-serif)', color: '#fff' }}
             >
               3 min
             </p>

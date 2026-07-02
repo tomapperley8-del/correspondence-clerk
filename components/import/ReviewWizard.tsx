@@ -124,7 +124,7 @@ export function ReviewWizard({ scanResult, scanId, provider, onImportComplete }:
     const pct = progress.total > 0 ? Math.round((progress.imported / progress.total) * 100) : 0
     return (
       <div className="max-w-lg mx-auto mt-8 text-center">
-        <h2 className="font-[Lora,serif] text-xl font-semibold text-brand-dark mb-6">Importing emails…</h2>
+        <h2 className="font-serif text-xl font-semibold text-brand-dark mb-6">Importing emails…</h2>
         <div className="w-full bg-gray-100 rounded-full h-3 mb-4 overflow-hidden">
           <div
             className="h-3 bg-brand-navy rounded-full transition-all duration-300"

@@ -6,7 +6,7 @@ export function MarketingFooter() {
       <div className="container mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row md:justify-between gap-8">
           <div>
-            <p className="font-semibold mb-1" style={{ fontFamily: 'Lora, Georgia, serif', color: '#fff' }}>
+            <p className="font-semibold mb-1" style={{ fontFamily: 'var(--font-serif)', color: '#fff' }}>
               Correspondence Clerk
             </p>
             <p className="text-sm" style={{ color: '#64748b' }}>

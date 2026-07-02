@@ -4,7 +4,7 @@ export function MarketingNav() {
   return (
     <header style={{ backgroundColor: 'var(--main-bg)', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
       <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-        <Link href="/" className="font-serif text-xl font-bold" style={{ color: 'var(--header-bg)', fontFamily: 'Lora, Georgia, serif' }}>
+        <Link href="/" className="font-serif text-xl font-bold" style={{ color: 'var(--header-bg)', fontFamily: 'var(--font-serif)' }}>
           Correspondence Clerk
         </Link>
         <nav className="hidden md:flex items-center gap-8">

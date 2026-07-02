@@ -32,7 +32,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
-      <h1 className="font-[Lora,serif] text-2xl font-semibold text-brand-dark mb-2">Import emails</h1>
+      <h1 className="font-serif text-2xl font-semibold text-brand-dark mb-2">Import emails</h1>
       <p className="text-gray-500 text-sm mb-8">
         Connect your email account to pull in months of past correspondence. New businesses and contacts will be
         discovered automatically — you review everything before it&apos;s saved.

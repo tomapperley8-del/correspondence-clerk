@@ -11,6 +11,7 @@ import { getUserProfile, updateDisplayName, updateBriefingEmailOptOut, deleteAcc
 import { getInboundEmailToken, getOwnEmailAddresses, updateOwnEmailAddresses, getBlockedSenders, unblockSender } from '@/app/actions/inbound-email'
 import { getUnformattedCount, formatAllUnformatted } from '@/app/actions/ai-formatter'
 import { runRetroScan, applyRetroScanResult, dismissRetroScanResult, type RetroMediumResult } from '@/app/actions/retro-scan'
+import { scanAllBusinessesForArticles } from '@/app/actions/articles'
 import { toast } from '@/lib/toast'
 import { createClient } from '@/lib/supabase/client'
 
@@ -53,6 +54,8 @@ function SettingsPageContent() {
   const [scanAutoApplied, setScanAutoApplied] = useState(0)
   const [scanReview, setScanReview] = useState<RetroMediumResult[]>([])
   const [applyingRetroId, setApplyingRetroId] = useState<string | null>(null)
+  const [isScanningArticles, setIsScanningArticles] = useState(false)
+  const [articleScanResult, setArticleScanResult] = useState<{ scanned: number; total_new: number } | null>(null)
   const validTabs = ['profile', 'email', 'tools', 'account'] as const
   type Tab = typeof validTabs[number]
   const initialTab = (validTabs as readonly string[]).includes(searchParams.get('tab') ?? '')
@@ -753,6 +756,45 @@ function SettingsPageContent() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 p-6 mb-6">
+            <h2 className="text-xl font-bold mb-4 text-gray-900">News Coverage Scanner</h2>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-gray-600">
+                  Search The Chiswick Calendar for news articles mentioning your businesses (last 5 years).
+                  Found articles appear on each business page for review. Also runs automatically every Monday.
+                </p>
+                {articleScanResult && !isScanningArticles && (
+                  <p className="text-sm text-green-700 mt-2">
+                    Scanned {articleScanResult.scanned} businesses — found {articleScanResult.total_new} new article{articleScanResult.total_new === 1 ? '' : 's'}.
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={async () => {
+                  setIsScanningArticles(true)
+                  setArticleScanResult(null)
+                  try {
+                    const result = await scanAllBusinessesForArticles()
+                    setArticleScanResult({ scanned: result.scanned, total_new: result.total_new })
+                    if (result.total_new > 0) {
+                      toast.success(`Found ${result.total_new} new article${result.total_new === 1 ? '' : 's'} across ${result.scanned} businesses`)
+                    } else {
+                      toast.info('No new articles found')
+                    }
+                  } catch {
+                    toast.error('Article scan failed')
+                  }
+                  setIsScanningArticles(false)
+                }}
+                disabled={isScanningArticles}
+                className="shrink-0 px-4 py-2 text-sm font-semibold text-white rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-brand-navy hover:bg-brand-navy-hover"
+              >
+                {isScanningArticles ? 'Scanning…' : 'Scan all businesses'}
+              </button>
             </div>
           </div>
 

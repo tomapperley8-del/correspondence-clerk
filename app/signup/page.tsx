@@ -17,14 +17,14 @@ function LeftPanel() {
       <Link
         href="/"
         className="text-xl font-bold text-white"
-        style={{ fontFamily: 'Lora, Georgia, serif' }}
+        style={{ fontFamily: 'var(--font-serif)' }}
       >
         Correspondence Clerk
       </Link>
       <div>
         <p
           className="text-2xl font-semibold text-white leading-snug mb-3"
-          style={{ fontFamily: 'Lora, Georgia, serif' }}
+          style={{ fontFamily: 'var(--font-serif)' }}
         >
           Know exactly what needs your attention today.
         </p>
@@ -133,7 +133,7 @@ function SignupPageContent() {
           <div className="w-full max-w-sm">
             <h1
               className="text-2xl font-bold mb-4 text-gray-900"
-              style={{ fontFamily: 'Lora, Georgia, serif' }}
+              style={{ fontFamily: 'var(--font-serif)' }}
             >
               Check your email
             </h1>
@@ -171,7 +171,7 @@ function SignupPageContent() {
         <div className="w-full max-w-sm">
           <h1
             className="text-2xl font-bold mb-2 text-gray-900"
-            style={{ fontFamily: 'Lora, Georgia, serif' }}
+            style={{ fontFamily: 'var(--font-serif)' }}
           >
             Create account
           </h1>

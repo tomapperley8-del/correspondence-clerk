@@ -35,6 +35,7 @@ import { ThreadsView } from './ThreadsView'
 import { type EditFields } from './CorrespondenceEditForm'
 import { useCorrespondence } from './useCorrespondence'
 import { PipelineStatusCard } from './PipelineStatusCard'
+import { BusinessArticles } from './BusinessArticles'
 
 function formatRelativeTime(isoString: string): string {
   const diffMs = Date.now() - new Date(isoString).getTime()
@@ -830,6 +831,9 @@ export function BusinessDetailClient({
 
       {/* Files Section */}
       <BusinessFiles businessId={business.id} />
+
+      {/* News Coverage */}
+      <BusinessArticles businessId={business.id} />
 
       {/* Letter File / Correspondence */}
       <div className="bg-white border-2 border-gray-300 p-6">

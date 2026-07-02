@@ -67,7 +67,7 @@ export default function FirstBusinessPage() {
         <Link
           href="/"
           className="text-xl font-bold text-white"
-          style={{ fontFamily: 'Lora, Georgia, serif' }}
+          style={{ fontFamily: 'var(--font-serif)' }}
         >
           Correspondence Clerk
         </Link>
@@ -81,7 +81,7 @@ export default function FirstBusinessPage() {
           <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#94a3b8' }}>Step 3 of 4</p>
           <p
             className="text-2xl font-semibold text-white leading-snug mb-3"
-            style={{ fontFamily: 'Lora, Georgia, serif' }}
+            style={{ fontFamily: 'var(--font-serif)' }}
           >
             Add your first business and contact.
           </p>
@@ -102,7 +102,7 @@ export default function FirstBusinessPage() {
         <div className="w-full max-w-sm">
           <h1
             className="text-2xl font-bold mb-2 text-gray-900"
-            style={{ fontFamily: 'Lora, Georgia, serif' }}
+            style={{ fontFamily: 'var(--font-serif)' }}
           >
             Business &amp; contact
           </h1>

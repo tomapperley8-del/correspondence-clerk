@@ -101,7 +101,7 @@ export default function FeaturesPage() {
           <Link
             href="/"
             className="font-bold text-xl"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
+            style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)' }}
           >
             Correspondence Clerk
           </Link>
@@ -128,7 +128,7 @@ export default function FeaturesPage() {
           </p>
           <h1
             className="text-4xl md:text-5xl font-bold mb-5 leading-tight"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.02em' }}
+            style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)', letterSpacing: '-0.02em' }}
           >
             An AI assistant for your business correspondence
           </h1>
@@ -152,7 +152,7 @@ export default function FeaturesPage() {
               <div className="md:col-span-3">
                 <h2
                   className="text-xl font-bold mb-3"
-                  style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
+                  style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)' }}
                 >
                   {feature.title}
                 </h2>
@@ -185,7 +185,7 @@ export default function FeaturesPage() {
         <div className="mt-20 pt-10" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
           <h2
             className="text-2xl font-bold mb-3"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
+            style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)' }}
           >
             Start knowing what needs your attention
           </h2>

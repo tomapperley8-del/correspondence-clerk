@@ -37,7 +37,7 @@ export function FAQ() {
       <div className="container mx-auto px-6 max-w-2xl">
         <h2
           className="text-2xl font-bold mb-10"
-          style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)' }}
+          style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)' }}
         >
           Frequently asked questions
         </h2>

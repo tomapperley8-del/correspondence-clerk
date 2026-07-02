@@ -26,7 +26,7 @@ export function HowItWorks() {
         <div className="mb-16">
           <h2
             className="text-3xl md:text-4xl font-bold"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--header-bg)', letterSpacing: '-0.01em' }}
+            style={{ fontFamily: 'var(--font-serif)', color: 'var(--header-bg)', letterSpacing: '-0.01em' }}
           >
             How it works
           </h2>

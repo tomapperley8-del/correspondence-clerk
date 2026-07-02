@@ -31,7 +31,7 @@ export default async function InboxPage() {
         <div>
           <h1
             className="text-3xl font-bold mb-1"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--brand-dark)' }}
+            style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}
           >
             Inbox
           </h1>
@@ -54,7 +54,7 @@ export default async function InboxPage() {
         >
           <p
             className="text-xl mb-2"
-            style={{ fontFamily: 'Lora, Georgia, serif', color: 'var(--brand-dark)' }}
+            style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}
           >
             You&rsquo;re all caught up
           </p>
