@@ -48,6 +48,28 @@ function daysRemaining(contractEnd: string | null, today: string): number | null
   return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 }
 
+const STAGE_DATE_FIELDS: Record<string, keyof ContractBusiness> = {
+  not_started: 'renewal_not_started_at',
+  contacted: 'renewal_contacted_at',
+  in_discussion: 'renewal_in_discussion_at',
+  agreed: 'renewal_agreed_at',
+  invoice_paid: 'renewal_invoice_paid_at',
+}
+
+function getContractStageDate(b: ContractBusiness): string | null {
+  const stage = mapLegacyStage(b.renewal_stage || 'not_started')
+  const field = STAGE_DATE_FIELDS[stage]
+  return field ? (b[field] as string | null) : null
+}
+
+function daysSinceDate(dateStr: string | null): number | null {
+  if (!dateStr) return null
+  const d = new Date(dateStr + 'T00:00:00')
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+}
+
 type TypeFilter = 'all' | 'club_card' | 'advertiser'
 
 type RenewalContractFields = {
@@ -65,11 +87,12 @@ type ContractsViewProps = {
   onStageChange: (businessId: string, stage: RenewalStage) => void
   onRenew: (businessId: string, contract: RenewalContractFields) => Promise<void>
   onAddBusiness: (businessId: string, type: 'club_card' | 'advertiser') => Promise<void>
+  onDateChange: (businessId: string, field: string, date: string) => Promise<void>
   allBusinessNames: { id: string; name: string }[]
   onMoveToOutreach?: (businessId: string) => void
 }
 
-export function ContractsView({ businesses, today, onStageChange, onRenew, onAddBusiness, allBusinessNames, onMoveToOutreach }: ContractsViewProps) {
+export function ContractsView({ businesses, today, onStageChange, onRenew, onAddBusiness, onDateChange, allBusinessNames, onMoveToOutreach }: ContractsViewProps) {
   const [renewingBusiness, setRenewingBusiness] = useState<ContractBusiness | null>(null)
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline')
   const [search, setSearch] = useState('')
@@ -250,12 +273,14 @@ export function ContractsView({ businesses, today, onStageChange, onRenew, onAdd
           today={today}
           onStageChange={handleStageChangeOrRenew}
           onMoveToOutreach={onMoveToOutreach}
+          onDateChange={onDateChange}
         />
       ) : (
         <ListView
           businesses={filtered}
           today={today}
           onStageChange={handleStageChangeOrRenew}
+          onDateChange={onDateChange}
         />
       )}
 
@@ -310,11 +335,13 @@ function PipelineView({
   today,
   onStageChange,
   onMoveToOutreach,
+  onDateChange,
 }: {
   byStage: Record<RenewalStage, ContractBusiness[]>
   today: string
   onStageChange: (businessId: string, stage: RenewalStage) => void
   onMoveToOutreach?: (businessId: string) => void
+  onDateChange: (businessId: string, field: string, date: string) => Promise<void>
 }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<RenewalStage | null>(null)
@@ -374,6 +401,7 @@ function PipelineView({
                   onDragEnd={handleDragEnd}
                   isDragging={dragId === b.id}
                   onMoveToOutreach={stage.key === 'not_renewing' ? onMoveToOutreach : undefined}
+                  onDateChange={onDateChange}
                 />
               ))}
               {items.length === 0 && (
@@ -395,6 +423,7 @@ function BusinessCard({
   onDragEnd,
   isDragging,
   onMoveToOutreach,
+  onDateChange,
 }: {
   business: ContractBusiness
   today: string
@@ -402,11 +431,16 @@ function BusinessCard({
   onDragEnd: () => void
   isDragging: boolean
   onMoveToOutreach?: (businessId: string) => void
+  onDateChange: (businessId: string, field: string, date: string) => Promise<void>
 }) {
+  const [editingDate, setEditingDate] = useState(false)
   const days = daysRemaining(business.current_contract_end, today)
   const isExpired = days !== null && days < 0
   const badge = getTypeBadge(business)
   const stage = mapLegacyStage(business.renewal_stage)
+  const stageDate = getContractStageDate(business)
+  const daysInStage = daysSinceDate(stageDate)
+  const dateField = STAGE_DATE_FIELDS[stage]
 
   return (
     <div
@@ -425,6 +459,11 @@ function BusinessCard({
           {business.name}
         </Link>
         <div className="flex items-center gap-1 flex-shrink-0">
+          {daysInStage !== null && (
+            <span className={`text-[8px] font-semibold px-1 py-0.5 ${daysInStage > 30 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+              {daysInStage}d
+            </span>
+          )}
           {business.total_contract_count > 1 && (
             <span className="text-[8px] font-semibold px-1 py-0.5 bg-brand-olive/15 text-brand-olive" title={`${business.total_contract_count} contracts on record`}>
               ×{business.total_contract_count}
@@ -447,10 +486,32 @@ function BusinessCard({
         <p className="text-[10px] text-gray-300 italic">No contract date</p>
       )}
 
-      {business.renewal_contacted_at && stage !== 'not_started' && (
-        <p className="text-[9px] text-blue-500 mt-0.5">
-          Contacted: {formatDateShortGB(business.renewal_contacted_at + 'T00:00:00')}
-        </p>
+      {stageDate && !editingDate && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setEditingDate(true) }}
+          className="text-[9px] text-gray-400 hover:text-gray-600 transition-colors mt-0.5"
+        >
+          Since: {formatDateShortGB(stageDate + 'T00:00:00')}
+        </button>
+      )}
+      {editingDate && dateField && (
+        <input
+          type="date"
+          defaultValue={stageDate || ''}
+          className="text-[9px] w-full border border-gray-200 px-1 py-0.5 outline-none focus:border-brand-navy mt-0.5"
+          autoFocus
+          onBlur={(e) => {
+            if (e.target.value && e.target.value !== stageDate) {
+              onDateChange(business.id, dateField as string, e.target.value)
+            }
+            setEditingDate(false)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') setEditingDate(false)
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
       )}
 
       {onMoveToOutreach && (
@@ -469,10 +530,12 @@ function ListView({
   businesses,
   today,
   onStageChange,
+  onDateChange,
 }: {
   businesses: ContractBusiness[]
   today: string
   onStageChange: (businessId: string, stage: RenewalStage) => void
+  onDateChange: (businessId: string, field: string, date: string) => Promise<void>
 }) {
   const sorted = useMemo(() =>
     [...businesses].sort((a, b) => {
@@ -486,10 +549,12 @@ function ListView({
 
   return (
     <div className="border border-gray-200 divide-y divide-gray-100">
-      <div className="grid grid-cols-[1fr_80px_100px_110px_60px] gap-2 px-3 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+      <div className="grid grid-cols-[1fr_60px_90px_90px_50px_110px_50px] gap-2 px-3 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500">
         <span>Business</span>
         <span>Type</span>
         <span>Contract ends</span>
+        <span>Stage date</span>
+        <span>Days</span>
         <span>Stage</span>
         <span></span>
       </div>
@@ -499,6 +564,7 @@ function ListView({
           business={b}
           today={today}
           onStageChange={onStageChange}
+          onDateChange={onDateChange}
         />
       ))}
       {sorted.length === 0 && (
@@ -514,19 +580,24 @@ function BusinessListRow({
   business,
   today,
   onStageChange,
+  onDateChange,
 }: {
   business: ContractBusiness
   today: string
   onStageChange: (businessId: string, stage: RenewalStage) => void
+  onDateChange: (businessId: string, field: string, date: string) => Promise<void>
 }) {
   const days = daysRemaining(business.current_contract_end, today)
   const isExpired = days !== null && days < 0
   const badge = getTypeBadge(business)
   const stage = mapLegacyStage(business.renewal_stage)
   const stageInfo = STAGES.find(s => s.key === stage)!
+  const stageDate = getContractStageDate(business)
+  const daysInStage = daysSinceDate(stageDate)
+  const dateField = STAGE_DATE_FIELDS[stage]
 
   return (
-    <div className="grid grid-cols-[1fr_80px_100px_110px_60px] gap-2 items-center px-3 py-2.5 hover:bg-brand-warm/50 transition-colors">
+    <div className="grid grid-cols-[1fr_60px_90px_90px_50px_110px_50px] gap-2 items-center px-3 py-2.5 hover:bg-brand-warm/50 transition-colors">
       <Link
         href={`/businesses/${business.id}`}
         className="text-sm text-brand-navy hover:text-brand-olive transition-colors truncate font-medium"
@@ -540,6 +611,21 @@ function BusinessListRow({
 
       <span className={`text-xs whitespace-nowrap ${isExpired ? 'text-red-600 font-medium' : business.current_contract_end ? 'text-gray-500' : 'text-gray-300 italic'}`}>
         {business.current_contract_end ? formatDateShortGB(business.current_contract_end + 'T00:00:00') : 'Not set'}
+      </span>
+
+      <span className="text-xs text-gray-500">
+        {stageDate && dateField ? (
+          <input
+            type="date"
+            value={stageDate}
+            onChange={(e) => { if (e.target.value) onDateChange(business.id, dateField as string, e.target.value) }}
+            className="text-[10px] w-full border border-transparent hover:border-gray-200 focus:border-brand-navy px-0.5 py-0 bg-transparent outline-none cursor-pointer"
+          />
+        ) : '—'}
+      </span>
+
+      <span className={`text-[10px] font-medium text-center ${daysInStage !== null && daysInStage > 30 ? 'text-amber-600' : 'text-gray-400'}`}>
+        {daysInStage !== null ? `${daysInStage}d` : '—'}
       </span>
 
       <select

@@ -37,15 +37,38 @@ function monthsAgo(dateStr: string | null): number | null {
   return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
 }
 
+const STAGE_DATE_FIELDS: Record<string, keyof OutreachBusiness> = {
+  identified: 'outreach_identified_at',
+  contacted: 'outreach_contacted_at',
+  followed_up: 'outreach_followed_up_at',
+  in_discussion: 'outreach_in_discussion_at',
+  won: 'outreach_won_at',
+  invoice_paid: 'outreach_invoice_paid_at',
+}
+
+function getStageDate(b: OutreachBusiness): string | null {
+  const field = STAGE_DATE_FIELDS[b.outreach_stage]
+  return field ? (b[field] as string | null) : null
+}
+
+function daysSince(dateStr: string | null): number | null {
+  if (!dateStr) return null
+  const d = new Date(dateStr + 'T00:00:00')
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+}
+
 type OutreachViewProps = {
   businesses: OutreachBusiness[]
   onStageChange: (businessId: string, stage: OutreachStage) => void
   onAddBusiness: (businessId: string) => Promise<void>
   onRemoveBusiness: (businessId: string) => Promise<void>
+  onDateChange: (businessId: string, field: string, date: string) => Promise<void>
   allBusinessNames: { id: string; name: string }[]
 }
 
-export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemoveBusiness, allBusinessNames }: OutreachViewProps) {
+export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemoveBusiness, onDateChange, allBusinessNames }: OutreachViewProps) {
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline')
   const [search, setSearch] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -181,12 +204,14 @@ export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemov
           byStage={byStage}
           onStageChange={onStageChange}
           onRemove={onRemoveBusiness}
+          onDateChange={onDateChange}
         />
       ) : (
         <OutreachList
           businesses={filtered}
           onStageChange={onStageChange}
           onRemove={onRemoveBusiness}
+          onDateChange={onDateChange}
         />
       )}
 
@@ -277,10 +302,12 @@ function OutreachPipeline({
   byStage,
   onStageChange,
   onRemove,
+  onDateChange,
 }: {
   byStage: Record<OutreachStage, OutreachBusiness[]>
   onStageChange: (businessId: string, stage: OutreachStage) => void
   onRemove: (businessId: string) => Promise<void>
+  onDateChange: (businessId: string, field: string, date: string) => Promise<void>
 }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<OutreachStage | null>(null)
@@ -339,6 +366,7 @@ function OutreachPipeline({
                   onDragEnd={handleDragEnd}
                   isDragging={dragId === b.id}
                   onRemove={onRemove}
+                  onDateChange={onDateChange}
                 />
               ))}
               {items.length === 0 && (
@@ -359,14 +387,20 @@ function OutreachCard({
   onDragEnd,
   isDragging,
   onRemove,
+  onDateChange,
 }: {
   business: OutreachBusiness
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void
   isDragging: boolean
   onRemove: (businessId: string) => Promise<void>
+  onDateChange: (businessId: string, field: string, date: string) => Promise<void>
 }) {
+  const [editingDate, setEditingDate] = useState(false)
   const badge = getTypeBadge(business)
+  const stageDate = getStageDate(business)
+  const days = daysSince(stageDate)
+  const dateField = STAGE_DATE_FIELDS[business.outreach_stage]
 
   return (
     <div
@@ -384,22 +418,46 @@ function OutreachCard({
         >
           {business.name}
         </Link>
-        {badge && (
-          <span className="text-[8px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy flex-shrink-0">
-            {badge}
-          </span>
-        )}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {days !== null && (
+            <span className={`text-[8px] font-semibold px-1 py-0.5 ${days > 30 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+              {days}d
+            </span>
+          )}
+          {badge && (
+            <span className="text-[8px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy">
+              {badge}
+            </span>
+          )}
+        </div>
       </div>
 
-      {business.outreach_contacted_at && (
-        <p className="text-[9px] text-blue-500">
-          Contacted: {formatDateShortGB(business.outreach_contacted_at + 'T00:00:00')}
-        </p>
+      {stageDate && !editingDate && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setEditingDate(true) }}
+          className="text-[9px] text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          {formatDateShortGB(stageDate + 'T00:00:00')}
+        </button>
       )}
-      {business.outreach_followed_up_at && (
-        <p className="text-[9px] text-purple-500">
-          Followed up: {formatDateShortGB(business.outreach_followed_up_at + 'T00:00:00')}
-        </p>
+      {editingDate && dateField && (
+        <input
+          type="date"
+          defaultValue={stageDate || ''}
+          className="text-[9px] w-full border border-gray-200 px-1 py-0.5 outline-none focus:border-brand-navy"
+          autoFocus
+          onBlur={(e) => {
+            if (e.target.value && e.target.value !== stageDate) {
+              onDateChange(business.id, dateField as string, e.target.value)
+            }
+            setEditingDate(false)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') setEditingDate(false)
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
       )}
 
       <button
@@ -416,18 +474,20 @@ function OutreachList({
   businesses,
   onStageChange,
   onRemove,
+  onDateChange,
 }: {
   businesses: OutreachBusiness[]
   onStageChange: (businessId: string, stage: OutreachStage) => void
   onRemove: (businessId: string) => Promise<void>
+  onDateChange: (businessId: string, field: string, date: string) => Promise<void>
 }) {
   return (
     <div className="border border-gray-200 divide-y divide-gray-100">
-      <div className="grid grid-cols-[1fr_80px_100px_100px_110px_60px] gap-2 px-3 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+      <div className="grid grid-cols-[1fr_60px_90px_60px_110px_60px] gap-2 px-3 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500">
         <span>Business</span>
         <span>Type</span>
-        <span>Contacted</span>
-        <span>Followed up</span>
+        <span>Stage date</span>
+        <span>Days</span>
         <span>Stage</span>
         <span></span>
       </div>
@@ -435,9 +495,12 @@ function OutreachList({
         const badge = getTypeBadge(b)
         const stage = (b.outreach_stage || 'identified') as OutreachStage
         const stageInfo = ALL_STAGES.find(s => s.key === stage) ?? ALL_STAGES[0]
+        const stageDate = getStageDate(b)
+        const days = daysSince(stageDate)
+        const dateField = STAGE_DATE_FIELDS[stage]
 
         return (
-          <div key={b.id} className="grid grid-cols-[1fr_80px_100px_100px_110px_60px] gap-2 items-center px-3 py-2.5 hover:bg-brand-warm/50 transition-colors">
+          <div key={b.id} className="grid grid-cols-[1fr_60px_90px_60px_110px_60px] gap-2 items-center px-3 py-2.5 hover:bg-brand-warm/50 transition-colors">
             <Link
               href={`/businesses/${b.id}`}
               className="text-sm text-brand-navy hover:text-brand-olive transition-colors truncate font-medium"
@@ -450,11 +513,18 @@ function OutreachList({
             </span>
 
             <span className="text-xs text-gray-500">
-              {b.outreach_contacted_at ? formatDateShortGB(b.outreach_contacted_at + 'T00:00:00') : '—'}
+              {stageDate && dateField ? (
+                <input
+                  type="date"
+                  value={stageDate}
+                  onChange={(e) => { if (e.target.value) onDateChange(b.id, dateField as string, e.target.value) }}
+                  className="text-[10px] w-full border border-transparent hover:border-gray-200 focus:border-brand-navy px-0.5 py-0 bg-transparent outline-none cursor-pointer"
+                />
+              ) : '—'}
             </span>
 
-            <span className="text-xs text-gray-500">
-              {b.outreach_followed_up_at ? formatDateShortGB(b.outreach_followed_up_at + 'T00:00:00') : '—'}
+            <span className={`text-[10px] font-medium text-center ${days !== null && days > 30 ? 'text-amber-600' : 'text-gray-400'}`}>
+              {days !== null ? `${days}d` : '—'}
             </span>
 
             <select

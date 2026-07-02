@@ -5,6 +5,7 @@ import { InsightsProvider } from '@/components/InsightsContext'
 import { ToastContainer } from '@/components/Toast'
 import { DynamicPanels } from '@/components/DynamicPanels'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
+import { PwaNavBar } from '@/components/PwaNavBar'
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -50,6 +51,7 @@ export default function RootLayout({
           >
             Skip to main content
           </a>
+          <PwaNavBar />
           <Navigation />
           <DynamicPanels />
           <ToastContainer />

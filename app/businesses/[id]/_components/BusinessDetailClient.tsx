@@ -34,6 +34,7 @@ import { AllEntriesView } from './AllEntriesView'
 import { ThreadsView } from './ThreadsView'
 import { type EditFields } from './CorrespondenceEditForm'
 import { useCorrespondence } from './useCorrespondence'
+import { PipelineStatusCard } from './PipelineStatusCard'
 
 function formatRelativeTime(isoString: string): string {
   const diffMs = Date.now() - new Date(isoString).getTime()
@@ -640,6 +641,9 @@ export function BusinessDetailClient({
           </div>
         )}
       </div>
+
+      {/* Pipeline Status */}
+      <PipelineStatusCard business={business} />
 
       {/* Quick Actions Bar */}
       <div className="sticky top-0 z-10 bg-white border border-gray-200 px-4 py-2.5 mb-6 flex items-center gap-3">

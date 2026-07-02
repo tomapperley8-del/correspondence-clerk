@@ -15,7 +15,7 @@ import {
 } from '@/app/actions/tasks'
 import { getCategoryColor } from '@/lib/task-colors'
 import { markCorrespondenceDone, type GoneQuietItem } from '@/app/actions/correspondence'
-import { updateBusiness, updateBusinessRenewalStage, addBusinessToContracts, updateOutreachStage, addBusinessToOutreach, removeBusinessFromOutreach, promoteOutreachToContracts } from '@/app/actions/businesses'
+import { updateBusiness, updateBusinessRenewalStage, addBusinessToContracts, updateOutreachStage, addBusinessToOutreach, removeBusinessFromOutreach, promoteOutreachToContracts, updateOutreachStageDate, updateRenewalStageDate } from '@/app/actions/businesses'
 import type { ContractBusiness, OutreachBusiness } from '@/app/actions/businesses'
 import { createContract, updateContract, getContractsByBusiness } from '@/app/actions/contracts'
 import { toast } from '@/lib/toast'
@@ -441,11 +441,20 @@ export function TodosClient({
   const handleStageChange = useCallback(
     async (businessId: string, stage: string) => {
       setContractBusinesses((prev) =>
-        prev.map((b) => (b.id === businessId ? {
-          ...b,
-          renewal_stage: stage === 'renewed' ? 'not_started' : stage,
-          renewal_contacted_at: stage === 'contacted' ? todayStr() : stage === 'renewed' ? null : b.renewal_contacted_at,
-        } : b))
+        prev.map((b) => {
+          if (b.id !== businessId) return b
+          const isRenewed = stage === 'renewed'
+          return {
+            ...b,
+            renewal_stage: isRenewed ? 'not_started' : stage,
+            renewal_not_started_at: isRenewed ? todayStr() : stage === 'not_started' ? todayStr() : b.renewal_not_started_at,
+            renewal_contacted_at: stage === 'contacted' ? todayStr() : isRenewed ? null : b.renewal_contacted_at,
+            renewal_in_discussion_at: stage === 'in_discussion' ? todayStr() : isRenewed ? null : b.renewal_in_discussion_at,
+            renewal_agreed_at: stage === 'agreed' ? todayStr() : isRenewed ? null : b.renewal_agreed_at,
+            renewal_invoice_paid_at: stage === 'invoice_paid' ? todayStr() : isRenewed ? null : b.renewal_invoice_paid_at,
+            renewal_declined_at: stage === 'not_renewing' ? new Date().toISOString() : stage !== 'not_renewing' ? null : b.renewal_declined_at,
+          }
+        })
       )
       const result = await updateBusinessRenewalStage(businessId, stage)
       if (result.error) {
@@ -526,7 +535,11 @@ export function TodosClient({
             is_club_card: isCC,
             is_advertiser: biz.is_advertiser,
             renewal_stage: 'not_started',
+            renewal_not_started_at: todayStr(),
             renewal_contacted_at: null,
+            renewal_in_discussion_at: null,
+            renewal_agreed_at: null,
+            renewal_invoice_paid_at: null,
             renewal_declined_at: null,
             current_contract_end: null,
             current_contract_start: null,
@@ -549,8 +562,12 @@ export function TodosClient({
         prev.map((b) => (b.id === businessId ? {
           ...b,
           outreach_stage: stage,
+          outreach_identified_at: stage === 'identified' ? todayStr() : b.outreach_identified_at,
           outreach_contacted_at: stage === 'contacted' ? todayStr() : b.outreach_contacted_at,
           outreach_followed_up_at: stage === 'followed_up' ? todayStr() : b.outreach_followed_up_at,
+          outreach_in_discussion_at: stage === 'in_discussion' ? todayStr() : b.outreach_in_discussion_at,
+          outreach_won_at: stage === 'won' ? todayStr() : b.outreach_won_at,
+          outreach_invoice_paid_at: stage === 'invoice_paid' ? todayStr() : b.outreach_invoice_paid_at,
           outreach_declined_at: stage === 'not_interested' ? new Date().toISOString() : stage !== 'not_interested' ? null : b.outreach_declined_at,
         } : b))
       )
@@ -573,8 +590,12 @@ export function TodosClient({
           is_club_card: false,
           is_advertiser: false,
           outreach_stage: 'identified',
+          outreach_identified_at: todayStr(),
           outreach_contacted_at: null,
           outreach_followed_up_at: null,
+          outreach_in_discussion_at: null,
+          outreach_won_at: null,
+          outreach_invoice_paid_at: null,
           outreach_declined_at: null,
         }])
       }
@@ -598,6 +619,34 @@ export function TodosClient({
         router.refresh()
       } else {
         toast.success('Removed from outreach')
+      }
+    },
+    [router]
+  )
+
+  const handleOutreachDateChange = useCallback(
+    async (businessId: string, field: string, date: string) => {
+      setOutreachBusinesses((prev) =>
+        prev.map((b) => (b.id === businessId ? { ...b, [field]: date } : b))
+      )
+      const result = await updateOutreachStageDate(businessId, field, date)
+      if (result.error) {
+        toast.error(result.error)
+        router.refresh()
+      }
+    },
+    [router]
+  )
+
+  const handleRenewalDateChange = useCallback(
+    async (businessId: string, field: string, date: string) => {
+      setContractBusinesses((prev) =>
+        prev.map((b) => (b.id === businessId ? { ...b, [field]: date } : b))
+      )
+      const result = await updateRenewalStageDate(businessId, field, date)
+      if (result.error) {
+        toast.error(result.error)
+        router.refresh()
       }
     },
     [router]
@@ -982,6 +1031,7 @@ export function TodosClient({
           onStageChange={handleStageChange}
           onRenew={handleRenew}
           onAddBusiness={handleAddBusinessToContracts}
+          onDateChange={handleRenewalDateChange}
           allBusinessNames={allBusinessNames}
           onMoveToOutreach={(businessId) => {
             handleAddOutreachBusiness(businessId)
@@ -995,6 +1045,7 @@ export function TodosClient({
           onStageChange={handleOutreachStageChange}
           onAddBusiness={handleAddOutreachBusiness}
           onRemoveBusiness={handleRemoveOutreachBusiness}
+          onDateChange={handleOutreachDateChange}
           allBusinessNames={allBusinessNames}
         />
       )}

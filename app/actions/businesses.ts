@@ -56,6 +56,21 @@ export type Business = {
   business_type: string | null
   relationship_memory: string | null
   relationship_memory_updated_at: string | null
+  outreach_stage: string | null
+  outreach_identified_at: string | null
+  outreach_contacted_at: string | null
+  outreach_followed_up_at: string | null
+  outreach_in_discussion_at: string | null
+  outreach_won_at: string | null
+  outreach_invoice_paid_at: string | null
+  outreach_declined_at: string | null
+  renewal_stage: string | null
+  renewal_not_started_at: string | null
+  renewal_contacted_at: string | null
+  renewal_in_discussion_at: string | null
+  renewal_agreed_at: string | null
+  renewal_invoice_paid_at: string | null
+  renewal_declined_at: string | null
   disposition: 'follow_up_later' | 'not_interested' | null
   follow_up_after: string | null
   mute_replies: boolean
@@ -106,7 +121,7 @@ export async function getBusinessById(id: string) {
   // Select specific columns needed for detail page (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, disposition, follow_up_after, mute_replies, mastersheet_source_ids, organization_id, created_at, updated_at')
+    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, outreach_stage, outreach_identified_at, outreach_contacted_at, outreach_followed_up_at, outreach_in_discussion_at, outreach_won_at, outreach_invoice_paid_at, outreach_declined_at, renewal_stage, renewal_not_started_at, renewal_contacted_at, renewal_in_discussion_at, renewal_agreed_at, renewal_invoice_paid_at, renewal_declined_at, disposition, follow_up_after, mute_replies, mastersheet_source_ids, organization_id, created_at, updated_at')
     .eq('id', id)
     .single()
 
@@ -285,7 +300,11 @@ export type ContractBusiness = {
   is_club_card: boolean
   is_advertiser: boolean
   renewal_stage: string
+  renewal_not_started_at: string | null
   renewal_contacted_at: string | null
+  renewal_in_discussion_at: string | null
+  renewal_agreed_at: string | null
+  renewal_invoice_paid_at: string | null
   renewal_declined_at: string | null
   current_contract_end: string | null
   current_contract_start: string | null
@@ -305,7 +324,7 @@ export async function getContractBusinesses(): Promise<{ data?: ContractBusiness
 
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, is_club_card, is_advertiser, renewal_stage, renewal_contacted_at, renewal_declined_at, contracts(id, contract_start, contract_end, contract_amount, contract_currency, invoice_paid, is_current)')
+    .select('id, name, is_club_card, is_advertiser, renewal_stage, renewal_not_started_at, renewal_contacted_at, renewal_in_discussion_at, renewal_agreed_at, renewal_invoice_paid_at, renewal_declined_at, contracts(id, contract_start, contract_end, contract_amount, contract_currency, invoice_paid, is_current)')
     .eq('organization_id', orgId)
     .or('is_club_card.eq.true,is_advertiser.eq.true')
     .order('name', { ascending: true })
@@ -328,7 +347,11 @@ export async function getContractBusinesses(): Promise<{ data?: ContractBusiness
       is_club_card: b.is_club_card as boolean,
       is_advertiser: b.is_advertiser as boolean,
       renewal_stage: (b.renewal_stage as string) || 'not_started',
+      renewal_not_started_at: b.renewal_not_started_at as string | null,
       renewal_contacted_at: b.renewal_contacted_at as string | null,
+      renewal_in_discussion_at: b.renewal_in_discussion_at as string | null,
+      renewal_agreed_at: b.renewal_agreed_at as string | null,
+      renewal_invoice_paid_at: b.renewal_invoice_paid_at as string | null,
       renewal_declined_at: b.renewal_declined_at as string | null,
       current_contract_end: current?.contract_end ?? null,
       current_contract_start: current?.contract_start ?? null,
@@ -360,12 +383,24 @@ export async function updateBusinessRenewalStage(
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
+  const today = new Date().toISOString().slice(0, 10)
   const isRenewed = stage === 'renewed'
   const update: Record<string, unknown> = { renewal_stage: isRenewed ? 'not_started' : stage }
-  if (stage === 'contacted') {
-    update.renewal_contacted_at = new Date().toISOString().slice(0, 10)
-  } else if (isRenewed) {
+  const dateFields: Record<string, string> = {
+    not_started: 'renewal_not_started_at',
+    contacted: 'renewal_contacted_at',
+    in_discussion: 'renewal_in_discussion_at',
+    agreed: 'renewal_agreed_at',
+    invoice_paid: 'renewal_invoice_paid_at',
+  }
+  if (isRenewed) {
+    update.renewal_not_started_at = today
     update.renewal_contacted_at = null
+    update.renewal_in_discussion_at = null
+    update.renewal_agreed_at = null
+    update.renewal_invoice_paid_at = null
+  } else if (dateFields[stage]) {
+    update[dateFields[stage]] = today
   }
   if (stage === 'not_renewing') {
     update.renewal_declined_at = new Date().toISOString()
@@ -381,6 +416,7 @@ export async function updateBusinessRenewalStage(
 
   if (error) return { error: error.message }
   revalidatePath('/todos')
+  revalidatePath(`/businesses/${businessId}`)
   return {}
 }
 
@@ -417,8 +453,12 @@ export type OutreachBusiness = {
   is_club_card: boolean
   is_advertiser: boolean
   outreach_stage: string
+  outreach_identified_at: string | null
   outreach_contacted_at: string | null
   outreach_followed_up_at: string | null
+  outreach_in_discussion_at: string | null
+  outreach_won_at: string | null
+  outreach_invoice_paid_at: string | null
   outreach_declined_at: string | null
 }
 
@@ -432,7 +472,7 @@ export async function getOutreachBusinesses(): Promise<{ data?: OutreachBusiness
 
   const { data, error } = await supabase
     .from('businesses')
-    .select('id, name, is_club_card, is_advertiser, outreach_stage, outreach_contacted_at, outreach_followed_up_at, outreach_declined_at')
+    .select('id, name, is_club_card, is_advertiser, outreach_stage, outreach_identified_at, outreach_contacted_at, outreach_followed_up_at, outreach_in_discussion_at, outreach_won_at, outreach_invoice_paid_at, outreach_declined_at')
     .eq('organization_id', orgId)
     .not('outreach_stage', 'is', null)
     .order('name', { ascending: true })
@@ -453,11 +493,18 @@ export async function updateOutreachStage(
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
+  const today = new Date().toISOString().slice(0, 10)
   const update: Record<string, unknown> = { outreach_stage: stage }
-  if (stage === 'contacted') {
-    update.outreach_contacted_at = new Date().toISOString().slice(0, 10)
-  } else if (stage === 'followed_up') {
-    update.outreach_followed_up_at = new Date().toISOString().slice(0, 10)
+  const dateFields: Record<string, string> = {
+    identified: 'outreach_identified_at',
+    contacted: 'outreach_contacted_at',
+    followed_up: 'outreach_followed_up_at',
+    in_discussion: 'outreach_in_discussion_at',
+    won: 'outreach_won_at',
+    invoice_paid: 'outreach_invoice_paid_at',
+  }
+  if (dateFields[stage]) {
+    update[dateFields[stage]] = today
   }
   if (stage === 'not_interested') {
     update.outreach_declined_at = new Date().toISOString()
@@ -473,6 +520,7 @@ export async function updateOutreachStage(
 
   if (error) return { error: error.message }
   revalidatePath('/todos')
+  revalidatePath(`/businesses/${businessId}`)
   return {}
 }
 
@@ -488,12 +536,13 @@ export async function addBusinessToOutreach(
 
   const { error } = await supabase
     .from('businesses')
-    .update({ outreach_stage: 'identified' })
+    .update({ outreach_stage: 'identified', outreach_identified_at: new Date().toISOString().slice(0, 10) })
     .eq('id', businessId)
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
   revalidatePath('/todos')
+  revalidatePath(`/businesses/${businessId}`)
   return {}
 }
 
@@ -516,9 +565,15 @@ export async function promoteOutreachToContracts(
 
   const update: Record<string, unknown> = {
     outreach_stage: null,
+    outreach_identified_at: null,
     outreach_contacted_at: null,
     outreach_followed_up_at: null,
+    outreach_in_discussion_at: null,
+    outreach_won_at: null,
+    outreach_invoice_paid_at: null,
+    outreach_declined_at: null,
     renewal_stage: 'not_started',
+    renewal_not_started_at: new Date().toISOString().slice(0, 10),
   }
 
   if (!biz?.is_club_card && !biz?.is_advertiser) {
@@ -549,12 +604,93 @@ export async function removeBusinessFromOutreach(
 
   const { error } = await supabase
     .from('businesses')
-    .update({ outreach_stage: null, outreach_contacted_at: null, outreach_followed_up_at: null })
+    .update({ outreach_stage: null, outreach_identified_at: null, outreach_contacted_at: null, outreach_followed_up_at: null, outreach_in_discussion_at: null, outreach_won_at: null, outreach_invoice_paid_at: null, outreach_declined_at: null })
     .eq('id', businessId)
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
   revalidatePath('/todos')
+  revalidatePath(`/businesses/${businessId}`)
+  return {}
+}
+
+export async function updateOutreachStageDate(
+  businessId: string,
+  field: string,
+  date: string
+): Promise<{ error?: string }> {
+  const allowed = ['outreach_identified_at', 'outreach_contacted_at', 'outreach_followed_up_at', 'outreach_in_discussion_at', 'outreach_won_at', 'outreach_invoice_paid_at']
+  if (!allowed.includes(field)) return { error: 'Invalid field' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update({ [field]: date })
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  return {}
+}
+
+export async function updateRenewalStageDate(
+  businessId: string,
+  field: string,
+  date: string
+): Promise<{ error?: string }> {
+  const allowed = ['renewal_not_started_at', 'renewal_contacted_at', 'renewal_in_discussion_at', 'renewal_agreed_at', 'renewal_invoice_paid_at']
+  if (!allowed.includes(field)) return { error: 'Invalid field' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update({ [field]: date })
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  return {}
+}
+
+export async function addBusinessToContractsFromDetail(
+  businessId: string,
+  type: 'club_card' | 'advertiser'
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const update = type === 'club_card'
+    ? { is_club_card: true, renewal_stage: 'not_started', renewal_not_started_at: new Date().toISOString().slice(0, 10) }
+    : { is_advertiser: true, renewal_stage: 'not_started', renewal_not_started_at: new Date().toISOString().slice(0, 10) }
+
+  const { error } = await supabase
+    .from('businesses')
+    .update(update)
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  revalidatePath('/dashboard')
+  revalidatePath(`/businesses/${businessId}`)
   return {}
 }
 
