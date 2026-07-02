@@ -770,6 +770,9 @@ function SettingsPageContent() {
                   Search The Chiswick Calendar for news articles mentioning your businesses (last 5 years).
                   Found articles appear on each business page for review. Also runs automatically every Monday.
                 </p>
+                <p className="text-sm mt-1">
+                  <Link href="/articles" className="text-brand-navy hover:underline">View all confirmed articles →</Link>
+                </p>
                 {articleScanResult && !isScanningArticles && (
                   <p className="text-sm text-green-700 mt-2">
                     Scanned {articleScanResult.scanned} businesses — found {articleScanResult.total_new} new article{articleScanResult.total_new === 1 ? '' : 's'}.

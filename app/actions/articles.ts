@@ -181,6 +181,26 @@ export async function scanBusinessForArticles(
   return { found: results.length, new_count: newCount }
 }
 
+export type ArticleWithBusiness = BusinessArticle & {
+  business_name: string
+}
+
+export async function getAllArticles(): Promise<ArticleWithBusiness[]> {
+  const org_id = await getCurrentUserOrganizationId()
+  if (!org_id) return []
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('business_articles')
+    .select('*, business:businesses!business_articles_business_id_fkey(name)')
+    .eq('organization_id', org_id)
+    .eq('status', 'confirmed')
+    .order('published_date', { ascending: false, nullsFirst: false })
+  return (data ?? []).map((a: Record<string, unknown>) => ({
+    ...(a as unknown as BusinessArticle),
+    business_name: (a.business as { name: string } | null)?.name ?? 'Unknown',
+  }))
+}
+
 export async function scanAllBusinessesForArticles(): Promise<{
   scanned: number
   total_found: number

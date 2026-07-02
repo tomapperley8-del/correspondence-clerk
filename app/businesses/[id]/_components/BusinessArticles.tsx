@@ -15,6 +15,7 @@ export function BusinessArticles({ businessId }: { businessId: string }) {
   const [articles, setArticles] = useState<BusinessArticle[]>([])
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   const loadArticles = useCallback(async () => {
     const data = await getArticlesForBusiness(businessId)
@@ -132,23 +133,33 @@ export function BusinessArticles({ businessId }: { businessId: string }) {
       )}
 
       {confirmed.length > 0 ? (
-        <ul className="space-y-1.5">
-          {confirmed.map(article => (
-            <li key={article.id} className="flex items-baseline gap-2">
-              <span className="text-xs text-gray-400 shrink-0 tabular-nums">
-                {article.published_date ? formatDateGB(article.published_date) : '—'}
-              </span>
-              <a
-                href={article.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-brand-navy hover:underline truncate"
-              >
-                {article.title}
-              </a>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-1.5">
+            {(expanded ? confirmed : confirmed.slice(0, 1)).map(article => (
+              <li key={article.id} className="flex items-baseline gap-2">
+                <span className="text-xs text-gray-400 shrink-0 tabular-nums">
+                  {article.published_date ? formatDateGB(article.published_date) : '—'}
+                </span>
+                <a
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-brand-navy hover:underline truncate"
+                >
+                  {article.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+          {confirmed.length > 1 && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="mt-2 text-xs text-gray-500 hover:text-brand-navy transition-colors"
+            >
+              {expanded ? 'Show less' : `Show all ${confirmed.length} articles`}
+            </button>
+          )}
+        </>
       ) : pending.length === 0 ? (
         <p className="text-sm text-gray-400">
           No articles found yet. Click &quot;Scan for articles&quot; to search The Chiswick Calendar.
