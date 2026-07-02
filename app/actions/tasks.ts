@@ -35,7 +35,7 @@ export type Task = {
   status: 'open' | 'done'
   is_priority: boolean
   category: 'work' | 'personal'
-  source: 'manual' | 'contract_renewal' | 'follow_up'
+  source: 'manual' | 'contract_renewal' | 'follow_up' | 'club_card_checkin' | 'advertiser_stats'
   type: TaskType
   task_category_id: string | null
   renewal_stage: RenewalStage
@@ -416,4 +416,156 @@ export async function refreshTaskCommitments(): Promise<{ count?: number; error?
   if (error) return { error: error.message }
   revalidatePath('/todos')
   return { count: data as number }
+}
+
+const CC_ADVERTISING_CATEGORY_ID = 'e0e7097b-342f-43f1-8ddb-f4dc9ba31e01'
+
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date)
+  d.setMonth(d.getMonth() + months)
+  return d
+}
+
+function toDateStr(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+export async function generateBusinessScheduledTasks(
+  businessId: string
+): Promise<{ created: number; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { created: 0, error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { created: 0, error: 'No organization found' }
+
+  const { data: business, error: bizError } = await supabase
+    .from('businesses')
+    .select('id, name, is_club_card, is_advertiser, contract_start, contract_end')
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+    .single()
+
+  if (bizError || !business) return { created: 0, error: bizError?.message || 'Business not found' }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayStr = toDateStr(today)
+
+  const { data: existingTasks } = await supabase
+    .from('tasks')
+    .select('due_date, source')
+    .eq('business_id', businessId)
+    .eq('organization_id', orgId)
+    .in('source', ['club_card_checkin', 'advertiser_stats'])
+
+  const existingDates = new Set(
+    (existingTasks || []).map(t => `${t.source}:${t.due_date}`)
+  )
+
+  const tasksToCreate: Array<{
+    title: string
+    due_date: string
+    source: string
+    business_id: string
+    organization_id: string
+    task_category_id: string
+    status: string
+    is_priority: boolean
+    category: string
+    type: string
+    position: number
+  }> = []
+
+  if (business.is_club_card) {
+    const startDate = business.contract_start ? new Date(business.contract_start) : today
+    for (let i = 1; i <= 4; i++) {
+      const dueDate = addMonths(startDate, i * 3)
+      const dueDateStr = toDateStr(dueDate)
+      if (dueDateStr < todayStr) continue
+      if (existingDates.has(`club_card_checkin:${dueDateStr}`)) continue
+      tasksToCreate.push({
+        title: `Check in with ${business.name}`,
+        due_date: dueDateStr,
+        source: 'club_card_checkin',
+        business_id: business.id,
+        organization_id: orgId,
+        task_category_id: CC_ADVERTISING_CATEGORY_ID,
+        status: 'open',
+        is_priority: false,
+        category: 'work',
+        type: 'task',
+        position: 0,
+      })
+    }
+  }
+
+  if (business.is_advertiser) {
+    const startDate = business.contract_start ? new Date(business.contract_start) : today
+    const endDate = business.contract_end
+      ? new Date(business.contract_end)
+      : addMonths(startDate, 12)
+    let current = addMonths(startDate, 1)
+    while (current <= endDate) {
+      const dueDateStr = toDateStr(current)
+      if (dueDateStr >= todayStr && !existingDates.has(`advertiser_stats:${dueDateStr}`)) {
+        tasksToCreate.push({
+          title: `Send stats to ${business.name}`,
+          due_date: dueDateStr,
+          source: 'advertiser_stats',
+          business_id: business.id,
+          organization_id: orgId,
+          task_category_id: CC_ADVERTISING_CATEGORY_ID,
+          status: 'open',
+          is_priority: false,
+          category: 'work',
+          type: 'task',
+          position: 0,
+        })
+      }
+      current = addMonths(current, 1)
+    }
+  }
+
+  if (tasksToCreate.length === 0) return { created: 0 }
+
+  const { error: insertError } = await supabase
+    .from('tasks')
+    .insert(tasksToCreate)
+
+  if (insertError) return { created: 0, error: insertError.message }
+
+  revalidatePath('/todos')
+  revalidatePath('/dashboard')
+  return { created: tasksToCreate.length }
+}
+
+export async function generateAllScheduledTasks(): Promise<{ created: number; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { created: 0, error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { created: 0, error: 'No organization found' }
+
+  const { data: businesses, error: bizError } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('organization_id', orgId)
+    .or('is_club_card.eq.true,is_advertiser.eq.true')
+
+  if (bizError) return { created: 0, error: bizError.message }
+  if (!businesses || businesses.length === 0) return { created: 0 }
+
+  let totalCreated = 0
+  for (const biz of businesses) {
+    const result = await generateBusinessScheduledTasks(biz.id)
+    if (result.error) return { created: totalCreated, error: `Failed for business ${biz.id}: ${result.error}` }
+    totalCreated += result.created
+  }
+
+  revalidatePath('/todos')
+  revalidatePath('/dashboard')
+  return { created: totalCreated }
 }

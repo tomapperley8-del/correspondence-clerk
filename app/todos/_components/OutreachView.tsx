@@ -75,6 +75,7 @@ export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemov
   const [addSearch, setAddSearch] = useState('')
   const [adding, setAdding] = useState(false)
   const [showNotInterested, setShowNotInterested] = useState(false)
+  const [showReEngage, setShowReEngage] = useState(false)
 
   const existingIds = useMemo(() => new Set(businesses.map(b => b.id)), [businesses])
 
@@ -215,33 +216,43 @@ export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemov
         />
       )}
 
-      {/* Re-engage section */}
+      {/* Re-engage section — collapsed by default */}
       {reEngageList.length > 0 && (
         <div className="mt-4 border border-amber-200 bg-amber-50/30">
-          <div className="px-3 py-2 border-b border-amber-200 flex items-center justify-between">
+          <button
+            onClick={() => setShowReEngage(!showReEngage)}
+            className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-amber-50 transition-colors"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700">
               Ready to re-engage ({reEngageList.length})
             </span>
-            <span className="text-[9px] text-amber-600">6+ months since last activity</span>
-          </div>
-          <div className="p-2 space-y-1">
-            {reEngageList.map(b => (
-              <div key={b.id} className="flex items-center justify-between bg-white border border-gray-200 px-2.5 py-1.5">
-                <Link
-                  href={`/businesses/${b.id}`}
-                  className="text-[11px] font-medium text-brand-navy hover:text-brand-olive transition-colors"
-                >
-                  {b.name}
-                </Link>
-                <button
-                  onClick={() => onStageChange(b.id, 'identified')}
-                  className="text-[9px] px-2 py-0.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
-                >
-                  Restart outreach
-                </button>
-              </div>
-            ))}
-          </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] text-amber-600">6+ months since last activity</span>
+              <svg className={`w-3 h-3 text-amber-600 transition-transform ${showReEngage ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </button>
+          {showReEngage && (
+            <div className="p-2 space-y-1 border-t border-amber-200">
+              {reEngageList.map(b => (
+                <div key={b.id} className="flex items-center justify-between bg-white border border-gray-200 px-2.5 py-1.5">
+                  <Link
+                    href={`/businesses/${b.id}`}
+                    className="text-[11px] font-medium text-brand-navy hover:text-brand-olive transition-colors"
+                  >
+                    {b.name}
+                  </Link>
+                  <button
+                    onClick={() => onStageChange(b.id, 'identified')}
+                    className="text-[9px] px-2 py-0.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
+                  >
+                    Restart outreach
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

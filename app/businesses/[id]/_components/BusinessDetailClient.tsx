@@ -616,6 +616,12 @@ export function BusinessDetailClient({
                 <span className="font-semibold">Deal:</span> {business.deal_terms}
               </div>
             )}
+
+            {business.invoice_number && (
+              <div className="text-sm text-gray-500 mt-1">
+                <span className="font-semibold">Invoice{business.invoice_number.includes(',') ? 's' : ''}:</span> {business.invoice_number}
+              </div>
+            )}
           </div>
           <EditBusinessButton business={business} />
         </div>

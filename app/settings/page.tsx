@@ -12,6 +12,7 @@ import { getInboundEmailToken, getOwnEmailAddresses, updateOwnEmailAddresses, ge
 import { getUnformattedCount, formatAllUnformatted } from '@/app/actions/ai-formatter'
 import { runRetroScan, applyRetroScanResult, dismissRetroScanResult, type RetroMediumResult } from '@/app/actions/retro-scan'
 import { scanAllBusinessesForArticles } from '@/app/actions/articles'
+import { generateAllScheduledTasks } from '@/app/actions/tasks'
 import { toast } from '@/lib/toast'
 import { createClient } from '@/lib/supabase/client'
 
@@ -56,6 +57,8 @@ function SettingsPageContent() {
   const [applyingRetroId, setApplyingRetroId] = useState<string | null>(null)
   const [isScanningArticles, setIsScanningArticles] = useState(false)
   const [articleScanResult, setArticleScanResult] = useState<{ scanned: number; total_new: number } | null>(null)
+  const [isGeneratingTasks, setIsGeneratingTasks] = useState(false)
+  const [tasksGenerated, setTasksGenerated] = useState<number | null>(null)
   const validTabs = ['profile', 'email', 'tools', 'account'] as const
   type Tab = typeof validTabs[number]
   const initialTab = (validTabs as readonly string[]).includes(searchParams.get('tab') ?? '')
@@ -794,6 +797,46 @@ function SettingsPageContent() {
                 className="shrink-0 px-4 py-2 text-sm font-semibold text-white rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-brand-navy hover:bg-brand-navy-hover"
               >
                 {isScanningArticles ? 'Scanning…' : 'Scan all businesses'}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 p-6 mb-6">
+            <h2 className="text-xl font-bold mb-4 text-gray-900">Scheduled Tasks</h2>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-gray-600">
+                  Generate recurring tasks for all club card and advertiser businesses.
+                  Club cards get quarterly check-ins; advertisers get monthly stats-sending tasks for the
+                  duration of their contract. Existing tasks are not duplicated.
+                </p>
+                {tasksGenerated !== null && !isGeneratingTasks && (
+                  <p className="text-sm text-green-700 mt-2">
+                    Created {tasksGenerated} task{tasksGenerated === 1 ? '' : 's'}.
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={async () => {
+                  setIsGeneratingTasks(true)
+                  setTasksGenerated(null)
+                  const result = await generateAllScheduledTasks()
+                  if (result.error) {
+                    toast.error(`Task generation failed: ${result.error}`)
+                  } else {
+                    setTasksGenerated(result.created)
+                    if (result.created > 0) {
+                      toast.success(`Created ${result.created} scheduled task${result.created === 1 ? '' : 's'}`)
+                    } else {
+                      toast.info('All scheduled tasks already exist')
+                    }
+                  }
+                  setIsGeneratingTasks(false)
+                }}
+                disabled={isGeneratingTasks}
+                className="shrink-0 px-4 py-2 text-sm font-semibold text-white rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-brand-navy hover:bg-brand-navy-hover"
+              >
+                {isGeneratingTasks ? 'Generating…' : 'Generate tasks'}
               </button>
             </div>
           </div>
