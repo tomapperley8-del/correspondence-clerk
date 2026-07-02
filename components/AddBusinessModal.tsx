@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,6 +24,7 @@ export function AddBusinessModal({
   onBusinessAdded,
   initialName,
 }: AddBusinessModalProps) {
+  const router = useRouter()
   const [name, setName] = useState(initialName ?? '')
   const [category, setCategory] = useState('')
   const [status, setStatus] = useState('')
@@ -61,6 +63,7 @@ export function AddBusinessModal({
       toast.success('Business added')
       onBusinessAdded(result.data)
       onClose()
+      router.refresh()
     }
   }
 

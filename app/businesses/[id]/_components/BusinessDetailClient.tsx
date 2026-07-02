@@ -86,6 +86,11 @@ export function BusinessDetailClient({
   const [threads, setThreads] = useState<ConversationThread[]>(initialThreads)
   const [duplicates, setDuplicates] = useState(initialDuplicates)
 
+  useEffect(() => { setBusiness(initialBusiness) }, [initialBusiness])
+  useEffect(() => { setContacts(initialContacts) }, [initialContacts])
+  useEffect(() => { setThreads(initialThreads) }, [initialThreads])
+  useEffect(() => { setDuplicates(initialDuplicates) }, [initialDuplicates])
+
   // Correspondence data, filters, pagination, and derived sections
   const {
     correspondence, setCorrespondence,

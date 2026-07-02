@@ -165,6 +165,12 @@ export function TodosClient({
   const [goneQuiet, setGoneQuiet] = useState<GoneQuietItem[]>(initialGoneQuiet)
   const [contractBusinesses, setContractBusinesses] = useState<ContractBusiness[]>(initialContractBusinesses)
   const [outreachBusinesses, setOutreachBusinesses] = useState<OutreachBusiness[]>(initialOutreachBusinesses)
+
+  useEffect(() => { setTasks(initialTasks) }, [initialTasks])
+  useEffect(() => { setNeedsReply(initialNeedsReply) }, [initialNeedsReply])
+  useEffect(() => { setGoneQuiet(initialGoneQuiet) }, [initialGoneQuiet])
+  useEffect(() => { setContractBusinesses(initialContractBusinesses) }, [initialContractBusinesses])
+  useEffect(() => { setOutreachBusinesses(initialOutreachBusinesses) }, [initialOutreachBusinesses])
   const [view, setView] = useState<ViewMode>('list')
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('week')
   const [editingTask, setEditingTask] = useState<Task | null>(null)

@@ -24,9 +24,13 @@ interface DashboardClientProps {
 }
 
 export function DashboardClient({ initialBusinesses, initialMembershipTypes, initialBusinessTypes, hasContact, initialActivity }: DashboardClientProps) {
-  const [businesses] = useState<BusinessListItem[]>(initialBusinesses)
-  const [membershipTypes] = useState<MembershipType[]>(initialMembershipTypes)
-  const [businessTypes] = useState<BusinessType[]>(initialBusinessTypes)
+  const [businesses, setBusinesses] = useState<BusinessListItem[]>(initialBusinesses)
+  const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>(initialMembershipTypes)
+  const [businessTypes, setBusinessTypes] = useState<BusinessType[]>(initialBusinessTypes)
+
+  useEffect(() => { setBusinesses(initialBusinesses) }, [initialBusinesses])
+  useEffect(() => { setMembershipTypes(initialMembershipTypes) }, [initialMembershipTypes])
+  useEffect(() => { setBusinessTypes(initialBusinessTypes) }, [initialBusinessTypes])
 
   // Filter and sort state
   const [searchQuery, setSearchQuery] = useState('')

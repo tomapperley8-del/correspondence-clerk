@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,6 +25,7 @@ export function AddContactModal({
   onContactAdded,
   initialEmail,
 }: AddContactModalProps) {
+  const router = useRouter()
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
   const [emails, setEmails] = useState<string[]>([initialEmail ?? ''])
@@ -89,6 +91,7 @@ export function AddContactModal({
       toast.success('Contact added')
       onContactAdded(result.data)
       onClose()
+      router.refresh()
     }
   }
 
