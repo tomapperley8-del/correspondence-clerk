@@ -6,6 +6,20 @@ import { confirmArticle, rejectArticle, type ArticleWithBusiness } from '@/app/a
 import { formatDateGB } from '@/lib/utils'
 import { toast } from '@/lib/toast'
 
+const SOURCE_LABELS: Record<string, string> = {
+  'chiswickcalendar.co.uk': 'CC',
+  'keepthingslocal.com': 'KTL',
+}
+
+function SourceBadge({ domain }: { domain: string }) {
+  const label = SOURCE_LABELS[domain] || domain.split('.')[0]
+  return (
+    <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-sm shrink-0 uppercase" title={domain}>
+      {label}
+    </span>
+  )
+}
+
 type Group = {
   name: string
   id: string
@@ -142,7 +156,7 @@ export function ArticlesListClient({ initialArticles }: { initialArticles: Artic
               )}
 
               {group.confirmed.length > 0 && (
-                <ul className={`space-y-1 ${group.pending.length > 0 ? 'mt-3 pt-3 border-t border-gray-200' : 'mt-2'}`}>
+                <ul className={`space-y-1.5 ${group.pending.length > 0 ? 'mt-3 pt-3 border-t border-gray-200' : 'mt-2'}`}>
                   {group.confirmed.map(article => (
                     <li key={article.id} className="flex items-baseline gap-2">
                       <span className="text-xs text-gray-400 shrink-0 tabular-nums">
@@ -156,6 +170,7 @@ export function ArticlesListClient({ initialArticles }: { initialArticles: Artic
                       >
                         {article.title}
                       </a>
+                      <SourceBadge domain={article.source_domain} />
                     </li>
                   ))}
                 </ul>

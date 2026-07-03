@@ -148,6 +148,9 @@ export function BusinessArticles({ businessId }: { businessId: string }) {
                 >
                   {article.title}
                 </a>
+                <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-sm shrink-0 uppercase" title={article.source_domain}>
+                  {article.source_domain === 'chiswickcalendar.co.uk' ? 'CC' : article.source_domain === 'keepthingslocal.com' ? 'KTL' : article.source_domain.split('.')[0]}
+                </span>
               </li>
             ))}
           </ul>

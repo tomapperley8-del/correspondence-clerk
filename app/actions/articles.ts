@@ -64,7 +64,13 @@ type SearchResult = {
   title: string
   url: string
   date: string | null
+  source_domain: string
 }
+
+const WP_SOURCES = [
+  { domain: 'chiswickcalendar.co.uk', apiBase: 'https://chiswickcalendar.co.uk/wp-json/wp/v2/posts' },
+  { domain: 'keepthingslocal.com', apiBase: 'https://keepthingslocal.com/wp-json/wp/v2/posts' },
+] as const
 
 type WPPost = {
   title: { rendered: string }
@@ -88,7 +94,7 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&quot;/g, '"')
 }
 
-async function searchWPApi(searchTerm: string, afterDate: string): Promise<SearchResult[]> {
+async function searchWPSite(apiBase: string, domain: string, searchTerm: string, afterDate: string): Promise<SearchResult[]> {
   const allResults: SearchResult[] = []
   const perPage = 100
 
@@ -105,7 +111,7 @@ async function searchWPApi(searchTerm: string, afterDate: string): Promise<Searc
 
     try {
       const response = await fetch(
-        `https://chiswickcalendar.co.uk/wp-json/wp/v2/posts?${params}`,
+        `${apiBase}?${params}`,
         {
           headers: { 'User-Agent': 'CorrespondenceClerk/1.0' },
           signal: AbortSignal.timeout(15000),
@@ -122,6 +128,7 @@ async function searchWPApi(searchTerm: string, afterDate: string): Promise<Searc
           title: decodeHtmlEntities(post.title.rendered),
           url: post.link,
           date: post.date ? post.date.split('T')[0] : null,
+          source_domain: domain,
         })
       }
 
@@ -132,6 +139,15 @@ async function searchWPApi(searchTerm: string, afterDate: string): Promise<Searc
     }
   }
 
+  return allResults
+}
+
+async function searchAllSources(searchTerm: string, afterDate: string): Promise<SearchResult[]> {
+  const allResults: SearchResult[] = []
+  for (const source of WP_SOURCES) {
+    const results = await searchWPSite(source.apiBase, source.domain, searchTerm, afterDate)
+    allResults.push(...results)
+  }
   return allResults
 }
 
@@ -155,7 +171,7 @@ export async function scanBusinessForArticles(
   fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5)
   const afterDate = fiveYearsAgo.toISOString()
 
-  const results = await searchWPApi(business.name, afterDate)
+  const results = await searchAllSources(business.name, afterDate)
 
   let newCount = 0
   for (const result of results) {
@@ -168,7 +184,7 @@ export async function scanBusinessForArticles(
           url: result.url,
           title: result.title,
           published_date: result.date,
-          source_domain: 'chiswickcalendar.co.uk',
+          source_domain: result.source_domain,
           status: 'pending',
           found_at: new Date().toISOString(),
         },
