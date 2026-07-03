@@ -72,6 +72,86 @@ const WP_SOURCES = [
   { domain: 'keepthingslocal.com', apiBase: 'https://keepthingslocal.com/wp-json/wp/v2/posts' },
 ] as const
 
+const RSS_SOURCES = [
+  { domain: 'chiswickw4.com', feedUrl: 'https://www.chiswickw4.com/rss.xml' },
+] as const
+
+type RSSItem = {
+  title: string
+  link: string
+  pubDate: string | null
+  description: string
+}
+
+function parseRSSItems(xml: string): RSSItem[] {
+  const items: RSSItem[] = []
+  const itemRegex = /<item>([\s\S]*?)<\/item>/gi
+  let match
+  while ((match = itemRegex.exec(xml)) !== null) {
+    const itemXml = match[1]
+    const title = itemXml.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/)?.[1]
+      ?? itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]
+      ?? ''
+    const link = itemXml.match(/<link>([\s\S]*?)<\/link>/)?.[1] ?? ''
+    const pubDate = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] ?? null
+    const desc = itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/)?.[1]
+      ?? itemXml.match(/<description>([\s\S]*?)<\/description>/)?.[1]
+      ?? ''
+    items.push({
+      title: decodeHtmlEntities(title.trim()),
+      link: link.trim(),
+      pubDate,
+      description: decodeHtmlEntities(desc.trim()),
+    })
+  }
+  return items
+}
+
+async function fetchRSSFeed(feedUrl: string): Promise<RSSItem[]> {
+  try {
+    const response = await fetch(feedUrl, {
+      headers: { 'User-Agent': 'CorrespondenceClerk/1.0' },
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!response.ok) return []
+    const xml = await response.text()
+    return parseRSSItems(xml)
+  } catch {
+    return []
+  }
+}
+
+function searchRSSItems(items: RSSItem[], searchTerm: string, domain: string, afterDate: string): SearchResult[] {
+  const termLower = searchTerm.toLowerCase()
+  const afterMs = new Date(afterDate).getTime()
+  const results: SearchResult[] = []
+
+  for (const item of items) {
+    if (item.pubDate) {
+      const itemMs = new Date(item.pubDate).getTime()
+      if (!isNaN(itemMs) && itemMs < afterMs) continue
+    }
+
+    const titleLower = item.title.toLowerCase()
+    const descLower = item.description.toLowerCase()
+    if (!titleLower.includes(termLower) && !descLower.includes(termLower)) continue
+
+    let date: string | null = null
+    if (item.pubDate) {
+      try { date = new Date(item.pubDate).toISOString().split('T')[0] } catch { /* skip */ }
+    }
+
+    results.push({
+      title: item.title,
+      url: item.link,
+      date,
+      source_domain: domain,
+    })
+  }
+
+  return results
+}
+
 type WPPost = {
   title: { rendered: string }
   link: string
@@ -146,6 +226,11 @@ async function searchAllSources(searchTerm: string, afterDate: string): Promise<
   const allResults: SearchResult[] = []
   for (const source of WP_SOURCES) {
     const results = await searchWPSite(source.apiBase, source.domain, searchTerm, afterDate)
+    allResults.push(...results)
+  }
+  for (const source of RSS_SOURCES) {
+    const items = await fetchRSSFeed(source.feedUrl)
+    const results = searchRSSItems(items, searchTerm, source.domain, afterDate)
     allResults.push(...results)
   }
   return allResults

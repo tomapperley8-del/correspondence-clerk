@@ -9,6 +9,7 @@ import { toast } from '@/lib/toast'
 const SOURCE_LABELS: Record<string, string> = {
   'chiswickcalendar.co.uk': 'CC',
   'keepthingslocal.com': 'KTL',
+  'chiswickw4.com': 'W4',
 }
 
 function SourceBadge({ domain }: { domain: string }) {
