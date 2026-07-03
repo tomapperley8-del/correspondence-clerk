@@ -14,12 +14,10 @@ const PIPELINE_STAGES: { key: OutreachStage; label: string; color: string; bg: s
   { key: 'in_discussion', label: 'In discussion', color: 'text-amber-700', bg: 'bg-amber-50/50', borderColor: 'border-amber-200' },
   { key: 'won', label: 'Won', color: 'text-green-700', bg: 'bg-green-50/50', borderColor: 'border-green-200' },
   { key: 'invoice_paid', label: 'Invoice paid', color: 'text-emerald-700', bg: 'bg-emerald-50/50', borderColor: 'border-emerald-200' },
+  { key: 'not_interested', label: 'Not interested', color: 'text-red-700', bg: 'bg-red-50/30', borderColor: 'border-red-200' },
 ]
 
-const ALL_STAGES = [
-  ...PIPELINE_STAGES,
-  { key: 'not_interested' as OutreachStage, label: 'Not interested', color: 'text-red-700', bg: 'bg-red-50/30', borderColor: 'border-red-200' },
-]
+const ALL_STAGES = PIPELINE_STAGES
 
 const RE_ENGAGE_MONTHS = 6
 
@@ -74,7 +72,6 @@ export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemov
   const [showAddForm, setShowAddForm] = useState(false)
   const [addSearch, setAddSearch] = useState('')
   const [adding, setAdding] = useState(false)
-  const [showNotInterested, setShowNotInterested] = useState(false)
   const [showReEngage, setShowReEngage] = useState(false)
 
   const existingIds = useMemo(() => new Set(businesses.map(b => b.id)), [businesses])
@@ -256,55 +253,6 @@ export function OutreachView({ businesses, onStageChange, onAddBusiness, onRemov
         </div>
       )}
 
-      {/* Not interested — collapsed */}
-      {byStage.not_interested.length > 0 && (
-        <div className="mt-4 border border-gray-200">
-          <button
-            onClick={() => setShowNotInterested(!showNotInterested)}
-            className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-          >
-            <span className="text-[10px] font-bold uppercase tracking-wide text-red-700">
-              Not interested ({byStage.not_interested.length})
-            </span>
-            <span className="text-[10px] text-gray-400">{showNotInterested ? '▲' : '▼'}</span>
-          </button>
-          {showNotInterested && (
-            <div className="p-2 space-y-1 border-t border-gray-200">
-              {byStage.not_interested.map(b => (
-                <div key={b.id} className="flex items-center justify-between bg-white border border-gray-200 px-2.5 py-1.5">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/businesses/${b.id}`}
-                      className="text-[11px] font-medium text-brand-navy hover:text-brand-olive transition-colors"
-                    >
-                      {b.name}
-                    </Link>
-                    {b.outreach_declined_at && (
-                      <span className="text-[9px] text-gray-400">
-                        {formatDateShortGB(b.outreach_declined_at)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onStageChange(b.id, 'identified')}
-                      className="text-[9px] text-brand-navy hover:underline"
-                    >
-                      Restart
-                    </button>
-                    <button
-                      onClick={() => onRemoveBusiness(b.id)}
-                      className="text-[9px] text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -472,7 +420,11 @@ function OutreachCard({
       )}
 
       <button
-        onClick={() => onRemove(business.id)}
+        onClick={() => {
+          if (window.confirm(`Remove "${business.name}" from outreach? This will clear all outreach progress.`)) {
+            onRemove(business.id)
+          }
+        }}
         className="text-[9px] text-gray-400 hover:text-red-500 transition-colors mt-1"
       >
         Remove
@@ -549,7 +501,11 @@ function OutreachList({
             </select>
 
             <button
-              onClick={() => onRemove(b.id)}
+              onClick={() => {
+                if (window.confirm(`Remove "${b.name}" from outreach?`)) {
+                  onRemove(b.id)
+                }
+              }}
               className="text-[10px] text-gray-400 hover:text-red-500 transition-colors text-center"
             >
               Remove

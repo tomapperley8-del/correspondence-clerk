@@ -366,7 +366,8 @@ export async function scanBusinessForArticles(
           title: result.title,
           published_date: result.date,
           source_domain: result.source_domain,
-          status: 'pending',
+          status: 'confirmed',
+          confirmed_at: new Date().toISOString(),
           found_at: new Date().toISOString(),
         },
         { onConflict: 'business_id,url', ignoreDuplicates: true }
