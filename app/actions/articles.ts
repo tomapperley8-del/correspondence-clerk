@@ -76,6 +76,98 @@ const RSS_SOURCES = [
   { domain: 'chiswickw4.com', feedUrl: 'https://www.chiswickw4.com/rss.xml' },
 ] as const
 
+const NEWSLETTER_SOURCES = [
+  { domain: 'chiswickw4.com', archiveUrl: 'https://www.chiswickw4.com/info/arlatest.htm', recentCount: 4 },
+] as const
+
+function parseNewsletterUrls(html: string, recentCount: number): { url: string; date: string }[] {
+  const urls: { url: string; date: string }[] = []
+  const regex = /href="(newsletters\/w4(\d{2})(\d{2})(\d{2})\.htm)"/gi
+  let m
+  while ((m = regex.exec(html)) !== null) {
+    const path = m[1]
+    const yy = parseInt(m[2]), mm = parseInt(m[3]), dd = parseInt(m[4])
+    const year = 2000 + yy
+    const date = new Date(year, mm - 1, dd)
+    urls.push({ url: 'https://www.chiswickw4.com/info/' + path, date: date.toISOString().split('T')[0] })
+  }
+  return urls.slice(0, recentCount)
+}
+
+function parseNewsletterArticles(html: string, newsletterDate: string): { title: string; url: string; date: string }[] {
+  const articles: { title: string; url: string; date: string }[] = []
+  const seen = new Set<string>()
+  const regex = /<a\s[^>]*?href\s*=\s*"([^"]+)"[^>]*?>([^<]{10,})<\/a>/gi
+  let m
+  while ((m = regex.exec(html)) !== null) {
+    let url = m[1].trim()
+    const title = decodeHtmlEntities(m[2].trim())
+
+    if (url.includes('mailto:')) continue
+    if (/\.(jpg|jpeg|gif|png|css|js)$/i.test(url)) continue
+    if (url.includes('newsletter') && url.includes('.htm')) continue
+    if (/^(click here|read more|sign up|subscribe|home|back|next|previous|chiswickw4)/i.test(title)) continue
+    if (title.length > 200) continue
+
+    if (!url.startsWith('http')) {
+      if (url.startsWith('/')) url = 'https://www.chiswickw4.com' + url
+      else if (url.startsWith('../')) url = 'https://www.chiswickw4.com/info/' + url.replace('../', '')
+      else url = 'https://www.chiswickw4.com/info/' + url
+    }
+
+    if (seen.has(url)) continue
+    seen.add(url)
+    articles.push({ title, url, date: newsletterDate })
+  }
+  return articles
+}
+
+async function fetchNewsletterArticles(archiveUrl: string, domain: string, recentCount: number, searchTerm: string): Promise<SearchResult[]> {
+  try {
+    const archiveRes = await fetch(archiveUrl, {
+      headers: { 'User-Agent': 'CorrespondenceClerk/1.0' },
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!archiveRes.ok) return []
+    const archiveHtml = await archiveRes.text()
+
+    const newsletters = parseNewsletterUrls(archiveHtml, recentCount)
+    if (newsletters.length === 0) return []
+
+    const termLower = searchTerm.toLowerCase()
+    const results: SearchResult[] = []
+
+    for (const nl of newsletters) {
+      try {
+        const res = await fetch(nl.url, {
+          headers: { 'User-Agent': 'CorrespondenceClerk/1.0' },
+          signal: AbortSignal.timeout(15000),
+        })
+        if (!res.ok) continue
+        const html = await res.text()
+        const articles = parseNewsletterArticles(html, nl.date)
+
+        for (const article of articles) {
+          if (article.title.toLowerCase().includes(termLower)) {
+            results.push({
+              title: article.title,
+              url: article.url,
+              date: article.date,
+              source_domain: domain,
+            })
+          }
+        }
+      } catch {
+        continue
+      }
+    }
+
+    return results
+  } catch {
+    return []
+  }
+}
+
 type RSSItem = {
   title: string
   link: string
@@ -231,6 +323,10 @@ async function searchAllSources(searchTerm: string, afterDate: string): Promise<
   for (const source of RSS_SOURCES) {
     const items = await fetchRSSFeed(source.feedUrl)
     const results = searchRSSItems(items, searchTerm, source.domain, afterDate)
+    allResults.push(...results)
+  }
+  for (const source of NEWSLETTER_SOURCES) {
+    const results = await fetchNewsletterArticles(source.archiveUrl, source.domain, source.recentCount, searchTerm)
     allResults.push(...results)
   }
   return allResults
