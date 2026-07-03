@@ -185,7 +185,7 @@ export type ArticleWithBusiness = BusinessArticle & {
   business_name: string
 }
 
-export async function getAllArticles(): Promise<ArticleWithBusiness[]> {
+export async function getAllArticles(includeStatuses: ('confirmed' | 'pending')[] = ['confirmed', 'pending']): Promise<ArticleWithBusiness[]> {
   const org_id = await getCurrentUserOrganizationId()
   if (!org_id) return []
   const supabase = await createClient()
@@ -193,7 +193,7 @@ export async function getAllArticles(): Promise<ArticleWithBusiness[]> {
     .from('business_articles')
     .select('*, business:businesses!business_articles_business_id_fkey(name)')
     .eq('organization_id', org_id)
-    .eq('status', 'confirmed')
+    .in('status', includeStatuses)
     .order('published_date', { ascending: false, nullsFirst: false })
   return (data ?? []).map((a: Record<string, unknown>) => ({
     ...(a as unknown as BusinessArticle),
