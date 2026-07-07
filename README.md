@@ -36,6 +36,11 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
+`ANTHROPIC_API_KEY` powers the AI formatter, insights, Daily Briefing chat and the
+"Delegate to Claude" email drafting button on task cards (`/api/delegate-draft`).
+It is the only external API cost. Set it in Vercel → Project Settings →
+Environment Variables for production.
+
 ## Development
 
 ```bash

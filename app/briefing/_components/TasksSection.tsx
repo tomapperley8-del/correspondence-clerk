@@ -6,6 +6,7 @@ import type { Task } from '@/app/actions/tasks'
 import { updateTask } from '@/app/actions/tasks'
 import { formatDateShortGB } from '@/lib/utils'
 import { toast } from '@/lib/toast'
+import { DelegateButton } from '@/components/DelegateButton'
 
 export function TasksSection({ initialTasks }: { initialTasks: Task[] }) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
@@ -65,6 +66,13 @@ export function TasksSection({ initialTasks }: { initialTasks: Task[] }) {
                 )}
               </p>
             </div>
+            {task.business_id ? (
+              <DelegateButton taskId={task.id} />
+            ) : task.category === 'work' ? (
+              <span className="text-[10px] text-gray-300 whitespace-nowrap" title="Link a business to this task to delegate drafting to Claude">
+                Link a business to delegate
+              </span>
+            ) : null}
           </div>
         )
       })}

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { Task } from '@/app/actions/tasks'
 import { formatDateShortGB } from '@/lib/utils'
 import { getCategoryColor } from '@/lib/task-colors'
+import { DelegateButton } from '@/components/DelegateButton'
 
 export function TaskRow({
   task,
@@ -88,6 +89,10 @@ export function TaskRow({
             {task.due_time && <span className="font-medium">{task.due_time} </span>}
             {formatDateShortGB(task.due_date + 'T00:00:00')}
           </span>
+        )}
+
+        {task.business_id && !isDone && (
+          <DelegateButton taskId={task.id} compact />
         )}
 
         {task.business_id && task.business && (
