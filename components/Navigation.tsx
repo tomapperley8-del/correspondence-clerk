@@ -148,7 +148,7 @@ export function Navigation() {
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">
             <Link
-              href="/todos"
+              href="/briefing"
               className="text-xl font-bold text-white flex items-center gap-2"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
@@ -351,7 +351,7 @@ export function Navigation() {
       {/* Mobile bottom bar — primary actions always accessible */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-brand-dark border-t border-white/20 flex">
         <Link
-          href="/todos"
+          href="/briefing"
           className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${
             pathname === '/briefing' || pathname === '/todos' ? 'text-white' : 'text-white/60 hover:text-white'
           }`}
