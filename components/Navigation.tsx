@@ -166,6 +166,17 @@ export function Navigation() {
 
             <div className="hidden md:flex h-16">
               <Link
+                href="/todos"
+                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
+                  pathname === '/todos'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
+                }`}
+              >
+                To-dos
+              </Link>
+
+              <Link
                 href="/dashboard"
                 className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
                   pathname === '/dashboard'
@@ -193,6 +204,17 @@ export function Navigation() {
                     {inboundCount > 99 ? '99+' : inboundCount}
                   </span>
                 )}
+              </Link>
+
+              <Link
+                href="/resources"
+                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
+                  pathname === '/resources'
+                    ? 'text-white bg-brand-olive'
+                    : 'text-white hover:bg-brand-olive/20'
+                }`}
+              >
+                Resources
               </Link>
 
               {pathname !== '/insights' && <InsightsButton />}
@@ -282,8 +304,10 @@ export function Navigation() {
             {/* Nav items */}
             <div className="flex-1 overflow-y-auto py-2">
               {[
+                { href: '/todos', label: 'To-dos', badge: todosDueCount > 0 ? todosDueCount : null },
                 { href: '/dashboard', label: 'Businesses' },
                 { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
+                { href: '/resources', label: 'Resources' },
                 { href: '/new-entry', label: 'New Entry' },
                 { href: '/insights', label: 'Insights' },
                 { href: '/help', label: 'Help' },
@@ -329,7 +353,7 @@ export function Navigation() {
         <Link
           href="/todos"
           className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${
-            pathname === '/todos' ? 'text-white' : 'text-white/60 hover:text-white'
+            pathname === '/briefing' || pathname === '/todos' ? 'text-white' : 'text-white/60 hover:text-white'
           }`}
         >
           <span className="relative">
