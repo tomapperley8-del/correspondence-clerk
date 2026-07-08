@@ -26,6 +26,7 @@ export function ResourcesClient({
   const [addOpen, setAddOpen] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [openingId, setOpeningId] = useState<string | null>(null)
+  const [expandedTextId, setExpandedTextId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     let list = resources
@@ -49,6 +50,11 @@ export function ResourcesClient({
   }, [resources])
 
   async function handleOpen(resource: Resource) {
+    // Pasted-text resources have no URL — expand inline instead.
+    if (resource.file_type === 'text') {
+      setExpandedTextId(prev => (prev === resource.id ? null : resource.id))
+      return
+    }
     setOpeningId(resource.id)
     const result = await getResourceOpenUrl(resource.id)
     setOpeningId(null)
@@ -56,6 +62,15 @@ export function ResourcesClient({
       window.open(result.url, '_blank', 'noopener,noreferrer')
     } else {
       toast.error(result.error ?? 'Could not open resource')
+    }
+  }
+
+  async function handleCopyText(resource: Resource) {
+    try {
+      await navigator.clipboard.writeText(resource.content_text ?? '')
+      toast.success('Copied to clipboard')
+    } catch {
+      toast.error('Could not copy — expand and select the text instead')
     }
   }
 
@@ -202,6 +217,36 @@ export function ResourcesClient({
 
                   {resource.description && (
                     <p className="text-xs text-gray-500 line-clamp-2">{resource.description}</p>
+                  )}
+
+                  {resource.file_type === 'text' && (
+                    <div>
+                      {expandedTextId === resource.id ? (
+                        <pre className="text-xs text-gray-700 bg-brand-warm border border-gray-200 p-2.5 whitespace-pre-wrap font-mono max-h-64 overflow-y-auto">
+                          {resource.content_text}
+                        </pre>
+                      ) : (
+                        resource.content_text && (
+                          <p className="text-xs text-gray-500 whitespace-pre-wrap line-clamp-2">
+                            {resource.content_text}
+                          </p>
+                        )
+                      )}
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <button
+                          onClick={() => setExpandedTextId(prev => (prev === resource.id ? null : resource.id))}
+                          className="text-xs font-medium text-brand-navy hover:text-brand-olive transition-colors"
+                        >
+                          {expandedTextId === resource.id ? 'Hide' : 'View'}
+                        </button>
+                        <button
+                          onClick={() => handleCopyText(resource)}
+                          className="text-xs font-medium text-brand-navy hover:text-brand-olive transition-colors"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
                   )}
 
                   <div className="mt-auto pt-2 flex items-center justify-between border-t border-gray-100">

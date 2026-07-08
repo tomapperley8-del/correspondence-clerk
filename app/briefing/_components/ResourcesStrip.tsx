@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { Resource } from '@/app/actions/resources'
 import { getResourceOpenUrl } from '@/app/actions/resources'
 import { categoryMeta, fileTypeLabel } from '@/lib/resource-meta'
@@ -9,8 +10,14 @@ import { toast } from '@/lib/toast'
 
 export function ResourcesStrip({ resources }: { resources: Resource[] }) {
   const [openingId, setOpeningId] = useState<string | null>(null)
+  const router = useRouter()
 
   async function handleOpen(resource: Resource) {
+    // Pasted-text resources are viewed/copied on the full Resource Hub page.
+    if (resource.file_type === 'text') {
+      router.push('/resources')
+      return
+    }
     setOpeningId(resource.id)
     const result = await getResourceOpenUrl(resource.id)
     setOpeningId(null)

@@ -23,6 +23,7 @@ export type Resource = {
   file_type: string | null
   is_uploaded: boolean
   storage_path: string | null
+  content_text: string | null
   linked_business_id: string | null
   tags: string[]
   is_pinned: boolean
@@ -118,11 +119,13 @@ export async function createResource(formData: FormData): Promise<{ data?: Resou
 
   const file = formData.get('file') as File | null
   const externalUrl = (formData.get('external_url') as string | null)?.trim() || null
+  const pastedText = formData.get('content_text') as string | null
 
   let fileUrl: string | null = null
   let fileType: string | null = null
   let isUploaded = false
   let storagePath: string | null = null
+  let contentText: string | null = null
 
   if (file && file.size > 0) {
     const detected = ALLOWED_TYPES[file.type]
@@ -148,8 +151,11 @@ export async function createResource(formData: FormData): Promise<{ data?: Resou
     }
     fileUrl = externalUrl
     fileType = detectLinkType(externalUrl)
+  } else if (pastedText && pastedText.trim()) {
+    contentText = pastedText
+    fileType = 'text'
   } else {
-    return { error: 'Upload a file or paste an external link' }
+    return { error: 'Upload a file, paste an external link, or paste text' }
   }
 
   const { data, error } = await supabase
@@ -163,6 +169,7 @@ export async function createResource(formData: FormData): Promise<{ data?: Resou
       file_type: fileType,
       is_uploaded: isUploaded,
       storage_path: storagePath,
+      content_text: contentText,
       linked_business_id: linkedBusinessId,
       tags,
     })

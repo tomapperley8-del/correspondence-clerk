@@ -24,6 +24,7 @@ export const FILE_TYPE_LABELS: Record<string, string> = {
   pptx: 'PowerPoint',
   csv: 'CSV',
   txt: 'Text',
+  text: 'Text',
   image: 'Image',
   google_sheet: 'Google Sheet',
   google_doc: 'Google Doc',

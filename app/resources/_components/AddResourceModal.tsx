@@ -24,9 +24,10 @@ export function AddResourceModal({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('other')
-  const [mode, setMode] = useState<'upload' | 'link'>('upload')
+  const [mode, setMode] = useState<'upload' | 'link' | 'paste'>('upload')
   const [file, setFile] = useState<File | null>(null)
   const [externalUrl, setExternalUrl] = useState('')
+  const [pastedText, setPastedText] = useState('')
   const [tags, setTags] = useState('')
   const [businessSearch, setBusinessSearch] = useState('')
   const [linkedBusinessId, setLinkedBusinessId] = useState<string | null>(null)
@@ -52,6 +53,7 @@ export function AddResourceModal({
     setMode('upload')
     setFile(null)
     setExternalUrl('')
+    setPastedText('')
     setTags('')
     setBusinessSearch('')
     setLinkedBusinessId(null)
@@ -70,6 +72,10 @@ export function AddResourceModal({
       setError('Paste an external link, or switch to file upload')
       return
     }
+    if (mode === 'paste' && !pastedText.trim()) {
+      setError('Paste some text, or switch to file upload or a link')
+      return
+    }
 
     setIsLoading(true)
     const formData = new FormData()
@@ -80,6 +86,7 @@ export function AddResourceModal({
     if (linkedBusinessId) formData.set('linked_business_id', linkedBusinessId)
     if (mode === 'upload' && file) formData.set('file', file)
     if (mode === 'link') formData.set('external_url', externalUrl.trim())
+    if (mode === 'paste') formData.set('content_text', pastedText)
 
     const result = await createResource(formData)
     setIsLoading(false)
@@ -177,16 +184,26 @@ export function AddResourceModal({
               <button
                 type="button"
                 onClick={() => setMode('link')}
-                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 ${
                   mode === 'link' ? 'bg-brand-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
                 aria-pressed={mode === 'link'}
               >
                 External link
               </button>
+              <button
+                type="button"
+                onClick={() => setMode('paste')}
+                className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 ${
+                  mode === 'paste' ? 'bg-brand-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+                aria-pressed={mode === 'paste'}
+              >
+                Paste text
+              </button>
             </div>
 
-            {mode === 'upload' ? (
+            {mode === 'upload' && (
               <div
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
                 onDragLeave={() => setIsDragging(false)}
@@ -229,7 +246,9 @@ export function AddResourceModal({
                   </p>
                 )}
               </div>
-            ) : (
+            )}
+
+            {mode === 'link' && (
               <div>
                 <Label htmlFor="resource-url" className="block mb-2 font-semibold">Link URL</Label>
                 <Input
@@ -241,6 +260,24 @@ export function AddResourceModal({
                   className="w-full"
                   placeholder="https://docs.google.com/spreadsheets/..."
                 />
+              </div>
+            )}
+
+            {mode === 'paste' && (
+              <div>
+                <Label htmlFor="resource-text" className="block mb-2 font-semibold">Text</Label>
+                <textarea
+                  id="resource-text"
+                  value={pastedText}
+                  onChange={(e) => setPastedText(e.target.value)}
+                  disabled={isLoading}
+                  rows={10}
+                  className="w-full border border-gray-300 px-3 py-2 text-sm font-mono whitespace-pre-wrap focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
+                  placeholder={'Paste an email template or any text here.\n\nLine breaks and spacing are preserved exactly as pasted.'}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Ideal for email templates. View and copy it later with one click.
+                </p>
               </div>
             )}
           </div>
