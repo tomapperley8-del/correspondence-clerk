@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { NewsLead, NewsLeadStatus } from '@/app/actions/leads'
 import { updateNewsLeadStatus } from '@/app/actions/leads'
-import { NEWS_COLUMNS, sourceBadgeClass, storyTypeBadgeClass, timeAgo } from '@/lib/lead-meta'
+import { NEWS_COLUMNS, sourceBadgeClass, storyTypeBadgeClass } from '@/lib/lead-meta'
 import { toast } from '@/lib/toast'
 
 const DATE_FILTERS = [
@@ -33,7 +33,10 @@ export function NewsBoard({ initialLeads }: { initialLeads: NewsLead[] }) {
     if (typeFilter) list = list.filter(l => l.story_type === typeFilter)
     if (daysFilter > 0) {
       const cutoff = Date.now() - daysFilter * 24 * 60 * 60 * 1000
-      list = list.filter(l => new Date(l.found_at).getTime() >= cutoff)
+      list = list.filter(l => {
+        const date = l.published_at ? new Date(l.published_at + 'T00:00:00') : new Date(l.found_at)
+        return date.getTime() >= cutoff
+      })
     }
     return list
   }, [leads, sourceFilter, typeFilter, daysFilter])
@@ -149,7 +152,11 @@ export function NewsBoard({ initialLeads }: { initialLeads: NewsLead[] }) {
                               {lead.story_type}
                             </span>
                           )}
-                          <span className="text-[10px] text-gray-400 ml-auto">{timeAgo(lead.found_at)}</span>
+                          <span className="text-[10px] text-gray-400 ml-auto">
+                            {lead.published_at
+                              ? new Date(lead.published_at + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                              : new Date(lead.found_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
                         </div>
                         {!expanded && lead.relevance_reason && (
                           <p className="text-[11px] text-gray-500 mt-1.5 line-clamp-2">{lead.relevance_reason}</p>

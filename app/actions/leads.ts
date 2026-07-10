@@ -15,6 +15,7 @@ export type NewsLead = {
   snippet: string | null
   relevance_reason: string | null
   story_type: string | null
+  published_at: string | null
   status: NewsLeadStatus
   found_at: string
   created_at: string
