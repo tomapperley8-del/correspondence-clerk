@@ -28,6 +28,21 @@ export const PERSONAL_DOMAINS = new Set([
   'zoho.com',
   'fastmail.com',
   'fastmail.fm',
+  // UK consumer ISP domains. Broadband providers, not business identities,
+  // and several collide with real business names (virgin.net, sky.com).
+  'virgin.net',
+  'virginmedia.com',
+  'btinternet.com',
+  'btconnect.com',
+  'sky.com',
+  'talktalk.net',
+  'tiscali.co.uk',
+  'blueyonder.co.uk',
+  'ntlworld.com',
+  'gmx.net',
+  'gmx.com',
+  'zen.co.uk',
+  'plus.net',
 ])
 
 export function isPersonalDomain(domain: string): boolean {
