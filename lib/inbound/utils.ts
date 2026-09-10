@@ -10,6 +10,13 @@ const PERSONAL_DOMAINS = new Set([
   'hotmail.com', 'hotmail.co.uk', 'outlook.com', 'live.com', 'live.co.uk',
   'icloud.com', 'me.com', 'mac.com', 'msn.com',
   'protonmail.com', 'proton.me', 'fastmail.com', 'aol.com',
+  // UK consumer ISP domains. These are broadband/mail providers, not business
+  // identities, and several share a name with a real business (virgin.net vs
+  // Virgin Active, sky.com vs Sky). Without this, one manual filing teaches a
+  // domain_mapping that then misfiles every future email from that provider.
+  'virgin.net', 'virginmedia.com', 'btinternet.com', 'btconnect.com',
+  'sky.com', 'talktalk.net', 'tiscali.co.uk', 'blueyonder.co.uk',
+  'ntlworld.com', 'gmx.net', 'gmx.com', 'zen.co.uk', 'plus.net',
   // Transactional/notification services — emails from these should never be
   // mapped to a business as they're shared infrastructure, not a sender identity
   'notification.intuit.com', 'intuit.com', 'quickbooks.com',
