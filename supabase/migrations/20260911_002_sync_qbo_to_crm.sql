@@ -1,5 +1,14 @@
 -- 20260911_002_sync_qbo_to_crm.sql
 --
+-- AMENDED IN PLACE 2026-09-12 (applied as migration
+-- 'sync_qbo_never_marks_ended_term_as_renewed'). The renewal_stage update had a
+-- conceptual error: it set 'invoice_paid' from any paid invoice matching a
+-- contract window, including the invoice that paid for a business's FIRST and
+-- only contract. For Levent Borek and Archie's London that produced a renewal
+-- card claiming a renewal that had never happened, on a term already ended.
+-- Two guards added, marked below. Marking contracts.invoice_paid is unchanged:
+-- that is a fact about the invoice and stays true after the term ends.
+--
 -- Phase 2 of the data audit. Applied 2026-09-11.
 --
 -- Lets QuickBooks drive the money side of Correspondence Clerk, so that raising
@@ -145,7 +154,7 @@ BEGIN
   ---------------------------------------------------------------------------
   CREATE TEMP TABLE _qbo_settled ON COMMIT DROP AS
   WITH win AS (
-    SELECT c.id AS contract_id, c.business_id,
+    SELECT c.id AS contract_id, c.business_id, c.contract_end,
            count(i.*)          AS invoices_in_window,
            bool_and(i.is_paid) AS all_paid,
            max(i.txn_date)     AS paid_on
@@ -156,7 +165,7 @@ BEGIN
          AND coalesce(i.private_memo, '') <> 'Voided'
          AND i.total_amount > 0
     WHERE c.is_current AND NOT c.invoice_paid AND c.contract_start IS NOT NULL
-    GROUP BY c.id, c.business_id
+    GROUP BY c.id, c.business_id, c.contract_end
   )
   SELECT * FROM win WHERE invoices_in_window = 1 AND all_paid;
 
@@ -184,7 +193,12 @@ BEGIN
       AND NOT b.mute_replies
       AND b.renewal_declined_at IS NULL
       AND coalesce(b.status,'') NOT IN ('Former','Inactive','Closed')
-      AND coalesce(b.renewal_stage,'') <> 'invoice_paid';
+      AND coalesce(b.renewal_stage,'') <> 'invoice_paid'
+      -- AMENDED 2026-09-12: the term must still be running. Once it has ended,
+      -- "the renewal is paid" says nothing true about anything.
+      AND s.contract_end >= current_date
+      -- AMENDED 2026-09-12: never leapfrog a renewal conversation under way.
+      AND coalesce(b.renewal_stage,'not_started') IN ('not_started','agreed');
     GET DIAGNOSTICS v_stage = ROW_COUNT;
   ELSE
     SELECT count(*) INTO v_paid FROM _qbo_settled;
