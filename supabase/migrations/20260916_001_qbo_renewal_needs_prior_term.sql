@@ -1,50 +1,23 @@
--- 20260911_002_sync_qbo_to_crm.sql
+-- 20260916_001_qbo_renewal_needs_prior_term.sql
 --
--- AMENDED IN PLACE 2026-09-12 (applied as migration
--- 'sync_qbo_never_marks_ended_term_as_renewed'). The renewal_stage update had a
--- conceptual error: it set 'invoice_paid' from any paid invoice matching a
--- contract window, including the invoice that paid for a business's FIRST and
--- only contract. For Levent Borek and Archie's London that produced a renewal
--- card claiming a renewal that had never happened, on a term already ended.
--- Two guards added, marked below. Marking contracts.invoice_paid is unchanged:
--- that is a fact about the invoice and stays true after the term ends.
+-- Amends public.sync_qbo_to_crm (first defined in 20260911_002). Applied 2026-09-16.
 --
--- Phase 2 of the data audit. Applied 2026-09-11.
+-- Third guard on moving a renewal card to 'invoice_paid'. The 2026-09-12 guards
+-- (term still running, no leapfrogging) did not cover a business on its FIRST
+-- contract whose term is still running. HATCH MEYHANE was the live case: one
+-- contract, 15 Oct 2025 to 15 Oct 2026, paid by invoice 1674. Linking its
+-- QuickBooks customer would have moved its renewal card to 'invoice_paid' a
+-- month before the renewal is due, hiding a live renewal. Same mistake Tom
+-- caught on Levent Borek and Archie's London.
 --
--- Lets QuickBooks drive the money side of Correspondence Clerk, so that raising
--- and paying an invoice updates the CRM without anyone touching it.
+-- Now the card only moves when the paid contract is a renewal: the business
+-- held an earlier term. contracts.invoice_paid is still set either way, since
+-- that is a fact about the invoice.
 --
--- Scheduled via pg_cron as 'apply-qbo-to-crm', daily at 07:20 UTC:
---     SELECT cron.schedule('apply-qbo-to-crm', '20 7 * * *',
---            $cron$SELECT public.sync_qbo_to_crm(false);$cron$);
---
--- NOTE ON THE REFRESH SIDE: this function applies whatever is already in
--- qbo_invoices / qbo_customers. Step 0 of the CC daily desk routine refreshes
--- those tables from QuickBooks each morning, before this job runs at 07:20.
--- (An earlier version of this note called the mirror a one-off snapshot. It is
--- not: the whole table shares one synced_at because the routine stamps it.)
---
--- WHY THE PAID TEST IS STRUCTURAL RATHER THAN FINANCIAL
---
--- Neither billing_frequency nor contract_amount can be trusted. Every one of
--- the 110 current contracts claims 'annual', including LONDON BATH CO, which is
--- plainly billed monthly: nine invoices of GBP 583 whose line descriptions read
--- "Payment 9 of 12", "Payment 10 of 12". Its contract_amount of GBP 587 is a
--- monthly figure, not an annual total.
---
--- So the test is the shape of the evidence, not the numbers: exactly one
--- non-voided invoice inside the contract window, and it is paid. A contract
--- with several invoices in its window is an instalment plan, and one payment
--- says nothing about the whole term. Those are counted and skipped, never
--- guessed at.
---
--- Invoices are recorded as Note, never Email. An invoice is a record, not
--- contact with the business, so it must appear in the history without moving an
--- outreach card. derive_business_stages() excludes Note for the same reason.
---
--- First live run: 1 customer linked, 137 invoice notes written, 1 contract
--- marked paid (LEVENT BOREK), 1 renewal card moved, 10 ambiguous skipped.
--- Second run returned all zeros, confirming idempotence.
+-- CORRECTION to the 20260911_002 header: the QuickBooks mirror is not a one-off
+-- snapshot. Step 0 of the CC daily desk routine refreshes it every run, and the
+-- shared synced_at is by design (the routine stamps the whole table). Stale
+-- data on 2026-09-12 was the routine stalling on a permission prompt.
 
 CREATE OR REPLACE FUNCTION public.sync_qbo_to_crm(p_dry_run boolean DEFAULT false)
 RETURNS TABLE (action text, detail text, affected integer)
@@ -154,7 +127,7 @@ BEGIN
   ---------------------------------------------------------------------------
   CREATE TEMP TABLE _qbo_settled ON COMMIT DROP AS
   WITH win AS (
-    SELECT c.id AS contract_id, c.business_id, c.contract_end,
+    SELECT c.id AS contract_id, c.business_id, c.contract_start, c.contract_end,
            count(i.*)          AS invoices_in_window,
            bool_and(i.is_paid) AS all_paid,
            max(i.txn_date)     AS paid_on
@@ -165,7 +138,7 @@ BEGIN
          AND coalesce(i.private_memo, '') <> 'Voided'
          AND i.total_amount > 0
     WHERE c.is_current AND NOT c.invoice_paid AND c.contract_start IS NOT NULL
-    GROUP BY c.id, c.business_id, c.contract_end
+    GROUP BY c.id, c.business_id, c.contract_start, c.contract_end
   )
   SELECT * FROM win WHERE invoices_in_window = 1 AND all_paid;
 
@@ -198,7 +171,14 @@ BEGIN
       -- "the renewal is paid" says nothing true about anything.
       AND s.contract_end >= current_date
       -- AMENDED 2026-09-12: never leapfrog a renewal conversation under way.
-      AND coalesce(b.renewal_stage,'not_started') IN ('not_started','agreed');
+      AND coalesce(b.renewal_stage,'not_started') IN ('not_started','agreed')
+      -- AMENDED 2026-09-16: the paid contract must itself be a renewal, i.e. the
+      -- business held an earlier term. A first contract's invoice pays for the
+      -- term now running; it says nothing about the renewal coming up.
+      AND EXISTS (SELECT 1 FROM contracts p
+                  WHERE p.business_id = s.business_id
+                    AND p.id <> s.contract_id
+                    AND p.contract_start < s.contract_start);
     GET DIAGNOSTICS v_stage = ROW_COUNT;
   ELSE
     SELECT count(*) INTO v_paid FROM _qbo_settled;
@@ -215,6 +195,4 @@ END;
 $fn$;
 
 COMMENT ON FUNCTION public.sync_qbo_to_crm(boolean) IS
-  'Applies QuickBooks state to Correspondence Clerk: links customers, writes invoice Notes, and marks contracts paid where unambiguous. Idempotent. Pass true for a dry run.';
-
-GRANT EXECUTE ON FUNCTION public.sync_qbo_to_crm(boolean) TO authenticated, service_role;
+  'Applies QuickBooks state to Correspondence Clerk: links customers, writes invoice Notes, and marks contracts paid where unambiguous. Moves a renewal card only for a paid renewal term. Idempotent. Pass true for a dry run.';
