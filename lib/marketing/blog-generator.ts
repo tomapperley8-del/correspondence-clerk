@@ -204,7 +204,10 @@ export async function getPublishedPosts(
     .range(offset, offset + limit - 1)
 
   if (error) {
-    console.error('Error fetching blog posts:', error)
+    // The blog was never launched, so blog_posts does not exist. That is not an error.
+    if (error.code !== 'PGRST205' && error.code !== '42P01') {
+      console.error('Error fetching blog posts:', error)
+    }
     return []
   }
 
