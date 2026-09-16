@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
 
 interface RateLimitConfig {
   /** Maximum requests allowed in the window */
@@ -154,7 +155,9 @@ export function rateLimitError(resetIn: number): { error: string } {
  * Call this from a scheduled job or cron
  */
 export async function cleanupExpiredRateLimits(): Promise<number> {
-  const supabase = await createClient()
+  // Runs from a cron with no user session, so it needs the service role.
+  // The anon role has no EXECUTE on cleanup_expired_rate_limits.
+  const supabase = createServiceRoleClient()
 
   const { data, error } = await supabase.rpc('cleanup_expired_rate_limits')
 
