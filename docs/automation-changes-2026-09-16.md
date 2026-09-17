@@ -69,3 +69,20 @@ Every data change below was backed up to `cc_phase0_backup` first (reason shown)
 - **Old Outreach Engine:** no Edge Function calls, so the pause is holding.
 - **Follow-up fix:** with AI off, the formatter now skips the call quietly instead of logging an error for every inbound email. The desk email subject now reads "Sep" rather than "Sept".
 - **Test run on 16 Sep evening:** stopped by the 5-hour usage limit partway through the mail sweep, after completing step 0. A long interactive session had used the allowance. Keep heavy manual sessions away from the 05:30 to 08:30 UTC window.
+
+## Added 17 Sep 2026: member care drafts
+
+- **New routine `CC member care drafts`** (`trig_01StP874yVwk1toJgR5EsCrN`), weekdays 06:05 UTC, Sonnet, connectors Supabase and Microsoft 365. Its prompt is in `docs/member-care-routine-prompt.md`. It writes drafts only, never sends, in Tom's voice after reading the history and both mailboxes:
+  - renewal, one month before a Club Card or advertising term ends
+  - payment chaser, 7+ days overdue, at most once every 21 days per business
+  - check-in, every 3 months of a live term
+  - at most 6 drafts a day, 3 of them check-ins
+  - one email per business; an overdue invoice takes precedence over a renewal
+  - holds back when there's an open conversation or a recent email
+- **Migration `20260917_001_member_care.sql`:**
+  - `routine_drafts` logs every draft or hold-back, with a snooze date on hold-backs
+  - `v_member_care_queue` decides who is due
+  - `member_care` added to the heartbeat schedule
+- **Desk email:** now opens with "Drafts waiting in your Outlook", from `routine_drafts` over the last 26 hours.
+- **Outreach routine:** now records its drafts in `routine_drafts`. Drafts carry Tom's signature and Aptos 12, and the routine checks the Drafts folder before writing.
+- **Queue on the first day:** 6 renewals, 9 businesses with overdue invoices, 62 check-ins. The check-in backlog clears at up to 3 a day.
