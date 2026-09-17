@@ -8,9 +8,9 @@ Single source of truth for Claude Code sessions on Correspondence Clerk.
 
 ## Production
 
-- **URL:** https://correspondence-clerk.vercel.app
+- **URL:** https://correspondenceclerk.com (also https://correspondence-clerk.vercel.app)
 - **Vercel:** tom-apperleys-projects / correspondence-clerk (prj_TLkqSYexjPOdnZNKJGGcq3AGpSO9)
-- **Auto-deploys** from `main` branch
+- **Auto-deploys** from `main` branch (the Vercel production branch was wrongly `master` until 16 Sep 2026; check it if a push doesn't go live)
 
 ## Commands
 
@@ -226,7 +226,9 @@ Marketing automation (optional):
 - `SMARTLEAD_API_KEY` - Smartlead cold email API key
 - `LINKEDIN_ACCESS_TOKEN` - LinkedIn Marketing API access token
 - `TWITTER_BEARER_TOKEN` - Twitter API v2 bearer token
-- `CRON_SECRET` - Secret for authenticating Vercel cron jobs
+- `CRON_SECRET` - Secret for authenticating Vercel cron jobs (set in production; required by /api/cron/desk-email)
+- `AI_ENABLED` - set to `false` to stop all app AI calls (production: false since 16 Sep 2026)
+- `DESK_EMAIL_TO` - desk email recipient (default tom@thechiswickcalendar.co.uk)
 
 ## Screenshot Workflow
 
@@ -255,7 +257,7 @@ All features complete and deployed (unless noted):
 17. Onboarding flow (4-step: org → describe business → first business+contact → first entry)
 18. Actions page (top priorities hero, needs-reply, flagged/reminders in Actions Due, renewals, keyboard nav, rationale panel, commitment alerts)
 19. Inbound Email Forwarding + BCC Capture — **live** (Forward Email $3/month, migrated from Postmark. Flat payload format — see project_forward_email_migration.md)
-20. Daily Briefing Email — **live** (Resend cron at 8am, opt-out toggle in Settings, smart cache reuse)
+20. Daily Briefing Email — **retired 16 Sep 2026**. Replaced by the desk email: `/api/cron/desk-email` (Vercel cron 07:00 UTC) runs `run_morning_pipeline()` and sends `v_morning_desk` via Resend with no AI. See `docs/automation-changes-2026-09-16.md`.
 21. API Cost Reduction — **live** (model tiering: Haiku for 9/11 call sites, Sonnet for Chat + strategic Insights only. Centralised in `lib/ai/models.ts`. Cache TTLs doubled. Prompt caching added to 6 endpoints. Regex bypass for trivial emails.)
 22. Actionable Insight Buttons — contextual actions on 7 insight types (Log call, Copy draft, View Actions, etc.)
 23. File Uploads — **live** (Supabase Storage, 10MB/file, 50MB/org cap, upload/download/delete on business pages.)
@@ -266,6 +268,8 @@ All features complete and deployed (unless noted):
 28. Actions Page — **live** (unified smart list → top priorities hero + 3 collapsible sections. Needs Reply direction-aware, no 7-day cap. Done permanent via `reply_dismissed_at`. One-click flag sets due_at +7d. Commitment alerts from insight_history. Rationale slide-out panel. AI auto-flags high-confidence inbound emails. Insights "Add to Actions" push. Keyboard nav D/S/L/Enter.)
 
 ## Recent Changes
+
+- **Sep 16, 2026:** Automation simplification (full log in `docs/automation-changes-2026-09-16.md`). App AI is switched off with `AI_ENABLED=false`: inbound email is stored unformatted unless the regex fast path handles it. The desk email is built in the app with no AI, and the AI daily-briefing cron was removed. Cron routes need `CRON_SECRET`. The rate-limit cleanup uses the service role. The Claude routines (daily desk v2, outreach) do only judgement work; deterministic work runs in `run_morning_pipeline()` and pg_cron. The rate card is served at `/chiswick-calendar-rate-card.pdf` and from the `public-assets` storage bucket.
 
 - **Jul 8, 2026:** Scraper tables + Resource Hub + /briefing dashboard + Delegate to Claude — (1) `news_leads`, `prospect_leads`, `scraper_logs` tables for external Claude Code Routines (RLS authenticated, status/found_at/source indexes); Routines write via service role, app reads + updates status. (2) `/resources` Resource Hub: `resources` table (org-scoped RLS), private `resources` storage bucket, card grid with category chips, tag/title search, pin, drag-drop upload or external link modal. (3) `/briefing` is the new default landing (logo, mobile Home, post-login redirect): tasks due, News Leads kanban, Prospect Leads kanban (match-type badges, link to matched business), Recent Drafts, resources strip; drag-and-drop or dropdown status moves. (4) Delegate to Claude: ✨ Draft button on business-linked task cards (`TaskRow`, briefing `TasksSection`) → POST `/api/delegate-draft` → Sonnet drafts outreach email from business record + full history + task + contacts → saved as correspondence `type='Draft'`, `direction='outbound'` (new enum value + widened direction check — 'outbound' deliberately ≠ 'sent' so drafts never clear Needs Reply), `ai_metadata.source='delegate_draft'` with draft/sent status. Migrations `20260707_001–004`. Nav gains To-dos + Resources links. NOTE: Anthropic API key had zero credit at build time — delegate button verified to the API call, insert path verified via simulated row.
 
