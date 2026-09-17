@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { buildDeskEmail, type ClosedItem, type DeskLine } from '@/lib/email/desk-email'
+import { buildDeskEmail, type ClosedItem, type DeskLine, type DraftItem } from '@/lib/email/desk-email'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   const since = new Date(now.getTime() - 24 * 3_600_000).toISOString()
-  const [linesRes, briefRes, healthRes, closedRes, missedRes] = await Promise.all([
+  const [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes] = await Promise.all([
     supabase.from('v_morning_desk').select('section, heading, sort, line, is_priority'),
     supabase.from('v_daily_brief').select('*').maybeSingle(),
     supabase.from('v_system_health').select('*').maybeSingle(),
@@ -55,9 +55,14 @@ export async function GET(request: NextRequest) {
       .select('signal_meta')
       .neq('status', 'done')
       .eq('signal_meta->>kind', 'routine_missed'),
+    supabase
+      .from('routine_drafts')
+      .select('kind, outcome, recipient, reason, businesses(name)')
+      .gte('created_at', new Date(now.getTime() - 26 * 3_600_000).toISOString())
+      .order('created_at', { ascending: true }),
   ])
 
-  const firstError = [linesRes, briefRes, healthRes, closedRes, missedRes].find(r => r.error)?.error
+  const firstError = [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes].find(r => r.error)?.error
   if (firstError) {
     console.error('[desk-email] read error:', firstError.message)
     return NextResponse.json({ error: firstError.message }, { status: 500 })
@@ -72,6 +77,16 @@ export async function GET(request: NextRequest) {
     .map(r => (r.signal_meta as { routine?: string } | null)?.routine)
     .filter((x): x is string => !!x)
 
+  const draftRows = draftsRes.data ?? []
+  const drafts: DraftItem[] = draftRows
+    .filter(r => r.outcome === 'drafted')
+    .map(r => {
+      const biz = r.businesses as unknown as { name: string } | { name: string }[] | null
+      const name = Array.isArray(biz) ? biz[0]?.name : biz?.name
+      return { kind: r.kind, business: name ?? '(business)', recipient: r.recipient, reason: r.reason }
+    })
+  const skippedCount = draftRows.filter(r => r.outcome === 'skipped').length
+
   const email = buildDeskEmail({
     now,
     lines: (linesRes.data ?? []) as DeskLine[],
@@ -80,6 +95,8 @@ export async function GET(request: NextRequest) {
     closed,
     missedRoutines,
     pipeline,
+    drafts,
+    skippedCount,
   })
 
   if (dry) {
