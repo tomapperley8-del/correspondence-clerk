@@ -32,6 +32,7 @@ import {
   extractContactFormSender,
   getOwnDomains,
   domainBusinessNameScore,
+  plainEmailBody,
 } from '@/lib/inbound/utils'
 
 export const maxDuration = 60
@@ -318,8 +319,11 @@ async function insertCorrespondenceServiceRole(
       contact_id: opts.contactId,
       user_id: opts.userId,
       raw_text_original: opts.rawText,
-      formatted_text_original: null,
-      formatted_text_current: null,
+      // A readable body from the raw text, with no AI. The AI formatter still
+      // overwrites this later when it is switched on; when it is off this is
+      // what the app and the routines read, instead of nothing at all.
+      formatted_text_original: plainEmailBody(opts.rawText) || null,
+      formatted_text_current: plainEmailBody(opts.rawText) || null,
       entry_date: opts.entryDate,
       subject: opts.subject,
       type: 'Email',

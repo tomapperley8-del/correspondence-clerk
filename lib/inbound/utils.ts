@@ -219,3 +219,62 @@ export function extractForwardedSender(rawBody: string): { email: string; name: 
 
   return null
 }
+
+/**
+ * Readable body text from a stored raw email, with no AI involved.
+ *
+ * The raw text we keep looks like this:
+ *
+ *   From: Someone <someone@example.com>
+ *   Date: 2026-09-17T09:02:55.000Z
+ *   Subject: Whatever
+ *
+ *   ________________________________
+ *
+ *   the actual message
+ *
+ *   From: Tom | The Chiswick Calendar <tom@...>
+ *   Sent: 16 September 2026 11:08
+ *   ... the quoted chain ...
+ *
+ * Before 17 Sep 2026 the body was only ever written by the AI formatter, so
+ * with AI switched off 626 entries were saved with nothing readable in them at
+ * all. This takes the header block off the top, cuts the quoted chain off the
+ * bottom, and tidies Outlook's <mailto:> and <http> link noise.
+ */
+export function plainEmailBody(rawText: string | null | undefined): string {
+  if (!rawText) return ''
+  let body = rawText.replace(/\r\n/g, '\n')
+
+  // Drop the header block: either up to the underscore rule Outlook inserts,
+  // or the leading From/Date/Subject lines when there is no rule.
+  const rule = body.match(/\n_{10,}\n/)
+  if (rule && rule.index !== undefined && rule.index < 600) {
+    body = body.slice(rule.index + rule[0].length)
+  } else {
+    body = body.replace(/^(?:(?:From|To|Cc|Date|Sent|Subject|Reply-To):[^\n]*\n)+/i, '')
+  }
+
+  // Cut everything from the first sign of a quoted reply.
+  const cutPatterns = [
+    /\n_{10,}\s*\n+\s*From:/,
+    /\nFrom:[^\n]*\n\s*(?:Sent|Date):/i,
+    /\n-{3,}\s*Original Message\s*-{3,}/i,
+    /\n-{3,}\s*Forwarded message\s*-{3,}/i,
+    /\nOn .{5,120}\bwrote:/,
+    /\n-- \n/,
+  ]
+  for (const p of cutPatterns) {
+    const m = body.match(p)
+    if (m && m.index !== undefined) body = body.slice(0, m.index)
+  }
+
+  return body
+    .replace(/<mailto:[^>]*>/gi, '')
+    .replace(/<https?:\/\/[^>]*>/gi, '')
+    .replace(/^_{10,}$/gm, '')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 8000)
+}
