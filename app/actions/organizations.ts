@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { isAiEnabled } from '@/lib/ai/client'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -12,12 +13,14 @@ export type NavData = {
   organizationName: string | null
   todosDueCount: number
   inboundCount: number
+  /** False when AI_ENABLED=false: the app hides the buttons that would only fail. */
+  aiEnabled: boolean
 }
 
 export async function getNavData(): Promise<NavData> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { displayName: null, organizationId: null, organizationName: null, todosDueCount: 0, inboundCount: 0 }
+  if (!user) return { displayName: null, organizationId: null, organizationName: null, todosDueCount: 0, inboundCount: 0, aiEnabled: isAiEnabled() }
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -25,7 +28,7 @@ export async function getNavData(): Promise<NavData> {
     .eq('id', user.id)
     .single()
 
-  if (!profile) return { displayName: null, organizationId: null, organizationName: null, todosDueCount: 0, inboundCount: 0 }
+  if (!profile) return { displayName: null, organizationId: null, organizationName: null, todosDueCount: 0, inboundCount: 0, aiEnabled: isAiEnabled() }
 
   const orgId = profile.organization_id
   const orgs = profile.organizations as { id: string; name: string }[] | { id: string; name: string } | null
@@ -46,6 +49,7 @@ export async function getNavData(): Promise<NavData> {
     organizationName: org?.name ?? null,
     todosDueCount: todosDue.count ?? 0,
     inboundCount: inbound.count ?? 0,
+    aiEnabled: isAiEnabled(),
   }
 }
 

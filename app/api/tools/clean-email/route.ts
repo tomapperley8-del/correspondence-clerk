@@ -4,12 +4,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getAnthropicClient } from '@/lib/ai/client'
+import { getAnthropicClient, isAiEnabled } from '@/lib/ai/client'
 import { AI_MODELS } from '@/lib/ai/models'
 
-const anthropic = getAnthropicClient()
-
 export async function POST(request: NextRequest) {
+  // The client used to be built when this module loaded, which meant a missing
+  // key took the whole build down rather than this one route.
+  if (!isAiEnabled()) {
+    return NextResponse.json(
+      { error: 'This tool is temporarily unavailable.' },
+      { status: 503 }
+    )
+  }
+
   try {
     const { text } = await request.json()
 
@@ -44,7 +51,7 @@ export async function POST(request: NextRequest) {
 
 async function cleanEmail(text: string): Promise<string> {
   try {
-    const message = await anthropic.messages.create({
+    const message = await getAnthropicClient().messages.create({
       model: AI_MODELS.ECONOMY,
       max_tokens: 2000,
       system: [{ type: 'text' as const, text: 'Clean up email text. Remove unnecessary quoted text, fix formatting, but preserve actual content and wording exactly. Return ONLY the cleaned email text.', cache_control: { type: 'ephemeral' as const } }],

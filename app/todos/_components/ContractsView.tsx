@@ -27,6 +27,15 @@ function mapLegacyStage(stage: string): RenewalStage {
 
 const RE_ENGAGE_MONTHS = 6
 
+// A term that ended this long ago is not a renewal any more, it is a lapsed
+// member. They were sitting in "To contact" looking like live business.
+const LAPSED_AFTER_DAYS = 90
+
+function isLapsed(b: ContractBusiness, today: string): boolean {
+  const days = daysRemaining(b.current_contract_end, today)
+  return days !== null && days < -LAPSED_AFTER_DAYS
+}
+
 function monthsAgo(dateStr: string | null): number | null {
   if (!dateStr) return null
   const d = new Date(dateStr)
@@ -121,10 +130,12 @@ export function ContractsView({ businesses, today, onStageChange, onRenew, onAdd
     }
     for (const b of filtered) {
       const stage = mapLegacyStage(b.renewal_stage || 'not_started')
+      // Lapsed members have their own list below the board.
+      if (stage === 'not_started' && isLapsed(b, today)) continue
       map[stage].push(b)
     }
     return map
-  }, [filtered])
+  }, [filtered, today])
 
   const addCandidates = useMemo(() => {
     if (!addSearch || addSearch.length < 2) return []
@@ -165,6 +176,12 @@ export function ContractsView({ businesses, today, onStageChange, onRenew, onAdd
       return months !== null && months >= RE_ENGAGE_MONTHS
     })
   }, [filtered])
+
+  const lapsedList = useMemo(() => {
+    return filtered
+      .filter(b => mapLegacyStage(b.renewal_stage || 'not_started') === 'not_started' && isLapsed(b, today))
+      .sort((a, b) => (a.current_contract_end ?? '').localeCompare(b.current_contract_end ?? ''))
+  }, [filtered, today])
 
   const ccCount = businesses.filter(b => b.is_club_card).length
   const adCount = businesses.filter(b => b.is_advertiser).length
@@ -285,6 +302,55 @@ export function ContractsView({ businesses, today, onStageChange, onRenew, onAdd
       )}
 
       {/* Re-engage section */}
+      {lapsedList.length > 0 && (
+        <div className="mt-4 border border-gray-200 bg-gray-50/50">
+          <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-gray-600">
+              Lapsed ({lapsedList.length})
+            </span>
+            <span className="text-[9px] text-gray-500">term ended over three months ago, not a live renewal</span>
+          </div>
+          <div className="p-2 space-y-1">
+            {lapsedList.map(b => (
+              <div key={b.id} className="flex items-center justify-between bg-white border border-gray-200 px-2.5 py-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Link
+                    href={`/businesses/${b.id}`}
+                    className="text-[11px] font-medium text-brand-navy hover:text-brand-olive transition-colors truncate"
+                  >
+                    {b.name}
+                  </Link>
+                  <span className="text-[8px] font-semibold px-1 py-0.5 bg-brand-navy/10 text-brand-navy">
+                    {getTypeBadge(b)}
+                  </span>
+                  {b.current_contract_end && (
+                    <span className="text-[9px] text-gray-500 whitespace-nowrap">
+                      ended {formatDateShortGB(b.current_contract_end + 'T00:00:00')}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => onStageChange(b.id, 'contacted' as RenewalStage)}
+                    className="text-[9px] px-2 py-0.5 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy hover:text-white transition-colors"
+                  >
+                    Chasing it
+                  </button>
+                  {onMoveToOutreach && (
+                    <button
+                      onClick={() => onMoveToOutreach(b.id)}
+                      className="text-[9px] px-2 py-0.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
+                    >
+                      Move to outreach
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {reEngageList.length > 0 && (
         <div className="mt-4 border border-amber-200 bg-amber-50/30">
           <div className="px-3 py-2 border-b border-amber-200 flex items-center justify-between">

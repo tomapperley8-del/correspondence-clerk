@@ -3,7 +3,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
-import { generateBusinessScheduledTasks } from '@/app/actions/tasks'
 import { z } from 'zod'
 
 const createBusinessSchema = z.object({
@@ -690,8 +689,6 @@ export async function addBusinessToContractsFromDetail(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-
-  await generateBusinessScheduledTasks(businessId)
 
   revalidatePath('/todos')
   revalidatePath('/dashboard')

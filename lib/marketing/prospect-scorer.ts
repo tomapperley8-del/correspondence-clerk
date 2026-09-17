@@ -7,7 +7,6 @@ import { TARGET_SIC_CODES, SicCode } from './companies-house'
 import { getAnthropicClient } from '@/lib/ai/client'
 import { AI_MODELS } from '@/lib/ai/models'
 
-const anthropic = getAnthropicClient()
 
 export interface ProspectData {
   company_name: string
@@ -145,7 +144,7 @@ Scoring guide:
 - 40-59: Moderate fit, low priority
 - 0-39: Poor fit, skip`
 
-  const message = await anthropic.messages.create({
+  const message = await getAnthropicClient().messages.create({
     model: AI_MODELS.ECONOMY,
     max_tokens: 500,
     system: [{ type: 'text' as const, text: 'You are a sales intelligence AI scoring leads for Correspondence Clerk, a SaaS tool for organising correspondence. ICP: small-medium UK businesses (5-50 employees) in correspondence-heavy industries (law, estate agents, accountants, publishers, associations). Return ONLY valid JSON with score (0-100), score_reasons, recommended_action fields.', cache_control: { type: 'ephemeral' as const } }],

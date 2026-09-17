@@ -51,9 +51,6 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12 // 4 rows of 3 cards
 
-  // Check if bookmarklet is installed
-  const [bookmarkletInstalled, setBookmarkletInstalled] = useState(false)
-
   // Onboarding checklist
   const hasBusiness = businesses.length > 0
   const hasEntry = businesses.some((b) => b.last_contacted_at)
@@ -73,9 +70,6 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
 
   // Compute new entries badges and restore prefs from localStorage on mount
   useEffect(() => {
-    const installed = localStorage.getItem('bookmarklet-installed')
-    setBookmarkletInstalled(!!installed)
-
     const dismissed = localStorage.getItem('checklist_dismissed')
     setChecklistDismissed(dismissed === 'true')
 
@@ -289,36 +283,6 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
         </div>
       )}
 
-      {/* Bookmarklet Installation Card — only show once there are businesses */}
-      {!bookmarkletInstalled && businesses.length > 0 && (
-        <div className="border border-brand-navy/20 bg-brand-navy/[0.03] p-5 mb-6 rounded-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <h2 className="text-base font-semibold text-gray-900 mb-1">Import Emails</h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Install the Email Import Tool to import emails from Outlook or Gmail with one click.
-              </p>
-              <Link
-                href="/bookmarklet"
-                className="inline-block px-4 py-2 bg-brand-navy text-white text-sm font-medium hover:bg-brand-navy-hover transition-colors"
-              >
-                Install Email Import Tool
-              </Link>
-            </div>
-            <button
-              onClick={() => {
-                setBookmarkletInstalled(true)
-                localStorage.setItem('bookmarklet-installed', 'true')
-              }}
-              className="text-gray-500 hover:text-gray-700"
-              title="Dismiss this message"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
       {businesses.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded p-10 max-w-lg mx-auto mt-8 shadow-[var(--shadow-md,0_2px_8px_rgba(0,0,0,0.08))]">
           <h1 className="font-serif text-2xl font-semibold text-brand-dark mb-2">
@@ -328,7 +292,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
           <ol className="space-y-5 mb-8">
             {[
               'Add your first business and contact',
-              'Import an email (bookmarklet) or paste one in',
+              'Forward an email to your filing address, or paste one in',
               'Run your first Insight to see what needs attention',
             ].map((step, i) => (
               <li key={i} className="flex items-start gap-3">

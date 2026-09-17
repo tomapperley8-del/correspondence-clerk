@@ -37,6 +37,7 @@ export function Navigation() {
   const [isLoading, setIsLoading] = useState(true)
   const [todosDueCount, setTodosDueCount] = useState(0)
   const [inboundCount, setInboundCount] = useState(0)
+  const [aiEnabled, setAiEnabled] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -49,6 +50,7 @@ export function Navigation() {
     setDisplayName(nav.displayName)
     setTodosDueCount(nav.todosDueCount)
     setInboundCount(nav.inboundCount)
+    setAiEnabled(nav.aiEnabled)
     if (nav.organizationId) {
       setOrganization({ id: nav.organizationId, name: nav.organizationName ?? '' })
     } else {
@@ -217,7 +219,7 @@ export function Navigation() {
                 Resources
               </Link>
 
-              {pathname !== '/insights' && <InsightsButton />}
+              {aiEnabled && pathname !== '/insights' && <InsightsButton />}
             </div>
           </div>
 
@@ -309,7 +311,7 @@ export function Navigation() {
                 { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
                 { href: '/resources', label: 'Resources' },
                 { href: '/new-entry', label: 'New Entry' },
-                { href: '/insights', label: 'Insights' },
+                ...(aiEnabled ? [{ href: '/insights', label: 'Insights' }] : []),
                 { href: '/help', label: 'Help' },
                 { href: '/settings', label: 'Settings' },
               ].map(({ href, label, badge }: { href: string; label: string; badge?: number | null }) => (

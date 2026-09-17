@@ -60,9 +60,13 @@ export async function getProspectLeads(): Promise<{ data?: ProspectLead[]; error
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  // Only the ones still worth a decision. Converted leads have become members
+  // (the contracts trigger clears them off the outreach board too) and rejected
+  // ones have no column on the board, so counting them only made the header lie.
   const { data, error } = await supabase
     .from('prospect_leads')
     .select('*, matched_business:businesses!prospect_leads_matched_business_id_fkey(id, name)')
+    .in('status', ['new', 'reviewing', 'outreach_planned', 'contacted'])
     .order('found_at', { ascending: false })
     .limit(300)
 
