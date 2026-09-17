@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getNewsLeads, getProspectLeads, getRecentDrafts } from '@/app/actions/leads'
+import { getNewsLeads, getProspectLeads, getRoutineDrafts } from '@/app/actions/leads'
 import { getTasks } from '@/app/actions/tasks'
 import { getPinnedOrRecentResources } from '@/app/actions/resources'
 import { CollapsibleBlock } from './_components/CollapsibleBlock'
@@ -16,7 +16,7 @@ export default async function BriefingPage() {
     getNewsLeads().catch(() => ({ data: [], error: 'Could not load news leads' })),
     getProspectLeads().catch(() => ({ data: [], error: 'Could not load prospect leads' })),
     getTasks().catch(() => ({ data: [] })),
-    getRecentDrafts().catch(() => ({ data: [] })),
+    getRoutineDrafts().catch(() => ({ data: [] })),
     getPinnedOrRecentResources().catch(() => []),
   ])
 
@@ -113,8 +113,9 @@ export default async function BriefingPage() {
         </CollapsibleBlock>
 
         <CollapsibleBlock
-          title="Recent Drafts"
-          count={drafts.length}
+          title="Drafts written for you"
+          count={drafts.filter(d => d.outcome === 'drafted').length}
+          countHighlight={drafts.some(d => d.outcome === 'drafted')}
           defaultOpen={drafts.length > 0}
         >
           <DraftsSection initialDrafts={drafts} />

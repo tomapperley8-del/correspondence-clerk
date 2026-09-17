@@ -92,7 +92,7 @@ export function TaskRow({
         )}
 
         {task.business_id && !isDone && (
-          <DelegateButton taskId={task.id} compact />
+          <DelegateButton task={task} compact />
         )}
 
         {task.business_id && task.business && (

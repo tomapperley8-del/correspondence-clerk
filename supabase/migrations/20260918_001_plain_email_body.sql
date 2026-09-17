@@ -31,8 +31,9 @@ BEGIN
 
   -- Header block: everything up to Outlook's underscore rule, if there is one
   -- near the top, otherwise the leading From/Date/Subject lines.
-  IF body ~ ('^[\s\S]{0,600}?\n_{10,}\n') THEN
-    body := regexp_replace(body, '^[\s\S]{0,600}?\n_{10,}\n', '');
+  cut := regexp_instr(left(body, 700), E'\n_{10,}\n', 1, 1, 1);
+  IF cut > 0 THEN
+    body := substr(body, cut);
   ELSE
     body := regexp_replace(body, '^((From|To|Cc|Date|Sent|Subject|Reply-To):[^\n]*\n)+', '', 'i');
   END IF;
@@ -40,7 +41,7 @@ BEGIN
   -- Cut at the earliest sign of a quoted reply.
   best := NULL;
   FOREACH pat IN ARRAY ARRAY[
-    E'\n_{10,}[\\s]*\n+[\\s]*From:',
+    E'\n_{10,}\\s*\n+\\s*From:',
     E'\nFrom:[^\n]*\n[ \t]*(Sent|Date):',
     E'\n-{3,}[ ]*Original Message[ ]*-{3,}',
     E'\n-{3,}[ ]*Forwarded message[ ]*-{3,}',

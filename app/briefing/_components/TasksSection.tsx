@@ -67,10 +67,10 @@ export function TasksSection({ initialTasks }: { initialTasks: Task[] }) {
               </p>
             </div>
             {task.business_id ? (
-              <DelegateButton taskId={task.id} />
+              <DelegateButton task={task} />
             ) : task.category === 'work' ? (
-              <span className="text-[10px] text-gray-300 whitespace-nowrap" title="Link a business to this task to delegate drafting to Claude">
-                Link a business to delegate
+              <span className="text-[10px] text-gray-300 whitespace-nowrap" title="Link a business to this task so a routine can draft the email">
+                Link a business to ask for a draft
               </span>
             ) : null}
           </div>

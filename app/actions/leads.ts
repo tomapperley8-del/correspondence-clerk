@@ -106,74 +106,60 @@ export async function updateProspectLeadStatus(
   return { error: null }
 }
 
-// ---- Recent AI drafts (created by the Delegate to Claude button) ----
+// ---- Drafts written by the routines ----
+//
+// The member care and outreach routines write real drafts into Tom's Outlook and
+// record every decision here, including the ones they deliberately held back.
+// This is the same data the 07:00 desk email lists.
 
-export type RecentDraft = {
+export type RoutineDraft = {
   id: string
-  business_id: string
-  subject: string | null
-  formatted_text_current: string | null
   created_at: string
-  edited_at: string | null
-  draft_status: 'draft' | 'sent'
-  task_title: string | null
+  routine: string
+  kind: string
+  outcome: 'drafted' | 'skipped'
+  business_id: string | null
+  recipient: string | null
+  subject: string | null
+  reason: string | null
+  snooze_until: string | null
   business: { id: string; name: string } | null
 }
 
-export async function getRecentDrafts(limit = 10): Promise<{ data?: RecentDraft[]; error?: string }> {
+export async function getRoutineDrafts(days = 14, limit = 40): Promise<{ data?: RoutineDraft[]; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  const since = new Date(Date.now() - days * 86_400_000).toISOString()
   const { data, error } = await supabase
-    .from('correspondence')
-    .select('id, business_id, subject, formatted_text_current, created_at, edited_at, ai_metadata, business:businesses!correspondence_business_id_fkey(id, name)')
-    .eq('ai_metadata->>source', 'delegate_draft')
+    .from('routine_drafts')
+    .select('id, created_at, routine, kind, outcome, business_id, recipient, subject, reason, snooze_until, business:businesses!routine_drafts_business_id_fkey(id, name)')
+    .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(limit)
 
   if (error) return { error: error.message }
 
-  const drafts: RecentDraft[] = (data ?? []).map(row => {
-    const meta = (row.ai_metadata ?? {}) as { draft_status?: string; task_title?: string }
+  const drafts: RoutineDraft[] = (data ?? []).map(row => {
     const bizRaw = row.business as unknown
-    const biz = Array.isArray(bizRaw) ? (bizRaw[0] as { id: string; name: string } | undefined) ?? null : (bizRaw as { id: string; name: string } | null)
+    const biz = Array.isArray(bizRaw)
+      ? (bizRaw[0] as { id: string; name: string } | undefined) ?? null
+      : (bizRaw as { id: string; name: string } | null)
     return {
       id: row.id,
-      business_id: row.business_id,
-      subject: row.subject,
-      formatted_text_current: row.formatted_text_current,
       created_at: row.created_at,
-      edited_at: row.edited_at,
-      draft_status: meta.draft_status === 'sent' ? 'sent' : 'draft',
-      task_title: meta.task_title ?? null,
+      routine: row.routine,
+      kind: row.kind,
+      outcome: row.outcome === 'skipped' ? 'skipped' : 'drafted',
+      business_id: row.business_id,
+      recipient: row.recipient,
+      subject: row.subject,
+      reason: row.reason,
+      snooze_until: row.snooze_until,
       business: biz,
     }
   })
 
   return { data: drafts }
-}
-
-export async function markDraftSent(id: string): Promise<{ error?: string | null }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
-
-  const { data: entry } = await supabase
-    .from('correspondence')
-    .select('ai_metadata')
-    .eq('id', id)
-    .single()
-
-  if (!entry) return { error: 'Draft not found' }
-
-  const meta = { ...((entry.ai_metadata ?? {}) as Record<string, unknown>), draft_status: 'sent' }
-  const { error } = await supabase
-    .from('correspondence')
-    .update({ ai_metadata: meta })
-    .eq('id', id)
-
-  if (error) return { error: error.message }
-  revalidatePath('/briefing')
-  return { error: null }
 }

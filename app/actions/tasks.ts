@@ -44,8 +44,28 @@ export type Task = {
   created_at: string
   updated_at: string
   completed_at: string | null
+  signal_key: string | null
+  signal_meta: TaskSignalMeta | null
   business?: TaskBusiness | null
   task_category?: TaskCategory | null
+  /** A draft for this task is waiting for the routine to write it. */
+  draft_requested?: boolean
+}
+
+/**
+ * What the task engine and the routines leave on a task.
+ * draft_* is stamped by routine_draft_marks_tasks() when a routine writes the
+ * email this task is asking for, so the row can say "draft waiting in Outlook".
+ */
+export type TaskSignalMeta = {
+  kind?: string
+  routine?: string
+  draft_at?: string
+  draft_kind?: string
+  draft_subject?: string
+  draft_recipient?: string
+  draft_id?: string
+  [key: string]: unknown
 }
 
 export async function getTasks(): Promise<{ data?: Task[]; error?: string }> {
@@ -64,7 +84,79 @@ export async function getTasks(): Promise<{ data?: Task[]; error?: string }> {
     .order('created_at', { ascending: false })
 
   if (error) return { error: error.message }
-  return { data: data as Task[] }
+
+  const tasks = (data ?? []) as Task[]
+
+  // Draft requests Tom has made that no routine has answered yet.
+  const { data: pending } = await supabase
+    .from('draft_requests')
+    .select('task_id, business_id')
+    .eq('status', 'pending')
+
+  if (pending && pending.length > 0) {
+    const byTask = new Set(pending.map(r => r.task_id).filter(Boolean))
+    const byBusiness = new Set(pending.map(r => r.business_id).filter(Boolean))
+    for (const t of tasks) {
+      if (byTask.has(t.id) || (t.business_id && byBusiness.has(t.business_id))) {
+        t.draft_requested = true
+      }
+    }
+  }
+
+  return { data: tasks }
+}
+
+/**
+ * Ask the member care routine for an email on this task.
+ *
+ * The app used to generate the draft itself through the Anthropic API. That
+ * account has no credit and app AI is switched off, so the button did nothing
+ * but show an error. The routine writes a better email anyway: it reads the
+ * whole history and both mailboxes, and it puts the draft straight into Outlook
+ * in Tom's voice. This just leaves the request for it.
+ */
+export async function requestDraft(taskId: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organisation found' }
+
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('id, title, business_id')
+    .eq('id', taskId)
+    .eq('organization_id', orgId)
+    .maybeSingle()
+
+  if (!task) return { error: 'Task not found' }
+  if (!task.business_id) return { error: 'Link a business to this task first' }
+
+  const { data: existing } = await supabase
+    .from('draft_requests')
+    .select('id')
+    .eq('business_id', task.business_id)
+    .eq('status', 'pending')
+    .limit(1)
+    .maybeSingle()
+
+  if (existing) {
+    revalidatePath('/todos')
+    return {}
+  }
+
+  const { error } = await supabase.from('draft_requests').insert({
+    business_id: task.business_id,
+    task_id: task.id,
+    requested_by: user.id,
+    note: task.title,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath('/todos')
+  revalidatePath('/briefing')
+  return {}
 }
 
 export async function createTask(input: {

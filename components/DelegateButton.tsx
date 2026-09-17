@@ -1,93 +1,92 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import Link from 'next/link'
+import { useState } from 'react'
+import type { Task } from '@/app/actions/tasks'
+import { requestDraft } from '@/app/actions/tasks'
 import { toast } from '@/lib/toast'
 
-const COOLDOWN_MS = 10_000
+const OUTLOOK_DRAFTS = 'https://outlook.office.com/mail/drafts'
+
+function formatDateGB(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
 
 /**
- * "Delegate to Claude" — drafts an outreach email for a task via /api/delegate-draft.
- * Only render when the task has a linked business.
+ * The draft control on a task row. Three states:
+ *
+ *  - a routine has already written the email  → link to it in Outlook Drafts
+ *  - Tom has asked for one                    → says so, nothing more to do
+ *  - neither                                  → "Ask for a draft"
+ *
+ * It used to call /api/delegate-draft, which generated the email with the
+ * Anthropic API. App AI is off and that account has no credit, so every click
+ * was an error. The member care routine writes the email instead, on its next
+ * morning run, with the full history and both mailboxes behind it.
  */
 export function DelegateButton({
-  taskId,
+  task,
   compact,
 }: {
-  taskId: string
+  task: Task
   compact?: boolean
 }) {
-  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle')
-  const [result, setResult] = useState<{ correspondenceId: string; businessId: string } | null>(null)
-  const lastClickAt = useRef(0)
+  const [requested, setRequested] = useState(task.draft_requested === true)
+  const [saving, setSaving] = useState(false)
+
+  const draftAt = task.signal_meta?.draft_at
+  const size = compact ? 'text-xs' : 'text-sm'
+
+  if (typeof draftAt === 'string') {
+    return (
+      <a
+        href={OUTLOOK_DRAFTS}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={e => e.stopPropagation()}
+        title={task.signal_meta?.draft_subject ? String(task.signal_meta.draft_subject) : 'Written by a routine'}
+        className={`${size} font-medium text-brand-olive hover:text-brand-navy transition-colors whitespace-nowrap`}
+      >
+        Draft waiting ({formatDateGB(draftAt)})
+      </a>
+    )
+  }
+
+  if (requested) {
+    return (
+      <span className={`${size} text-gray-400 whitespace-nowrap`} title="The member care routine writes it on its next weekday run">
+        Draft requested
+      </span>
+    )
+  }
 
   async function handleClick(e: React.MouseEvent) {
     e.stopPropagation()
-    const now = Date.now()
-    if (now - lastClickAt.current < COOLDOWN_MS || state === 'loading') return
-    lastClickAt.current = now
-
-    setState('loading')
-    try {
-      const res = await fetch('/api/delegate-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setState('error')
-        toast.error(data.error ?? 'Drafting failed')
-        return
-      }
-      setResult({ correspondenceId: data.correspondenceId, businessId: data.businessId })
-      setState('idle')
-      toast.success('Draft ready')
-    } catch {
-      setState('error')
-      toast.error('Drafting failed — check your connection')
+    if (saving) return
+    setSaving(true)
+    const result = await requestDraft(task.id)
+    setSaving(false)
+    if (result.error) {
+      toast.error(result.error)
+      return
     }
-  }
-
-  if (result) {
-    return (
-      <Link
-        href={`/businesses/${result.businessId}#entry-${result.correspondenceId}`}
-        onClick={(e) => e.stopPropagation()}
-        className={`font-medium text-brand-olive hover:text-brand-navy transition-colors whitespace-nowrap ${
-          compact ? 'text-xs' : 'text-sm'
-        }`}
-      >
-        Draft ready — View
-      </Link>
-    )
+    setRequested(true)
+    toast.success('Asked for a draft. It will be in your Outlook Drafts in the morning.')
   }
 
   return (
     <button
       onClick={handleClick}
-      disabled={state === 'loading'}
-      title="Claude drafts an email for this task using the business record and correspondence history"
+      disabled={saving}
+      title="The member care routine writes this email into your Outlook Drafts on its next run"
       className={`font-medium border transition-colors whitespace-nowrap ${
         compact ? 'text-xs px-1.5 py-0.5' : 'text-sm px-2.5 py-1'
       } ${
-        state === 'loading'
+        saving
           ? 'border-gray-200 text-gray-400 cursor-wait'
-          : state === 'error'
-            ? 'border-red-300 text-red-600 hover:bg-red-50'
-            : 'border-brand-navy/30 text-brand-navy hover:bg-brand-navy hover:text-white'
+          : 'border-brand-navy/30 text-brand-navy hover:bg-brand-navy hover:text-white'
       }`}
     >
-      {state === 'loading' ? (
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-brand-navy rounded-full animate-spin" aria-hidden="true" />
-          Drafting...
-        </span>
-      ) : state === 'error' ? (
-        'Failed — Retry'
-      ) : (
-        <>✨ Draft</>
-      )}
+      {saving ? 'Asking...' : 'Ask for a draft'}
     </button>
   )
 }
