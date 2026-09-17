@@ -5,7 +5,7 @@
  */
 
 import { stripQuotedContent } from '@/lib/inbound/utils';
-import { getAnthropicClient } from './client';
+import { getAnthropicClient, isAiEnabled } from './client';
 import { AI_MODELS } from './models';
 import { detectTier1Action } from './keyword-detection';
 import {
@@ -459,6 +459,15 @@ export async function formatCorrespondence(
           data: deterministicResult,
           quotedContent,
         }
+      }
+    }
+
+    // AI switched off: store unformatted without making (and logging) a failed call.
+    if (!isAiEnabled()) {
+      return {
+        success: false,
+        error: 'AI formatting is switched off',
+        shouldSaveUnformatted: true,
       }
     }
 

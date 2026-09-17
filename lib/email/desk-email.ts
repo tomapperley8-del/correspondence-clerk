@@ -64,7 +64,7 @@ export function deskSubject(now: Date): string {
     timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short',
   }).formatToParts(now)
   const get = (t: string) => parts.find(p => p.type === t)?.value ?? ''
-  return `Desk: ${get('weekday')} ${get('day')} ${get('month')}`
+  return `Desk: ${get('weekday')} ${get('day')} ${get('month').slice(0, 3)}`
 }
 
 interface Section { heading: string; items: string[] }
