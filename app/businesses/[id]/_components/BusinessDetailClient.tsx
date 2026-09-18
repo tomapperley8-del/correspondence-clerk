@@ -17,6 +17,8 @@ import { useInsights } from '@/components/InsightsContext'
 import { CorrespondenceSummary } from '@/components/CorrespondenceSummary'
 import { ActionSuggestions } from '@/components/ActionSuggestions'
 import { ContractDetailsCard } from '@/components/ContractDetailsCard'
+import type { RoutineDraft } from '@/app/actions/leads'
+import { BusinessDrafts } from './BusinessDrafts'
 import { SuccessBanner } from '@/components/SuccessBanner'
 import { OpenThreadsCard } from '@/components/OpenThreadsCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
@@ -64,6 +66,8 @@ interface Props {
   membershipTypes: MembershipType[]
   initialOpenThreads: import('@/app/actions/correspondence').OpenThread[]
   businessId: string
+  routineDrafts: RoutineDraft[]
+  aiEnabled: boolean
   saved?: string
   fromTodos: boolean
 }
@@ -76,6 +80,8 @@ export function BusinessDetailClient({
   membershipTypes,
   initialOpenThreads,
   businessId,
+  routineDrafts,
+  aiEnabled,
   saved,
   fromTodos,
 }: Props) {
@@ -602,7 +608,7 @@ export function BusinessDetailClient({
           <div>
             <h1 className="text-2xl font-bold text-brand-dark">{business.name}</h1>
 
-            {business.is_club_card && (business.contract_start || business.contract_end) && (
+            {(business.is_club_card || business.is_advertiser) && (business.contract_start || business.contract_end) && (
               <div className="text-sm text-gray-700 mt-1">
                 <span className="font-semibold">Contract:</span>{' '}
                 {business.contract_start && <span>{formatDateGB(business.contract_start)}</span>}
@@ -794,11 +800,13 @@ export function BusinessDetailClient({
         </div>
       )}
 
-      {/* AI Summary — lazy, generates on demand */}
-      <CorrespondenceSummary businessId={business.id} refreshTrigger={summaryRefreshTrigger} />
+      {/* AI Summary and Action Suggestions: hidden while app AI is off, when
+          their Generate buttons could only fail. */}
+      {aiEnabled && <CorrespondenceSummary businessId={business.id} refreshTrigger={summaryRefreshTrigger} />}
+      {aiEnabled && <ActionSuggestions businessId={business.id} />}
 
-      {/* AI Action Suggestions — lazy, generates on demand */}
-      <ActionSuggestions businessId={business.id} />
+      {/* What the routines drafted or held back for this business */}
+      <BusinessDrafts drafts={routineDrafts} />
 
       {/* Contract Details */}
       <div className="mb-6">

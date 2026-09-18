@@ -1,9 +1,8 @@
 import Link from 'next/link'
-import { getNewsLeads, getProspectLeads, getRoutineDrafts } from '@/app/actions/leads'
+import { getProspectLeads, getRoutineDrafts } from '@/app/actions/leads'
 import { getTasks } from '@/app/actions/tasks'
 import { getPinnedOrRecentResources } from '@/app/actions/resources'
 import { CollapsibleBlock } from './_components/CollapsibleBlock'
-import { NewsBoard } from './_components/NewsBoard'
 import { ProspectBoard } from './_components/ProspectBoard'
 import { TasksSection } from './_components/TasksSection'
 import { DraftsSection } from './_components/DraftsSection'
@@ -12,15 +11,14 @@ import { ResourcesStrip } from './_components/ResourcesStrip'
 export const dynamic = 'force-dynamic'
 
 export default async function BriefingPage() {
-  const [newsResult, prospectsResult, tasksResult, draftsResult, resources] = await Promise.all([
-    getNewsLeads().catch(() => ({ data: [], error: 'Could not load news leads' })),
+  // News Leads was removed on 18 Sep 2026: the news scan routine is switched off.
+  const [prospectsResult, tasksResult, draftsResult, resources] = await Promise.all([
     getProspectLeads().catch(() => ({ data: [], error: 'Could not load prospect leads' })),
     getTasks().catch(() => ({ data: [] })),
     getRoutineDrafts().catch(() => ({ data: [] })),
     getPinnedOrRecentResources().catch(() => []),
   ])
 
-  const newsLeads = newsResult.data ?? []
   const prospectLeads = prospectsResult.data ?? []
   const drafts = draftsResult.data ?? []
 
@@ -34,9 +32,6 @@ export default async function BriefingPage() {
     })
     .slice(0, 10)
 
-  const newNewsCount = newsLeads.filter(l => l.status === 'new').length
-  // Killed leads are history, not work: they no longer count towards the header.
-  const liveNews = newsLeads.filter(l => l.status !== 'killed').length
   const newProspectCount = prospectLeads.filter(l => l.status === 'new').length
 
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'
@@ -57,10 +52,9 @@ export default async function BriefingPage() {
           <p className="text-sm text-gray-500 mt-1">
             {dateLabel}
             {' — '}
-            {newNewsCount > 0 || newProspectCount > 0 || dueTasks.length > 0 ? (
+            {newProspectCount > 0 || dueTasks.length > 0 ? (
               <>
                 {[
-                  newNewsCount > 0 ? `${newNewsCount} new stor${newNewsCount === 1 ? 'y' : 'ies'}` : null,
                   newProspectCount > 0 ? `${newProspectCount} new prospect${newProspectCount === 1 ? '' : 's'}` : null,
                   dueTasks.length > 0 ? `${dueTasks.length} task${dueTasks.length === 1 ? '' : 's'} due` : null,
                 ]
@@ -82,23 +76,6 @@ export default async function BriefingPage() {
           defaultOpen={dueTasks.length > 0}
         >
           <TasksSection initialTasks={dueTasks} />
-        </CollapsibleBlock>
-
-        <CollapsibleBlock
-          title="News Leads"
-          count={liveNews}
-          countHighlight={newNewsCount > 0}
-          defaultOpen={liveNews > 0}
-        >
-          {newsResult.error ? (
-            <p className="text-sm text-red-700">{newsResult.error}</p>
-          ) : liveNews === 0 ? (
-            <p className="text-sm text-gray-400">
-              No live story leads. The news scan routine is switched off, so nothing new arrives here until it is turned back on.
-            </p>
-          ) : (
-            <NewsBoard initialLeads={newsLeads} />
-          )}
         </CollapsibleBlock>
 
         <CollapsibleBlock

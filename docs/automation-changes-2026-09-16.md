@@ -109,3 +109,25 @@ An audit of every page, table and routine found parts that did not talk to each 
 **First morning on the new wiring (18 Sep):** member care drafted 4 (Hatch Meyhane renewal, check-ins for Kings House Sports Ground, Foster Books and Cykl Haus) and held back 6, including four where a draft was already waiting in Outlook and one where the member is waiting on a reply from Tom. Overnight, 8 emails were filed and none had an empty body.
 
 **Walk-through of the live site, 18 Sep:** four more fixes (migration `20260918_004`). Drafts are marked sent, and answered, when the BCC copy files back with the same subject; the task then says "Sent". Hold-backs appear on their task as "Held back to <date>" with the reason and an "Ask again" button. To-dos now groups automatic tasks by kind (payments to chase, replies waiting, stats emails) instead of labelling everything "renewals". News Leads counts only live leads.
+
+## 18 Sep 2026: QuickBooks drives contracts
+
+QuickBooks was synced every morning, but an invoice for a new term never became a contract. Members invoiced for another year still showed as expired, and Chiswick Physio, a current advertiser, was marked Former.
+
+- **`record_qbo_terms()`** now runs first in `run_morning_pipeline()`. A membership or advertising invoice becomes a contract when it's clearly a new term:
+  - a **renewal**: the current term ends within 90 days either side of the invoice, and the invoice is at least 80% of the old amount, which ignores monthly standing orders;
+  - a **new member**: a 12-month invoice from the last 60 days, with no current contract.
+  - Instalment deals are skipped and need recording by hand. Each invoice is used once (`contracts.qbo_invoice_id`).
+- **First run:** 6 contracts, for Arcane, Bollo House, Levent Borek, Oddono's, Tarantella (renewals) and Rozies (new member).
+- **Chiswick Physio** is now recorded by hand as one advertiser contract: 17 Jul 2026 to 16 Jul 2027, £2,160 in three instalments. Invoice 1793 (£720) is still outstanding.
+- **`sync_business_flags_from_contracts()`** now also:
+  - copies the current contract onto the business's own contract fields, which the business page header and the Mastersheet export read;
+  - marks a business Active when it has a contract in force. This covered 5 members who were still labelled Prospect.
+- **Business page:**
+  - a new "Drafts and decisions by the routines" panel;
+  - contract dates shown for advertisers as well as Club Card members;
+  - the AI summary and suggestion panels are hidden while AI is off.
+- **Home page:** the News Leads board is removed, because the news scan is off.
+- **Removed:** `/api/businesses/update-contract`, which was unused and wrote only to the business row.
+- **Backups:** reason `quickbooks_drives_contracts_2026_09_18`.
+- **Still to decide:** Theatre at the Tabard has two current contracts for the same year (£1,920 and £1,439.99).
