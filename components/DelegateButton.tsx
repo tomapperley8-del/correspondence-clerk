@@ -12,11 +12,13 @@ function formatDateGB(iso: string): string {
 }
 
 /**
- * The draft control on a task row. Three states:
+ * The draft control on a task row:
  *
- *  - a routine has already written the email  → link to it in Outlook Drafts
+ *  - the drafted email has gone               → "Sent 17 Sept"
+ *  - a routine has written it                 → link to it in Outlook Drafts
+ *  - the routine chose to hold back           → "Held back to 1 Oct", reason on hover
  *  - Tom has asked for one                    → says so, nothing more to do
- *  - neither                                  → "Ask for a draft"
+ *  - none of those                            → "Ask for a draft"
  *
  * It used to call /api/delegate-draft, which generated the email with the
  * Anthropic API. App AI is off and that account has no credit, so every click
@@ -34,7 +36,17 @@ export function DelegateButton({
   const [saving, setSaving] = useState(false)
 
   const draftAt = task.signal_meta?.draft_at
+  const sentAt = task.signal_meta?.draft_sent_at
+  const heldUntil = task.signal_meta?.held_until
   const size = compact ? 'text-xs' : 'text-sm'
+
+  if (typeof sentAt === 'string') {
+    return (
+      <span className={`${size} text-gray-500 whitespace-nowrap`} title={task.signal_meta?.draft_subject ? String(task.signal_meta.draft_subject) : undefined}>
+        Sent {formatDateGB(sentAt)}
+      </span>
+    )
+  }
 
   if (typeof draftAt === 'string') {
     return (
@@ -50,6 +62,10 @@ export function DelegateButton({
       </a>
     )
   }
+
+  // The routine looked at this one and chose not to write it yet. Say so, with
+  // its reason, rather than inviting a request for the draft it just declined.
+  const held = typeof heldUntil === 'string' && heldUntil >= new Date().toISOString().slice(0, 10) && !requested
 
   if (requested) {
     return (
@@ -71,6 +87,27 @@ export function DelegateButton({
     }
     setRequested(true)
     toast.success('Asked for a draft. It will be in your Outlook Drafts in the morning.')
+  }
+
+  if (held) {
+    return (
+      <span className={`${size} whitespace-nowrap`}>
+        <span
+          className="text-amber-700 cursor-help"
+          title={task.signal_meta?.held_reason ? String(task.signal_meta.held_reason) : 'Held back by the member care routine'}
+        >
+          Held back to {formatDateGB(heldUntil as string)}
+        </span>
+        <button
+          onClick={handleClick}
+          disabled={saving}
+          className="ml-2 text-brand-navy hover:text-brand-olive transition-colors font-medium"
+          title="Ask the routine to look again on its next run. It re-reads the history and may still hold back, with its reason."
+        >
+          {saving ? 'Asking...' : 'Ask again'}
+        </button>
+      </span>
+    )
   }
 
   return (

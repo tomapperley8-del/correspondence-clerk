@@ -127,6 +127,10 @@ export type RoutineDraft = {
   subject: string | null
   reason: string | null
   snooze_until: string | null
+  /** Set when the sent email files itself back through the BCC address. */
+  sent_at: string | null
+  /** Set when they answer it. */
+  replied_at: string | null
   business: { id: string; name: string } | null
 }
 
@@ -138,7 +142,7 @@ export async function getRoutineDrafts(days = 14, limit = 40): Promise<{ data?: 
   const since = new Date(Date.now() - days * 86_400_000).toISOString()
   const { data, error } = await supabase
     .from('routine_drafts')
-    .select('id, created_at, routine, kind, outcome, business_id, recipient, subject, reason, snooze_until, business:businesses!routine_drafts_business_id_fkey(id, name)')
+    .select('id, created_at, routine, kind, outcome, business_id, recipient, subject, reason, snooze_until, sent_at, replied_at, business:businesses!routine_drafts_business_id_fkey(id, name)')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -161,6 +165,8 @@ export async function getRoutineDrafts(days = 14, limit = 40): Promise<{ data?: 
       subject: row.subject,
       reason: row.reason,
       snooze_until: row.snooze_until,
+      sent_at: row.sent_at,
+      replied_at: row.replied_at,
       business: biz,
     }
   })

@@ -65,6 +65,11 @@ export type TaskSignalMeta = {
   draft_subject?: string
   draft_recipient?: string
   draft_id?: string
+  /** The drafted email has been sent (it filed itself back through the BCC). */
+  draft_sent_at?: string
+  /** The routine looked and deliberately held back until this date. */
+  held_until?: string
+  held_reason?: string
   [key: string]: unknown
 }
 

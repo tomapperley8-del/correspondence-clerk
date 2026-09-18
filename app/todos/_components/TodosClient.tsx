@@ -89,43 +89,75 @@ type BatchedGroup = {
   tasks: Task[]
 }
 
+// What each kind of automatic task is, for the group headings. The task engine
+// names its tasks with a signal_key like "invoice_overdue:10557"; the part
+// before the colon is the kind.
+const TASK_KIND_LABELS: Record<string, [string, string]> = {
+  invoice_overdue: ['payment to chase', 'payments to chase'],
+  invoice_due_soon: ['invoice due soon', 'invoices due soon'],
+  renewal_due: ['renewal', 'renewals'],
+  contract_renewal: ['renewal', 'renewals'],
+  renewal_lapsed: ['lapsed member', 'lapsed members'],
+  unrecorded_renewal: ['renewal to record', 'renewals to record'],
+  reply: ['reply waiting', 'replies waiting'],
+  commitment: ["thing you said you'd do", "things you said you'd do"],
+  editorial: ['editorial item', 'editorial items'],
+  stats: ['stats email to send', 'stats emails to send'],
+  checkin: ['check-in', 'check-ins'],
+  corr_flagged: ['follow-up', 'follow-ups'],
+  routine_missed: ['routine warning', 'routine warnings'],
+}
+
+function taskKind(t: Task): string {
+  if (t.signal_key) return t.signal_key.split(':')[0]
+  return t.source
+}
+
+/**
+ * Collapses automatic tasks of the same kind into one row, so a section reads
+ * "6 payments to chase" and "10 stats emails to send" instead of a wall of rows.
+ *
+ * This used to group every non-manual task by date and call the lot
+ * "renewals", which was true before the task engine existed. Once the engine
+ * started opening chasers, replies, stats and check-ins, "45 renewals due
+ * 18 Sept" was really 45 different things.
+ */
 function batchCrmTasks(tasks: Task[]): BatchedGroup[] {
-  const crmByDate = new Map<string, Task[]>()
-  const manualTasks: Task[] = []
+  const byKind = new Map<string, Task[]>()
+  const singles: Task[] = []
 
   for (const t of tasks) {
-    if (t.source !== 'manual' && t.due_date) {
-      const key = t.due_date
-      if (!crmByDate.has(key)) crmByDate.set(key, [])
-      crmByDate.get(key)!.push(t)
+    if (t.source !== 'manual' && t.status !== 'done') {
+      const kind = taskKind(t)
+      if (!byKind.has(kind)) byKind.set(kind, [])
+      byKind.get(kind)!.push(t)
     } else {
-      manualTasks.push(t)
+      singles.push(t)
     }
   }
 
   const allEntries: { date: string | null; item: BatchedGroup }[] = []
 
-  for (const [date, crmTasks] of crmByDate) {
-    if (crmTasks.length === 1) {
-      allEntries.push({ date, item: { type: 'single', task: crmTasks[0] } })
-    } else {
-      const ccCount = crmTasks.filter((t) => t.business?.is_club_card && !t.business?.is_advertiser).length
-      const adCount = crmTasks.filter((t) => t.business?.is_advertiser && !t.business?.is_club_card).length
-      const bothCount = crmTasks.filter((t) => t.business?.is_club_card && t.business?.is_advertiser).length
-      const otherCount = crmTasks.length - ccCount - adCount - bothCount
-
-      const parts: string[] = []
-      if (ccCount > 0) parts.push(`${ccCount} Club Card renewal${ccCount > 1 ? 's' : ''}`)
-      if (adCount > 0) parts.push(`${adCount} Advertiser renewal${adCount > 1 ? 's' : ''}`)
-      if (bothCount > 0) parts.push(`${bothCount} CC + Ad renewal${bothCount > 1 ? 's' : ''}`)
-      if (otherCount > 0) parts.push(`${otherCount} renewal${otherCount > 1 ? 's' : ''}`)
-      const label = parts.join(', ') + ' due ' + formatDateShortGB(date + 'T00:00:00')
-
-      allEntries.push({ date, item: { type: 'batch', label, date, tasks: crmTasks } })
+  for (const [kind, kindTasks] of byKind) {
+    kindTasks.sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''))
+    const first = kindTasks[0].due_date
+    if (kindTasks.length === 1) {
+      allEntries.push({ date: first, item: { type: 'single', task: kindTasks[0] } })
+      continue
     }
+    const [one, many] = TASK_KIND_LABELS[kind] ?? ['other task', 'other tasks']
+    const n = kindTasks.length
+    const last = kindTasks[n - 1].due_date
+    const when = !first
+      ? ''
+      : first === last
+        ? ` due ${formatDateShortGB(first + 'T00:00:00')}`
+        : ` due ${formatDateShortGB(first + 'T00:00:00')} to ${formatDateShortGB(last + 'T00:00:00')}`
+    const label = `${n} ${n === 1 ? one : many}${when}`
+    allEntries.push({ date: first, item: { type: 'batch', label, date: first ?? '', tasks: kindTasks } })
   }
 
-  for (const t of manualTasks) {
+  for (const t of singles) {
     allEntries.push({ date: t.due_date, item: { type: 'single', task: t } })
   }
 

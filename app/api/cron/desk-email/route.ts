@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       .eq('signal_meta->>kind', 'routine_missed'),
     supabase
       .from('routine_drafts')
-      .select('kind, outcome, recipient, reason, businesses(name)')
+      .select('kind, outcome, recipient, reason, sent_at, businesses(name)')
       .gte('created_at', new Date(now.getTime() - 26 * 3_600_000).toISOString())
       .order('created_at', { ascending: true }),
   ])
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
 
   const draftRows = draftsRes.data ?? []
   const drafts: DraftItem[] = draftRows
-    .filter(r => r.outcome === 'drafted')
+    .filter(r => r.outcome === 'drafted' && !r.sent_at)
     .map(r => {
       const biz = r.businesses as unknown as { name: string } | { name: string }[] | null
       const name = Array.isArray(biz) ? biz[0]?.name : biz?.name

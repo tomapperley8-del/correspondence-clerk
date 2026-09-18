@@ -35,6 +35,8 @@ export default async function BriefingPage() {
     .slice(0, 10)
 
   const newNewsCount = newsLeads.filter(l => l.status === 'new').length
+  // Killed leads are history, not work: they no longer count towards the header.
+  const liveNews = newsLeads.filter(l => l.status !== 'killed').length
   const newProspectCount = prospectLeads.filter(l => l.status === 'new').length
 
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'
@@ -84,14 +86,16 @@ export default async function BriefingPage() {
 
         <CollapsibleBlock
           title="News Leads"
-          count={newsLeads.length}
+          count={liveNews}
           countHighlight={newNewsCount > 0}
-          defaultOpen={newsLeads.length > 0}
+          defaultOpen={liveNews > 0}
         >
           {newsResult.error ? (
             <p className="text-sm text-red-700">{newsResult.error}</p>
-          ) : newsLeads.length === 0 ? (
-            <p className="text-sm text-gray-400">Nothing new today — the news Routine hasn&apos;t found anything yet.</p>
+          ) : liveNews === 0 ? (
+            <p className="text-sm text-gray-400">
+              No live story leads. The news scan routine is switched off, so nothing new arrives here until it is turned back on.
+            </p>
           ) : (
             <NewsBoard initialLeads={newsLeads} />
           )}
@@ -114,8 +118,8 @@ export default async function BriefingPage() {
 
         <CollapsibleBlock
           title="Drafts written for you"
-          count={drafts.filter(d => d.outcome === 'drafted').length}
-          countHighlight={drafts.some(d => d.outcome === 'drafted')}
+          count={drafts.filter(d => d.outcome === 'drafted' && !d.sent_at).length}
+          countHighlight={drafts.some(d => d.outcome === 'drafted' && !d.sent_at)}
           defaultOpen={drafts.length > 0}
         >
           <DraftsSection initialDrafts={drafts} />

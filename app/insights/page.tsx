@@ -23,7 +23,7 @@ export default function InsightsPage() {
             The app stopped making its own AI calls on 16 September 2026 (AI_ENABLED=false), so these
             panels would only show errors. The judgement work happens in the Claude routines instead:
             the morning desk run, the outreach drafts and the member care drafts, which all land in
-            your Outlook and in the 07:00 desk email.
+            your Outlook and in the morning desk email.
           </p>
           <p className="text-sm text-gray-600 mt-2">
             To bring them back, top up the Anthropic API account and set AI_ENABLED=true in Vercel.
