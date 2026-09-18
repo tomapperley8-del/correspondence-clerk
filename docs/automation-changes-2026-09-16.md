@@ -86,3 +86,24 @@ Every data change below was backed up to `cc_phase0_backup` first (reason shown)
 - **Desk email:** now opens with "Drafts waiting in your Outlook", from `routine_drafts` over the last 26 hours.
 - **Outreach routine:** now records its drafts in `routine_drafts`. Drafts carry Tom's signature and Aptos 12, and the routine checks the Drafts folder before writing.
 - **Queue on the first day:** 6 renewals, 9 businesses with overdue invoices, 62 check-ins. The check-in backlog clears at up to 3 a day.
+
+## 17-18 Sep 2026: wiring audit and fixes
+
+An audit of every page, table and routine found parts that did not talk to each other. All fixed, every data change backed up to `cc_phase0_backup` first.
+
+| Gap | Fix | Where |
+|---|---|---|
+| 626 emails stored with an empty body, about 1,000 unreadable in total (the body was only ever written by the AI formatter, which is off) | `plainEmailBody()` fills the body on arrival with no AI; `plain_email_body()` backfilled 1,017 rows (backup `empty_body_backfill_2026_09_18`) | `lib/inbound/utils.ts`, `app/api/inbound-email/route.ts`, migration `20260918_001` |
+| Routine drafts only visible in the 07:00 email; "Recent Drafts" on /briefing read the wrong table | /briefing "Drafts written for you" reads `routine_drafts`, with hold-backs and their return dates | `app/actions/leads.ts`, `app/briefing/_components/DraftsSection.tsx` |
+| Tasks did not know a draft had been written | `routine_draft_marks_tasks()` stamps matching open tasks; the task row shows "Draft waiting" and links to Outlook Drafts | migration `20260918_002`, `components/DelegateButton.tsx` |
+| The ✨ Draft button called an AI account with no credit | Now "Ask for a draft": writes `draft_requests`, which the member care routine handles first on its next run (prompt step 0). `/api/delegate-draft` deleted | `app/actions/tasks.ts`, routine `trig_01StP874yVwk1toJgR5EsCrN` |
+| A routine that finished late looked failed until 10:30 the next day | A heartbeat closes its own missed-run task on arrival | migration `heartbeat_closes_missed_task` (applied via MCP, recorded here) |
+| Prospect Leads and the Outreach board disagreed | The two mirror each other through triggers; the board counts only leads still needing a decision (backup `prospect_pipeline_sync_2026_09_18`) | migration `20260918_003`, `getProspectLeads()` |
+| Members whose term ended long ago sat in "To contact" | A Lapsed list below the renewals board for terms ended over 90 days ago, with "Chasing it" and "Move to outreach" | `app/todos/_components/ContractsView.tsx` |
+| Insights offered buttons that could only fail with AI off | Hidden from the nav when `AI_ENABLED=false`; /insights explains why | `components/Navigation.tsx`, `app/insights/page.tsx` |
+| Dead code: legacy task generators (a trigger already blocked their inserts), a renewal-date migration running on every To-dos load, the retired daily-briefing cron route, the bookmarklet banner | Deleted | `app/actions/tasks.ts`, `app/settings/page.tsx`, `components/DashboardClient.tsx` |
+| AI clients built at module load, so a missing key broke the whole build | Built on use | `app/api/tools/clean-email`, `lib/marketing/*` |
+| Nine Former businesses still typed as current members | `membership_type` set to `former_*` (backup `former_membership_type_tidy_2026_09_18`) | data |
+| Rate card link held only in routine prompts | The Resource Hub rate card row now points at the same file and is pinned. To change the rate card, replace the PDF at the same storage path (`public-assets/chiswick-calendar-rate-card.pdf`) and every link keeps working | data |
+
+**First morning on the new wiring (18 Sep):** member care drafted 4 (Hatch Meyhane renewal, check-ins for Kings House Sports Ground, Foster Books and Cykl Haus) and held back 6, including four where a draft was already waiting in Outlook and one where the member is waiting on a reply from Tom. Overnight, 8 emails were filed and none had an empty body.

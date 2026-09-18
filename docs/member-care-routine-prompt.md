@@ -10,6 +10,13 @@ Every routine on this account shares one weekly usage allowance. Keep SQL result
 - Supabase MCP, project `ayoiibrzkllerrwbhvda` (execute_sql).
 - Microsoft 365 as tom@. The shared mailbox info@thechiswickcalendar.co.uk is reached with `mailboxOwnerEmail` (use `query`, not `recipient`, there). Tom works out of both.
 
+## 0. What Tom has asked for
+SELECT r.id, r.business_id, b.name, r.note, r.created_at
+FROM draft_requests r JOIN businesses b ON b.id = r.business_id
+WHERE r.status = 'pending' ORDER BY r.created_at;
+
+These are Tom pressing "Ask for a draft" on a task in Correspondence Clerk, so they come first, before the queue below, and they count towards the six. Treat each one exactly like a queue candidate: read the history, decide, then write it or hold back with a reason. Record it in routine_drafts with whichever kind fits (renewal, overdue, checkin, or outreach for anything else) and use `note` as the brief; the request closes itself when you record the decision. If the business is not a member or advertiser at all, still write it. Tom asked.
+
 ## 1. Get today's queue
 SELECT kind, priority, business_id, business_name, ref, membership_type, contract_start, contract_end, contract_amount, deal_terms, invoices, amount_due, days_overdue, last_sent_at, last_received_at, last_draft_at
 FROM v_member_care_queue ORDER BY priority, days_overdue DESC NULLS LAST, contract_end NULLS LAST, contract_start NULLS FIRST;

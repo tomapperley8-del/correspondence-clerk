@@ -94,7 +94,7 @@ lib/ai/
   types.ts                 AI response contracts
 
 lib/
-  inbound/utils.ts             isPersonalDomain, stripQuotedContent
+  inbound/utils.ts             isPersonalDomain, stripQuotedContent, plainEmailBody (readable body with no AI)
   email-import/execute-chunk.ts  Shared Gmail+Outlook chunked import logic
   toast.ts                     Toast emitter (CustomEvent — call toast.success/error/info())
   supabase/service-role.ts     createServiceRoleClient() for cron/session-less contexts
@@ -268,6 +268,8 @@ All features complete and deployed (unless noted):
 28. Actions Page — **live** (unified smart list → top priorities hero + 3 collapsible sections. Needs Reply direction-aware, no 7-day cap. Done permanent via `reply_dismissed_at`. One-click flag sets due_at +7d. Commitment alerts from insight_history. Rationale slide-out panel. AI auto-flags high-confidence inbound emails. Insights "Add to Actions" push. Keyboard nav D/S/L/Enter.)
 
 ## Recent Changes
+
+- **Sep 18, 2026:** Wiring audit (full list in `docs/automation-changes-2026-09-16.md`). Inbound email bodies are written without AI (`plainEmailBody` / `plain_email_body`). /briefing shows the routines' drafts from `routine_drafts`. A draft stamps its task (`signal_meta.draft_*`), and "Ask for a draft" writes `draft_requests` for the member care routine. Prospect leads and the outreach stage mirror each other. The renewals board has a Lapsed list. Insights is hidden while AI is off. The legacy task generators and `/api/delegate-draft` are gone.
 
 - **Sep 16, 2026:** Automation simplification (full log in `docs/automation-changes-2026-09-16.md`). App AI is switched off with `AI_ENABLED=false`: inbound email is stored unformatted unless the regex fast path handles it. The desk email is built in the app with no AI, and the AI daily-briefing cron was removed. Cron routes need `CRON_SECRET`. The rate-limit cleanup uses the service role. The Claude routines (daily desk v2, outreach) do only judgement work; deterministic work runs in `run_morning_pipeline()` and pg_cron. The rate card is served at `/chiswick-calendar-rate-card.pdf` and from the `public-assets` storage bucket.
 
