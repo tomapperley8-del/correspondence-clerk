@@ -5,6 +5,7 @@ import { findDuplicatesInBusiness, getOpenThreads } from '@/app/actions/correspo
 import { getThreadsByBusiness } from '@/app/actions/threads'
 import { getActiveMembershipTypes } from '@/app/actions/membership-types'
 import { getRoutineDraftsForBusiness } from '@/app/actions/leads'
+import { getOneOffSales } from '@/app/actions/contracts'
 import { isAiEnabled } from '@/lib/ai/client'
 import { BusinessDetailClient } from './_components/BusinessDetailClient'
 
@@ -18,7 +19,7 @@ export default async function BusinessDetailPage({
   const { id } = await params
   const { saved, from } = await searchParams
 
-  const [businessResult, contactsResult, duplicatesResult, threadsResult, membershipTypesResult, openThreadsResult, draftsResult] =
+  const [businessResult, contactsResult, duplicatesResult, threadsResult, membershipTypesResult, openThreadsResult, draftsResult, oneOffsResult] =
     await Promise.all([
       getBusinessById(id),
       getContactsByBusiness(id),
@@ -27,6 +28,7 @@ export default async function BusinessDetailPage({
       getActiveMembershipTypes(),
       getOpenThreads({ businessId: id }),
       getRoutineDraftsForBusiness(id).catch(() => ({ data: [] })),
+      getOneOffSales(id).catch(() => ({ data: [] })),
     ])
 
   if ('error' in businessResult || !businessResult.data) {
@@ -43,6 +45,7 @@ export default async function BusinessDetailPage({
       initialOpenThreads={'error' in openThreadsResult ? [] : (openThreadsResult.data ?? [])}
       businessId={id}
       routineDrafts={draftsResult.data ?? []}
+      oneOffSales={oneOffsResult.data ?? []}
       aiEnabled={isAiEnabled()}
       saved={saved}
       fromTodos={from === 'todos'}

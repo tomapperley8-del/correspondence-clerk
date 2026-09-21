@@ -19,6 +19,8 @@ import { ActionSuggestions } from '@/components/ActionSuggestions'
 import { ContractDetailsCard } from '@/components/ContractDetailsCard'
 import type { RoutineDraft } from '@/app/actions/leads'
 import { BusinessDrafts } from './BusinessDrafts'
+import { BusinessOneOffs } from './BusinessOneOffs'
+import type { OneOffSale } from '@/app/actions/contracts'
 import { SuccessBanner } from '@/components/SuccessBanner'
 import { OpenThreadsCard } from '@/components/OpenThreadsCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
@@ -67,6 +69,7 @@ interface Props {
   initialOpenThreads: import('@/app/actions/correspondence').OpenThread[]
   businessId: string
   routineDrafts: RoutineDraft[]
+  oneOffSales: OneOffSale[]
   aiEnabled: boolean
   saved?: string
   fromTodos: boolean
@@ -81,6 +84,7 @@ export function BusinessDetailClient({
   initialOpenThreads,
   businessId,
   routineDrafts,
+  oneOffSales,
   aiEnabled,
   saved,
   fromTodos,
@@ -807,6 +811,9 @@ export function BusinessDetailClient({
 
       {/* What the routines drafted or held back for this business */}
       <BusinessDrafts drafts={routineDrafts} />
+
+      {/* Work bought outside a membership, from QuickBooks */}
+      <BusinessOneOffs sales={oneOffSales} />
 
       {/* Contract Details */}
       <div className="mb-6">

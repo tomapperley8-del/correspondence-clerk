@@ -141,3 +141,33 @@ export async function deleteContract(contractId: string, businessId: string) {
   revalidatePath(`/businesses/${businessId}`)
   return { success: true }
 }
+
+// ---- One-off work: advertorials, featured articles, short ad runs, band fees ----
+//
+// Recorded from QuickBooks each morning by record_qbo_one_offs(). They are not
+// memberships, so they never appear on the renewal board, but they are real
+// revenue and worth seeing on a business page.
+
+export type OneOffSale = {
+  id: string
+  sold_on: string
+  amount: number
+  is_paid: boolean
+  doc_number: string | null
+  description: string | null
+}
+
+export async function getOneOffSales(businessId: string): Promise<{ data?: OneOffSale[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data, error } = await supabase
+    .from('one_off_sales')
+    .select('id, sold_on, amount, is_paid, doc_number, description')
+    .eq('business_id', businessId)
+    .order('sold_on', { ascending: false })
+
+  if (error) return { error: error.message }
+  return { data: (data ?? []) as OneOffSale[] }
+}

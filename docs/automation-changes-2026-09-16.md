@@ -148,3 +148,11 @@ Before this, an email to someone who was not already a contact was dropped, and 
 Guardrails: never our own domains; no-reply, newsletter and blocked senders are dropped before this point; an exact business-name clash reuses the existing business; every automatic record says so in its notes, and a new business opens a "Check the new record for X" task.
 
 **Theatre at the Tabard:** the duplicate contract is retired. The live one is the advertising deal, 12 months sidebar at £160 a month, £1,920 in total, paid £480 every 3 months, Nov 2025 to Nov 2026. Invoices 1683, 1726 and 1728 are paid; the last £480 instalment is still to invoice. Backup reason `tabard_single_contract_2026_09_21`.
+
+## 21 Sep 2026: yes, no, and one-off work
+
+Two jobs that still needed Tom.
+
+**"Agreed" and "Not renewing" move themselves.** The desk routine already tags every inbound email each morning. Its intent list gains `renewal_agreed`, `renewal_declined` and `deal_agreed`, with strict wording: only what the customer actually said, in an email they sent, never read into our own words or into silence. A trigger (`apply_intent_to_stage`) then moves the card, sets the date, and will not walk a paid renewal backwards. Runbook backup reason `runbook_before_yes_no_intents_2026_09_21`.
+
+**One-off work is recorded.** `one_off_sales`, filled by `record_qbo_one_offs()` as the second step of the morning pipeline: any QuickBooks invoice that is not an annual membership or advertising term, so advertorials, featured articles, short ad runs and band fee contributions. The business page shows them under "Other work bought", with the total and anything unpaid. First run recorded **40 invoices, £30,278, of which £1,360 is outstanding**. Three membership renewals were caught by the first pass and removed; the test now excludes anything mentioning a Club Card or membership.
