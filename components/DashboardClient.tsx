@@ -293,7 +293,7 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
             {[
               'Add your first business and contact',
               'Forward an email to your filing address, or paste one in',
-              'Run your first Insight to see what needs attention',
+              'Read the morning desk email to see what needs attention',
             ].map((step, i) => (
               <li key={i} className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-7 h-7 rounded-full bg-brand-navy text-white text-sm font-semibold flex items-center justify-center mt-0.5">
