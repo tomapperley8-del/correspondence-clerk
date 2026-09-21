@@ -131,3 +131,20 @@ QuickBooks was synced every morning, but an invoice for a new term never became 
 - **Removed:** `/api/businesses/update-contract`, which was unused and wrote only to the business row.
 - **Backups:** reason `quickbooks_drives_contracts_2026_09_18`.
 - **Still to decide:** Theatre at the Tabard has two current contracts for the same year (£1,920 and £1,439.99).
+
+## 21 Sep 2026: emails put people on file
+
+Before this, an email to someone who was not already a contact was dropped, and one from an unknown business was dropped too. Both now create what is missing (`app/api/inbound-email/route.ts`):
+
+| Situation | What happens now |
+|---|---|
+| Tom BCCs an email to a known business, unknown person | The contact is created on that business, with the name from the header |
+| Tom BCCs an email to a company we have never dealt with | The business is created from the company's domain, plus the contact, plus a task to check the record. The domain is remembered for next time |
+| Tom BCCs an email to a personal address (gmail and the like) with no match | The business is named after the person, so it can be renamed |
+| An email arrives from a new person at a known business | The contact is created |
+| An email arrives from a company we have never dealt with | The business and contact are created and the email is filed |
+| An email arrives from a personal address with no match | Left alone, as before: there is no business to infer |
+
+Guardrails: never our own domains; no-reply, newsletter and blocked senders are dropped before this point; an exact business-name clash reuses the existing business; every automatic record says so in its notes, and a new business opens a "Check the new record for X" task.
+
+**Theatre at the Tabard:** the duplicate contract is retired. The live one is the advertising deal, 12 months sidebar at £160 a month, £1,920 in total, paid £480 every 3 months, Nov 2025 to Nov 2026. Invoices 1683, 1726 and 1728 are paid; the last £480 instalment is still to invoice. Backup reason `tabard_single_contract_2026_09_21`.

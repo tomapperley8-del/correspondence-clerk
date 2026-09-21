@@ -604,6 +604,164 @@ async function matchContactByNameAndLearn(
 }
 
 // ---------------------------------------------------------------------------
+// Auto-create: a person Tom writes to, or hears from, ends up on file.
+//
+// Tom BCCs the filing address on the emails he sends. Before this, an email to
+// someone who was not already a contact was dropped, and one from an unknown
+// business waited in the Inbox. Now the contact is created on the business that
+// already exists, and when the business does not exist either, both are created
+// with whatever the email gives us: the person's name from the header, their
+// address, and the company's own domain.
+//
+// Guardrails: never our own domains; a business is only invented from a real
+// company domain (never gmail and friends, and never a no-reply or newsletter
+// sender, which the spam filter has already dropped); every automatic record
+// says so in its notes, and a new business also opens a task to check it.
+// ---------------------------------------------------------------------------
+
+/** "jane.smith" -> "Jane Smith"; "thegoodwineshop.co.uk" -> "Thegoodwineshop". */
+function prettifyName(raw: string): string {
+  return raw
+    .replace(/[._-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .map(w => (w.length > 2 ? w[0].toUpperCase() + w.slice(1) : w.toUpperCase()))
+    .join(' ')
+}
+
+/** The company part of a domain, without the public suffix. */
+function domainRoot(domain: string): string {
+  const parts = domain.split('.').filter(Boolean)
+  if (parts.length <= 1) return domain
+  const last2 = parts.slice(-2).join('.')
+  // co.uk, org.uk, com.au and friends need one more label
+  return /^(co|org|net|gov|ac|ltd|plc|me|com)\.[a-z]{2}$/.test(last2) && parts.length >= 3
+    ? parts[parts.length - 3]
+    : parts[parts.length - 2]
+}
+
+async function findOrCreateContact(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  orgId: string,
+  businessId: string,
+  email: string,
+  displayName: string
+): Promise<string | null> {
+  if (!email) return null
+
+  const { data: existing } = await supabase
+    .from('contacts')
+    .select('id')
+    .eq('business_id', businessId)
+    .filter('emails', 'cs', JSON.stringify([email.toLowerCase()]))
+    .limit(1)
+    .maybeSingle()
+  if (existing) return existing.id
+
+  const byName = displayName
+    ? await matchContactByNameAndLearn(supabase, businessId, displayName, email)
+    : null
+  if (byName) return byName
+
+  const cleanName = (displayName ?? '').trim()
+  const local = email.split('@')[0] ?? ''
+  const { data: created, error } = await supabase
+    .from('contacts')
+    .insert({
+      business_id: businessId,
+      organization_id: orgId,
+      name: cleanName || prettifyName(local),
+      emails: [email.toLowerCase()],
+      is_active: true,
+      name_is_placeholder: cleanName === '',
+      notes: `Added automatically from an email on ${new Date().toLocaleDateString('en-GB')}.`,
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    log('[inbound-email] contact_autocreate_failed', { error: error.message, email })
+    return null
+  }
+  log('[inbound-email] contact_autocreated', { contactId: created.id, businessId, email })
+  return created.id
+}
+
+async function createBusinessAndContact(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  orgId: string,
+  email: string,
+  displayName: string,
+  ownDomains: Set<string>
+): Promise<{ businessId: string; contactId: string | null } | null> {
+  const domain = email.split('@')[1]?.toLowerCase() ?? ''
+  if (!domain || ownDomains.has(domain)) return null
+
+  const personal = isPersonalDomain(domain)
+  // On a company domain the domain is the business. On gmail and the like it is
+  // not, so fall back to the person's name and let Tom rename it.
+  const name = personal ? (displayName ?? '').trim() : prettifyName(domainRoot(domain))
+  if (!name) return null
+
+  const { data: clash } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('organization_id', orgId)
+    .eq('normalized_name', name.toLowerCase().trim())
+    .limit(1)
+    .maybeSingle()
+
+  let businessId = clash?.id ?? null
+
+  if (!businessId) {
+    const { data: created, error } = await supabase
+      .from('businesses')
+      .insert({
+        organization_id: orgId,
+        name,
+        normalized_name: name.toLowerCase().trim(),
+        status: 'Prospect',
+        email: email.toLowerCase(),
+        notes: `Added automatically on ${new Date().toLocaleDateString('en-GB')} from an email ${personal ? 'with' : `from ${domain}`}. Check the name and details.`,
+      })
+      .select('id')
+      .single()
+
+    if (error) {
+      log('[inbound-email] business_autocreate_failed', { error: error.message, domain })
+      return null
+    }
+    businessId = created.id
+    log('[inbound-email] business_autocreated', { businessId, name, domain })
+
+    await supabase.from('tasks').insert({
+      organization_id: orgId,
+      title: `Check the new record for ${name}`,
+      notes: `Created automatically from an email ${personal ? `with ${email}` : `from ${domain}`}. Confirm the name, category and contact details.`,
+      due_date: new Date().toISOString().slice(0, 10),
+      status: 'open',
+      is_priority: false,
+      category: 'work',
+      source: 'signal',
+      type: 'task',
+      business_id: businessId,
+      signal_key: `auto_business:${businessId}`,
+      signal_meta: { kind: 'auto_business', domain },
+    })
+  }
+
+  // A company domain that now has a business is worth remembering.
+  if (!personal) {
+    await supabase
+      .from('domain_mappings')
+      .upsert({ org_id: orgId, domain, business_id: businessId }, { onConflict: 'org_id,domain' })
+  }
+
+  const contactId = await findOrCreateContact(supabase, orgId, businessId, email, displayName)
+  return { businessId, contactId }
+}
+
+// ---------------------------------------------------------------------------
 // Structured logger
 // ---------------------------------------------------------------------------
 function log(event: string, data: Record<string, unknown> = {}) {
@@ -804,11 +962,10 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       if (!resolvedContactId) {
         const toEntry = [...(payload.to?.value ?? []), ...(payload.cc?.value ?? [])]
           .find(r => r.address?.toLowerCase() === match.matchedEmail)
-        if (toEntry?.name) {
-          resolvedContactId = await matchContactByNameAndLearn(
-            supabase, match.businessId, toEntry.name, match.matchedEmail
-          )
-        }
+        // Tom wrote to someone we have no contact record for: put them on file.
+        resolvedContactId = await findOrCreateContact(
+          supabase, orgId, match.businessId, match.matchedEmail, toEntry?.name ?? ''
+        )
       }
 
       const rawForAI = buildRawForAI(payload, strippedBody, 'sent')
@@ -853,13 +1010,17 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       const fuzzyBizId = await matchBusinessByDomainName(supabase, orgId, domain)
       if (fuzzyBizId) {
         log('[inbound-email] auto_filed_sent_fuzzy_match', { businessId: fuzzyBizId, domain })
+        const fuzzyEntry = toEmails.find(r => r.email === email)
+        const fuzzyContactId = await findOrCreateContact(
+          supabase, orgId, fuzzyBizId, email, fuzzyEntry?.name ?? ''
+        )
         const rawForAI = buildRawForAI(payload, strippedBody, 'sent')
         const entryDate = payload.date ?? new Date().toISOString()
         try {
           const insertedId = await insertCorrespondenceServiceRole(supabase, {
             orgId, userId,
             businessId: fuzzyBizId,
-            contactId: null,
+            contactId: fuzzyContactId,
             rawText: rawForAI,
             subject: payload.subject || '(No subject)',
             entryDate,
@@ -881,6 +1042,44 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
         }
         return NextResponse.json({}, { status: 200 })
       }
+    }
+
+    // Nobody on file. Tom chose to write to them and to BCC the filing address,
+    // so create the business and the contact rather than dropping the email.
+    for (const recipient of toEmails) {
+      const created = await createBusinessAndContact(
+        supabase, orgId, recipient.email, recipient.name, ownDomains
+      )
+      if (!created) continue
+
+      const rawForAI = buildRawForAI(payload, strippedBody, 'sent')
+      const entryDate = payload.date ?? new Date().toISOString()
+      try {
+        const insertedId = await insertCorrespondenceServiceRole(supabase, {
+          orgId, userId,
+          businessId: created.businessId,
+          contactId: created.contactId,
+          rawText: rawForAI,
+          subject: payload.subject || '(No subject)',
+          entryDate,
+          fromEmail,
+          direction: 'sent',
+        })
+        if (insertedId) {
+          after(async () => {
+            try {
+              await applyFormattingBackground(supabase, insertedId, rawForAI, entryDate, 'sent')
+            } catch (err) {
+              log('[inbound-email] bg_format_failed', { error: String(err), id: insertedId })
+            }
+          })
+        }
+      } catch (err) {
+        log('[inbound-email] auto_created_sent_insert_failed', { error: String(err) })
+        await saveDeadLetter(supabase, orgId, rawBody, String(err), 'auto_file_sent_created')
+      }
+      log('[inbound-email] auto_filed_sent_new_business', { businessId: created.businessId, email: recipient.email })
+      return NextResponse.json({}, { status: 200 })
     }
 
     log('[inbound-email] dropped_sent_no_match', { recipientDomains: recipientEmails.map(e => e.split('@')[1] ?? '') })
@@ -957,9 +1156,10 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
         .maybeSingle()
       contactId = contact?.id ?? null
     }
-    if (!contactId && effectiveFromName) {
-      contactId = await matchContactByNameAndLearn(
-        supabase, autoFiledBusinessId, effectiveFromName, effectiveFromEmail
+    if (!contactId) {
+      // Someone new at a business we know: put them on file.
+      contactId = await findOrCreateContact(
+        supabase, orgId, autoFiledBusinessId, effectiveFromEmail, effectiveFromName ?? ''
       )
     }
 
@@ -1009,6 +1209,51 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     log('[inbound-email] waiting_on_them_cleared', { businessId: autoFiledBusinessId })
 
     return NextResponse.json({}, { status: 200 })
+  }
+
+  // An email from a company we have never dealt with. It has already passed the
+  // spam filter, the blocked list and the no-reply check, so file it under a new
+  // business rather than dropping it. Personal addresses (gmail and the like)
+  // are left alone: there is no business to infer from them.
+  if (!senderIsOwn && effectiveDomain && !isPersonalDomain(effectiveDomain)) {
+    const created = await createBusinessAndContact(
+      supabase, orgId, effectiveFromEmail, effectiveFromName ?? '', ownDomains
+    )
+    if (created) {
+      const rawForAI = buildRawForAI(
+        payload,
+        strippedBody,
+        'received',
+        effectiveFromEmail !== fromEmail ? { email: effectiveFromEmail, name: effectiveFromName } : undefined
+      )
+      const entryDate = payload.date ?? new Date().toISOString()
+      try {
+        const insertedId = await insertCorrespondenceServiceRole(supabase, {
+          orgId, userId,
+          businessId: created.businessId,
+          contactId: created.contactId,
+          rawText: rawForAI,
+          subject: payload.subject || '(No subject)',
+          entryDate,
+          fromEmail: effectiveFromEmail,
+          direction: 'received',
+        })
+        if (insertedId) {
+          after(async () => {
+            try {
+              await applyFormattingBackground(supabase, insertedId, rawForAI, entryDate, 'received')
+            } catch (err) {
+              log('[inbound-email] bg_format_failed', { error: String(err), id: insertedId })
+            }
+          })
+        }
+      } catch (err) {
+        log('[inbound-email] auto_created_received_insert_failed', { error: String(err) })
+        await saveDeadLetter(supabase, orgId, rawBody, String(err), 'auto_file_received_created')
+      }
+      log('[inbound-email] auto_filed_received_new_business', { businessId: created.businessId, domain: effectiveDomain })
+      return NextResponse.json({}, { status: 200 })
+    }
   }
 
   log('[inbound-email] dropped_received_no_match', { domain: effectiveDomain || '(personal/unknown)', from: effectiveFromEmail, subject: payload.subject ?? '' })
