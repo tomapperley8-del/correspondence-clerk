@@ -156,3 +156,13 @@ Two jobs that still needed Tom.
 **"Agreed" and "Not renewing" move themselves.** The desk routine already tags every inbound email each morning. Its intent list gains `renewal_agreed`, `renewal_declined` and `deal_agreed`, with strict wording: only what the customer actually said, in an email they sent, never read into our own words or into silence. A trigger (`apply_intent_to_stage`) then moves the card, sets the date, and will not walk a paid renewal backwards. Runbook backup reason `runbook_before_yes_no_intents_2026_09_21`.
 
 **One-off work is recorded.** `one_off_sales`, filled by `record_qbo_one_offs()` as the second step of the morning pipeline: any QuickBooks invoice that is not an annual membership or advertising term, so advertorials, featured articles, short ad runs and band fee contributions. The business page shows them under "Other work bought", with the total and anything unpaid. First run recorded **40 invoices, £30,278, of which £1,360 is outstanding**. Three membership renewals were caught by the first pass and removed; the test now excludes anything mentioning a Club Card or membership.
+
+## 23 Sep 2026: why the chasers went quiet
+
+Tom noticed he had stopped seeing renewal and payment drafts. Three faults in `v_member_care_queue` (migration `20260923_001`):
+
+1. **Former members were excluded from everything, including money they owe.** Pub in the Park (£360, 503 days) and The Old Pack Horse (£250, 523 days) could never be chased. The overdue part now covers every business that is not muted; renewals and check-ins still go only to current members.
+2. **Any later contract row counted as "already renewed".** Rocks Lane's Club Card expired on 23 Sep having never been chased, because a three-month sidebar ad from May started later than the Club Card term. The test is now a current contract of the same kind.
+3. **Three weeks between payment chasers.** Everyone overdue had been chased on 17 or 21 Sep, so the queue was empty for most of the month. Now two weeks.
+
+The rest was working as designed: renewals that looked missing had drafts already sitting in Outlook (four of which Tom sent on 21 Sep), and several were held back with snooze dates the routine had set itself.
