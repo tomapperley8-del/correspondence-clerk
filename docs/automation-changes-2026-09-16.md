@@ -178,3 +178,21 @@ Tom's rule: money and renewals get chased every day, as many as are needed, and 
 - The desk email and the home page now say when a draft has been waiting and how many times it has been moved back up.
 
 Found while investigating: the Drafts folder held only that morning's drafts. Some had been sent (they file themselves back through the BCC, which is how the app knows), and others were in Deleted Items. The routine now treats a deleted draft as a decision to bin it and writes a fresh one next time round.
+
+## 23 Sep 2026 (later): nothing should be slipping
+
+Tom: "I just don't want to miss anything, it's important." So two more holes closed and a watchdog added.
+
+**A term that had already run out fell off the list.** The renewal window was "ends within 35 days", so the day after a membership expired it vanished. Seven members were sitting unchased: Archie's London and West London Welcome (August), The Pilot, The Eye Studio, Greenhouse, Omnia and The Packhorse & Talbot (September). The window now runs from 60 days past to 35 days ahead, and the routine has wording for a term that has already ended: say so plainly, ask if they want to pick it back up, no apology for asking late.
+
+**Chasers parked for weeks.** Three had been snoozed to October, two of them for want of a named contact, which is no longer a reason to hold money back. All three now return within two days.
+
+**`v_care_gaps`**, shown in the desk email as "Nothing should be slipping":
+- money owed by a QuickBooks customer not linked to any business
+- a business that owes money but has replies muted
+- a payment chaser parked more than a week ahead
+- a draft nobody has sent after a week, with how many times it has been lifted
+- a member or advertiser with no contract on file
+- a term that ended and has nothing recorded since
+
+Each is something no routine would otherwise pick up. Today the list holds the seven lapsed terms, which are now in the queue anyway, and nothing else.

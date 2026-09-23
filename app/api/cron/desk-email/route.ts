@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { buildDeskEmail, type ClosedItem, type DeskLine, type DraftItem } from '@/lib/email/desk-email'
+import { buildDeskEmail, type CareGap, type ClosedItem, type DeskLine, type DraftItem } from '@/lib/email/desk-email'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   const since = new Date(now.getTime() - 24 * 3_600_000).toISOString()
-  const [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes] = await Promise.all([
+  const [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes, gapsRes] = await Promise.all([
     supabase.from('v_morning_desk').select('section, heading, sort, line, is_priority'),
     supabase.from('v_daily_brief').select('*').maybeSingle(),
     supabase.from('v_system_health').select('*').maybeSingle(),
@@ -60,9 +60,10 @@ export async function GET(request: NextRequest) {
       .select('kind, outcome, recipient, reason, sent_at, bump_count, bumped_at, businesses(name)')
       .or(`created_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()},bumped_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()}`)
       .order('created_at', { ascending: true }),
+    supabase.from('v_care_gaps').select('severity, gap, detail').order('severity'),
   ])
 
-  const firstError = [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes].find(r => r.error)?.error
+  const firstError = [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes, gapsRes].find(r => r.error)?.error
   if (firstError) {
     console.error('[desk-email] read error:', firstError.message)
     return NextResponse.json({ error: firstError.message }, { status: 500 })
@@ -103,6 +104,7 @@ export async function GET(request: NextRequest) {
     pipeline,
     drafts,
     skippedCount,
+    gaps: (gapsRes.data ?? []) as CareGap[],
   })
 
   if (dry) {

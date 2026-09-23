@@ -49,6 +49,12 @@ export interface DraftItem {
   bumps?: number
 }
 
+export interface CareGap {
+  severity: number
+  gap: string
+  detail: string
+}
+
 export interface DeskEmailInput {
   now: Date
   lines: DeskLine[]
@@ -59,6 +65,8 @@ export interface DeskEmailInput {
   pipeline: Record<string, unknown> | null
   drafts?: DraftItem[]
   skippedCount?: number
+  /** Anything that ought to be chased but is on no list. */
+  gaps?: CareGap[]
 }
 
 const esc = (s: string) =>
@@ -92,7 +100,7 @@ function pick(lines: DeskLine[], section: number, limit: number, lead?: string):
 }
 
 export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: string; text: string } {
-  const { now, lines, brief, health, closed, missedRoutines, pipeline, drafts = [], skippedCount = 0 } = input
+  const { now, lines, brief, health, closed, missedRoutines, pipeline, drafts = [], skippedCount = 0, gaps = [] } = input
 
   const sections: Section[] = []
   const add = (s: Section | null) => { if (s) sections.push(s) }
@@ -121,6 +129,20 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
   add(pick(lines, 6, 6, '{n} arrived'))   // Editorial arrivals
   add(pick(lines, 7, 10))                 // New businesses worth approaching
   add(pick(lines, 8, 8))                  // Story leads
+
+  // The safety net: things no routine will pick up on its own.
+  if (gaps.length > 0) {
+    const byGap = new Map<string, string[]>()
+    for (const g of gaps) {
+      if (!byGap.has(g.gap)) byGap.set(g.gap, [])
+      byGap.get(g.gap)!.push(g.detail)
+    }
+    sections.push({
+      heading: `Nothing should be slipping (${gaps.length})`,
+      items: [...byGap.entries()].map(([gap, details]) =>
+        `${gap}: ${details.slice(0, 6).join('; ')}${details.length > 6 ? ` and ${details.length - 6} more` : ''}`),
+    })
+  }
 
   if (closed.length > 0) {
     sections.push({

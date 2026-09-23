@@ -22,7 +22,7 @@ SELECT kind, priority, business_id, business_name, ref, membership_type, contrac
 FROM v_member_care_queue ORDER BY priority, days_overdue DESC NULLS LAST, contract_end NULLS LAST, contract_start NULLS FIRST;
 
 - kind `overdue`: invoices 7+ days past due (all of them for that business, in `invoices`).
-- kind `renewal`: term ends within about a month.
+- kind `renewal`: term ends within about a month, or ran out within the last two months and nothing has been recorded since.
 - kind `checkin`: three months since their term started or since the last check-in.
 
 Work through it in that order: money first, then renewals, then check-ins.
@@ -76,6 +76,7 @@ Rules:
 
 Per kind:
 - **renewal (Club Card):** their membership ends on <date>; would they like to continue for another year at the same price (use their contract_amount if set, else £250); say what they keep (Club Card page and offer, newsletter mention, social posts); if yes, Tom will send the invoice over. Invite them to update their offer if they like.
+- **renewal where the term has already ended** (contract_end is in the past): say plainly that it ran out on that date and ask whether they would like to pick it back up. Never imply they are still covered, and never apologise for asking late.
 - **renewal (advertiser):** their advertising runs until <date>; ask whether they would like to carry on, referring to their actual deal (deal_terms / contract_amount) and never quoting new prices; offer to send the latest stats and to refresh their creative.
 - **overdue:** polite and matter-of-fact. Quote the invoice number(s), date(s) and amount(s) from `invoices`. Assume it slipped through; offer to resend the invoice or help if anything is wrong. If over 90 days overdue, be clear but still friendly and ask them to let Tom know when it will be settled. Never threaten, never mention late fees, never include payment links.
 - **checkin (Club Card):** a light hello; is there anything coming up they would like us to promote (events, new menus or products, offers, news) in the newsletter or on socials; happy to refresh their Club Card offer.
