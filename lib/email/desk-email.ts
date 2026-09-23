@@ -45,6 +45,8 @@ export interface DraftItem {
   business: string
   recipient: string | null
   reason: string | null
+  /** How many times this draft has been lifted back to the top of Outlook Drafts. */
+  bumps?: number
 }
 
 export interface DeskEmailInput {
@@ -100,8 +102,12 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
     const label: Record<string, string> = {
       renewal: 'Renewal', overdue: 'Payment chaser', checkin: 'Check-in', outreach: 'New business',
     }
-    const items = drafts.map(d =>
-      `${label[d.kind] ?? d.kind}: ${d.business}${d.recipient ? ` (to ${d.recipient})` : ''}${d.reason ? `. ${d.reason}` : ''}`)
+    const items = drafts.map(d => {
+      const waiting = (d.bumps ?? 0) > 0
+        ? ` Still waiting from ${d.bumps === 1 ? 'yesterday' : `${d.bumps} days ago`}, moved back to the top.`
+        : ''
+      return `${label[d.kind] ?? d.kind}: ${d.business}${d.recipient ? ` (to ${d.recipient})` : ''}${d.reason ? `. ${d.reason}` : ''}${waiting}`
+    })
     if (skippedCount > 0) items.push(`${skippedCount} more considered and held back, for reasons like a recent conversation`)
     sections.push({ heading: `Drafts waiting in your Outlook (${drafts.length})`, items })
   }

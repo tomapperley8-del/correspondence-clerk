@@ -74,6 +74,11 @@ export function DraftsSection({ initialDrafts }: { initialDrafts: RoutineDraft[]
                     <p className="text-xs text-gray-400 mt-0.5">
                       {timeAgo(draft.created_at)}
                       {draft.recipient && ` · to ${draft.recipient}`}
+                      {draft.bump_count > 0 && (
+                        <span className="text-amber-700">
+                          {' '}· still waiting, moved back to the top {draft.bump_count === 1 ? 'once' : `${draft.bump_count} times`}
+                        </span>
+                      )}
                     </p>
                   </div>
                   {draft.business_id && (

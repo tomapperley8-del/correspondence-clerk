@@ -57,8 +57,8 @@ export async function GET(request: NextRequest) {
       .eq('signal_meta->>kind', 'routine_missed'),
     supabase
       .from('routine_drafts')
-      .select('kind, outcome, recipient, reason, sent_at, businesses(name)')
-      .gte('created_at', new Date(now.getTime() - 26 * 3_600_000).toISOString())
+      .select('kind, outcome, recipient, reason, sent_at, bump_count, bumped_at, businesses(name)')
+      .or(`created_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()},bumped_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()}`)
       .order('created_at', { ascending: true }),
   ])
 
@@ -83,7 +83,13 @@ export async function GET(request: NextRequest) {
     .map(r => {
       const biz = r.businesses as unknown as { name: string } | { name: string }[] | null
       const name = Array.isArray(biz) ? biz[0]?.name : biz?.name
-      return { kind: r.kind, business: name ?? '(business)', recipient: r.recipient, reason: r.reason }
+      return {
+        kind: r.kind,
+        business: name ?? '(business)',
+        recipient: r.recipient,
+        reason: r.reason,
+        bumps: typeof r.bump_count === 'number' ? r.bump_count : 0,
+      }
     })
   const skippedCount = draftRows.filter(r => r.outcome === 'skipped').length
 

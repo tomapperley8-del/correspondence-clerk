@@ -166,3 +166,15 @@ Tom noticed he had stopped seeing renewal and payment drafts. Three faults in `v
 3. **Three weeks between payment chasers.** Everyone overdue had been chased on 17 or 21 Sep, so the queue was empty for most of the month. Now two weeks.
 
 The rest was working as designed: renewals that looked missing had drafts already sitting in Outlook (four of which Tom sent on 21 Sep), and several were held back with snooze dates the routine had set itself.
+
+## 23 Sep 2026: chase until it is sent
+
+Tom's rule: money and renewals get chased every day, as many as are needed, and anything he has not sent gets lifted back to the top of his Drafts folder.
+
+- **No more waiting on the clock.** The queue used to go quiet for 14 or 21 days after a draft was *written*. What counts now is whether the email was *sent*: a chaser that went out rests for 7 days, then the debt comes back round. Same for renewals, which also drop out for good once the customer agrees, pays or declines.
+- **No cap on money or renewals.** Every overdue business and every renewal in the window is handled on every run. Check-ins stay at 3 a run, after the money. A whole run stops at 15 emails to protect the shared allowance.
+- **Unsent drafts are lifted, not duplicated.** Each queue row carries `open_draft_id`, `open_draft_written_at` and `open_draft_bumps`. The routine re-saves that draft through `outlook_update_draft`, which moves it to the top of Drafts, and records the lift on the same `routine_drafts` row (`bumped_at`, `bump_count`). If the draft has been deleted, it writes a fresh one, shorter and more direct. After three lifts it holds back and says it needs Tom.
+- **Money is never held back for want of a named contact.** It uses the QuickBooks billing address and opens with "Hello,". No chaser is snoozed for more than 7 days.
+- The desk email and the home page now say when a draft has been waiting and how many times it has been moved back up.
+
+Found while investigating: the Drafts folder held only that morning's drafts. Some had been sent (they file themselves back through the BCC, which is how the app knows), and others were in Deleted Items. The routine now treats a deleted draft as a decision to bin it and writes a fresh one next time round.

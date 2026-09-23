@@ -131,6 +131,8 @@ export type RoutineDraft = {
   sent_at: string | null
   /** Set when they answer it. */
   replied_at: string | null
+  /** How many times an unsent draft has been lifted back to the top of Outlook. */
+  bump_count: number
   business: { id: string; name: string } | null
 }
 
@@ -146,7 +148,7 @@ export async function getRoutineDrafts(days = 14, limit = 40, businessId?: strin
   const since = new Date(Date.now() - days * 86_400_000).toISOString()
   const query = supabase
     .from('routine_drafts')
-    .select('id, created_at, routine, kind, outcome, business_id, recipient, subject, reason, snooze_until, sent_at, replied_at, business:businesses!routine_drafts_business_id_fkey(id, name)')
+    .select('id, created_at, routine, kind, outcome, business_id, recipient, subject, reason, snooze_until, sent_at, replied_at, bump_count, business:businesses!routine_drafts_business_id_fkey(id, name)')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -172,6 +174,7 @@ export async function getRoutineDrafts(days = 14, limit = 40, businessId?: strin
       snooze_until: row.snooze_until,
       sent_at: row.sent_at,
       replied_at: row.replied_at,
+      bump_count: row.bump_count ?? 0,
       business: biz,
     }
   })
