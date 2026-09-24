@@ -200,3 +200,5 @@ Each is something no routine would otherwise pick up. Today the list holds the s
 ## 24 Sep 2026: lift unsent drafts every morning
 
 Tom saw no new chaser or advertising drafts on the 24th. Nothing had slipped: every debtor and every expiring term was either drafted the day before and still waiting in Outlook, sent within the last 7 days (Fudge's, Oddono's), or held back until the 25th. But an unsent draft was only lifted back to the top every other morning, because the queue waited 2 days. Now 20 hours (migration `20260924_001`), so each morning's run lifts whatever the day before left unsent.
+
+**Same day: holds for "a draft is already waiting" now last one day.** Garment Spa, My Place and Killik had been held until 2 Oct because older drafts existed on 18 Sep, but those drafts were never sent and later disappeared. My Place's term ends 1 Oct, so it would have expired unchased. A trigger now caps any such hold at one day, so the next run checks again; the three stale holds were released and drafted the same morning (migration `20260924_002`).
