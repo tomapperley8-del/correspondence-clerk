@@ -196,3 +196,7 @@ Tom: "I just don't want to miss anything, it's important." So two more holes clo
 - a term that ended and has nothing recorded since
 
 Each is something no routine would otherwise pick up. Today the list holds the seven lapsed terms, which are now in the queue anyway, and nothing else.
+
+## 24 Sep 2026: lift unsent drafts every morning
+
+Tom saw no new chaser or advertising drafts on the 24th. Nothing had slipped: every debtor and every expiring term was either drafted the day before and still waiting in Outlook, sent within the last 7 days (Fudge's, Oddono's), or held back until the 25th. But an unsent draft was only lifted back to the top every other morning, because the queue waited 2 days. Now 20 hours (migration `20260924_001`), so each morning's run lifts whatever the day before left unsent.
