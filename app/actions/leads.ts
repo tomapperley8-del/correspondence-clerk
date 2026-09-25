@@ -156,7 +156,11 @@ export async function getRoutineDrafts(days = 14, limit = 40, businessId?: strin
 
   if (error) return { error: error.message }
 
-  const drafts: RoutineDraft[] = (data ?? []).map(row => {
+  // Businesses Tom has told the routines to stop writing to are left out.
+  const { data: letGoRows } = await supabase.from('care_exclusions').select('business_id').eq('kind', 'all')
+  const letGo = new Set((letGoRows ?? []).map(r => r.business_id))
+
+  const drafts: RoutineDraft[] = (data ?? []).filter(row => !letGo.has(row.business_id)).map(row => {
     const bizRaw = row.business as unknown
     const biz = Array.isArray(bizRaw)
       ? (bizRaw[0] as { id: string; name: string } | undefined) ?? null

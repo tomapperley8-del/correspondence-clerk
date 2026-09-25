@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   const since = new Date(now.getTime() - 24 * 3_600_000).toISOString()
-  const [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes, gapsRes] = await Promise.all([
+  const [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes, gapsRes, letGoRes] = await Promise.all([
     supabase.from('v_morning_desk').select('section, heading, sort, line, is_priority'),
     supabase.from('v_daily_brief').select('*').maybeSingle(),
     supabase.from('v_system_health').select('*').maybeSingle(),
@@ -57,10 +57,11 @@ export async function GET(request: NextRequest) {
       .eq('signal_meta->>kind', 'routine_missed'),
     supabase
       .from('routine_drafts')
-      .select('kind, outcome, recipient, reason, sent_at, bump_count, bumped_at, businesses(name)')
+      .select('kind, outcome, recipient, reason, sent_at, bump_count, bumped_at, business_id, businesses(name)')
       .or(`created_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()},bumped_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()}`)
       .order('created_at', { ascending: true }),
     supabase.from('v_care_gaps').select('severity, gap, detail').order('severity'),
+    supabase.from('care_exclusions').select('business_id').eq('kind', 'all'),
   ])
 
   const firstError = [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes, gapsRes].find(r => r.error)?.error
@@ -78,7 +79,10 @@ export async function GET(request: NextRequest) {
     .map(r => (r.signal_meta as { routine?: string } | null)?.routine)
     .filter((x): x is string => !!x)
 
-  const draftRows = draftsRes.data ?? []
+  // Businesses Tom has told us to stop writing to drop out of the list, even if
+  // an unsent draft from before the decision is still sitting in Outlook.
+  const letGo = new Set((letGoRes.data ?? []).map(r => r.business_id))
+  const draftRows = (draftsRes.data ?? []).filter(r => !letGo.has(r.business_id))
   const drafts: DraftItem[] = draftRows
     .filter(r => r.outcome === 'drafted' && !r.sent_at)
     .map(r => {
