@@ -206,3 +206,11 @@ Tom saw no new chaser or advertising drafts on the 24th. Nothing had slipped: ev
 ## 25 Sep 2026: letting someone go
 
 Tom asked to stop chasing Chiswick Physio (£720), Pub in the Park Festivals (£360, from April 2025) and Tarantella (£250). A snooze would not hold: snoozes expire, money snoozes are capped at a week, and the watchdog flags anything parked longer. So a decision to stop now has its own table, `care_exclusions` (business, kind or 'all', reason, who decided). A row there takes the business out of `v_member_care_queue`, out of `v_care_gaps`, and out of the drafts listed in the desk email and on the home page. Delete the row to resume. The invoices stay outstanding in QuickBooks until they are paid or written off there (migration `20260925_001`).
+
+## 25 Sep 2026: an invoice is not a yes
+
+Tarantella were never renewed. Tom raised invoice 1782 in July while still asking them, and `record_qbo_terms` read the unpaid invoice as a renewal, made a current Club Card contract to July 2027 and marked them Active. That contract is retired (kept, so it is never made again), and Tarantella are back to Former, former_club_card, not_renewing, last term 3 Jul 2025 to 3 Jul 2026. Backed up in `cc_phase0_backup` first. Their `care_exclusions` row stays.
+
+From now on a renewal invoice becomes a contract only once it is paid, or once the business has said yes (`renewal_stage` agreed or invoice_paid). Until then the business stays on the renewal list and the unpaid invoice is chased as usual; the renewal is recorded the morning the payment lands. New members are unchanged (migration `20260925_002`).
+
+Other contracts made earlier from invoices that are still unpaid, left as they are pending Tom: Arcane (1794), Bollo House (1725), Levent Borek (1783), Oddono's (1784), Rozies (1797). Chiswick Physio (1793) is confirmed.
