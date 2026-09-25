@@ -417,7 +417,8 @@ async function applyFormattingBackground(
 async function matchBusinessFromEmail(
   supabase: ReturnType<typeof createServiceRoleClient>,
   orgId: string,
-  email: string
+  email: string,
+  subject = ''
 ): Promise<{ businessId: string; contactId: string | null; routeToInbox: boolean } | null> {
   if (!email) return null
 
@@ -430,14 +431,22 @@ async function matchBusinessFromEmail(
     .limit(5)
 
   if (contactMatches && contactMatches.length > 0) {
-    const businessIds = [...new Set(contactMatches.map(c => c.business_id))]
-    const { data: biz } = await supabase
+    const { data: orgBiz } = await supabase
       .from('businesses')
       .select('id')
-      .in('id', businessIds)
+      .in('id', [...new Set(contactMatches.map(c => c.business_id))])
       .eq('organization_id', orgId)
-      .limit(1)
-      .maybeSingle()
+    const businessIds = (orgBiz ?? []).map(b => b.id as string)
+
+    // One person on file at two businesses (Tim at Hogarth Club and at the
+    // lash studio there): let the subject, a current contract and recent
+    // correspondence decide, never the database's row order.
+    let chosen: string | null = businessIds[0] ?? null
+    if (businessIds.length > 1) {
+      const { data: picked } = await supabase.rpc('pick_business', { p_ids: businessIds, p_subject: subject })
+      chosen = (picked as string | null) ?? chosen
+    }
+    const biz = chosen ? { id: chosen } : null
 
     if (biz) {
       const contact = contactMatches.find(c => c.business_id === biz.id)!
@@ -468,7 +477,8 @@ async function matchBusinessFromRecipients(
   supabase: ReturnType<typeof createServiceRoleClient>,
   orgId: string,
   recipientEmails: string[],
-  ownDomains: Set<string>
+  ownDomains: Set<string>,
+  subject = ''
 ): Promise<{ businessId: string; contactId: string | null; matchedEmail: string } | null> {
   // 1. Exact email match against contacts.emails[] or businesses.email
   //    Handles personal-domain contacts (gmail, hotmail, etc.)
@@ -477,7 +487,7 @@ async function matchBusinessFromRecipients(
   for (const email of recipientEmails) {
     const domain = email.split('@')[1]?.toLowerCase() ?? ''
     if (domain && ownDomains.has(domain)) continue
-    const match = await matchBusinessFromEmail(supabase, orgId, email)
+    const match = await matchBusinessFromEmail(supabase, orgId, email, subject)
     if (match) return { ...match, matchedEmail: email }
   }
 
@@ -486,12 +496,10 @@ async function matchBusinessFromRecipients(
     const domain = email.split('@')[1]?.toLowerCase() ?? ''
     if (!domain || isPersonalDomain(domain) || ownDomains.has(domain)) continue
 
-    const { data: mapping } = await supabase
-      .from('domain_mappings')
-      .select('business_id')
-      .eq('org_id', orgId)
-      .eq('domain', domain)
-      .maybeSingle()
+    // The learned mapping, or the one business everyone else at that domain
+    // belongs to (admin@oddonos.com when only manager.chiswick@ was on file).
+    const { data: domainBiz } = await supabase.rpc('business_for_domain', { p_org: orgId, p_domain: domain })
+    const mapping = domainBiz ? { business_id: domainBiz as string } : null
 
     if (mapping?.business_id) {
       const { data: contact } = await supabase
@@ -953,7 +961,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   if (direction === 'sent') {
     const recipientEmails = extractRecipientEmails(payload)
 
-    const match = await matchBusinessFromRecipients(supabase, orgId, recipientEmails, ownDomains)
+    const match = await matchBusinessFromRecipients(supabase, orgId, recipientEmails, ownDomains, payload.subject ?? '')
 
     if (match) {
       // If email-based matching didn't find a contact, try name-based fallback
@@ -1082,7 +1090,21 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({}, { status: 200 })
     }
 
-    log('[inbound-email] dropped_sent_no_match', { recipientDomains: recipientEmails.map(e => e.split('@')[1] ?? '') })
+    // Tom wrote this and BCC'd it, so it matters. Nothing could place it:
+    // keep it in the inbox for filing by hand rather than losing it.
+    await supabase.from('inbound_queue').insert({
+      org_id: orgId,
+      from_email: fromEmail,
+      from_name: fromName || null,
+      subject: payload.subject ?? null,
+      body_preview: bodyPreview,
+      body_text: strippedBody || null,
+      to_emails: toEmails,
+      direction: 'sent',
+      raw_payload: JSON.parse(rawBody),
+      status: 'pending',
+    })
+    log('[inbound-email] queued_sent_no_match', { recipientDomains: recipientEmails.map(e => e.split('@')[1] ?? '') })
     return NextResponse.json({}, { status: 200 })
   }
 
@@ -1107,7 +1129,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   if (!senderIsOwn) {
     // 1. Try exact email match (contacts.emails[] or businesses.email)
     //    Works for any sender, including personal-domain contacts.
-    const emailMatch = await matchBusinessFromEmail(supabase, orgId, effectiveFromEmail)
+    const emailMatch = await matchBusinessFromEmail(supabase, orgId, effectiveFromEmail, payload.subject ?? '')
     if (emailMatch) {
       if (emailMatch.routeToInbox) {
         // Contact has "Always route to inbox" set — queue for manual filing
@@ -1123,14 +1145,8 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     // 2. Fall back to domain mapping (for business senders not yet in contacts).
     //    Skip personal domains and own domains — neither represents a business identity.
     if (!skipAutoFile && !autoFiledBusinessId && effectiveDomain && !isPersonalDomain(effectiveDomain) && !ownDomains.has(effectiveDomain)) {
-      const { data: mapping } = await supabase
-        .from('domain_mappings')
-        .select('business_id')
-        .eq('org_id', orgId)
-        .eq('domain', effectiveDomain)
-        .maybeSingle()
-
-      autoFiledBusinessId = mapping?.business_id ?? null
+      const { data: domainBiz } = await supabase.rpc('business_for_domain', { p_org: orgId, p_domain: effectiveDomain })
+      autoFiledBusinessId = (domainBiz as string | null) ?? null
     }
 
     // 3. Fuzzy match: compare domain name against business names
