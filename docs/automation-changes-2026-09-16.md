@@ -214,3 +214,18 @@ Tarantella were never renewed. Tom raised invoice 1782 in July while still askin
 From now on a renewal invoice becomes a contract only once it is paid, or once the business has said yes (`renewal_stage` agreed or invoice_paid). Until then the business stays on the renewal list and the unpaid invoice is chased as usual; the renewal is recorded the morning the payment lands. New members are unchanged (migration `20260925_002`).
 
 Other contracts made earlier from invoices that are still unpaid, left as they are pending Tom: Arcane (1794), Bollo House (1725), Levent Borek (1783), Oddono's (1784), Rozies (1797). Chiswick Physio (1793) is confirmed.
+
+## 25-27 Sep 2026: mail that never reached Correspondence Clerk
+
+Tom asked whether he had already chased Oddono's. He had, twice, and QuickBooks had too, and the routine drafted another. An audit of his mailbox from July to 2 September (when the daily sweep started) found four leaks:
+
+1. **A BCC'd email to someone not on file was dropped.** Tom's reply to admin@oddonos.com (1 Sep) vanished because only manager.chiswick@ was a contact. Since 21 Sep the same email would have created a duplicate business instead. The webhook now asks `business_for_domain`: the learned mapping, or the one business everyone else at that domain belongs to (it learns the mapping). A BCC'd email nothing can place goes to the inbox instead of being dropped.
+2. **One address at two businesses was filed by row order.** Tim Slater is a contact at Hogarth Club and at Agnes Dos Santos Lash Experts, so Tom's Hogarth reply was filed under the lash studio; four Mumadoo emails sat under Cow & Co the same way. `pick_business` now decides by the business named in the subject, then the most recent correspondence, then a current contract. The five emails were moved (backed up first).
+3. **QuickBooks invoices and reminders were thrown away.** They reach the webhook through info@ from a notification address. They are now filed as sent on the business that owns the invoice (`business_for_invoice`, source `quickbooks_notice`), and the daily sweep treats them as chasers, not noise. September's 11 were backfilled.
+4. **Emails sent without the BCC.** The 28 August batch of 15 renewal chasers had none. The daily sweep has caught these since 2 September; the gap before that was backfilled from Tom's Sent Items.
+
+27 missing emails were filed from Tom's mailbox (`ai_metadata.backfill = 2026-09-27`), including Oddono's promise to pay by mid September. Emails Tom sent in July with the BCC, and replies from people on file, were all already there. Staging table: `mail_backfill_stage`.
+
+The member care queue now rests an overdue invoice for 7 days after any chaser, whoever sent it: the routine, Tom himself (subject mentions invoice, payment, overdue or outstanding) or QuickBooks. A renewal rests for 7 days after any renewal or Club Card email Tom sent himself (migration `20260925_004`).
+
+Contacts added: Samuela (admin@oddonos.com) and accounts@oddonos.com. Villa di Geggiano's manager@villadegeggiano.co.uk bounces; noted on the contact.
