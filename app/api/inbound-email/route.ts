@@ -293,6 +293,7 @@ async function insertCorrespondenceServiceRole(
     entryDate: string
     fromEmail: string
     direction: 'received' | 'sent'
+    source?: string
   }
 ): Promise<string | null> {
   const { data: contentHash } = await supabase.rpc('compute_content_hash', {
@@ -333,7 +334,7 @@ async function insertCorrespondenceServiceRole(
       formatting_status: 'unformatted',
       content_hash: contentHash || null,
       ai_metadata: {
-        source: opts.direction === 'sent' ? 'webhook_bcc' : 'webhook_inbound',
+        source: opts.source ?? (opts.direction === 'sent' ? 'webhook_bcc' : 'webhook_inbound'),
         from_email: opts.fromEmail,
       },
     })
@@ -912,6 +913,40 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
 
     if (blocked) {
       log('[inbound-email] discarded', { reason: 'blocked sender', from: effectiveFromEmail })
+      return NextResponse.json({}, { status: 200 })
+    }
+  }
+
+  // 6c. QuickBooks invoices and reminders. QuickBooks emails the customer on
+  // Tom's behalf and copies info@, which forwards here. They come from a
+  // notification address, so the matcher below would drop them; file them as
+  // sent on the business that owns the invoice, because a reminder QuickBooks
+  // sent yesterday is a chaser the member care routine must not repeat today.
+  const qboDoc = [fromDomain, effectiveFromEmail.split('@')[1] ?? ''].some(d => /(?:^|\.)intuit\.com$/.test(d))
+    ? (payload.subject ?? '').match(/\bInvoice\s+(\d{3,6})\b/i)?.[1]
+    : undefined
+  if (qboDoc) {
+    const { data: qboBiz } = await supabase.rpc('business_for_invoice', { p_doc: qboDoc })
+    if (qboBiz) {
+      const entryDate = payload.date ?? new Date().toISOString()
+      const body = stripQuotedContent(payload.text ?? '').slice(0, 1500)
+      try {
+        await insertCorrespondenceServiceRole(supabase, {
+          orgId, userId,
+          businessId: qboBiz as string,
+          contactId: null,
+          // The date keeps two identical reminders from looking like duplicates.
+          rawText: `Sent by QuickBooks on ${entryDate}\n${payload.subject ?? ''}\n\n${body}`,
+          subject: payload.subject || `Invoice ${qboDoc}`,
+          entryDate,
+          fromEmail,
+          direction: 'sent',
+          source: 'quickbooks_notice',
+        })
+      } catch (err) {
+        log('[inbound-email] quickbooks_notice_insert_failed', { error: String(err), doc: qboDoc })
+      }
+      log('[inbound-email] quickbooks_notice_filed', { doc: qboDoc, businessId: qboBiz })
       return NextResponse.json({}, { status: 200 })
     }
   }
