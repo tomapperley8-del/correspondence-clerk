@@ -11,6 +11,9 @@
 --     list and the Mastersheet export; its domain links are removed so it stops
 --     catching mail; its open tasks are closed. Correspondence and contacts stay.
 --   KEEP (77): nothing changes; they stay Prospect.
+--   FOLD (Tom, 21 Oct): at LIVING ROOM AT THE CHISWICK the placeholder contact
+--     "Contact" (mazurmariana20@gmail.com) is Mariana Mazur; it is folded into
+--     the Mariana Mazur contact that moves there.
 --   Also: domain links for personal mail providers are removed wherever they
 --     point (a gmail-style address is never a business identity).
 --
@@ -90,6 +93,19 @@ SELECT c.id AS src_contact, m.dst,
         ORDER BY o.is_active DESC, o.created_at LIMIT 1) AS join_to
 FROM contacts c JOIN _mv m ON m.src = c.business_id;
 
+-- Placeholder contacts Tom identified as a moved person
+CREATE TEMP TABLE _fold (src_contact uuid PRIMARY KEY, into_contact uuid NOT NULL) ON COMMIT DROP;
+INSERT INTO _fold VALUES
+  ('3fd6e09b-bdf1-4560-8d6a-446acf1f3a4f', '11ef4c90-3aaf-4af3-b174-687743d67bb5'); -- "Contact" -> Mariana Mazur
+
+DO $$ BEGIN
+  IF (SELECT count(*) FROM _fold f JOIN contacts a ON a.id = f.src_contact JOIN contacts b ON b.id = f.into_contact
+      WHERE a.business_id = 'd96021a3-c275-4733-bfa5-9cf9d0616a14'
+        AND b.business_id = '8d1721c6-689d-424d-9cbc-00f32195dfeb') <> 1 THEN
+    RAISE EXCEPTION 'the Mariana Mazur contacts are not where expected';
+  END IF;
+END $$;
+
 CREATE TEMP TABLE _all_biz ON COMMIT DROP AS
 SELECT src AS id FROM _mv UNION SELECT dst FROM _mv UNION SELECT id FROM _hide;
 
@@ -99,6 +115,7 @@ SELECT 'businesses', b.id, to_jsonb(b), 'stage2_review_2026_10_21' FROM business
 UNION ALL
 SELECT 'contacts', c.id, to_jsonb(c), 'stage2_review_2026_10_21' FROM contacts c
  WHERE c.business_id IN (SELECT src FROM _mv) OR c.id IN (SELECT join_to FROM _cmap)
+    OR c.id IN (SELECT src_contact FROM _fold)
 UNION ALL
 SELECT 'correspondence', c.id, to_jsonb(c), 'stage2_review_2026_10_21' FROM correspondence c
  WHERE c.business_id IN (SELECT src FROM _mv)
@@ -106,6 +123,9 @@ SELECT 'correspondence', c.id, to_jsonb(c), 'stage2_review_2026_10_21' FROM corr
     OR c.contact_id IN (SELECT src_contact FROM _cmap WHERE join_to IS NOT NULL)
     OR c.cc_contact_ids && ARRAY(SELECT src_contact FROM _cmap WHERE join_to IS NOT NULL)
     OR c.bcc_contact_ids && ARRAY(SELECT src_contact FROM _cmap WHERE join_to IS NOT NULL)
+    OR c.contact_id IN (SELECT src_contact FROM _fold)
+    OR c.cc_contact_ids && ARRAY(SELECT src_contact FROM _fold)
+    OR c.bcc_contact_ids && ARRAY(SELECT src_contact FROM _fold)
 UNION ALL
 SELECT 'tasks', t.id, to_jsonb(t), 'stage2_review_2026_10_21' FROM tasks t
  WHERE t.business_id IN (SELECT src FROM _mv) OR (t.business_id IN (SELECT id FROM _hide) AND t.status = 'open')
@@ -168,6 +188,27 @@ SET last_contacted_at = greatest(d.last_contacted_at, s.last_contacted_at)
 FROM _mv m JOIN businesses s ON s.id = m.src
 WHERE d.id = m.dst;
 
+-- 3b. FOLD: the placeholder gives its addresses to the named contact
+UPDATE contacts o
+SET emails = (SELECT jsonb_agg(DISTINCT e) FROM (
+                SELECT jsonb_array_elements_text(o.emails) e
+                UNION SELECT jsonb_array_elements_text(c.emails) FROM contacts c
+                WHERE c.id IN (SELECT src_contact FROM _fold WHERE into_contact = o.id)) x)
+WHERE o.id IN (SELECT into_contact FROM _fold);
+
+UPDATE correspondence c SET contact_id = f.into_contact FROM _fold f WHERE c.contact_id = f.src_contact;
+
+UPDATE correspondence c
+SET cc_contact_ids  = ARRAY(SELECT DISTINCT coalesce(f.into_contact, x) FROM unnest(c.cc_contact_ids) x LEFT JOIN _fold f ON f.src_contact = x),
+    bcc_contact_ids = ARRAY(SELECT DISTINCT coalesce(f.into_contact, x) FROM unnest(c.bcc_contact_ids) x LEFT JOIN _fold f ON f.src_contact = x)
+WHERE c.cc_contact_ids && ARRAY(SELECT src_contact FROM _fold)
+   OR c.bcc_contact_ids && ARRAY(SELECT src_contact FROM _fold);
+
+UPDATE contacts c
+SET is_active = false,
+    notes = concat_ws(E'\n', c.notes, 'Same person as Mariana Mazur; joined to that contact in the review of 21 Oct 2026.')
+WHERE c.id IN (SELECT src_contact FROM _fold);
+
 -- 4. HIDE, and the emptied MOVE records
 UPDATE tasks t
 SET status = 'done', completed_at = now(),
@@ -195,6 +236,8 @@ DO $$ DECLARE n int; BEGIN
   IF n > 0 THEN RAISE EXCEPTION '% active contacts still on a moved business', n; END IF;
   SELECT count(*) INTO n FROM domain_mappings WHERE business_id IN (SELECT id FROM _hide UNION SELECT src FROM _mv);
   IF n > 0 THEN RAISE EXCEPTION '% domain mappings still on a hidden business', n; END IF;
+  SELECT count(*) INTO n FROM correspondence WHERE contact_id IN (SELECT src_contact FROM _fold);
+  IF n > 0 THEN RAISE EXCEPTION '% correspondence rows still on a folded contact', n; END IF;
   SELECT count(*) INTO n FROM businesses WHERE status = 'Not a business';
   IF n <> 58 THEN RAISE EXCEPTION 'expected 58 businesses marked Not a business, found %', n; END IF;
 END $$;
