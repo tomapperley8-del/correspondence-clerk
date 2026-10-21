@@ -6,7 +6,19 @@ Single source of truth for Claude Code sessions on Correspondence Clerk.
 
 - **UI overhaul (Oct 2026 onwards):** read `docs/ui-overhaul-plan.md` first. It holds the audit, Tom's decisions, the stage list and its status, and takes precedence over older plans in this file and in `docs/UX_AUDIT_PLAN.md`.
 
-- **"lets go"** — read `docs/UX_AUDIT_PLAN.md`, find the first item without a ✅, do it, commit + push, mark it ✅, update CLAUDE.md Recent Changes and any relevant memory files, then move straight to the next item. Keep going until told to stop or context gets long. If context gets long, commit, update the plan, then say so.
+- **"lets go"** — open `docs/ui-overhaul-plan.md`, read the Stages table and the last few Log entries, and do the next unfinished step. Work on the `ui-overhaul` branch and commit after each step. Never merge to `main` or push it without Tom saying so (`main` auto-deploys to production). Never apply a migration to the live database without Tom's go-ahead for that migration. `docs/UX_AUDIT_PLAN.md` is the finished older plan; don't work from it.
+
+## Managing your own context
+
+A session has a limited context window, and this project is big. Work so that nothing important lives only in the conversation.
+
+1. **Start lean.** Read `docs/ui-overhaul-plan.md` (Stages, Decisions, the latest Log entries) and only the files the next step needs. Don't read whole folders or old docs unless the step requires it.
+2. **The plan is the memory.** Decisions go in the Decisions table, progress in the Stages table, and what happened in the Log. Chat history can be summarised away at any time; the plan can't.
+3. **Small steps, written down.** After each meaningful step: commit on `ui-overhaul`, then update the stage status and add a dated Log line saying what changed and how it was verified.
+4. **Keep big output out of the conversation.** Cap SQL results (aggregate, `LIMIT`, pick columns). Write dumps, long query results and logs to files in `supabase/.local/` (git-ignored) and read back only the lines needed. Pipe long command output through `tail`, `head` or `grep`.
+5. **Stop at a clean point before the window fills.** When the context gauge passes about 70%, or a summary notice appears, finish the current small step, commit, and add a Log entry headed **"Next session starts here"** with the exact next action, any half-done work, and anything waiting on Tom. Then tell Tom it's a good point to start a fresh session.
+6. **Don't redo work.** A new session trusts the plan and the git log rather than re-auditing. Re-check only what the next step depends on.
+7. **Live data is read-only by default.** Investigate with read-only queries. Any write to the live database, Vercel or the Mastersheet needs Tom's explicit go-ahead for that specific action, recorded in the Log.
 
 ## Production
 
