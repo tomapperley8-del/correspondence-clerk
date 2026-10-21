@@ -48,3 +48,6 @@ Mastersheet.csv
 
 .vercel
 .env*.local
+
+# Local copies of the live database (UI overhaul testing) - never commit
+supabase/.local/
