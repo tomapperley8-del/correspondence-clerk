@@ -36,6 +36,7 @@ export function Navigation() {
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [todosDueCount, setTodosDueCount] = useState(0)
+  const [attentionCount, setAttentionCount] = useState<number | null>(null)
   const [inboundCount, setInboundCount] = useState(0)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -49,6 +50,7 @@ export function Navigation() {
     const nav = await getNavData()
     setDisplayName(nav.displayName)
     setTodosDueCount(nav.todosDueCount)
+    setAttentionCount(nav.attentionCount)
     setInboundCount(nav.inboundCount)
     setAiEnabled(nav.aiEnabled)
     if (nav.organizationId) {
@@ -158,7 +160,7 @@ export function Navigation() {
               <span className="sm:hidden">Clerk</span>
               {todosDueCount > 0 && (
                 <span
-                  title={`${todosDueCount} task${todosDueCount === 1 ? '' : 's'} due`}
+                  title={`Old count: ${todosDueCount} task${todosDueCount === 1 ? '' : 's'} due`}
                   className="text-[10px] font-medium text-white/60"
                 >
                   {todosDueCount}
@@ -167,6 +169,26 @@ export function Navigation() {
             </Link>
 
             <div className="hidden md:flex h-16">
+              {attentionCount !== null && (
+                <Link
+                  href="/attention"
+                  className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
+                    pathname === '/attention'
+                      ? 'text-white bg-brand-olive'
+                      : 'text-white hover:bg-brand-olive/20'
+                  }`}
+                >
+                  Needs attention
+                  {attentionCount > 0 && (
+                    <span
+                      title={`${attentionCount} need${attentionCount === 1 ? 's' : ''} attention (old count: ${todosDueCount})`}
+                      className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                    >
+                      {attentionCount > 99 ? '99+' : attentionCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               <Link
                 href="/todos"
                 className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
@@ -306,6 +328,9 @@ export function Navigation() {
             {/* Nav items */}
             <div className="flex-1 overflow-y-auto py-2">
               {[
+                ...(attentionCount !== null
+                  ? [{ href: '/attention', label: 'Needs attention', badge: attentionCount > 0 ? attentionCount : null }]
+                  : []),
                 { href: '/todos', label: 'To-dos', badge: todosDueCount > 0 ? todosDueCount : null },
                 { href: '/dashboard', label: 'Businesses' },
                 { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
@@ -327,7 +352,7 @@ export function Navigation() {
                   {label}
                   {badge != null && (
                     <span className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center leading-none bg-amber-500">
-                      {badge > 20 ? '20+' : badge}
+                      {badge > 99 ? '99+' : badge}
                     </span>
                   )}
                 </Link>

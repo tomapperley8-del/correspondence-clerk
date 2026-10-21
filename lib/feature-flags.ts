@@ -10,6 +10,9 @@ export const FEATURES = {
   apiAccess: process.env.FEATURE_API_ACCESS === 'true',
   sso: process.env.FEATURE_SSO === 'true',
   branding: process.env.FEATURE_BRANDING === 'true',
+  // UI overhaul Stage 4: the Needs attention page and count. On unless set to
+  // 'false' (the rollback); it also hides itself if the database view is missing.
+  attentionView: process.env.FEATURE_ATTENTION_VIEW !== 'false',
 } as const
 
 export type FeatureFlag = keyof typeof FEATURES
