@@ -87,6 +87,10 @@ export type BusinessListItem = Pick<
   'id' | 'name' | 'normalized_name' | 'category' | 'status' | 'is_club_card' | 'is_advertiser' | 'membership_type' | 'business_type' | 'last_contacted_at'
 >
 
+// A record that turned out not to be a business (a mail service, spam, a person
+// filed under their own name). Its correspondence and contacts are kept.
+const NOT_A_BUSINESS = 'Not a business'
+
 export async function getBusinesses(): Promise<{ data?: BusinessListItem[]; error?: string }> {
   const supabase = await createClient()
   const {
@@ -100,6 +104,8 @@ export async function getBusinesses(): Promise<{ data?: BusinessListItem[]; erro
   const { data, error } = await supabase
     .from('businesses')
     .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, last_contacted_at')
+    // Records found not to be businesses in a review: kept for their emails, never listed
+    .or(`status.is.null,status.neq."${NOT_A_BUSINESS}"`)
     .order('name', { ascending: true })
 
   if (error) {

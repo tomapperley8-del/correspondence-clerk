@@ -157,6 +157,7 @@ export async function searchAll(query: string, filters?: SearchFilters) {
     .select('id, name, category, status')
     .eq('organization_id', orgId)
     .ilike('name', `%${trimmed}%`)
+    .or('status.is.null,status.neq."Not a business"')
     .order('name')
     .limit(10)
 
