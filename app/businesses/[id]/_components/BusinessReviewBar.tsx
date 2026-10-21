@@ -26,7 +26,8 @@ export function BusinessReviewBar({ business }: Props) {
   const router = useRouter()
   const isUnreviewed = business.status === 'Unreviewed'
   const isHidden = business.status === 'Not a business'
-  const isAutoCreated = (business.notes ?? '').includes(AUTO_CREATED_NOTE)
+  // startsWith: a merge copies the source's notes onto the end of the target's
+  const isAutoCreated = (business.notes ?? '').startsWith(AUTO_CREATED_NOTE)
 
   const [busy, setBusy] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
