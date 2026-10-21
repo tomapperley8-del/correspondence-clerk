@@ -4,6 +4,8 @@ Single source of truth for Claude Code sessions on Correspondence Clerk.
 
 ## Quick Commands
 
+- **UI overhaul (Oct 2026 onwards):** read `docs/ui-overhaul-plan.md` first. It holds the audit, Tom's decisions, the stage list and its status, and takes precedence over older plans in this file and in `docs/UX_AUDIT_PLAN.md`.
+
 - **"lets go"** — read `docs/UX_AUDIT_PLAN.md`, find the first item without a ✅, do it, commit + push, mark it ✅, update CLAUDE.md Recent Changes and any relevant memory files, then move straight to the next item. Keep going until told to stop or context gets long. If context gets long, commit, update the plan, then say so.
 
 ## Production
