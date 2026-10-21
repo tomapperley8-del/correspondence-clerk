@@ -20,13 +20,17 @@ export function EditBusinessButton({ business }: { business: Business }) {
   const [showFinalDeleteConfirm, setShowFinalDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
+  // Added automatically from an email and not looked at yet. Saving this form
+  // counts as the review: it becomes a Prospect unless that box is unticked.
+  const isUnreviewed = business.status === 'Unreviewed'
+
   const [formData, setFormData] = useState({
     name: business.name,
     category: business.category || '',
     status: business.status || '',
     notes: business.notes || '',
   })
-  const [isProspect, setIsProspect] = useState(business.status === 'Prospect')
+  const [isProspect, setIsProspect] = useState(business.status === 'Prospect' || isUnreviewed)
   const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([])
   const [businessTypeValue, setBusinessTypeValue] = useState(business.business_type ?? '')
   const [disposition, setDisposition] = useState<string>(business.disposition ?? '')
@@ -51,7 +55,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       status: business.status || '',
       notes: business.notes || '',
     })
-    setIsProspect(business.status === 'Prospect')
+    setIsProspect(business.status === 'Prospect' || isUnreviewed)
     setBusinessTypeValue(business.business_type ?? '')
     setDisposition(business.disposition ?? '')
     setFollowUpAfter(business.follow_up_after ?? '')
@@ -73,7 +77,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
     let newStatus: string | null = formData.status || null
     if (isProspect) {
       newStatus = 'Prospect'
-    } else if (business.status === 'Prospect') {
+    } else if (business.status === 'Prospect' || isUnreviewed) {
       newStatus = (business.is_club_card || business.is_advertiser) ? 'Active' : null
     }
 
@@ -255,6 +259,12 @@ export function EditBusinessButton({ business }: { business: Business }) {
 
             {/* Flags */}
             <div className="mb-6 space-y-2">
+              {isUnreviewed && (
+                <p className="text-sm text-gray-700 bg-brand-warm border border-gray-200 px-3 py-2">
+                  Not reviewed yet: this business was added automatically from an email.
+                  Saving marks it as reviewed.
+                </p>
+              )}
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"

@@ -107,8 +107,11 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
       if (deferredSearchQuery && !business.name.toLowerCase().includes(deferredSearchQuery.toLowerCase())) {
         return false
       }
+      // Unreviewed businesses were added automatically from email; they only
+      // show under their own filter until Tom has looked at them.
+      if ((filterType === 'unreviewed') !== (business.status === 'Unreviewed')) return false
       if (filterType === 'prospect' && business.membership_type) return false
-      if (filterType !== 'all' && filterType !== 'prospect' && business.membership_type !== filterType) return false
+      if (filterType !== 'all' && filterType !== 'prospect' && filterType !== 'unreviewed' && business.membership_type !== filterType) return false
       if (selectedCategory !== 'all' && business.category !== selectedCategory) return false
       if (selectedBusinessType !== 'all' && business.business_type !== selectedBusinessType) return false
       return true
@@ -126,6 +129,16 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
     localStorage.setItem('dashboard_prefs', JSON.stringify(prefs))
   }, [filterType, selectedCategory, selectedBusinessType, sortBy, viewMode])
 
+  const unreviewedCount = useMemo(
+    () => businesses.filter((b) => b.status === 'Unreviewed').length,
+    [businesses]
+  )
+
+  // A saved Unreviewed filter outlives the last unreviewed business
+  useEffect(() => {
+    if (filterType === 'unreviewed' && unreviewedCount === 0) setFilterType('all')
+  }, [filterType, unreviewedCount])
+
   // Get unique categories (memoized)
   const categories = useMemo(() =>
     Array.from(
@@ -140,8 +153,11 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
       if (deferredSearchQuery && !business.name.toLowerCase().includes(deferredSearchQuery.toLowerCase())) {
         return false
       }
+      // Unreviewed businesses were added automatically from email; they only
+      // show under their own filter until Tom has looked at them.
+      if ((filterType === 'unreviewed') !== (business.status === 'Unreviewed')) return false
       if (filterType === 'prospect' && business.membership_type) return false
-      if (filterType !== 'all' && filterType !== 'prospect' && business.membership_type !== filterType) return false
+      if (filterType !== 'all' && filterType !== 'prospect' && filterType !== 'unreviewed' && business.membership_type !== filterType) return false
       if (selectedCategory !== 'all' && business.category !== selectedCategory) return false
       if (selectedBusinessType !== 'all' && business.business_type !== selectedBusinessType) return false
       return true
@@ -433,6 +449,14 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
                 >
                   Prospects Only
                 </FilterButton>
+                {unreviewedCount > 0 && (
+                  <FilterButton
+                    active={filterType === 'unreviewed'}
+                    onClick={() => setFilterType('unreviewed')}
+                  >
+                    Unreviewed ({unreviewedCount})
+                  </FilterButton>
+                )}
               </div>
             </div>
 

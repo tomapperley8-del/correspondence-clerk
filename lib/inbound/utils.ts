@@ -17,6 +17,9 @@ const PERSONAL_DOMAINS = new Set([
   'virgin.net', 'virginmedia.com', 'btinternet.com', 'btconnect.com',
   'sky.com', 'talktalk.net', 'tiscali.co.uk', 'blueyonder.co.uk',
   'ntlworld.com', 'gmx.net', 'gmx.com', 'zen.co.uk', 'plus.net',
+  'btopenworld.com', 'ymail.com', 'aol.co.uk', 'gmx.co.uk',
+  // Shared mail for members of an institution, not a business identity
+  'cantab.net', 'nhs.net',
   // Transactional/notification services — emails from these should never be
   // mapped to a business as they're shared infrastructure, not a sender identity
   'notification.intuit.com', 'intuit.com', 'quickbooks.com',
@@ -24,8 +27,57 @@ const PERSONAL_DOMAINS = new Set([
   'bounce.gmail.com', 'noreply.github.com',
 ])
 
+// Free mail providers that have a domain per country (yahoo.fr, hotmail.it, ...)
+const PERSONAL_FAMILIES = /^(yahoo|hotmail|outlook|live|gmx|aol)\.[a-z.]{2,6}$/
+
 export function isPersonalDomain(domain: string): boolean {
-  return PERSONAL_DOMAINS.has(domain.toLowerCase())
+  const d = domain.toLowerCase()
+  return PERSONAL_DOMAINS.has(d) || PERSONAL_FAMILIES.test(d)
+}
+
+// Senders that are services, not businesses Tom deals with. Matched on the
+// registrable domain, so any subdomain (news.paypal.com) is covered too.
+const NOTIFICATION_DOMAINS = new Set([
+  'paypal.com', 'dropbox.com', 'zoom.us', 'hmrc.gov.uk', 'mailchimpapp.com',
+  'mynewsdesk.com', 'microsoft.com', 'google.com', 'apple.com', 'amazon.co.uk',
+  'amazon.com', 'linkedin.com', 'facebookmail.com', 'eventbrite.com',
+  'stripe.com', 'gocardless.com', 'xero.com', 'docusign.net',
+])
+
+// Bulk-mail platforms that send from a numbered domain (createsend7.com)
+const NOTIFICATION_FAMILIES = /^createsend\d*\.com$/
+
+/**
+ * The part of a domain someone registers: thegoodwineshop.co.uk for
+ * mail.thegoodwineshop.co.uk, paypal.com for news.paypal.com.
+ */
+export function registrableDomain(domain: string): string {
+  const parts = domain.toLowerCase().split('.').filter(Boolean)
+  if (parts.length <= 2) return parts.join('.')
+  const last2 = parts.slice(-2).join('.')
+  // co.uk, org.uk, com.au and friends need one more label
+  const keep = /^(co|org|net|gov|ac|ltd|plc|me|com|nhs|sch|police)\.[a-z]{2}$/.test(last2) ? 3 : 2
+  return parts.slice(-keep).join('.')
+}
+
+/**
+ * Why an email from this domain must not create a new business, or null if it
+ * may. Personal providers are handled separately by isPersonalDomain.
+ *
+ * Businesses Tom deals with write from their own domain (jane@shop.co.uk). A
+ * sender on a subdomain (news.paypal.com, x18z3o47.outinchiangmai.com,
+ * outlook.mail.microsoft) is a mailing system or spam in every case seen in the
+ * 135 businesses auto-created between 21 Sep and 21 Oct 2026, so those are
+ * refused too. Nothing is lost: a refused received email is kept in the inbox
+ * queue as discarded, a refused BCC'd sent email waits in the inbox for filing
+ * by hand, and a business already on file is still matched as before.
+ */
+export function newBusinessRefusal(domain: string): string | null {
+  const d = domain.toLowerCase()
+  const root = registrableDomain(d)
+  if (NOTIFICATION_DOMAINS.has(root) || NOTIFICATION_FAMILIES.test(root)) return 'notification service'
+  if (root !== d) return 'sent from a subdomain'
+  return null
 }
 
 /**
@@ -51,7 +103,9 @@ function normaliseForComparison(input: string): string[] {
  * Returns a value between 0 and 1. A score >= 0.6 is a good match.
  */
 export function domainBusinessNameScore(domain: string, businessName: string): number {
-  const domainBase = domain.split('.')[0] ?? ''
+  // The company part: "stripe" for email.stripe.com, not "email", which once
+  // matched a business called "Mail" and filed Stripe's mail there.
+  const domainBase = registrableDomain(domain).split('.')[0] ?? ''
   const domainTokens = normaliseForComparison(domainBase)
   const bizTokens = normaliseForComparison(businessName)
   if (domainTokens.length === 0 || bizTokens.length === 0) return 0

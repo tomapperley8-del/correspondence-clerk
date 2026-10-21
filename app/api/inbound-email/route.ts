@@ -27,6 +27,7 @@ import { formatCorrespondence } from '@/lib/ai/formatter'
 import { isThreadSplitResponse } from '@/lib/ai/types'
 import {
   isPersonalDomain,
+  newBusinessRefusal,
   stripQuotedContent,
   extractForwardedSender,
   extractContactFormSender,
@@ -531,7 +532,8 @@ async function matchBusinessByDomainName(
   orgId: string,
   domain: string
 ): Promise<string | null> {
-  if (!domain) return null
+  // A service's mail (Stripe, PayPal) is never a business's, whatever its name
+  if (!domain || newBusinessRefusal(domain) === 'notification service') return null
   const { data: businesses } = await supabase
     .from('businesses')
     .select('id, name')
@@ -707,6 +709,11 @@ async function createBusinessAndContact(
   if (!domain || ownDomains.has(domain)) return null
 
   const personal = isPersonalDomain(domain)
+  const refusal = personal ? null : newBusinessRefusal(domain)
+  if (refusal) {
+    log('[inbound-email] business_autocreate_refused', { domain, reason: refusal })
+    return null
+  }
   // On a company domain the domain is the business. On gmail and the like it is
   // not, so fall back to the person's name and let Tom rename it.
   const name = personal ? (displayName ?? '').trim() : prettifyName(domainRoot(domain))
@@ -729,7 +736,9 @@ async function createBusinessAndContact(
         organization_id: orgId,
         name,
         normalized_name: name.toLowerCase().trim(),
-        status: 'Prospect',
+        // Unreviewed keeps it out of the business lists and the Mastersheet
+        // export until Tom has looked at it.
+        status: 'Unreviewed',
         email: email.toLowerCase(),
         notes: `Added automatically on ${new Date().toLocaleDateString('en-GB')} from an email ${personal ? 'with' : `from ${domain}`}. Check the name and details.`,
       })
@@ -742,21 +751,6 @@ async function createBusinessAndContact(
     }
     businessId = created.id
     log('[inbound-email] business_autocreated', { businessId, name, domain })
-
-    await supabase.from('tasks').insert({
-      organization_id: orgId,
-      title: `Check the new record for ${name}`,
-      notes: `Created automatically from an email ${personal ? `with ${email}` : `from ${domain}`}. Confirm the name, category and contact details.`,
-      due_date: new Date().toISOString().slice(0, 10),
-      status: 'open',
-      is_priority: false,
-      category: 'work',
-      source: 'signal',
-      type: 'task',
-      business_id: businessId,
-      signal_key: `auto_business:${businessId}`,
-      signal_meta: { kind: 'auto_business', domain },
-    })
   }
 
   // A company domain that now has a business is worth remembering.
@@ -1266,6 +1260,26 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   // spam filter, the blocked list and the no-reply check, so file it under a new
   // business rather than dropping it. Personal addresses (gmail and the like)
   // are left alone: there is no business to infer from them.
+  const refusal = effectiveDomain && !isPersonalDomain(effectiveDomain)
+    ? newBusinessRefusal(effectiveDomain)
+    : null
+  if (!senderIsOwn && refusal) {
+    // A service or bulk sender. Keep it, out of the way, as the spam filter does.
+    log('[inbound-email] discarded', { reason: `no new business: ${refusal}`, from: effectiveFromEmail })
+    await supabase.from('inbound_queue').insert({
+      org_id: orgId,
+      from_email: effectiveFromEmail,
+      from_name: effectiveFromName || null,
+      subject: payload.subject ?? null,
+      body_preview: null,
+      body_text: null,
+      to_emails: null,
+      direction: 'received',
+      raw_payload: JSON.parse(rawBody),
+      status: 'discarded',
+    })
+    return NextResponse.json({}, { status: 200 })
+  }
   if (!senderIsOwn && effectiveDomain && !isPersonalDomain(effectiveDomain)) {
     const created = await createBusinessAndContact(
       supabase, orgId, effectiveFromEmail, effectiveFromName ?? '', ownDomains
