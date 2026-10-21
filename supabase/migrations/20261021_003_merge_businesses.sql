@@ -287,9 +287,10 @@ BEGIN
                   SELECT jsonb_array_elements(x.mastersheet_source_ids) v
                   UNION SELECT jsonb_array_elements(s.mastersheet_source_ids)) z)
         ELSE coalesce(x.mastersheet_source_ids, s.mastersheet_source_ids) END,
+      -- a record with no status (colleagues, councils, contributors) keeps none
       status = CASE
-        WHEN coalesce(x.status, '') IN ('', 'Unreviewed', 'Prospect') AND s.status IN ('Active', 'Former') THEN s.status
-        WHEN coalesce(x.status, '') IN ('', 'Unreviewed') THEN 'Prospect'
+        WHEN x.status IN ('Unreviewed', 'Prospect') AND s.status IN ('Active', 'Former') THEN s.status
+        WHEN x.status = 'Unreviewed' THEN 'Prospect'
         ELSE x.status END,
       notes = concat_ws(E'\n', nullif(x.notes, ''),
               'Merged in ' || s.name || ' on ' || to_char(now(), 'DD/MM/YYYY') || '.'

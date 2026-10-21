@@ -56,6 +56,7 @@ SELECT pg_temp.ok((SELECT notes LIKE '%Merged in M|P Studio%' FROM businesses WH
 INSERT INTO _res SELECT 'm2', merge_businesses('eaf396d4-1b7e-4221-acf0-9c41f76ea54a', '2f295ff1-87a8-4ca8-84d8-f674ad564231');
 SELECT pg_temp.ok((_res.v->'moved'->>'contacts_joined')::int = 1 AND (_res.v->'moved'->>'contacts_moved')::int = 0, 'Dawn''s contact joined, not moved') FROM _res WHERE k = 'm2';
 SELECT pg_temp.ok((SELECT count(*) FROM correspondence WHERE business_id = '2f295ff1-87a8-4ca8-84d8-f674ad564231') = 97, '92 + 5 emails on Dwmultimedia');
+SELECT pg_temp.ok((SELECT status IS NULL FROM businesses WHERE id = '2f295ff1-87a8-4ca8-84d8-f674ad564231'), 'a target with no status keeps none');
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM correspondence c JOIN contacts k ON k.id = c.contact_id
                               WHERE c.business_id = '2f295ff1-87a8-4ca8-84d8-f674ad564231' AND k.business_id <> c.business_id),
                   'every email''s contact is at the business it is filed under');
