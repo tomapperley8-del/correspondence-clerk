@@ -172,6 +172,7 @@ export async function createTask(input: {
   notes?: string | null
   type?: TaskType
   task_category_id?: string | null
+  business_id?: string | null
 }): Promise<{ data?: Task; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -190,6 +191,7 @@ export async function createTask(input: {
       notes: input.notes || null,
       type: input.type || 'task',
       task_category_id: input.task_category_id || null,
+      business_id: input.business_id || null,
       status: 'open',
       is_priority: false,
       source: 'manual',
@@ -201,6 +203,7 @@ export async function createTask(input: {
 
   if (error) return { error: error.message }
   revalidatePath('/todos')
+  if (input.business_id) revalidatePath(`/businesses/${input.business_id}`)
   return { data: data as Task }
 }
 

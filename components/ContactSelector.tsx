@@ -178,6 +178,9 @@ function ContactSelectorComponent({
                         {!(contact.is_active ?? true) && (
                           <span className="text-xs text-gray-500 font-normal">(Former)</span>
                         )}
+                        {contact.name_is_placeholder && (
+                          <span className="text-xs text-gray-500 font-normal">(placeholder, no name yet)</span>
+                        )}
                       </div>
                       {contact.role && (
                         <div className="text-xs text-gray-600 mt-1">
@@ -341,6 +344,9 @@ function ContactSelectorComponent({
                 {selectedContact.name}
                 {!(selectedContact.is_active ?? true) && (
                   <span className="text-xs text-gray-500 font-normal">(Former)</span>
+                )}
+                {selectedContact.name_is_placeholder && (
+                  <span className="text-xs text-gray-500 font-normal">(placeholder, no name yet)</span>
                 )}
               </div>
               {selectedContact.role && (

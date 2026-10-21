@@ -10,7 +10,8 @@
 --      a second merge of an already-merged business is refused.
 --   4. Undo of all three merges in reverse order: every table is exactly as it
 --      was (updated_at aside).
---   5. mark_not_a_business closes open tasks and removes domain links; undo restores.
+--   5. mark_not_a_business closes open tasks and removes domain links; the app's
+--      undo (undo_last_business_change) restores.
 --   6. A signed-in user from another organisation is refused; anon can't call it.
 
 BEGIN;
@@ -105,7 +106,7 @@ SELECT pg_temp.ok((SELECT status FROM businesses WHERE id = '2f295ff1-87a8-4ca8-
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM domain_mappings WHERE business_id = '2f295ff1-87a8-4ca8-84d8-f674ad564231'), 'domain link removed');
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM tasks WHERE business_id = '2f295ff1-87a8-4ca8-84d8-f674ad564231' AND status <> 'done'), 'no open tasks');
 SELECT pg_temp.ok((SELECT count(*) FROM correspondence WHERE business_id = '2f295ff1-87a8-4ca8-84d8-f674ad564231') = 92, 'emails kept');
-SELECT pg_temp.ok((undo_business_merge(v->>'reason')->>'reason') IS NOT NULL, 'undo hide') FROM _res WHERE k = 'h1';
+SELECT pg_temp.ok((undo_last_business_change('2f295ff1-87a8-4ca8-84d8-f674ad564231')->>'reason') = v->>'reason', 'undo hide via the app''s undo') FROM _res WHERE k = 'h1';
 DELETE FROM _fp WHERE label = 'undone';
 SELECT pg_temp.fp('undone');
 SELECT pg_temp.ok((SELECT bool_and(a.n = b.n AND a.h = b.h) FROM _fp a JOIN _fp b USING (t)

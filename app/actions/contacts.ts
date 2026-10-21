@@ -27,6 +27,9 @@ const updateContactSchema = z.object({
   route_to_inbox: z.boolean().optional(),
 })
 
+// Names the inbound email path and the old imports use when the person isn't known
+const PLACEHOLDER_NAME = /^(contact|info|admin|enquiries|office|hello|team)$/i
+
 export type Contact = {
   id: string
   business_id: string
@@ -38,6 +41,8 @@ export type Contact = {
   notes: string | null
   is_active: boolean
   route_to_inbox: boolean
+  is_primary: boolean
+  name_is_placeholder: boolean
   organization_id: string
   created_at: string
   updated_at: string
@@ -71,10 +76,12 @@ export async function getContactsByBusiness(businessId: string) {
   // Select specific columns needed (avoids SELECT * overhead)
   const { data, error } = await supabase
     .from('contacts')
-    .select('id, business_id, name, normalized_email, role, emails, phones, notes, is_active, route_to_inbox, organization_id, created_at, updated_at')
+    .select('id, business_id, name, normalized_email, role, emails, phones, notes, is_active, route_to_inbox, is_primary, name_is_placeholder, organization_id, created_at, updated_at')
     .eq('business_id', businessId)
     .eq('organization_id', orgId)
     .order('is_active', { ascending: false }) // active contacts first
+    .order('is_primary', { ascending: false })
+    .order('name_is_placeholder', { ascending: true }) // named people before placeholders
     .order('name', { ascending: true })
 
   if (error) {
@@ -88,6 +95,8 @@ export async function getContactsByBusiness(businessId: string) {
     phones: parseJsonArray(contact.phones),
     is_active: contact.is_active ?? true,
     route_to_inbox: contact.route_to_inbox ?? false,
+    is_primary: contact.is_primary ?? false,
+    name_is_placeholder: contact.name_is_placeholder ?? false,
   })) || []
 
   return { data: parsedData }
@@ -222,7 +231,11 @@ export async function updateContact(
 
   const updateData: Record<string, unknown> = {}
 
-  if (formData.name !== undefined) updateData.name = formData.name.trim()
+  if (formData.name !== undefined) {
+    updateData.name = formData.name.trim()
+    // Typing a real name over a "Contact" placeholder makes it a named person
+    updateData.name_is_placeholder = PLACEHOLDER_NAME.test(updateData.name as string)
+  }
 
   if (formData.emails !== undefined) {
     const emailsArray = formData.emails.map(e => e.trim().toLowerCase()).filter(e => e)
@@ -275,6 +288,47 @@ export async function updateContact(
   }
 
   return { data: parsedData }
+}
+
+export async function setPrimaryContact(id: string, isPrimary: boolean = true) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) return { error: 'No organization found' }
+
+  const { data: contact, error: fetchError } = await supabase
+    .from('contacts')
+    .select('id, business_id')
+    .eq('id', id)
+    .eq('organization_id', organizationId)
+    .single()
+  if (fetchError || !contact) return { error: fetchError?.message || 'Contact not found' }
+
+  // One primary per business (unique index): clear the old one first
+  if (isPrimary) {
+    const { error: clearError } = await supabase
+      .from('contacts')
+      .update({ is_primary: false })
+      .eq('business_id', contact.business_id)
+      .eq('organization_id', organizationId)
+      .eq('is_primary', true)
+      .neq('id', id)
+    if (clearError) return { error: clearError.message }
+  }
+
+  const { error } = await supabase
+    .from('contacts')
+    .update({ is_primary: isPrimary })
+    .eq('id', id)
+    .eq('organization_id', organizationId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`/businesses/${contact.business_id}`)
+  return {}
 }
 
 export async function deleteContact(id: string) {

@@ -19,6 +19,8 @@
 --     src is left as a 'Not a business' record with merged_into = dst.
 --   undo_business_merge(reason)
 --     Puts every backed-up row back exactly as it was.
+--   undo_last_business_change(id)
+--     The app's Undo: undoes the latest merge or hide of that business.
 --   mark_not_a_business(id)
 --     Hides a business: status 'Not a business', domain links removed, open
 --     tasks closed. Its correspondence and contacts stay. Undo with
@@ -426,11 +428,32 @@ BEGIN
   RETURN jsonb_build_object('reason', p_reason, 'restored', restored);
 END $$;
 
+-- The app's Undo button on a merged or hidden record: undoes the latest change
+-- made to that business by merge_businesses or mark_not_a_business.
+CREATE OR REPLACE FUNCTION public.undo_last_business_change(p_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE r text;
+BEGIN
+  PERFORM cc_assert_business_access(ARRAY[p_id]);
+  SELECT reason INTO r FROM cc_phase0_backup
+  WHERE (reason LIKE 'merge ' || p_id || ' into % at %' OR reason LIKE 'not a business ' || p_id || ' at %')
+    AND reason NOT LIKE '% (undone)'
+  ORDER BY taken_at DESC, id DESC LIMIT 1;
+  IF r IS NULL THEN RAISE EXCEPTION 'No merge or hide of this business to undo'; END IF;
+  RETURN undo_business_merge(r);
+END $$;
+
 REVOKE ALL ON FUNCTION public.cc_backup_rows(text, text, text, uuid, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.cc_assert_business_access(uuid[]) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.merge_businesses(uuid, uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.mark_not_a_business(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.undo_business_merge(text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.undo_last_business_change(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.undo_last_business_change(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.merge_businesses(uuid, uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.mark_not_a_business(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.undo_business_merge(text) TO authenticated, service_role;

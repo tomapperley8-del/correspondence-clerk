@@ -3,6 +3,7 @@
 -- removes the functions and the three new columns (and what is stored in them).
 
 BEGIN;
+DROP FUNCTION IF EXISTS public.undo_last_business_change(uuid);
 DROP FUNCTION IF EXISTS public.undo_business_merge(text);
 DROP FUNCTION IF EXISTS public.mark_not_a_business(uuid);
 DROP FUNCTION IF EXISTS public.merge_businesses(uuid, uuid);

@@ -1,8 +1,10 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { type Contact } from '@/app/actions/contacts'
+import { type Contact, setPrimaryContact } from '@/app/actions/contacts'
+import { toast } from '@/lib/toast'
 import { type Business } from '@/app/actions/businesses'
 import { EditContactButton } from '@/components/EditContactButton'
 import { AddContactButton } from '@/components/AddContactButton'
@@ -15,6 +17,20 @@ interface ContactsListProps {
 }
 
 export const ContactsList = React.memo(function ContactsList({ contacts, business, onDeleteContact }: ContactsListProps) {
+  const router = useRouter()
+  const [savingPrimary, setSavingPrimary] = useState<string | null>(null)
+
+  const handlePrimary = async (contact: Contact) => {
+    setSavingPrimary(contact.id)
+    const result = await setPrimaryContact(contact.id, !contact.is_primary)
+    setSavingPrimary(null)
+    if (result.error) toast.error(result.error)
+    else {
+      toast.success(contact.is_primary ? 'No longer the main contact' : `${contact.name} is now the main contact`)
+      router.refresh()
+    }
+  }
+
   return (
     <div className="bg-white border-2 border-gray-300 p-6 mb-6">
       <div className="flex justify-between items-center mb-4">
@@ -32,7 +48,25 @@ export const ContactsList = React.memo(function ContactsList({ contacts, busines
             <div key={contact.id} className="border border-gray-300 p-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="font-semibold text-gray-900">{contact.name}</h3>
+                  <h3 className="font-semibold text-gray-900 flex flex-wrap items-center gap-2">
+                    {contact.name_is_placeholder ? (
+                      <span className="text-gray-500 italic font-normal">
+                        No name yet <span className="not-italic">(filed as &ldquo;{contact.name}&rdquo;)</span>
+                      </span>
+                    ) : (
+                      contact.name
+                    )}
+                    {contact.is_primary && (
+                      <span className="text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 bg-brand-navy text-white rounded-sm">
+                        Main contact
+                      </span>
+                    )}
+                    {contact.name_is_placeholder && (
+                      <span className="text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 border border-gray-300 text-gray-600 rounded-sm">
+                        Placeholder
+                      </span>
+                    )}
+                  </h3>
                   {contact.role && (
                     <p className="text-sm text-gray-600">{contact.role}</p>
                   )}
@@ -76,6 +110,15 @@ export const ContactsList = React.memo(function ContactsList({ contacts, busines
                   )}
                 </div>
                 <div className="flex gap-2">
+                  {contact.is_active && (
+                    <Button
+                      onClick={() => handlePrimary(contact)}
+                      disabled={savingPrimary === contact.id}
+                      className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1 text-xs"
+                    >
+                      {contact.is_primary ? 'Not main contact' : 'Make main contact'}
+                    </Button>
+                  )}
                   <EditContactButton contact={contact} />
                   <Button
                     onClick={() => onDeleteContact(contact.id, contact.name)}

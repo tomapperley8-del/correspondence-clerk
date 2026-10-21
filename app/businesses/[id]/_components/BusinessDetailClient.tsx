@@ -40,6 +40,7 @@ import { type EditFields } from './CorrespondenceEditForm'
 import { useCorrespondence } from './useCorrespondence'
 import { PipelineStatusCard } from './PipelineStatusCard'
 import { BusinessArticles } from './BusinessArticles'
+import { BusinessReviewBar } from './BusinessReviewBar'
 
 function formatRelativeTime(isoString: string): string {
   const diffMs = Date.now() - new Date(isoString).getTime()
@@ -659,6 +660,9 @@ export function BusinessDetailClient({
         )}
       </div>
 
+      {/* Review of a record added automatically from email */}
+      <BusinessReviewBar business={business} />
+
       {/* Pipeline Status */}
       <PipelineStatusCard business={business} />
 
@@ -684,7 +688,7 @@ export function BusinessDetailClient({
               e.preventDefault()
               if (!quickTaskTitle.trim()) return
               setQuickSaving(true)
-              const result = await createTask({ title: `${quickTaskTitle.trim()} (${business.name})`, category: 'work' })
+              const result = await createTask({ title: quickTaskTitle.trim(), category: 'work', business_id: businessId })
               setQuickSaving(false)
               if (result.error) toast.error(result.error)
               else { toast.success('Task added'); setQuickTaskTitle(''); setQuickTaskOpen(false) }
