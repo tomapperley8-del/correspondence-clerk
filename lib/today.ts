@@ -91,3 +91,20 @@ export function ageWords(item: TodayItem, today: string): string {
       return age > 0 ? `${days(age)} overdue` : age === 0 ? 'due today' : `due in ${days(-age)}`
   }
 }
+
+/**
+ * Task-engine tasks the app no longer shows (Stage 7): replies, renewals and
+ * invoices are worked out by v_business_attention instead. The engine keeps
+ * running for the desk email and the routines. Hand-written to-dos, check-ins,
+ * stats and editorial still show.
+ */
+export const HIDDEN_ENGINE_KINDS = [
+  'reply', 'unanswered', 'renewal_due', 'renewal_lapsed', 'unrecorded_renewal',
+  'invoice_overdue', 'invoice_due_soon', 'corr_flagged', 'auto_business', 'routine_missed', 'commitment',
+]
+
+export function isHiddenEngineTask(t: { source?: string | null; signal_key?: string | null }): boolean {
+  if (t.source === 'contract_renewal') return true
+  if (t.source !== 'signal') return false
+  return HIDDEN_ENGINE_KINDS.includes((t.signal_key ?? '').split(':')[0])
+}

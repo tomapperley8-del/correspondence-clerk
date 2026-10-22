@@ -15,10 +15,10 @@ export default async function BusinessDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ saved?: string; from?: string }>
+  searchParams: Promise<{ saved?: string; from?: string; tab?: string }>
 }) {
   const { id } = await params
-  const { saved, from } = await searchParams
+  const { saved, from, tab } = await searchParams
 
   const [businessResult, contactsResult, duplicatesResult, threadsResult, membershipTypesResult, openThreadsResult, draftsResult, oneOffsResult, glanceResult] =
     await Promise.all([
@@ -34,7 +34,7 @@ export default async function BusinessDetailPage({
     ])
 
   if ('error' in businessResult || !businessResult.data) {
-    redirect('/dashboard')
+    redirect('/businesses')
   }
 
   return (
@@ -52,6 +52,7 @@ export default async function BusinessDetailPage({
       aiEnabled={isAiEnabled()}
       saved={saved}
       fromTodos={from === 'todos'}
+      initialTab={tab}
     />
   )
 }

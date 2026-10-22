@@ -1,6 +1,6 @@
 import type { RoutineDraft } from '@/app/actions/leads'
 
-const KIND_LABEL: Record<string, string> = {
+export const DRAFT_KIND_LABEL: Record<string, string> = {
   renewal: 'Renewal',
   overdue: 'Payment chaser',
   checkin: 'Check-in',
@@ -9,6 +9,17 @@ const KIND_LABEL: Record<string, string> = {
 
 function formatDateGB(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** Where a draft stands: held back, waiting in Outlook, sent, answered. */
+export function draftStatus(d: RoutineDraft): string {
+  return d.outcome === 'skipped'
+    ? `Held back${d.snooze_until ? ` until ${formatDateGB(d.snooze_until)}` : ''}`
+    : d.replied_at
+      ? `Sent ${formatDateGB(d.sent_at ?? d.created_at)}, they replied ${formatDateGB(d.replied_at)}`
+      : d.sent_at
+        ? `Sent ${formatDateGB(d.sent_at)}`
+        : 'Waiting in your Outlook Drafts'
 }
 
 /**
@@ -25,17 +36,11 @@ export function BusinessDrafts({ drafts }: { drafts: RoutineDraft[] }) {
       <h2 className="text-sm font-semibold text-brand-dark mb-2">Drafts and decisions by the routines</h2>
       <ul className="divide-y divide-gray-100">
         {drafts.map(d => {
-          const status = d.outcome === 'skipped'
-            ? `Held back${d.snooze_until ? ` until ${formatDateGB(d.snooze_until)}` : ''}`
-            : d.replied_at
-              ? `Sent ${formatDateGB(d.sent_at ?? d.created_at)}, they replied ${formatDateGB(d.replied_at)}`
-              : d.sent_at
-                ? `Sent ${formatDateGB(d.sent_at)}`
-                : 'Waiting in your Outlook Drafts'
+          const status = draftStatus(d)
           return (
             <li key={d.id} className="py-2 text-sm">
               <p className="text-gray-800">
-                <span className="font-medium">{KIND_LABEL[d.kind] ?? d.kind}</span>
+                <span className="font-medium">{DRAFT_KIND_LABEL[d.kind] ?? d.kind}</span>
                 <span className="text-gray-400"> · {formatDateGB(d.created_at)}</span>
                 {d.subject && <span className="text-gray-500"> · {d.subject}</span>}
               </p>

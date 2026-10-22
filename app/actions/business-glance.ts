@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import type { AttentionRow } from '@/app/actions/attention'
+import { isHiddenEngineTask } from '@/lib/today'
 
 // Business page "at a glance" and timeline (UI overhaul Stage 6). The deal is
 // read from `contracts`, not the copies on `businesses` (finding F9). The
@@ -27,6 +28,7 @@ export type GlanceTask = {
   notes: string | null
   status: string
   source: string | null
+  signal_key: string | null
   due_date: string | null
   created_at: string
   completed_at: string | null
@@ -79,9 +81,11 @@ export async function getBusinessGlance(businessId: string): Promise<{ data?: Bu
       .maybeSingle(),
     // Hand-written to-dos (open or done) and anything still open. Done
     // automatic tasks are left out: they mirror emails already in the timeline.
+    // Open engine tasks for replies, renewals and invoices are left out too
+    // (Stage 7): the header's Needs attention covers them.
     supabase
       .from('tasks')
-      .select('id, title, notes, status, source, due_date, created_at, completed_at')
+      .select('id, title, notes, status, source, signal_key, due_date, created_at, completed_at')
       .eq('business_id', businessId)
       .eq('organization_id', orgId)
       .or('source.eq.manual,status.eq.open')
@@ -114,7 +118,7 @@ export async function getBusinessGlance(businessId: string): Promise<{ data?: Bu
       contracts: (contractsRes.data ?? []) as GlanceContract[],
       // A missing view (before its migration) just means no attention line.
       attention: attentionRes.error ? null : ((attentionRes.data as AttentionRow | null) ?? null),
-      tasks: tasksRes.error ? [] : ((tasksRes.data ?? []) as GlanceTask[]),
+      tasks: tasksRes.error ? [] : ((tasksRes.data ?? []) as GlanceTask[]).filter((t) => !isHiddenEngineTask(t)),
       invoices,
     },
   }

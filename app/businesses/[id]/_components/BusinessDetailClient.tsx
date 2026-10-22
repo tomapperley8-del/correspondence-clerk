@@ -77,6 +77,8 @@ interface Props {
   initialGlance: GlanceData | null
   aiEnabled: boolean
   saved?: string
+  /** Opens the at-a-glance page on this tab (Today's "Log renewal" uses details). */
+  initialTab?: string
   fromTodos: boolean
 }
 
@@ -93,6 +95,7 @@ export function BusinessDetailClient({
   initialGlance,
   aiEnabled,
   saved,
+  initialTab,
   fromTodos,
 }: Props) {
   const router = useRouter()
@@ -112,7 +115,9 @@ export function BusinessDetailClient({
   // At-a-glance layout (UI overhaul Stage 6). The classic page stays one click
   // away until Stage 7; the choice is remembered per browser.
   const [layout, setLayout] = useState<'glance' | 'classic'>('glance')
-  const [glanceTab, setGlanceTab] = useState<'history' | 'contacts' | 'details' | 'files'>('history')
+  const [glanceTab, setGlanceTab] = useState<'history' | 'contacts' | 'details' | 'files'>(
+    initialTab === 'contacts' || initialTab === 'details' || initialTab === 'files' ? initialTab : 'history'
+  )
   const [glance, setGlance] = useState<GlanceData | null>(initialGlance)
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null)
   useEffect(() => { setGlance(initialGlance) }, [initialGlance])
@@ -816,8 +821,8 @@ export function BusinessDetailClient({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Breadcrumbs items={[
           fromTodos
-            ? { label: 'To-dos', href: '/todos' }
-            : { label: 'Businesses', href: '/dashboard' },
+            ? { label: 'Today', href: '/today' }
+            : { label: 'Businesses', href: '/businesses' },
           { label: business.name },
         ]} />
 
@@ -882,6 +887,7 @@ export function BusinessDetailClient({
           <BusinessTimeline
             correspondence={correspondence}
             glance={glance}
+            drafts={routineDrafts}
             membershipTypes={membershipTypes}
             loading={correspondenceLoading}
             remainingInDB={remainingInDB}
@@ -928,8 +934,8 @@ export function BusinessDetailClient({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Breadcrumbs items={[
         fromTodos
-          ? { label: 'To-dos', href: '/todos' }
-          : { label: 'Businesses', href: '/dashboard' },
+          ? { label: 'Today', href: '/today' }
+          : { label: 'Businesses', href: '/businesses' },
         { label: business.name },
       ]} />
 

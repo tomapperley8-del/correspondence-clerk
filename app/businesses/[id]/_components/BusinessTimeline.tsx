@@ -9,18 +9,22 @@ import type { BusinessGlance, GlanceContract, GlanceInvoice, GlanceTask } from '
 import { CorrespondenceEntry } from './CorrespondenceEntry'
 import { type EditFields } from './CorrespondenceEditForm'
 import { dateOnlyGB, membershipLabel, money, relativeDays } from './BusinessGlance'
+import type { RoutineDraft } from '@/app/actions/leads'
+import { DRAFT_KIND_LABEL, draftStatus } from './BusinessDrafts'
 
 // One merged timeline (UI overhaul Stage 6): correspondence, to-dos, deal
 // starts and ends, and QuickBooks invoices, newest first. Correspondence uses
 // the same entry card as the classic page, so every entry action still works.
+// Stage 7: drafts the routines wrote sit just above the email they answer.
 
-type Kind = 'correspondence' | 'task' | 'deal' | 'invoice'
+type Kind = 'correspondence' | 'task' | 'deal' | 'invoice' | 'draft'
 
 type Item =
   | { kind: 'correspondence'; key: string; at: number; entry: Correspondence; pairedInvoice: boolean }
   | { kind: 'task'; key: string; at: number; task: GlanceTask }
   | { kind: 'deal'; key: string; at: number; contract: GlanceContract; event: 'start' | 'end' }
   | { kind: 'invoice'; key: string; at: number; invoice: GlanceInvoice; note: Correspondence | null }
+  | { kind: 'draft'; key: string; at: number; draft: RoutineDraft; answers: Correspondence | null }
 
 const FILTERS: { kind: Kind | 'all'; label: string }[] = [
   { kind: 'all', label: 'Everything' },
@@ -28,7 +32,29 @@ const FILTERS: { kind: Kind | 'all'; label: string }[] = [
   { kind: 'task', label: 'To-dos' },
   { kind: 'deal', label: 'Deals' },
   { kind: 'invoice', label: 'Invoices' },
+  { kind: 'draft', label: 'Drafts' },
 ]
+
+const bareSubject = (s: string | null | undefined) =>
+  (s ?? '').toLowerCase().replace(/^((re|fw|fwd)\s*:\s*)+/g, '').trim()
+
+const entryAt = (e: Correspondence) => new Date(e.entry_date || e.created_at).getTime()
+
+/**
+ * The email a routine's draft answers: a received email with the same subject
+ * in the 60 days before it, else the latest received email in the 30 days
+ * before it. Null when there is none (a renewal or check-in out of the blue).
+ * `received` is newest first.
+ */
+function answeredEmail(draft: RoutineDraft, received: Correspondence[]): Correspondence | null {
+  const at = Date.parse(draft.created_at)
+  const before = received.filter((e) => entryAt(e) <= at && at - entryAt(e) <= 60 * 86_400_000)
+  const subject = bareSubject(draft.subject)
+  const same = subject ? before.find((e) => bareSubject(e.subject) === subject) : undefined
+  if (same) return same
+  const latest = before[0]
+  return latest && at - entryAt(latest) <= 30 * 86_400_000 ? latest : null
+}
 
 function noteInvoiceId(entry: Correspondence): string | null {
   const meta = entry.ai_metadata as { source?: string; qbo_invoice_id?: string } | null
@@ -45,6 +71,7 @@ const dayAt = (isoDate: string) => Date.parse(`${isoDate.slice(0, 10)}T12:00:00Z
 interface Props {
   correspondence: Correspondence[]
   glance: BusinessGlance | null
+  drafts: RoutineDraft[]
   membershipTypes: MembershipType[]
   loading: boolean
   remainingInDB: number
@@ -97,7 +124,7 @@ function Row({ label, tone, date, children }: { label: string; tone: string; dat
 
 export function BusinessTimeline(props: Props) {
   const {
-    correspondence, glance, membershipTypes, loading, remainingInDB, isLoadingMore, loadMore,
+    correspondence, glance, drafts, membershipTypes, loading, remainingInDB, isLoadingMore, loadMore,
     searchQuery, setSearchQuery, filteredOut, onClearFilters, onTaskDone, busyTaskId,
     isExpandedEntry, ...entryProps
   } = props
@@ -132,11 +159,19 @@ export function BusinessTimeline(props: Props) {
     for (const invoice of glance?.invoices ?? []) {
       if (invoice.txn_date) items.push({ kind: 'invoice', key: `i-${invoice.qbo_invoice_id}`, at: dayAt(invoice.txn_date), invoice, note: noteFor.get(invoice.qbo_invoice_id) ?? null })
     }
+    // Drafts (not the ones held back) go just above the email they answer.
+    const received = correspondence.filter((e) => e.direction === 'received').sort((a, b) => entryAt(b) - entryAt(a))
+    for (const draft of drafts) {
+      if (draft.outcome !== 'drafted') continue
+      const answers = answeredEmail(draft, received)
+      const at = answers ? entryAt(answers) + 1 : Date.parse(draft.created_at)
+      items.push({ kind: 'draft', key: `d-${draft.id}`, at, draft, answers })
+    }
     return items.sort((a, b) => b.at - a.at)
-  }, [correspondence, glance, today])
+  }, [correspondence, glance, drafts, today])
 
   const counts = useMemo(() => {
-    const c: Record<Kind | 'all', number> = { all: allItems.length, correspondence: 0, task: 0, deal: 0, invoice: 0 }
+    const c: Record<Kind | 'all', number> = { all: allItems.length, correspondence: 0, task: 0, deal: 0, invoice: 0, draft: 0 }
     for (const i of allItems) c[i.kind]++
     return c
   }, [allItems])
@@ -149,7 +184,8 @@ export function BusinessTimeline(props: Props) {
       ? Math.min(...correspondence.filter((e) => !e.is_pinned).map((e) => new Date(e.entry_date || e.created_at).getTime()))
       : -Infinity
     return allItems.filter((item) => {
-      if (filter !== 'all' && item.kind !== filter) return false
+      // Drafts also show among the correspondence they answer.
+      if (filter !== 'all' && item.kind !== filter && !(filter === 'correspondence' && item.kind === 'draft')) return false
       // A paired invoice note shows under its invoice, except in the Correspondence list.
       if (item.kind === 'correspondence' && item.pairedInvoice && filter !== 'correspondence') return false
       if (filter === 'all' && item.kind !== 'correspondence' && item.at < oldestLoaded) return false
@@ -161,6 +197,8 @@ export function BusinessTimeline(props: Props) {
           return item.task.title.toLowerCase().includes(q) || (item.task.notes ?? '').toLowerCase().includes(q)
         case 'deal':
           return `${item.contract.deal_terms ?? ''} ${membershipLabel(item.contract.membership_type, membershipTypes)}`.toLowerCase().includes(q)
+        case 'draft':
+          return `${item.draft.subject ?? ''} ${item.draft.recipient ?? ''} ${item.draft.reason ?? ''}`.toLowerCase().includes(q)
         case 'invoice':
           return `${item.invoice.doc_number ?? ''} ${item.invoice.line_description ?? ''}`.toLowerCase().includes(q) || (!!item.note && entryMatches(item.note, q))
       }
@@ -236,6 +274,37 @@ export function BusinessTimeline(props: Props) {
               <p className="text-xs text-gray-600">Runs to {dateOnlyGB(c.contract_end)}</p>
             )}
             {item.event === 'start' && c.deal_terms && <p className="text-gray-600 whitespace-pre-wrap mt-0.5">{c.deal_terms}</p>}
+          </Row>
+        )
+      }
+      case 'draft': {
+        const d = item.draft
+        const waiting = !d.sent_at
+        const answers = item.answers
+        return (
+          <Row key={item.key} label="Draft" tone={waiting ? 'bg-brand-olive/20 text-brand-dark' : 'bg-gray-100 text-gray-700'} date={formatAt(Date.parse(d.created_at))}>
+            <p className="font-medium">
+              {DRAFT_KIND_LABEL[d.kind] ?? d.kind} draft by the routine{d.subject ? `: ${d.subject}` : ''}
+            </p>
+            {answers && (
+              <p className="text-xs text-gray-600 mt-0.5">
+                Answers the email below{answers.subject ? `, "${answers.subject}"` : ''}, received {dateOnlyGB(answers.entry_date || answers.created_at)}
+              </p>
+            )}
+            <p className={`text-xs mt-0.5 ${waiting ? 'text-brand-dark font-semibold' : 'text-gray-600'}`}>
+              {draftStatus(d)}{d.recipient ? ` · to ${d.recipient}` : ''}
+            </p>
+            {d.reason && <p className="text-xs text-gray-500 mt-0.5">{d.reason}</p>}
+            {waiting && (
+              <a
+                href="https://outlook.office.com/mail/drafts"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block text-xs text-brand-navy hover:underline mt-1"
+              >
+                Open Outlook Drafts
+              </a>
+            )}
           </Row>
         )
       }
