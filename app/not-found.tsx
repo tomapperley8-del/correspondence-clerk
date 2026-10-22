@@ -14,7 +14,7 @@ export default function NotFound() {
           That page doesn&rsquo;t exist or has moved.
         </p>
         <Link
-          href="/todos"
+          href="/today"
           className="inline-block px-6 py-3 bg-brand-navy text-white font-semibold hover:bg-brand-navy-hover transition-colors"
         >
           Back to Home

@@ -235,15 +235,15 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-700 mb-1">You&apos;re set up</p>
                 <p className="text-sm text-gray-600 mb-3">
-                  As you log correspondence, your{' '}
-                  <Link href="/todos" className="text-brand-navy hover:underline font-medium">To-dos page</Link>
+                  As you log correspondence,{' '}
+                  <Link href="/today" className="text-brand-navy hover:underline font-medium">Today</Link>
                   {' '}will surface replies that need sending, flagged follow-ups, and contract renewals — all in one place.
                 </p>
                 <Link
-                  href="/todos"
+                  href="/today"
                   className="inline-block px-4 py-1.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-navy-hover transition-colors"
                 >
-                  Go to To-dos
+                  Go to Today
                 </Link>
               </div>
               <button

@@ -88,7 +88,7 @@ export async function createContract(businessId: string, fields: {
   }
 
   revalidatePath(`/businesses/${businessId}`)
-  revalidatePath('/todos')
+  revalidatePath('/today')
   return { data: data as Contract }
 }
 

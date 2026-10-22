@@ -183,7 +183,7 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
       `<p><strong>${esc(s.heading)}</strong></p><ul>${s.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`),
     footer ? `<p style="color:#555">${esc(footer)}</p>` : '',
     warn ? `<p style="color:#9a3412">${esc(warn)}</p>` : '',
-    `<p style="color:#888;font-size:12px">Built from Correspondence Clerk at ${esc(now.toISOString().slice(0, 16).replace('T', ' '))} UTC. <a href="https://correspondenceclerk.com/todos">Open the app</a></p>`,
+    `<p style="color:#888;font-size:12px">Built from Correspondence Clerk at ${esc(now.toISOString().slice(0, 16).replace('T', ' '))} UTC. <a href="https://correspondenceclerk.com/today">Open the app</a></p>`,
   ].join('\n')
 
   const text = [

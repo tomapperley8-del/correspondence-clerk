@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const invitationToken = searchParams.get('invitation_token')
-  const next = searchParams.get('next') ?? '/dashboard'
+  const next = searchParams.get('next') ?? '/today'
 
   if (code) {
     const supabase = await createClient()
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
                 `${origin}/auth/auth-code-error?error=${encodeURIComponent(result.error)}`
               )
             }
-            return NextResponse.redirect(`${origin}/todos`)
+            return NextResponse.redirect(`${origin}/today`)
           }
         } else {
           // No invitation token, redirect to create organization

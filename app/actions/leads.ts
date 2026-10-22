@@ -88,7 +88,7 @@ export async function updateNewsLeadStatus(
     .eq('id', id)
 
   if (error) return { error: error.message }
-  revalidatePath('/briefing')
+  revalidatePath('/today')
   return { error: null }
 }
 
@@ -106,7 +106,7 @@ export async function updateProspectLeadStatus(
     .eq('id', id)
 
   if (error) return { error: error.message }
-  revalidatePath('/briefing')
+  revalidatePath('/today')
   return { error: null }
 }
 

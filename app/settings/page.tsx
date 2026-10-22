@@ -883,7 +883,7 @@ function SettingsPageContent() {
 
       <Button
         variant="outline"
-        onClick={() => router.push('/todos')}
+        onClick={() => router.push('/today')}
         className="border border-gray-200"
       >
         Back to Home

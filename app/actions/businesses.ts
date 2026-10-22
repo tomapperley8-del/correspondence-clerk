@@ -423,7 +423,7 @@ export async function updateBusinessRenewalStage(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath(`/businesses/${businessId}`)
   return {}
 }
@@ -450,7 +450,7 @@ export async function addBusinessToContracts(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath('/dashboard')
   return {}
 }
@@ -527,7 +527,7 @@ export async function updateOutreachStage(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath(`/businesses/${businessId}`)
   return {}
 }
@@ -549,7 +549,7 @@ export async function addBusinessToOutreach(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath(`/businesses/${businessId}`)
   return {}
 }
@@ -595,7 +595,7 @@ export async function promoteOutreachToContracts(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath('/dashboard')
   return {}
 }
@@ -617,7 +617,7 @@ export async function removeBusinessFromOutreach(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath(`/businesses/${businessId}`)
   return {}
 }
@@ -644,7 +644,7 @@ export async function updateOutreachStageDate(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   return {}
 }
 
@@ -670,7 +670,7 @@ export async function updateRenewalStageDate(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   return {}
 }
 
@@ -697,7 +697,7 @@ export async function addBusinessToContractsFromDetail(
 
   if (error) return { error: error.message }
 
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath('/dashboard')
   revalidatePath(`/businesses/${businessId}`)
   return {}

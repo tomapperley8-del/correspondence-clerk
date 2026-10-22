@@ -1186,7 +1186,7 @@ function OrganizationSettingsContent() {
 
       <Button
         variant="outline"
-        onClick={() => router.push('/todos')}
+        onClick={() => router.push('/today')}
         className="border-2 border-gray-800"
       >
         Back to Home

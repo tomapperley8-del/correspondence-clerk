@@ -2,7 +2,7 @@
   "name": "Correspondence Clerk",
   "short_name": "Clerk",
   "description": "Know exactly what needs your attention today.",
-  "start_url": "/todos",
+  "start_url": "/today",
   "display": "standalone",
   "background_color": "#FAFAF8",
   "theme_color": "#1E293B",

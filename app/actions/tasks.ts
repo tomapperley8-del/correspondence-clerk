@@ -147,7 +147,7 @@ export async function requestDraft(taskId: string): Promise<{ error?: string }> 
     .maybeSingle()
 
   if (existing) {
-    revalidatePath('/todos')
+    revalidatePath('/today')
     return {}
   }
 
@@ -159,8 +159,8 @@ export async function requestDraft(taskId: string): Promise<{ error?: string }> 
   })
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
-  revalidatePath('/briefing')
+  revalidatePath('/today')
+  revalidatePath('/today')
   return {}
 }
 
@@ -202,7 +202,7 @@ export async function createTask(input: {
     .single()
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   if (input.business_id) revalidatePath(`/businesses/${input.business_id}`)
   return { data: data as Task }
 }
@@ -250,7 +250,7 @@ export async function updateTask(
     .single()
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   return { data: data as Task }
 }
 
@@ -269,7 +269,7 @@ export async function deleteTask(id: string): Promise<{ error?: string | null }>
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   return { error: null }
 }
 
@@ -297,7 +297,7 @@ export async function setPriority(id: string): Promise<{ error?: string | null }
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   return { error: null }
 }
 
@@ -316,7 +316,7 @@ export async function clearPriority(id: string): Promise<{ error?: string | null
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   return { error: null }
 }
 
@@ -358,7 +358,7 @@ export async function createTaskFromCorrespondence(input: {
     .single()
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   return { data: data as Task }
 }
 
@@ -409,7 +409,7 @@ export async function createTaskCategory(input: {
     .single()
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath('/settings')
   return { data: data as TaskCategory }
 }
@@ -439,7 +439,7 @@ export async function updateTaskCategory(
     .single()
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath('/settings')
   return { data: data as TaskCategory }
 }
@@ -459,7 +459,7 @@ export async function deleteTaskCategory(id: string): Promise<{ error?: string |
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   revalidatePath('/settings')
   return { error: null }
 }
@@ -471,6 +471,6 @@ export async function refreshTaskCommitments(): Promise<{ count?: number; error?
 
   const { data, error } = await supabase.rpc('refresh_task_commitments')
   if (error) return { error: error.message }
-  revalidatePath('/todos')
+  revalidatePath('/today')
   return { count: data as number }
 }

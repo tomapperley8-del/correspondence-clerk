@@ -79,9 +79,9 @@ function getInsightActions(
       if (!businessId) return []
       return [{ label: 'View actions', href: `/businesses/${businessId}?tab=actions` }]
     case 'briefing':
-      return [{ label: 'View To-dos', href: '/todos' }]
+      return [{ label: 'Open Today', href: '/today' }]
     case 'reconnect_list':
-      return [{ label: 'View Reconnect List', href: '/todos' }]
+      return [{ label: 'Open Today', href: '/today' }]
     case 'outreach_draft':
       if (!content) return []
       return [{
@@ -93,7 +93,7 @@ function getInsightActions(
         },
       }]
     case 'relationship_radar':
-      return [{ label: 'View To-dos', href: '/todos' }]
+      return [{ label: 'Open Today', href: '/today' }]
     case 'next_best_action':
       if (!businessId) return []
       return [{ label: 'Log this action', href: `/new-entry?businessId=${businessId}&type=Note` }]

@@ -9,7 +9,7 @@ export default async function HomePage() {
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect('/briefing')
+    redirect('/today')
   }
 
   return <LandingPage />

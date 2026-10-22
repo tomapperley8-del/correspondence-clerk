@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { getBusinesses, type BusinessListItem } from '@/app/actions/businesses'
 import { getTasks, type Task } from '@/app/actions/tasks'
+import { isHiddenEngineTask } from '@/lib/today'
+import { formatDateGB } from '@/lib/utils'
 
 const RECENT_KEY = 'cmd_k_recent'
 const MAX_RECENT = 5
@@ -208,7 +210,7 @@ function buildResults(
       id: r.id,
       name: r.name,
       type: 'recent' as const,
-      href: r.type === 'task' ? '/todos' : `/businesses/${r.id}`,
+      href: r.type === 'task' ? '/today' : `/businesses/${r.id}`,
     }))
     const bizResults: SearchResult[] = businesses.slice(0, 6)
       .filter(b => !recent.some(r => r.id === b.id))
@@ -233,15 +235,17 @@ function buildResults(
       href: `/businesses/${b.id}`,
     }))
 
+  // Engine tasks for replies, renewals and invoices are not shown (Stage 7).
   const taskMatches: SearchResult[] = tasks
+    .filter(t => !isHiddenEngineTask(t))
     .filter(t => t.title.toLowerCase().includes(q) || t.business?.name.toLowerCase().includes(q))
     .slice(0, 5)
     .map(t => ({
       id: t.id,
       name: t.title,
       type: 'task' as const,
-      detail: t.business?.name || (t.due_date ? `Due ${t.due_date}` : undefined),
-      href: '/todos',
+      detail: t.business?.name || (t.due_date ? `Due ${formatDateGB(`${t.due_date}T12:00:00Z`)}` : undefined),
+      href: t.business_id ? `/businesses/${t.business_id}` : '/today',
     }))
 
   return [...bizMatches, ...taskMatches]

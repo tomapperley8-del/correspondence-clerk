@@ -67,17 +67,6 @@ export async function getAttention(): Promise<{ data?: AttentionRow[]; error?: s
   return { data: (data ?? []) as AttentionRow[] }
 }
 
-/** The old nav number (open tasks due by the UTC date), shown beside the new one for the comparison week. */
-export async function getOldTodosDueCount(): Promise<number | null> {
-  const supabase = await createClient()
-  const orgId = await getCurrentUserOrganizationId()
-  if (!orgId) return null
-  const today = new Date().toISOString().slice(0, 10)
-  const { count } = await supabase.from('tasks').select('id', { count: 'exact', head: true })
-    .eq('organization_id', orgId).eq('status', 'open').lte('due_date', today).neq('source', 'contract_renewal')
-  return count ?? null
-}
-
 /** Snooze a business until a date (YYYY-MM-DD), or clear the snooze with null. */
 export async function snoozeBusinessAttention(businessId: string, until: string | null) {
   const supabase = await createClient()
@@ -93,7 +82,7 @@ export async function snoozeBusinessAttention(businessId: string, until: string 
     .eq('id', businessId)
     .eq('organization_id', orgId)
   if (error) return { error: error.message }
-  revalidatePath('/attention')
+  revalidatePath('/today')
   return { success: true }
 }
 
@@ -119,7 +108,7 @@ export async function dismissWaitingReplies(businessId: string) {
     .is('reply_dismissed_at', null)
     .gt('entry_date', since)
   if (error) return { error: error.message }
-  revalidatePath('/attention')
+  revalidatePath('/today')
   revalidatePath(`/businesses/${businessId}`)
   return { success: true }
 }

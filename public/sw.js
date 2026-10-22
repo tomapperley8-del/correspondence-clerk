@@ -1,6 +1,6 @@
-const CACHE_NAME = 'cc-v1'
+const CACHE_NAME = 'cc-v2'
 const PRECACHE_URLS = [
-  '/todos',
+  '/today',
   '/manifest.json',
   '/icon.svg',
 ]

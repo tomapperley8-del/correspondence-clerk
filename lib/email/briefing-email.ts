@@ -155,7 +155,7 @@ export async function sendBriefingEmail(
   const urgentCount = countUrgentItems(content)
   const subject = buildBriefingSubject(urgentCount, actionItems.length)
   const insightsUrl = `${baseUrl}/insights`
-  const actionsUrl = `${baseUrl}/todos`
+  const actionsUrl = `${baseUrl}/today`
 
   const actionsHtml = buildActionsHtml(actionItems)
   const actionsText = buildActionsText(actionItems, actionsUrl)
