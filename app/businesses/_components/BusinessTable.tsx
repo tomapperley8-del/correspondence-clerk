@@ -5,12 +5,17 @@ import Link from 'next/link'
 import type { BusinessTable as TableData, TableRow } from '@/app/actions/business-table'
 import type { AttentionReason } from '@/app/actions/attention'
 import { formatDateGB } from '@/lib/utils'
+import type { ProspectLead } from '@/app/actions/leads'
+import { ProspectBoard } from '@/components/pipeline/ProspectBoard'
+import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 
 // The business table (UI overhaul Stage 5): Mastersheet-style, one row per
 // business, with built-in views from the plan's Decisions plus views Tom saves
-// himself (kept in this browser).
+// himself (kept in this browser). Stage 7 adds Leads (prospect leads from the
+// routine) and Outreach, and a board for Renewals and Outreach, replacing the
+// To-dos Contracts and Outreach tabs. A Club Card view comes in Stage 6b.
 
-type ViewKey = 'active' | 'attention' | 'renewals' | 'unreviewed' | 'prospects' | 'former' | 'internal' | 'everything'
+type ViewKey = 'active' | 'attention' | 'renewals' | 'outreach' | 'leads' | 'unreviewed' | 'prospects' | 'former' | 'internal' | 'everything'
 type SortKey = 'name' | 'contact' | 'deal' | 'last' | 'attention'
 type DealFilter = 'any' | 'club_card' | 'advertiser' | 'other' | 'none'
 
@@ -50,6 +55,22 @@ const VIEWS: { key: ViewKey; label: string; hint: string; sort: SortKey; dir: 'a
     sort: 'deal',
     dir: 'asc',
     match: (r) => r.in_renewal_window && r.is_commercial,
+  },
+  {
+    key: 'outreach',
+    label: 'Outreach',
+    hint: 'Businesses in the outreach pipeline, at any stage. Switch to the board to move them between stages.',
+    sort: 'last',
+    dir: 'desc',
+    match: (r) => !!r.outreach_stage,
+  },
+  {
+    key: 'leads',
+    label: 'Leads',
+    hint: 'Possible new business found by the prospecting routine. Not yet businesses on file: move each one along or reject it.',
+    sort: 'name',
+    dir: 'asc',
+    match: () => false,
   },
   {
     key: 'unreviewed',
@@ -208,7 +229,16 @@ function hasBlank(r: TableRow, sort: SortKey): boolean {
   }
 }
 
-export function BusinessTable({ data, initialView, initialQuery }: { data: TableData; initialView?: string; initialQuery?: string }) {
+const BOARD_VIEWS: ViewKey[] = ['renewals', 'outreach']
+
+export function BusinessTable({ data, initialView, initialQuery, initialBoard, leads, leadsError }: {
+  data: TableData
+  initialView?: string
+  initialQuery?: string
+  initialBoard?: boolean
+  leads: ProspectLead[]
+  leadsError?: string
+}) {
   const { today, rows } = data
 
   const [settings, setSettings] = useState<Settings>(() => {
@@ -219,6 +249,7 @@ export function BusinessTable({ data, initialView, initialQuery }: { data: Table
   const [limit, setLimit] = useState(PAGE_SIZE)
   const [naming, setNaming] = useState(false)
   const [newName, setNewName] = useState('')
+  const [board, setBoard] = useState(!!initialBoard)
 
   useEffect(() => {
     // Saved views live in this browser only; read after mount so the server render matches.
@@ -231,9 +262,10 @@ export function BusinessTable({ data, initialView, initialQuery }: { data: Table
     const params = new URLSearchParams()
     if (settings.view !== 'active') params.set('view', settings.view)
     if (settings.q) params.set('q', settings.q)
+    if (board && BOARD_VIEWS.includes(settings.view)) params.set('board', '1')
     const qs = params.toString()
     window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname)
-  }, [settings.view, settings.q])
+  }, [settings.view, settings.q, board])
 
   const membershipLabels = useMemo(() => new Map(data.membershipTypes.map((t) => [t.value, t.label])), [data.membershipTypes])
   const statuses = useMemo(() => [...new Set(rows.map((r) => r.status).filter((s): s is string => !!s))].sort(), [rows])
@@ -241,8 +273,10 @@ export function BusinessTable({ data, initialView, initialQuery }: { data: Table
   const counts = useMemo(() => {
     const c = {} as Record<ViewKey, number>
     for (const v of VIEWS) c[v.key] = rows.filter(v.match).length
+    c.leads = leads.filter((l) => l.status === 'new' || l.status === 'reviewing').length
     return c
-  }, [rows])
+  }, [rows, leads])
+  const allBusinessNames = useMemo(() => rows.map((r) => ({ id: r.id, name: r.name })), [rows])
 
   const shown = useMemo(() => {
     const view = viewDef(settings.view)
@@ -303,6 +337,8 @@ export function BusinessTable({ data, initialView, initialQuery }: { data: Table
 
   const filtersSet = settings.deal !== 'any' || !!settings.status || !!settings.type
   const view = viewDef(settings.view)
+  const mode: 'table' | 'board' | 'leads' =
+    settings.view === 'leads' ? 'leads' : board && BOARD_VIEWS.includes(settings.view) ? 'board' : 'table'
 
   return (
     <div>
@@ -352,6 +388,38 @@ export function BusinessTable({ data, initialView, initialQuery }: { data: Table
         </div>
       )}
       <p className="text-xs text-gray-500 mb-4">{view.hint}</p>
+
+      {BOARD_VIEWS.includes(settings.view) && (
+        <div className="inline-flex mb-4 border border-black/10 rounded-sm overflow-hidden" role="group" aria-label="Show as">
+          {([['table', 'Table'], ['board', 'Board']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={(key === 'board') === board}
+              onClick={() => setBoard(key === 'board')}
+              className={`px-3 py-1.5 text-sm transition-colors duration-200 ease-out ${
+                (key === 'board') === board ? 'bg-brand-navy text-white' : 'bg-white text-gray-800 hover:bg-brand-warm'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === 'leads' && (
+        leadsError ? (
+          <p className="text-sm text-red-700">Could not load the leads: {leadsError}</p>
+        ) : leads.length === 0 ? (
+          <p className="text-sm text-gray-500">No leads yet. The prospecting routine adds them here when it finds something.</p>
+        ) : (
+          <ProspectBoard initialLeads={leads} />
+        )
+      )}
+
+      {mode === 'board' && <PipelineBoard kind={settings.view === 'outreach' ? 'outreach' : 'renewals'} allBusinessNames={allBusinessNames} />}
+
+      {mode === 'table' && (<>
 
       {/* Search and filters */}
       <div className="flex flex-wrap items-end gap-3 mb-3">
@@ -491,6 +559,7 @@ export function BusinessTable({ data, initialView, initialQuery }: { data: Table
           Show {Math.min(PAGE_SIZE, shown.length - limit)} more ({shown.length - limit} not shown)
         </button>
       )}
+      </>)}
     </div>
   )
 }

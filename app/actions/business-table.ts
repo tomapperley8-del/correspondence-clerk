@@ -47,6 +47,8 @@ export type TableRow = {
   business_type_label: string | null
   is_commercial: boolean
   renewal_stage: string | null
+  /** Outreach pipeline stage; null when not in outreach. */
+  outreach_stage: string | null
   contact: TableContact | null
   contact_count: number
   deal: TableDeal | null
@@ -107,6 +109,7 @@ type BizRow = {
   status: string | null
   business_type: string | null
   renewal_stage: string | null
+  outreach_stage: string | null
 }
 type ContractRow = {
   business_id: string
@@ -141,7 +144,7 @@ async function loadAll(supabase: Supabase, orgId: string) {
     fetchAll<BizRow>((from, to) =>
       supabase
         .from('businesses')
-        .select('id, name, status, business_type, renewal_stage')
+        .select('id, name, status, business_type, renewal_stage, outreach_stage')
         .eq('organization_id', orgId)
         .is('merged_into', null)
         .or(`status.is.null,status.neq."${NOT_A_BUSINESS}"`)
@@ -305,6 +308,7 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
       // An untyped business counts as commercial, as in v_business_attention.
       is_commercial: type ? type.is_commercial : true,
       renewal_stage: b.renewal_stage,
+      outreach_stage: b.outreach_stage,
       contact: primary ? toContact(primary, true) : fallback ? toContact(fallback, false) : null,
       contact_count: bizContacts.length,
       deal: pickDeal(bizContracts, today),

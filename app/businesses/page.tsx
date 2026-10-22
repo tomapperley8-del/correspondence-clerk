@@ -1,15 +1,20 @@
 import { getBusinessTable } from '@/app/actions/business-table'
+import { getProspectLeads } from '@/app/actions/leads'
 import { BusinessTable } from './_components/BusinessTable'
 
-// The business table (UI overhaul Stage 5). On its own route for now; the home
-// page stays as it is until Tom switches it over.
+// The business table (UI overhaul Stage 5), one of the three places in the nav
+// (Stage 7). Leads and the renewals and outreach boards are views here.
 
 export const metadata = {
   title: 'Businesses — Correspondence Clerk',
 }
 
-export default async function BusinessesPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string }> }) {
-  const [result, params] = await Promise.all([getBusinessTable(), searchParams])
+export default async function BusinessesPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; board?: string }> }) {
+  const [result, leadsResult, params] = await Promise.all([
+    getBusinessTable(),
+    getProspectLeads().catch(() => ({ data: [], error: 'Could not load prospect leads' })),
+    searchParams,
+  ])
 
   return (
     <div className="mx-auto px-4 py-8 max-w-[1400px]">
@@ -28,7 +33,14 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
       {result.error || !result.data ? (
         <p className="text-sm text-red-700">Could not load the table: {result.error ?? 'no data'}</p>
       ) : (
-        <BusinessTable data={result.data} initialView={params.view} initialQuery={params.q} />
+        <BusinessTable
+          data={result.data}
+          initialView={params.view}
+          initialQuery={params.q}
+          initialBoard={params.board === '1'}
+          leads={leadsResult.data ?? []}
+          leadsError={leadsResult.error}
+        />
       )}
     </div>
   )
