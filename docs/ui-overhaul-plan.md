@@ -104,6 +104,31 @@ Agreed 22 Oct 2026. Tom finds the site confusing and uses none of Briefing; Brie
 - **Nav badge:** the Do now number (at most 8). Decided 22 Oct.
 - **What isn't lost:** prospect leads, routine drafts and resources all keep a place (Leads view, business page, user menu).
 
+## Order of the remaining work (agreed 22 Oct)
+
+1. Finish 6b (Club Card view) and 9 (Tom switches off the Mastersheet's Apps Script trigger).
+2. CLAUDE.md refreshed (done early, 22 Oct).
+3. Stage 11: 11a, then 11b, then 11c.
+4. Stage 8 (drafting templates).
+5. Stage 10 (switch off engine rules, update routines, final docs, walk-through with Tom).
+
+## Who reads what (the cohesion rule)
+
+The app is not the only reader of the data. Any stage that changes how a fact is stored or worked out must update **every** reader in the same go-live, and then check: (a) the routines still ran the next day (`routine_heartbeat`: `daily_desk`, `member_care`, `outreach`, `desk_email`), (b) the desk email matches Today, (c) the regression checklist. Keep view columns backward compatible where a routine reads them; routine prompts live in claude.ai and change only through Tom.
+
+Readers found on 22 Oct (re-check with a query before each change; this list goes stale):
+
+| Fact | Stored in | Read by |
+|---|---|---|
+| Business status | `businesses.status` (Stage 11a: derived) | `contract_insert_drives_pipeline`, `derive_business_stages`, `get_attention_count`, `mark_not_a_business`, `match_prospect_leads`, `merge_businesses`, `prospect_lead_mirrors_business`, `sync_business_flags_from_contracts`, `v_business_attention`, `v_daily_brief`, `v_member_care_queue`, `v_morning_desk`, `v_task_business_hints`, `v_task_verification_queue`; app: `getBusinesses()`, search, Businesses views, Edit Business; inbound webhook (creates `Unreviewed`) |
+| Category | `businesses.category` | `v_member_care_queue`, `v_morning_desk`, `v_business_attention`, `v_task_signals`; Businesses filters; 6b category checks |
+| Deal | `contracts` (copies on `businesses`) | copies still read by `get_contract_expiries`, `refresh_task_commitments`, `sync_business_flags_from_contracts` (writes them) |
+| Needs attention | `v_business_attention` | Today, nav badge, Businesses Needs attention view, business page; (6b adds Club Card reasons) |
+| Tasks | `tasks` (engine + hand-written) | nightly `refresh-system-tasks` (02:10), `morning-pipeline` (06:50) and the desk email, the routines; hidden in the app since Stage 7 except hand-written |
+| Main contact | `contacts.is_primary` | business page, Businesses table; (Stage 8 templates) |
+
+Scheduled jobs (pg_cron): `refresh-system-tasks` 02:10, `morning-pipeline` 06:50, `check-routine-heartbeats` 10:30. Vercel cron: desk email 07:00.
+
 ## One source of truth (Stage 11)
 
 Agreed 22 Oct 2026, after a read-only audit of live. Runs after 6b and 9, which are still bringing in data (website pages; 241 businesses updated from the Mastersheet).
@@ -171,10 +196,10 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 | 6 | Business detail "at a glance" and one merged timeline | 3, 4 | **Live 22 Oct** (code only, no migration). Not yet looked at logged in by Tom on production |
 | 6b | Club Card view: every member's website page, offer, edit date and contract in one list, with problems flagged (spec below); a saved view in Businesses, not a nav tab (Decision 22 Oct) | 5, 6, 7 | Not started; after Stage 7 |
 | 7 | New layout: Today page, three-place nav, retire Briefing / To-dos / Needs attention pages, Contracts and Outreach into Businesses (spec "New layout (Stage 7)" below) | 4, 5, 6 | **Live 22 Oct** (code only, no migration). Not yet looked at logged in by Tom on production |
-| 8 | Zero-credit drafting: templates and "Copy context pack" | 6 | Not started |
+| 8 | Zero-credit drafting: templates and "Copy context pack" | 11 (needs clean main contacts, deals and coverage) | Not started; after 11 |
 | 9 | Retire the Mastersheet: audit what exists only in the sheet, bring across what Tom chooses, then freeze it read-only and switch off the sync (spec below) | 3 | Nearly done: export off, archive link live; waiting on Tom to switch off the Apps Script trigger |
-| 10 | Docs: CLAUDE.md, bring `cc-live-export` into the repo | all | Not started |
-| 11 | One source of truth, then put it to use: one owner per fact, a Data health page, and an Insights page (spec below) | 6b, 9 | Not started |
+| 10 | Finish: switch off the task engine's reply, renewal and invoice rules once nothing reads them; update the routines' instructions; final docs; one logged-in walk-through with Tom. (CLAUDE.md refreshed early on 22 Oct; `cc-live-export` is switched off, so it no longer needs bringing into the repo) | all | Not started; last |
+| 11 | One source of truth, in three parts: **11a** shared truth layer (derived status, current deal, main contact, last in touch, category, read by everything; desk email rebuilt from Today's source); **11b** clean-up reviews; **11c** Insights and Data health (spec below) | 6b, 9 | Not started; next after 6b |
 
 ### Per stage: change, risk, verify, rollback
 
@@ -202,6 +227,8 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - [ ] Nav count matches the page
 - [ ] No console errors
 - [ ] `npm run build` and `npm run lint` pass
+- [ ] Every reader in "Who reads what" of a changed fact was updated in the same go-live
+- [ ] Next day: all four routines show a heartbeat, and the desk email matches Today
 
 ## Deferred
 
@@ -271,3 +298,5 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **22 Oct 2026, Stage 9 freeze (Tom approved: "Try switching off the Apps Script trigger through the Drive connector. Go ahead with switching off cc-live-export and adding the archive link. Leave the Xmas Gift Guide and Childrens Directory tabs in the archived sheet."):** (1) **`cc-live-export` switched off.** Last working version was **v13** (deployed Sep 2026, ezbr sha256 `13b48985…`); its source is saved in `supabase/.local/stage9/cc-live-export-v13/index.ts`, not in the repo, because it holds the sheet's access token. Deployed **v14** (sha256 `41f8ffe6…`, verify_jwt off as before): reads no data and answers every call with 410 Gone; checked with a plain call (HTTP 410). Before the switch, the function logs showed no calls in the previous 24 hours, and the sheet hasn't changed since 24 Sep, so the hourly sync had already stopped. To restore, redeploy the saved v13. `read-sheet`, `write-sheet` and `scheduled-sync` belong to the Feb 2026 prospecting tools (`write-sheet` writes a "Sheet1" tab, which the Mastersheet doesn't have); nothing in the app calls them, so they were left alone. (2) **Apps Script trigger: not possible through the Drive connector.** It can find the script project ("CC Mastersheet Scripts", Drive id `1VE56Lwj-Li630RStSsJhESLMQUcl2QV8yvat6i_fDxZmmuxFU1LzJGKN`, last changed 17 Sep 2026) but can't read Apps Script code or change triggers. Tom to switch it off (Extensions → Apps Script → Triggers). Until then, a run would only get the 410 and stop. (3) **Archive link:** "Mastersheet (archived)" in the user menu and the mobile menu, opening the sheet in a new tab (`components/Navigation.tsx`, `83d36aa`; lint and type check clean). Live once Tom approves merging `ui-overhaul` into `main`. (4) The Xmas Gift Guide and Childrens Directory tabs stay in the archived sheet (Tom's choice). Nothing in the sheet was changed or deleted.
 - **22 Oct 2026, Stage 11 agreed:** Tom asked for a stage that looks at all the data now held, finds one truth and puts it to use. Read-only audit of live and Tom's answers are in the section "One source of truth (Stage 11)". Runs after 6b and 9. Nothing built.
 - **22 Oct 2026, Stage 9 archive link live (Tom asked: "Merge ui-overhaul into main and deploy, so the Mastersheet archive link goes live"; then chose "Ship only the link"):** `ui-overhaul` also carried the Stage 6b Club Card code (`42a7480`: nightly cron `/api/cron/club-card-pages` in `vercel.json`, needing migration `20261022_001_club_card_pages`, which is not live or approved), so only the link commit went to `main`. `83d36aa` cherry-picked in a temporary worktree onto `origin/main` as `42be2f2` (`components/Navigation.tsx` byte-identical to the checked branch copy) and pushed: `main` `9cd72eb` → `42be2f2`. Vercel's automatic build was slow to start, so a production build of that commit was also requested through the API; both builds (`dpl_CkaqVKDnJz3WsRLomiqn2Rh4zz4j` from the push, `dpl_4aLvDZG9z544JsTWJncZgba9c6pu` requested) are READY and identical, and the newer serves correspondenceclerk.com. Rollback candidate: `dpl_4Nt1CuG1ZAfVk7eFXGNgudxHEZRM` (`9cd72eb`). `/login` 200, `/today` 307 when signed out, no runtime errors. Note for the next merge: `main` now has `42be2f2`, which is not on `ui-overhaul`, so the next merge is a normal merge, not a fast-forward; it applies cleanly because the change is identical. The plan file and the Stage 9 SQL on `ui-overhaul` are not on `main` yet. Not checked logged in on production. Left for Tom: switch off the sheet's Apps Script trigger.
+- **22 Oct 2026, order and cohesion rule:** remaining order agreed (6b and 9, CLAUDE.md, 11a/b/c, 8, 10). Added "Who reads what" with the readers found on live (14 functions and views read business status; 4 views read category; 3 functions still read deal copies; 4 routines and 3 cron jobs run daily) and two regression items. Stage 9's last step is Tom's: switch off the Mastersheet's Apps Script trigger.
+- **22 Oct 2026, CLAUDE.md refreshed (pulled forward from Stage 10):** app pages block, nav, a new "Today and Needs attention" section replacing the old Actions Architecture, new tables and columns (contracts, tasks, QuickBooks, business_articles, routines, cc_phase0_backup, status values, merged_into, is_primary), a Recent Changes entry for the overhaul, and Known Issues for parallel sessions and git identity. Hard Rule 2 left as Tom wrote it, with an audit note (F15) that the wording is his call.

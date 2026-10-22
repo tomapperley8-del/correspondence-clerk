@@ -45,6 +45,7 @@ These 10 rules override everything else:
 
 1. **PRESERVE USER WORDING EXACTLY** - No rewriting, polishing, summarizing
 2. **NEVER INVENT CONTENT** - No suggestions, reminders, auto follow-ups
+   _(Audit note F15, 22 Oct 2026: the deterministic task engine and the Needs attention list do raise reminders from rules, with no invented text. Whether this rule should say so is Tom's call; until then, never generate wording on Tom's behalf.)_
 3. **ENFORCE FORCED FILING** - Cannot save without business AND named contact
 4. **SHOW CONTACT DETAILS** - Role, email, phone always visible
 5. **FAIL GRACEFULLY** - AI outage never blocks saving
@@ -77,22 +78,27 @@ app/actions/
   files.ts               File upload/delete/download (Supabase Storage)
 
 app/
-  dashboard/page.tsx           Business list with search/filters/sort + onboarding checklist
-  businesses/[id]/page.tsx     Letter file view + sub-components in _components/
-  businesses/[id]/_components/ CorrespondenceEntry, EditForm, ThreadAssignPanel, AllEntriesView,
-                               ThreadsView, FilterBar, DuplicatesWarningBanner, ContactsList,
-                               BusinessFiles
-  new-entry/page.tsx           Add correspondence (forced filing + AI formatting + draft autosave)
-  actions/page.tsx             Top priorities hero + 3 collapsible sections (needs reply, actions due, renewals)
-  daily-briefing/page.tsx      Full-page inline ChatPanel
-  search/page.tsx              Full-text search results
-  import/gmail/page.tsx        Gmail bulk import wizard
-  import/outlook/page.tsx      Outlook bulk import wizard
+  today/page.tsx               HOME (`/` redirects here). Built on v_business_attention: This week strip,
+                               Do now (max 8, plain rules), everything else folded by reason, quick add.
+                               Nav badge = Do now count.
+  businesses/page.tsx          Businesses table (Mastersheet look) with saved views: All active, Needs attention,
+                               Renewals, Outreach, Leads, Unreviewed, Prospects, Former members, Internal and
+                               community, Everything; board toggle for Renewals/Outreach; Club Card view (Stage 6b)
+  businesses/[id]/page.tsx     Business page: at-a-glance header (deal from contracts, main contact, attention
+                               reason) + one merged history; review bar for auto-created records; drafts shown
+                               above the email they answer. Sub-components in _components/
   inbox/page.tsx               Inbound email queue triage
-  onboarding/                  4-step flow (create-org → describe-business → first-business → new-entry)
+  new-entry/page.tsx           Add correspondence (forced filing + draft autosave)
+  search/page.tsx              Full-text search results (Ctrl+K overlay is the usual way in)
   settings/page.tsx            User settings + Tools + membership types
+  dashboard/page.tsx           OLD business list, kept in the user menu as "Old business list"
+  briefing, todos, attention   RETIRED (Stage 7): redirect to /today; /todos?view=contracts|outreach redirect
+                               to the matching /businesses board
+  daily-briefing/page.tsx      Full-page inline ChatPanel (AI; off while AI_ENABLED=false)
+  import/gmail, import/outlook Bulk email import wizards
+  onboarding/                  4-step flow
   install-bookmarklet/page.tsx Bookmarklet installer (public)
-  admin/import/page.tsx        Mastersheet import UI
+  admin/import/page.tsx        Old Mastersheet CSV import UI (the Mastersheet is retired, Stage 9)
 
 app/api/
   inbound-email/route.ts       Forward Email webhook → verify → spam filter → block check → match → AI format → auto-file or queue
@@ -115,7 +121,9 @@ lib/
 
 components/
   CommandSearch.tsx        Cmd+K global overlay (sessionStorage cache 5min TTL, keyboard nav)
-  Navigation.tsx           App nav + actions badge + Daily Briefing button
+  Navigation.tsx           Three places: Today (badge = Do now count), Businesses, Inbox; Search (Ctrl+K), + New entry;
+                           user menu: Old business list, Resources, Import emails, Search page, Settings, Help,
+                           Mastersheet (archived)
   ChatPanel.tsx            Daily Briefing AI panel (inline=true or slide-out overlay)
   Toast.tsx                Toast container (singleton in layout.tsx)
   BusinessSelector.tsx     Search dropdown + Add New
@@ -140,35 +148,26 @@ lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feat
 - **contact_id nullable**: Note type entries have no contact — guard before accessing contact fields
 - **Toast**: `import { toast } from '@/lib/toast'` then `toast.success('message')` — works anywhere client-side
 
-### Actions Architecture
+### Today and Needs attention (UI overhaul, Oct 2026)
 
-The Actions page (`app/actions/page.tsx`) has a **Top Priorities hero block** (top 5 items, numbered) above **3 collapsible sections** (all default-collapsed): Needs Reply, Actions Due (reminders merged in), Renewals. Data flows through `buildUnifiedList()` → `unifiedList` (also drives keyboard nav); sections are visual groupings filtering from `unifiedList`. COMMITMENT cards from `insight_history` (type=`what_did_we_agree`, last 14 days) surface in the feed. Rationale slide-out panel (380px) opens on item click or Enter; Escape closes.
+The old `/actions` page and the Briefing, To-dos and Needs attention pages are gone. **Read `docs/ui-overhaul-plan.md`** (Definitions, "New layout (Stage 7)", "Who reads what") before changing any of this.
 
-**Signal sources (parallel fetches on load):**
-1. `getNeedsReply()` — received correspondence where Tom has sent nothing to that business since; client-side `likelyNeedsReply()` heuristic filters closers/OOO/signatures
-2. `getOutstandingActions()` — `action_needed != 'none'` entries, ordered by due_at
-3. `getPureReminders()` — `action_needed = 'none'` but `due_at IS NOT NULL` (displayed within Actions Due)
-4. `getContractExpiries()` — businesses where `contract_end IS NOT NULL` and within 30 days (null-safe)
-5. `insight_history` — `what_did_we_agree` entries last 14 days → COMMITMENT cards (localStorage dismissal via `dismissed_insights`)
-
-**"Needs Reply" logic:** fetches last 90 days; for each received entry checks `entries.some(other => other.direction === 'sent' && other.business_id === entry.business_id && otherDate > entryDate)` — any sent correspondence clears it. Also excludes: `reply_dismissed_at IS NOT NULL` (Done), `due_at > NOW()` (snoozed), `action_needed = 'waiting_on_them'`.
-
-**Done persistence:** `correspondence.reply_dismissed_at TIMESTAMPTZ` (migration 20260408_001). `markCorrespondenceDone()` sets it; `getNeedsReply()` filters it at DB level. Done = permanently done.
-
-**Badge urgency order:** REPLY (7+ days) → REPLY (3–6 days) → OVERDUE → DUE_TODAY → DUE_TOMORROW → DUE_SOON → RENEWAL (<7d) → FLAG → RENEWAL (7–30d) → REMINDER
-
-**How items enter the system (three paths):**
-1. **Manual one-click flag** — "Follow-up" button on `CorrespondenceEntry.tsx` calls `setCorrespondenceAction(id, 'follow_up', dueAt)` where `dueAt = today + 7 days`.
-2. **AI auto-flag on inbound email** — `app/api/inbound-email/route.ts`: if `ai_result.action_suggestion.confidence === 'high'`, `action_needed` and `due_at` are set at insert time. Falls back to `action_needed: 'none'` — never blocks.
-3. **Insights push** — "Add to Actions" button in `components/InsightsPanel.tsx` (for `call_prep`, `next_best_action`, `what_did_we_agree`, `outreach_draft`, `risk_check`) calls `createCorrespondence` with `action_needed: 'follow_up'`.
-
-**Keyboard shortcuts:** `↑ ↓` navigate · `D` done · `S` snooze 7d · `L` reply/log · `Enter` open rationale panel
+- **`v_business_attention`** (SQL view): one top reason per business, worked out live: 1 Money owed (QuickBooks, past due, no chase in 7 days), 2 Renewal (ending within 45 days or ended up to 60 days ago, not agreed, paid or declined), 3 Waiting on you (email from a reviewed commercial business within 30 days, nothing sent since), 4 Your to-dos (hand-written tasks). Nothing to tick: each clears when the thing is done. Per-business snooze: `businesses.attention_snoozed_until`. `cc_today()` is the one clock (London date). `get_attention_count()` feeds the badge.
+- **Today** (`app/today`, `lib/today.ts`, `app/actions/today.ts`) groups that list; "Do now" picks at most 8 by plain rules.
+- **Task engine** (`refresh_system_tasks()`, pg_cron 02:10; rules in `task_rules`, signals in `v_task_signals`) still runs, because the morning desk email and the Claude routines read `tasks`. Its reply, renewal and invoice tasks are hidden in the app; hand-written to-dos show. Ticks write back to the source (trigger `tasks_write_back_to_source`) and never reopen.
 
 ### Database Tables
 
-- **businesses** - name, category, status, membership_type, business_type (TEXT, per-org taxonomy), address, email, phone, notes, contract fields, last_contacted_at, relationship_memory (AI-distilled 3-sentence summary), relationship_memory_updated_at
-- **contacts** - business_id, name, emails[], phones[], role, notes, is_active (unique per business+email)
+- **businesses** - name, category, status (`Active` / `Former` / `Prospect` / `Unreviewed` (auto-created from email) / `Not a business` (hidden, kept for its emails); Stage 11 will derive it from contracts), merged_into (set by `merge_businesses()`), attention_snoozed_until, membership_type, business_type (TEXT, per-org taxonomy), address, email, phone, notes, contract fields, last_contacted_at, relationship_memory (AI-distilled 3-sentence summary), relationship_memory_updated_at
+- **contacts** - business_id, name, emails (jsonb array), phones[], role, notes, is_active, is_primary (main contact), name_is_placeholder
 - **correspondence** - business_id, contact_id (nullable — Notes have no contact), cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), linked_business_ids (UUID[] — shared entry visible on multiple businesses), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, reply_dismissed_at, edited_at, content_hash
+- **contracts** - the deal: business_id, membership_type (club_card / advertiser / ...), contract_start/end, amount, is_current, invoice_paid. Source of truth for deals; triggers copy the current one onto businesses (copies being retired in Stage 11)
+- **tasks / task_rules / system_task_runs** - task engine (see above); hand-written tasks have source='manual'
+- **qbo_customers / qbo_invoices / qbo_links** - QuickBooks data and business links (money owed)
+- **business_articles** - news articles about a business (chiswickcalendar.co.uk and others; status confirmed/rejected)
+- **routine_drafts / routine_heartbeat / draft_requests** - Claude routines (daily_desk, member_care, outreach) write drafts and a daily heartbeat; desk_email logs one too
+- **cc_phase0_backup** - before-images of every bulk data change in the overhaul (table_name, row_id, before_row jsonb, reason); undo scripts in supabase/data-fixes/ and supabase/migrations/rollback/
+- **org_business_types.is_commercial** - false = Internal/Community, kept out of commercial views
 - **duplicate_dismissals** - business_id, entry_id_1, entry_id_2, dismissed_by, dismissed_at
 - **organizations** - id, name, business_description, industry (used in Daily Briefing system prompt)
 - **org_membership_types** - id, org_id, label, value, sort_order, is_active (per-org configurable membership types)
@@ -269,7 +268,7 @@ All features complete and deployed (unless noted):
 15. Daily Briefing (AI chat panel — inline page + slide-out overlay, org business context)
 16. Configurable Membership Types (per-org settings UI)
 17. Onboarding flow (4-step: org → describe business → first business+contact → first entry)
-18. Actions page (top priorities hero, needs-reply, flagged/reminders in Actions Due, renewals, keyboard nav, rationale panel, commitment alerts)
+18. ~~Actions page~~ (replaced by Today, Oct 2026) (top priorities hero, needs-reply, flagged/reminders in Actions Due, renewals, keyboard nav, rationale panel, commitment alerts)
 19. Inbound Email Forwarding + BCC Capture — **live** (Forward Email $3/month, migrated from Postmark. Flat payload format — see project_forward_email_migration.md)
 20. Daily Briefing Email — **retired 16 Sep 2026**. Replaced by the desk email: `/api/cron/desk-email` (Vercel cron 07:00 UTC) runs `run_morning_pipeline()` and sends `v_morning_desk` via Resend with no AI. See `docs/automation-changes-2026-09-16.md`.
 21. API Cost Reduction — **live** (model tiering: Haiku for 9/11 call sites, Sonnet for Chat + strategic Insights only. Centralised in `lib/ai/models.ts`. Cache TTLs doubled. Prompt caching added to 6 endpoints. Regex bypass for trivial emails.)
@@ -279,9 +278,11 @@ All features complete and deployed (unless noted):
 25. Insight History — **live** (P33: `insight_history` table, "View history" in expanded InsightCard, timeline of past snapshots, click to view previous versions)
 26. Relationship Memory — **live** (P34: Haiku distils 3-sentence summary per business after each insight, stored in `businesses.relationship_memory`. Reduces correspondence context 50→30 entries. Fire-and-forget.)
 27. Correspondence Linking + Business Types — **live** (duplicate to another business creates independent copy; link creates shared single record visible on both; `business_type` per-org taxonomy on businesses; dashboard filter; migrations 20260514_001+002)
-28. Actions Page — **live** (unified smart list → top priorities hero + 3 collapsible sections. Needs Reply direction-aware, no 7-day cap. Done permanent via `reply_dismissed_at`. One-click flag sets due_at +7d. Commitment alerts from insight_history. Rationale slide-out panel. AI auto-flags high-confidence inbound emails. Insights "Add to Actions" push. Keyboard nav D/S/L/Enter.)
+28. ~~Actions Page~~ — replaced by Today (Oct 2026) (unified smart list → top priorities hero + 3 collapsible sections. Needs Reply direction-aware, no 7-day cap. Done permanent via `reply_dismissed_at`. One-click flag sets due_at +7d. Commitment alerts from insight_history. Rationale slide-out panel. AI auto-flags high-confidence inbound emails. Insights "Add to Actions" push. Keyboard nav D/S/L/Enter.)
 
 ## Recent Changes
+
+- **Oct 21-22, 2026: UI overhaul (`docs/ui-overhaul-plan.md` is the full record).** Paid Edge Function calls stopped (old Outreach Engine Vercel project paused). Task ticks stick and never reopen. Email from unknown senders creates `Unreviewed` businesses; services, bulk and personal-provider senders never do. 75 junk records marked `Not a business`, 17 duplicates merged (`merge_businesses()`), main contact (`is_primary`) and Internal/Community types added. `v_business_attention` gives one reason per business. New layout: Today (home), Businesses (Mastersheet-style table with saved views and boards), Inbox; Briefing, To-dos and Needs attention retired with redirects. Business page has an at-a-glance header and one merged history. Mastersheet retired: Tom's chosen data brought across, `cc-live-export` switched off, sheet archived (link in the user menu). In progress: Club Card view (6b); next: one source of truth and Insights (11), drafting templates (8), finish (10).
 
 - **Sep 21, 2026:** Inbound email creates what is missing. A BCC'd or forwarded email to or from an unknown person now creates the contact, and where the business is unknown too it creates the business (from the company domain, or from the person's name on a personal address), remembers the domain and opens a task to check the record. Personal-address senders with no match are still left alone. QuickBooks invoices for a new term become contracts (`record_qbo_terms`), and the contracts trigger mirrors the current contract onto the business row.
 
@@ -321,6 +322,8 @@ All features complete and deployed (unless noted):
 
 ## Known Issues
 
+- Several sessions may work in this folder at once during the overhaul: commit only your own files by name, never `git add -A`, and re-read `docs/ui-overhaul-plan.md` before editing it.
+- Git has no identity set on this machine: commit with `git -c user.name="Tom Apperley" -c user.email="tomapperley8@gmail.com"`; never commit `supabase/.temp/cli-latest`.
 - ~76 lint problems remain — two categories intentionally skipped: (1) `react-hooks/set-state-in-effect` false positives (async-fetch patterns, mount-time localStorage filter); (2) docx library `any` types in a single file. `CorrespondenceFilterBar` nested-component real bug was fixed May 2026.
 - Middleware deprecation warning in Vercel build: Next.js 16 prefers `proxy.ts` over `middleware.ts`. Not yet an error, deferred.
 
