@@ -233,9 +233,15 @@ export async function syncOrg(supabase: SupabaseClient, orgId: string, site: Sit
       const { error: e } = await supabase.from('club_card_pages').update({ ...siteFields, ...matchFields }).eq('id', row.id)
       if (e) throw new Error(e.message)
     } else {
-      pagesNew++
-      const { error: e } = await supabase.from('club_card_pages').insert({ organization_id: orgId, wp_id: p.wp_id, first_seen_at: now, ...siteFields, ...matchFields })
+      // Two runs can overlap (a manual run beside the cron): if the other run
+      // has just added this page, leave its row alone rather than fail.
+      const { data: added, error: e } = await supabase
+        .from('club_card_pages')
+        .upsert({ organization_id: orgId, wp_id: p.wp_id, first_seen_at: now, ...siteFields, ...matchFields },
+          { onConflict: 'organization_id,wp_id', ignoreDuplicates: true })
+        .select('id')
       if (e) throw new Error(e.message)
+      if (added?.length) pagesNew++
     }
   }
   const goneIds = (existing ?? []).filter((e) => !seen.has(e.wp_id) && !e.gone_at).map((e) => e.id)
