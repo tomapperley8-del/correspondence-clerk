@@ -4,26 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
 import type { User } from '@supabase/supabase-js'
 import { getNavData } from '@/app/actions/organizations'
 import { useInsights } from '@/components/InsightsContext'
-
-function InsightsButton() {
-  const { isOpen, toggle } = useInsights()
-  return (
-    <button
-      onClick={toggle}
-      className={`px-4 h-16 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
-        isOpen
-          ? 'text-white bg-brand-olive'
-          : 'text-white hover:bg-brand-olive/20'
-      }`}
-    >
-      Insights
-    </button>
-  )
-}
 
 type Organization = {
   id: string
@@ -35,22 +18,22 @@ export function Navigation() {
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [todosDueCount, setTodosDueCount] = useState(0)
-  const [attentionCount, setAttentionCount] = useState<number | null>(null)
+  const [doNowCount, setDoNowCount] = useState<number | null>(null)
   const [inboundCount, setInboundCount] = useState(0)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const { close: closeInsights } = useInsights()
+  const { close: closeInsights, toggle: toggleInsights } = useInsights()
   const navFetchedAt = useRef(0)
 
   async function loadNavData() {
     const nav = await getNavData()
     setDisplayName(nav.displayName)
-    setTodosDueCount(nav.todosDueCount)
-    setAttentionCount(nav.attentionCount)
+    setDoNowCount(nav.doNowCount)
     setInboundCount(nav.inboundCount)
     setAiEnabled(nav.aiEnabled)
     if (nav.organizationId) {
@@ -81,7 +64,7 @@ export function Navigation() {
       } else {
         setOrganization(null)
         setDisplayName(null)
-        setTodosDueCount(0)
+        setDoNowCount(null)
         setInboundCount(0)
       }
     })
@@ -99,8 +82,34 @@ export function Navigation() {
     }
     if (pathname === '/insights') closeInsights()
     setMobileOpen(false)
+    setMenuOpen(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
+
+  // Today asks for a fresh count after an item is cleared.
+  useEffect(() => {
+    const refresh = () => {
+      navFetchedAt.current = Date.now()
+      loadNavData()
+    }
+    window.addEventListener('cc:nav-refresh', refresh)
+    return () => window.removeEventListener('cc:nav-refresh', refresh)
+  }, [])
+
+  // Close the user menu on an outside click.
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [menuOpen])
+
+  const openSearch = () => {
+    setMobileOpen(false)
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -145,6 +154,52 @@ export function Navigation() {
     return null
   }
 
+  // Three places (UI overhaul Stage 7): Today, Businesses, Inbox. Everything
+  // else lives under the user menu.
+  const places: { href: string; label: string; active: boolean; badge: number | null; badgeTitle?: string; badgeTone: string }[] = [
+    {
+      href: '/today',
+      label: 'Today',
+      active: pathname === '/today',
+      badge: doNowCount && doNowCount > 0 ? doNowCount : null,
+      badgeTitle: `${doNowCount} to do now`,
+      badgeTone: 'bg-amber-500',
+    },
+    {
+      href: '/businesses',
+      label: 'Businesses',
+      active: !!pathname?.startsWith('/businesses') || pathname === '/dashboard',
+      badge: null,
+      badgeTone: '',
+    },
+    {
+      href: '/inbox',
+      label: 'Inbox',
+      active: pathname === '/inbox',
+      badge: inboundCount > 0 ? inboundCount : null,
+      badgeTitle: `${inboundCount} email${inboundCount === 1 ? '' : 's'} to file`,
+      badgeTone: 'bg-red-500',
+    },
+  ]
+
+  const menuItems: { href: string; label: string }[] = [
+    { href: '/resources', label: 'Resources' },
+    { href: '/search', label: 'Search page' },
+    { href: '/dashboard', label: 'Old business list' },
+    { href: '/import/gmail', label: 'Import emails' },
+    { href: '/help', label: 'Help' },
+    { href: '/settings', label: 'Settings' },
+  ]
+
+  const badgeEl = (n: number, tone: string, title?: string) => (
+    <span
+      title={title}
+      className={`min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center leading-none ${tone}`}
+    >
+      {n > 99 ? '99+' : n}
+    </span>
+  )
+
   return (
     <>
     <nav aria-label="Main navigation" className="bg-brand-dark border-b border-white/10">
@@ -152,147 +207,102 @@ export function Navigation() {
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">
             <Link
-              href="/briefing"
+              href="/today"
               className="text-xl font-bold text-white flex items-center gap-2"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-              <span className="hidden sm:inline">Correspondence Clerk</span>
-              <span className="sm:hidden">Clerk</span>
-              {todosDueCount > 0 && (
-                <span
-                  title={`Old count: ${todosDueCount} task${todosDueCount === 1 ? '' : 's'} due`}
-                  className="text-[10px] font-medium text-white/60"
-                >
-                  {todosDueCount}
-                </span>
-              )}
+              <span className="hidden lg:inline">Correspondence Clerk</span>
+              <span className="lg:hidden">Clerk</span>
             </Link>
 
             <div className="hidden md:flex h-16">
-              {attentionCount !== null && (
+              {places.map((p) => (
                 <Link
-                  href="/attention"
+                  key={p.href}
+                  href={p.href}
+                  aria-current={p.active ? 'page' : undefined}
                   className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
-                    pathname === '/attention'
-                      ? 'text-white bg-brand-olive'
-                      : 'text-white hover:bg-brand-olive/20'
+                    p.active ? 'text-white bg-brand-olive' : 'text-white hover:bg-brand-olive/20'
                   }`}
                 >
-                  Needs attention
-                  {attentionCount > 0 && (
-                    <span
-                      title={`${attentionCount} need${attentionCount === 1 ? 's' : ''} attention (old count: ${todosDueCount})`}
-                      className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
-                    >
-                      {attentionCount > 99 ? '99+' : attentionCount}
-                    </span>
-                  )}
+                  {p.label}
+                  {p.badge !== null && badgeEl(p.badge, p.badgeTone, p.badgeTitle)}
                 </Link>
-              )}
-              <Link
-                href="/todos"
-                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/todos'
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
-              >
-                To-dos
-              </Link>
-
-              <Link
-                href="/dashboard"
-                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/dashboard'
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
-              >
-                Businesses
-              </Link>
-
-              <Link
-                href="/inbox"
-                className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/inbox' || pathname === '/new-entry'
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
-              >
-                Inbox
-                {inboundCount > 0 && (
-                  <span
-                    title={`${inboundCount} email${inboundCount === 1 ? '' : 's'} to file`}
-                    className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"
-                  >
-                    {inboundCount > 99 ? '99+' : inboundCount}
-                  </span>
-                )}
-              </Link>
-
-              <Link
-                href="/resources"
-                className={`px-4 flex items-center text-sm font-medium transition-colors border-r border-white/20 ${
-                  pathname === '/resources'
-                    ? 'text-white bg-brand-olive'
-                    : 'text-white hover:bg-brand-olive/20'
-                }`}
-              >
-                Resources
-              </Link>
-
-              {aiEnabled && pathname !== '/insights' && <InsightsButton />}
+              ))}
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            {/* Hamburger — mobile only */}
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setMobileOpen((o) => !o)}
-              aria-label="Toggle navigation menu"
-              className="md:hidden flex flex-col gap-1 p-2 text-white"
+              type="button"
+              onClick={openSearch}
+              className="hidden md:inline-flex items-center gap-2 text-sm text-white/90 border border-white/30 rounded-sm px-3 py-1.5 hover:bg-white/10 transition-colors"
             >
-              <span className="block w-5 h-0.5 bg-white" />
-              <span className="block w-5 h-0.5 bg-white" />
-              <span className="block w-5 h-0.5 bg-white" />
+              Search <span className="text-xs text-white/60">Ctrl K</span>
             </button>
-            <div className="hidden md:block text-right max-w-[160px]">
-              <div className="text-sm text-white truncate">
-                {displayName || user.email?.split('@')[0] || user.email}
-              </div>
-              {organization && (
-                <div className="text-xs text-gray-400 truncate">{organization.name}</div>
+            <Link
+              href="/new-entry"
+              className={`hidden md:inline-flex text-sm font-semibold text-white rounded-sm px-3 py-1.5 transition-colors ${
+                pathname === '/new-entry' ? 'bg-brand-olive ring-1 ring-white/60' : 'bg-brand-olive hover:bg-brand-olive/80'
+              }`}
+            >
+              + New entry
+            </Link>
+            <div className="relative hidden md:block" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((o) => !o)}
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                className="text-left max-w-[180px] px-2 py-1 rounded-sm hover:bg-white/10 transition-colors"
+              >
+                <span className="block text-sm text-white truncate">
+                  {displayName || user.email?.split('@')[0] || user.email} <span aria-hidden="true">▾</span>
+                </span>
+                {organization && <span className="block text-xs text-gray-400 truncate">{organization.name}</span>}
+              </button>
+              {menuOpen && (
+                <div role="menu" className="absolute right-0 top-full mt-2 z-50 w-56 bg-white border border-black/[0.08] rounded-sm shadow-lg py-1">
+                  {menuItems.map((m) => (
+                    <Link
+                      key={m.href}
+                      href={m.href}
+                      role="menuitem"
+                      className={`block px-4 py-2 text-sm hover:bg-brand-warm ${pathname === m.href ? 'text-brand-navy font-semibold' : 'text-brand-dark'}`}
+                    >
+                      {m.label}
+                    </Link>
+                  ))}
+                  {aiEnabled && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setMenuOpen(false); toggleInsights() }}
+                      className="block w-full text-left px-4 py-2 text-sm text-brand-dark hover:bg-brand-warm"
+                    >
+                      Insights
+                    </button>
+                  )}
+                  <div className="border-t border-black/[0.06] my-1" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2 text-sm text-brand-dark hover:bg-brand-warm"
+                  >
+                    Log out
+                  </button>
+                </div>
               )}
             </div>
-            <Link
-              href="/help"
-              aria-label="Help"
-              title="Help"
-              className={`hidden md:flex px-3 h-16 items-center text-sm font-medium transition-colors ${
-                pathname === '/help'
-                  ? 'text-white bg-brand-olive'
-                  : 'text-white/60 hover:text-white hover:bg-brand-olive/20'
-              }`}
+            {/* Menu button: mobile only */}
+            <button
+              onClick={() => setMobileOpen((o) => !o)}
+              aria-label="Open menu"
+              className="md:hidden text-sm font-medium text-white border border-white/30 rounded-sm px-3 py-1.5"
             >
-              ?
-            </Link>
-            <Link
-              href="/settings"
-              className={`hidden md:flex px-4 h-16 items-center text-sm font-medium transition-colors ${
-                pathname?.startsWith('/settings')
-                  ? 'text-white bg-brand-olive'
-                  : 'text-white hover:bg-brand-olive/20'
-              }`}
-            >
-              Settings
-            </Link>
-            <Button
-              onClick={handleLogout}
-              variant="ghost"
-              className="hidden md:inline-flex text-white hover:text-brand-olive"
-            >
-              Logout
-            </Button>
+              Menu
+            </button>
           </div>
         </div>
       </div>
@@ -302,63 +312,68 @@ export function Navigation() {
       {/* Mobile slide-out drawer */}
       {mobileOpen && (
         <>
-          {/* Backdrop */}
           <div
             className="md:hidden fixed inset-0 z-40 bg-black/50"
             onClick={() => setMobileOpen(false)}
             aria-hidden="true"
           />
-          {/* Drawer */}
-          <div className="md:hidden fixed top-0 right-0 z-50 h-full w-72 bg-brand-dark flex flex-col shadow-xl">
-            {/* Drawer header */}
+          <div className="md:hidden fixed top-0 right-0 z-50 h-full w-72 max-w-[85vw] bg-brand-dark flex flex-col shadow-xl">
             <div className="flex items-center justify-between h-16 px-4 border-b border-white/20">
               <span className="text-base font-semibold text-white" style={{ fontFamily: 'var(--font-serif)' }}>
                 Menu
               </span>
               <button
                 onClick={() => setMobileOpen(false)}
-                aria-label="Close menu"
-                className="p-2 text-white/70 hover:text-white transition-colors"
+                className="px-2 py-1 text-sm text-white/80 hover:text-white transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                Close
               </button>
             </div>
-            {/* Nav items */}
             <div className="flex-1 overflow-y-auto py-2">
-              {[
-                ...(attentionCount !== null
-                  ? [{ href: '/attention', label: 'Needs attention', badge: attentionCount > 0 ? attentionCount : null }]
-                  : []),
-                { href: '/todos', label: 'To-dos', badge: todosDueCount > 0 ? todosDueCount : null },
-                { href: '/dashboard', label: 'Businesses' },
-                { href: '/inbox', label: 'Inbox', badge: inboundCount > 0 ? inboundCount : null },
-                { href: '/resources', label: 'Resources' },
-                { href: '/new-entry', label: 'New Entry' },
-                ...(aiEnabled ? [{ href: '/insights', label: 'Insights' }] : []),
-                { href: '/help', label: 'Help' },
-                { href: '/settings', label: 'Settings' },
-              ].map(({ href, label, badge }: { href: string; label: string; badge?: number | null }) => (
+              {places.map((p) => (
                 <Link
-                  key={href}
-                  href={href}
+                  key={p.href}
+                  href={p.href}
                   className={`flex items-center justify-between px-5 py-3 text-sm font-medium transition-colors ${
-                    pathname === href || (href === '/settings' && pathname?.startsWith('/settings'))
-                      ? 'text-white bg-brand-olive'
-                      : 'text-white hover:bg-brand-olive/20'
+                    p.active ? 'text-white bg-brand-olive' : 'text-white hover:bg-brand-olive/20'
                   }`}
                 >
-                  {label}
-                  {badge != null && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center leading-none bg-amber-500">
-                      {badge > 99 ? '99+' : badge}
-                    </span>
-                  )}
+                  {p.label}
+                  {p.badge !== null && badgeEl(p.badge, p.badgeTone)}
                 </Link>
               ))}
+              <button
+                type="button"
+                onClick={openSearch}
+                className="block w-full text-left px-5 py-3 text-sm font-medium text-white hover:bg-brand-olive/20"
+              >
+                Search
+              </button>
+              <Link href="/new-entry" className="block px-5 py-3 text-sm font-medium text-white hover:bg-brand-olive/20">
+                + New entry
+              </Link>
+              <div className="border-t border-white/20 my-2" />
+              {menuItems.map((m) => (
+                <Link
+                  key={m.href}
+                  href={m.href}
+                  className={`block px-5 py-3 text-sm transition-colors ${
+                    pathname === m.href ? 'text-white bg-brand-olive' : 'text-white/80 hover:bg-brand-olive/20'
+                  }`}
+                >
+                  {m.label}
+                </Link>
+              ))}
+              {aiEnabled && (
+                <button
+                  type="button"
+                  onClick={() => { setMobileOpen(false); toggleInsights() }}
+                  className="block w-full text-left px-5 py-3 text-sm text-white/80 hover:bg-brand-olive/20"
+                >
+                  Insights
+                </button>
+              )}
             </div>
-            {/* User / Logout footer */}
             <div className="border-t border-white/20 px-5 py-4">
               <p className="text-xs text-gray-400 truncate mb-3">
                 {displayName || user.email?.split('@')[0] || user.email}
@@ -368,69 +383,31 @@ export function Navigation() {
                 onClick={handleLogout}
                 className="text-sm font-medium text-white hover:text-brand-olive transition-colors"
               >
-                Logout
+                Log out
               </button>
             </div>
           </div>
         </>
       )}
 
-      {/* Mobile bottom bar — primary actions always accessible */}
+      {/* Mobile bottom bar: the three places and the menu */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-brand-dark border-t border-white/20 flex">
-        <Link
-          href="/briefing"
-          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${
-            pathname === '/briefing' || pathname === '/todos' ? 'text-white' : 'text-white/60 hover:text-white'
-          }`}
-        >
-          <span className="relative">
-            <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            {todosDueCount > 0 && (
-              <span className="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-0.5 rounded-full bg-white/20 text-white text-[9px] font-medium flex items-center justify-center leading-none">
-                {todosDueCount > 20 ? '20+' : todosDueCount}
-              </span>
-            )}
-          </span>
-          Home
-        </Link>
-        <Link
-          href="/dashboard"
-          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors ${
-            pathname === '/dashboard' ? 'text-white' : 'text-white/60 hover:text-white'
-          }`}
-        >
-          <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-          Businesses
-        </Link>
-        <Link
-          href="/inbox"
-          className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors relative ${
-            pathname === '/inbox' ? 'text-white' : 'text-white/60 hover:text-white'
-          }`}
-        >
-          <span className="relative">
-            <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
-            {inboundCount > 0 && (
-              <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                {inboundCount > 20 ? '20+' : inboundCount}
-              </span>
-            )}
-          </span>
-          Inbox
-        </Link>
+        {places.map((p) => (
+          <Link
+            key={p.href}
+            href={p.href}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors ${
+              p.active ? 'text-white' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            {p.label}
+            {p.badge !== null && badgeEl(p.badge, p.badgeTone)}
+          </Link>
+        ))}
         <button
           onClick={() => setMobileOpen(true)}
-          className="flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium text-white/60 hover:text-white transition-colors"
+          className="flex-1 flex items-center justify-center py-3 text-xs font-medium text-white/60 hover:text-white transition-colors"
         >
-          <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
           More
         </button>
       </div>

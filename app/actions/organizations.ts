@@ -5,16 +5,15 @@ import { isAiEnabled } from '@/lib/ai/client'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { isFeatureEnabled } from '@/lib/feature-flags'
-import { getAttentionCount } from '@/app/actions/attention'
+import { getDoNowCount } from '@/app/actions/today'
 import { PLANS, TRIAL_DAYS } from '@/lib/stripe/config'
 
 export type NavData = {
   displayName: string | null
   organizationId: string | null
   organizationName: string | null
-  todosDueCount: number
-  /** Needs attention count (Stage 4); null when switched off or unavailable. */
-  attentionCount: number | null
+  /** Today's "Do now" count (Stage 7, at most 8); null when switched off or unavailable. */
+  doNowCount: number | null
   inboundCount: number
   /** False when AI_ENABLED=false: the app hides the buttons that would only fail. */
   aiEnabled: boolean
@@ -23,7 +22,7 @@ export type NavData = {
 export async function getNavData(): Promise<NavData> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { displayName: null, organizationId: null, organizationName: null, todosDueCount: 0, attentionCount: null, inboundCount: 0, aiEnabled: isAiEnabled() }
+  if (!user) return { displayName: null, organizationId: null, organizationName: null, doNowCount: null, inboundCount: 0, aiEnabled: isAiEnabled() }
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -31,28 +30,23 @@ export async function getNavData(): Promise<NavData> {
     .eq('id', user.id)
     .single()
 
-  if (!profile) return { displayName: null, organizationId: null, organizationName: null, todosDueCount: 0, attentionCount: null, inboundCount: 0, aiEnabled: isAiEnabled() }
+  if (!profile) return { displayName: null, organizationId: null, organizationName: null, doNowCount: null, inboundCount: 0, aiEnabled: isAiEnabled() }
 
   const orgId = profile.organization_id
   const orgs = profile.organizations as { id: string; name: string }[] | { id: string; name: string } | null
   const org = Array.isArray(orgs) ? orgs[0] ?? null : orgs
 
-  const today = new Date().toISOString().slice(0, 10)
-
-  const [todosDue, inbound, attention] = await Promise.all([
-    supabase.from('tasks').select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId).eq('status', 'open').lte('due_date', today).neq('source', 'contract_renewal'),
+  const [inbound, doNow] = await Promise.all([
     supabase.from('inbound_queue').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('status', 'pending'),
-    getAttentionCount(),
+    getDoNowCount(),
   ])
 
   return {
     displayName: profile.display_name,
     organizationId: orgId,
     organizationName: org?.name ?? null,
-    todosDueCount: todosDue.count ?? 0,
-    attentionCount: attention?.total ?? null,
+    doNowCount: doNow,
     inboundCount: inbound.count ?? 0,
     aiEnabled: isAiEnabled(),
   }
