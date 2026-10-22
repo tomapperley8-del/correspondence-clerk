@@ -21,15 +21,19 @@ const OUTLOOK_DRAFTS = 'https://outlook.office.com/mail/drafts'
 const TAG_TONE: Record<TodayReason, string> = {
   money_owed: 'bg-red-50 text-red-800',
   renewal: 'bg-amber-50 text-amber-800',
+  club_card_lapsed: 'bg-amber-50 text-amber-800',
   waiting_on_you: 'bg-brand-navy/10 text-brand-navy',
   todo: 'bg-brand-olive/15 text-brand-dark',
+  club_card: 'bg-gray-100 text-gray-700',
 }
 
 const GROUPS: { reason: TodayReason; title: string; hint: string }[] = [
   { reason: 'money_owed', title: 'Money owed', hint: 'QuickBooks invoices past due, with no chaser in the last 7 days.' },
   { reason: 'renewal', title: 'Renewals', hint: 'Ending in the next 45 days or ended in the last 60, with no outcome recorded.' },
+  { reason: 'club_card_lapsed', title: 'Club Card ended, page still live', hint: 'The card ended more than 60 days ago (or is not renewing) but the website page is still up. Chase the renewal or take the page down.' },
   { reason: 'waiting_on_you', title: 'Waiting on you', hint: 'They wrote in the last 30 days and nothing has gone back.' },
   { reason: 'todo', title: 'Your to-dos', hint: 'Everything you have said you will do, and follow-up flags that are due.' },
+  { reason: 'club_card', title: 'Club Card pages', hint: 'Member pages on the website to fix: no page, offer out of date, missing from the A-Z, map or a category, listed twice, or contact details that differ from the app.' },
 ]
 
 const QUIET_LABEL: Record<QuietReminder['kind'], string> = {
@@ -153,6 +157,16 @@ export function TodayClient({ data }: { data: TodayData }) {
             >
               Mark paid
             </button>
+          </>
+        )}
+        {(i.reason === 'club_card_lapsed' || i.reason === 'club_card') && (
+          <>
+            {i.ref_id && (
+              <a href={`https://chiswickcalendar.co.uk/?page_id=${i.ref_id}`} target="_blank" rel="noopener noreferrer" className={btn} title="Open the member page on the website">
+                Open page
+              </a>
+            )}
+            <Link href={`${biz}?tab=details`} className={btn} title="Open the business's Club Card section">Club Card details</Link>
           </>
         )}
         {i.reason === 'renewal' && (
@@ -338,6 +352,12 @@ export function TodayClient({ data }: { data: TodayData }) {
           <p className="font-semibold text-brand-dark">{data.newLeads} new lead{data.newLeads === 1 ? '' : 's'}</p>
           <p className="text-gray-600 text-xs mb-1">From the prospecting routine.</p>
           <Link href="/businesses?view=leads" className="text-xs font-semibold text-brand-navy hover:underline">Open Leads</Link>
+          {data.clubCardToMatch > 0 && (
+            <p className="mt-2 pt-2 border-t border-black/[0.06]">
+              <span className="font-semibold text-brand-dark">{data.clubCardToMatch} Club Card page{data.clubCardToMatch === 1 ? '' : 's'} to match</span>{' '}
+              <Link href="/businesses/club-card-pages" className="text-xs font-semibold text-brand-navy hover:underline">Match them</Link>
+            </p>
+          )}
         </div>
         <div className="border border-black/[0.06] rounded-sm bg-brand-warm px-3 py-2.5 text-sm">
           <p className="font-semibold text-brand-dark">{data.draftsReady} draft{data.draftsReady === 1 ? '' : 's'} ready</p>

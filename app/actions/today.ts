@@ -37,6 +37,8 @@ export type TodayData = {
   owed: number
   newLeads: number
   draftsReady: number
+  /** Club Card pages waiting for Tom on the matching page. */
+  clubCardToMatch: number
   quiet: QuietReminder[]
 }
 
@@ -134,7 +136,7 @@ export async function getTodayData(): Promise<{ data?: TodayData; error?: string
   const weekEnd = addDays(today, 6)
   const draftsSince = new Date(Date.now() - 14 * 86_400_000).toISOString()
 
-  const [contractsRes, linksRes, invoicesRes, leadsRes, draftsRes, quietRes] = await Promise.all([
+  const [contractsRes, linksRes, invoicesRes, leadsRes, draftsRes, quietRes, toMatchRes] = await Promise.all([
     supabase
       .from('contracts')
       .select('business_id, membership_type, contract_end')
@@ -165,6 +167,13 @@ export async function getTodayData(): Promise<{ data?: TodayData; error?: string
       .eq('status', 'open')
       .or('source.in.(club_card_checkin,advertiser_stats),signal_key.like.checkin:*,signal_key.like.stats:*,signal_key.like.editorial:*')
       .order('due_date', { ascending: true, nullsFirst: false }),
+    // Club Card pages the nightly read couldn't match for sure (Stage 6b)
+    supabase
+      .from('club_card_pages')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .is('gone_at', null)
+      .in('match_status', ['unmatched', 'suggested']),
   ])
 
   // Business names for the week strip: the attention rows and to-dos carry most;
@@ -225,6 +234,7 @@ export async function getTodayData(): Promise<{ data?: TodayData; error?: string
       owed: rows.filter((r) => !r.is_snoozed).reduce((sum, r) => sum + (r.amount_owed ?? 0), 0),
       newLeads: leadsRes.count ?? 0,
       draftsReady: draftsRes.count ?? 0,
+      clubCardToMatch: toMatchRes.count ?? 0,
       quiet,
     },
   }

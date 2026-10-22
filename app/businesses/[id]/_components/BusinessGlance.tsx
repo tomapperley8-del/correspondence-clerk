@@ -17,8 +17,10 @@ import { formatDateGB } from '@/lib/utils'
 const REASON_LABEL: Record<AttentionReason, string> = {
   money_owed: 'Money owed',
   renewal: 'Renewal',
+  club_card_lapsed: 'Club Card page',
   waiting_on_you: 'Waiting on you',
   todo: 'To-do',
+  club_card: 'Club Card page',
 }
 
 export function dateOnlyGB(isoDate: string): string {
@@ -222,7 +224,9 @@ export function BusinessGlance({ business, contacts, glance, correspondence, mem
             </p>
             {attention.since && attention.reason !== 'renewal' && (
               <p className={attention.is_overdue ? 'text-red-700' : 'text-gray-600'}>
-                {attention.reason === 'waiting_on_you' ? 'Received' : 'Due'}{' '}
+                {attention.reason === 'waiting_on_you' ? 'Received'
+                  : attention.reason === 'club_card_lapsed' ? 'Card ended'
+                  : attention.reason === 'club_card' ? 'Offer ends' : 'Due'}{' '}
                 {dateOnlyGB(attention.since)} ({relativeDays(attention.since, today)})
               </p>
             )}

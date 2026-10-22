@@ -1,5 +1,6 @@
 import { getBusinessTable } from '@/app/actions/business-table'
 import { getProspectLeads } from '@/app/actions/leads'
+import { getClubCardMembers } from '@/app/actions/club-card'
 import { BusinessTable } from './_components/BusinessTable'
 
 // The business table (UI overhaul Stage 5), one of the three places in the nav
@@ -10,9 +11,10 @@ export const metadata = {
 }
 
 export default async function BusinessesPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; board?: string }> }) {
-  const [result, leadsResult, params] = await Promise.all([
+  const [result, leadsResult, clubCardResult, params] = await Promise.all([
     getBusinessTable(),
     getProspectLeads().catch(() => ({ data: [], error: 'Could not load prospect leads' })),
+    getClubCardMembers().catch(() => ({ error: 'Could not load the Club Card view' } as Awaited<ReturnType<typeof getClubCardMembers>>)),
     searchParams,
   ])
 
@@ -40,6 +42,7 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
           initialBoard={params.board === '1'}
           leads={leadsResult.data ?? []}
           leadsError={leadsResult.error}
+          clubCard={{ rows: clubCardResult.data ?? [], lastRun: clubCardResult.lastRun ?? null, toMatch: clubCardResult.toMatch ?? 0, error: clubCardResult.error }}
         />
       )}
     </div>

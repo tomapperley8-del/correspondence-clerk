@@ -2,7 +2,7 @@
 // and the nav badge so both always show the same "Do now" number.
 // The plan's section "New layout (Stage 7)" is the source of these rules.
 
-export type TodayReason = 'money_owed' | 'renewal' | 'waiting_on_you' | 'todo'
+export type TodayReason = 'money_owed' | 'renewal' | 'club_card_lapsed' | 'waiting_on_you' | 'todo' | 'club_card'
 
 export type TodayItem = {
   key: string
@@ -24,11 +24,14 @@ export const DO_NOW_LIMIT = 8
 export const REASON_LABEL: Record<TodayReason, string> = {
   money_owed: 'Money owed',
   renewal: 'Renewal',
+  club_card_lapsed: 'Club Card page',
   waiting_on_you: 'Waiting on you',
   todo: 'To-do',
+  club_card: 'Club Card page',
 }
 
-const REASON_WEIGHT: Record<TodayReason, number> = { money_owed: 4, renewal: 3, waiting_on_you: 2, todo: 1 }
+// The attention view's order (Stage 6b put the two Club Card reasons in).
+const REASON_WEIGHT: Record<TodayReason, number> = { money_owed: 6, renewal: 5, club_card_lapsed: 4, waiting_on_you: 3, todo: 2, club_card: 1 }
 
 /** Whole days from `since` to `today` (both YYYY-MM-DD); negative when `since` is in the future. */
 export function daysFrom(since: string | null, today: string): number | null {
@@ -60,6 +63,10 @@ export function isDoNow(item: TodayItem, today: string): boolean {
       return age >= 7
     case 'todo':
       return age >= 1
+    // Club Card page problems are never Do now: they wait in Everything else
+    case 'club_card_lapsed':
+    case 'club_card':
+      return false
   }
 }
 
@@ -89,6 +96,10 @@ export function ageWords(item: TodayItem, today: string): string {
       return age === 0 ? 'waiting since today' : `waiting ${days(age)}`
     case 'todo':
       return age > 0 ? `${days(age)} overdue` : age === 0 ? 'due today' : `due in ${days(-age)}`
+    case 'club_card_lapsed':
+      return age > 0 ? `card ended ${days(age)} ago` : 'card ended'
+    case 'club_card':
+      return age > 0 ? `offer ended ${days(age)} ago` : age === 0 ? 'offer ends today' : `offer ends in ${days(-age)}`
   }
 }
 
