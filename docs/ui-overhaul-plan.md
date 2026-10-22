@@ -63,6 +63,7 @@ Classification of the 173 open tasks on 21 Oct: about 66-74 actionable, 31 proba
 | 22 Oct | Club Card tab (Stage 6b) agreed, from Tom's answers: it spots problems and Tom fixes WordPress himself; lapsed pages are flagged and Tom decides; all Club Card page problems count towards needs attention. This is about the website pages; the halfway Club Card check-in stays a quiet reminder (Decision 21 Oct) |
 | 22 Oct | New layout (Stage 7), from Claude's recommendations, which Tom accepted after seeing a mockup (https://claude.ai/artifact/2QeGYeQQPta3NmwjRHYMmP): three places, Today / Businesses / Inbox; Briefing, To-dos and the separate Needs attention page are merged into Today; the Club Card tab becomes a Businesses view. Tom said he doesn't use Briefing and doesn't know where to go across the site. The nav badge number (Do now vs total) is decided after the Stage 4 comparison week |
 | 22 Oct | Tom ended the Stage 4 comparison week early ("forget the 28 October thing, lets crack on"). Stage 4 is done. Nav badge = the Today "Do now" number (at most 8), Claude's recommendation, changeable later. Next: Stage 7, then 6b |
+| 22 Oct | Stage 9 changed from keeping the Mastersheet export in sync to retiring the Mastersheet. Tom doesn't use it or keep it updated, but doesn't want to lose what's in it. It is a Google Sheet in Tom's Drive. Supersedes the 21 Oct decision to keep a read-only copy keyed on `business_id` during the rollout |
 
 **Commitments ("You said you'd").** Automatic detection depends on routine tags, which are optional and have been unreliable. So: a one-click "I'll do this by [date]" on any email or business row creates a linked to-do, and that is the only thing that counts. Where a routine has tagged a promise, the business page shows it as a suggestion with an "Add as to-do" button; it never enters the count and can't reopen. Existing open commitment tasks are bulk-closed after a backup (Stage 1, with Tom's go-ahead).
 
@@ -102,6 +103,17 @@ Agreed 22 Oct 2026. Tom finds the site confusing and uses none of Briefing; Brie
 - **Nav badge:** the Do now number (at most 8). Decided 22 Oct.
 - **What isn't lost:** prospect leads, routine drafts and resources all keep a place (Leads view, business page, user menu).
 
+## Retire the Mastersheet (Stage 9)
+
+Agreed 22 Oct 2026. Tom doesn't use the Mastersheet and doesn't keep it updated, which was part of the reason for the overhaul, but he doesn't want to lose what's in it.
+
+1. **Audit, read-only.** Read the sheet (a Google Sheet in Tom's Drive, through the Google Drive connector; never write to it). Match every row to a business by `business_id` where the export wrote one, otherwise by name. The app writes columns B/C/D/E/F/K/L/AA (see memory "Mastersheet sync architecture"); the other columns are Tom's own typing, so that's where anything unique will be. Produce: rows with no business in the app, and per matched business the sheet values the app doesn't hold (notes, outreach status, history, contacts, phone numbers and so on). Keep dumps in `supabase/.local/`.
+2. **Tom chooses.** A review page like Stage 2's: per item, "bring into the app" (as business notes or the matching field, or a new business for an unmatched row) or "leave it".
+3. **Bring it across.** One data script for Tom's choices, backed up to `cc_phase0_backup` first, with an undo, tested on a local copy; run on live only with Tom's go-ahead.
+4. **Freeze.** Switch off the sync: the app's `cc-live-export` Edge Function and the Mastersheet's Apps Script trigger (Tom does the Apps Script part, or confirms it can be done through the Drive connector). The sheet stays as a read-only archive; add a link to it from the app (user menu). Nothing in the sheet is deleted.
+
+Stage 10's "bring `cc-live-export` into the repo" falls away once the export is switched off; record its last version in the Log instead.
+
 ## Club Card tab (Stage 6b)
 
 Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
@@ -132,7 +144,7 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 | 6b | Club Card view: every member's website page, offer, edit date and contract in one list, with problems flagged (spec below); a saved view in Businesses, not a nav tab (Decision 22 Oct) | 5, 6, 7 | Not started; after Stage 7 |
 | 7 | New layout: Today page, three-place nav, retire Briefing / To-dos / Needs attention pages, Contracts and Outreach into Businesses (spec "New layout (Stage 7)" below) | 4, 5, 6 | **Live 22 Oct** (code only, no migration). Not yet looked at logged in by Tom on production |
 | 8 | Zero-credit drafting: templates and "Copy context pack" | 6 | Not started |
-| 9 | Mastersheet export keyed on `business_id`, one row per business, excludes Unreviewed; Apps Script update (Tom) | 2, 3 | Not started |
+| 9 | Retire the Mastersheet: audit what exists only in the sheet, bring across what Tom chooses, then freeze it read-only and switch off the sync (spec below) | 3 | Not started |
 | 10 | Docs: CLAUDE.md, bring `cc-live-export` into the repo | all | Not started |
 
 ### Per stage: change, risk, verify, rollback
@@ -144,7 +156,7 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **4.** New view and nav count; old and new shown side by side for a week. Risk: a missed item. Verify: compare against the 21 Oct classification. Rollback: flag off.
 - **5-7.** New routes alongside the old ones, then redirects. Risk: a missing feature. Verify: regression checklist. Rollback: flag off, remove redirects.
 - **8.** Templates in the database; mailto and copy only. Rollback: hide the buttons.
-- **9.** Export v13 adds fields only; Apps Script change by Tom. Rollback: previous export version.
+- **9.** Audit read-only, then a review page, then a data script for what Tom chooses (backed up like Stage 2), then the sync is switched off. Risk: losing something only the sheet holds. Verify: every sheet row is matched to a business or listed for Tom; nothing is changed in the sheet. Rollback: the data script's undo; re-enable the sync.
 
 ## Regression checklist (after every stage)
 
@@ -219,3 +231,4 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **Next session starts here (Stage 7):** waiting on Tom (1) to look at Today and say whether Do now should mix reasons; (2) for the go-ahead to merge `ui-overhaul` into `main` (code only; no migration; safe to deploy at any time). After the merge, check `/today` signed in on production and that `/todos`, `/briefing` and `/attention` redirect. Then Stage 6b (Club Card view in Businesses).
 - **22 Oct 2026, Stage 7 code live (Tom approved the merge):** `main` fast-forwarded from `3cbda78` to `40b7b0b` (10 commits) and pushed. The push started a Vercel build: production deployment `dpl_3k17ha18imQ7tXw4pj7VabmxcGFb`, READY in about 1 minute, aliased to correspondenceclerk.com. Rollback candidate: `dpl_FhNm2puwNPZjrgpcq5kYSifLAf9u` (`3cbda78`). Signed out: `/today` redirects to `/login` (it answered 404 for a few seconds while the old build was still serving); `/briefing`, `/attention`, `/todos` and `/actions` redirect to `/today`; `/todos?view=contracts` goes to `/businesses?view=renewals&board=1`; `/`, `/login` and `/businesses` answer 200; `manifest.json` starts at `/today`. No runtime errors in the 15 minutes after the deploy. Not checked logged in: Tom to open https://correspondenceclerk.com and say what's missing or wrong, and whether Do now should mix reasons (open question in the entry above). Phones that installed the app pick up the new service worker (`cc-v2`) on their next visit.
 - **Next session starts here:** Tom's logged-in look at Today, and his answer on mixing Do now. Then Stage 6b (Club Card view in Businesses).
+- **22 Oct 2026, Stage 9 reshaped and Stage 7 confirmed live:** Tom doesn't use the Mastersheet; Stage 9 is now retiring it (section "Retire the Mastersheet (Stage 9)"). Separately checked Stage 7 on production: `/briefing`, `/todos` and `/attention` return 307 to `/today`, and no runtime errors in the last 2 hours.
