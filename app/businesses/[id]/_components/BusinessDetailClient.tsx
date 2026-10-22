@@ -41,6 +41,7 @@ import { type EditFields } from './CorrespondenceEditForm'
 import { useCorrespondence } from './useCorrespondence'
 import { PipelineStatusCard } from './PipelineStatusCard'
 import { BusinessArticles } from './BusinessArticles'
+import { BusinessClubCard } from './BusinessClubCard'
 import { BusinessReviewBar } from './BusinessReviewBar'
 import { BusinessGlance } from './BusinessGlance'
 import { BusinessTimeline } from './BusinessTimeline'
@@ -914,6 +915,7 @@ export function BusinessDetailClient({
             <div className="mb-6">
               <ContractDetailsCard business={business} onUpdate={handleContractUpdate} membershipTypes={membershipTypes} />
             </div>
+            <BusinessClubCard businessId={business.id} />
             <BusinessOneOffs sales={oneOffSales} />
             <BusinessDrafts drafts={routineDrafts} />
           </>

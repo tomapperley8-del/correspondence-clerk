@@ -19,8 +19,10 @@ const ENDING_SOON_DAYS = 45
 const REASON_LABEL: Record<AttentionReason, string> = {
   money_owed: 'Money owed',
   renewal: 'Renewal',
+  club_card_lapsed: 'Club Card page',
   waiting_on_you: 'Waiting on you',
   todo: 'To-do',
+  club_card: 'Club Card page',
 }
 
 const RENEWAL_STAGE_LABEL: Record<string, string> = {

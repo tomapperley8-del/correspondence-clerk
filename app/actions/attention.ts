@@ -9,7 +9,7 @@ import { isFeatureEnabled } from '@/lib/feature-flags'
 // v_business_attention; the count comes from get_attention_count(), which uses
 // the same London date as the view, so the nav and the page always agree.
 
-export type AttentionReason = 'money_owed' | 'renewal' | 'waiting_on_you' | 'todo'
+export type AttentionReason = 'money_owed' | 'renewal' | 'club_card_lapsed' | 'waiting_on_you' | 'todo' | 'club_card'
 
 export type AttentionRow = {
   business_id: string
@@ -35,9 +35,13 @@ export type AttentionCount = {
   businesses: number
   money_owed: number
   renewal: number
+  club_card_lapsed: number
   waiting_on_you: number
   todo: number
+  club_card: number
   unlinked_todos: number
+  /** Club Card pages waiting for Tom to match (not in total). */
+  club_card_to_match: number
   snoozed: number
 }
 
