@@ -104,13 +104,15 @@ Agreed 22 Oct 2026. Tom finds the site confusing and uses none of Briefing; Brie
 - **Nav badge:** the Do now number (at most 8). Decided 22 Oct.
 - **What isn't lost:** prospect leads, routine drafts and resources all keep a place (Leads view, business page, user menu).
 
-## Order of the remaining work (agreed 22 Oct)
+## Order of the remaining work (agreed 22 Oct, updated)
 
-1. Finish 6b (Club Card view) and 9 (Tom switches off the Mastersheet's Apps Script trigger).
-2. CLAUDE.md refreshed (done early, 22 Oct).
-3. Stage 11: 11a, then 11b, then 11c.
-4. Stage 8 (drafting templates).
-5. Stage 10 (switch off engine rules, update routines, final docs, walk-through with Tom).
+1. Businesses filter fix: a filter searches all businesses and switches the view to Everything (done straight away, 22 Oct).
+2. 6b: code live 22 Oct; first website read 02:30 UTC 23 Oct, then Tom's matching review.
+3. Stage 11a (shared truth layer) and Stage 12 (calendar and newsletter list) side by side: 11a works on database views and the desk email, 12 on Today and to-dos.
+4. Stage 11b, then 11c.
+5. Stage 13 (spreadsheet upgrades), after 11, because once status is derived the cells may only edit fields Tom owns.
+6. Stage 8 (drafting templates).
+7. Stage 10 (finish).
 
 ## Who reads what (the cohesion rule)
 
@@ -128,6 +130,35 @@ Readers found on 22 Oct (re-check with a query before each change; this list goe
 | Main contact | `contacts.is_primary` | business page, Businesses table; (Stage 8 templates) |
 
 Scheduled jobs (pg_cron): `refresh-system-tasks` 02:10, `morning-pipeline` 06:50, `check-routine-heartbeats` 10:30. Vercel cron: desk email 07:00.
+
+## Calendar and newsletter list (Stage 12)
+
+Agreed 22 Oct 2026. Tom: the This week strip "should still be interactive, where you can click and add things, it should be a proper work calendar, and any changes made in it to line up with any other relevant data points on the site"; the "For Newsletter" items "were really useful".
+
+**Found:** tasks already have `due_date` and `due_time`, and task categories exist for Call, Meeting, Event and Deadline (barely used: 4, 3, 2, 0). "For Newsletter" is a task category with 182 tasks (4 open). Newsletter work also arrives as routine commitments ("You said you'd: include X in Wednesday's newsletter") and editorial emails ("Promote my event"). Moving an engine task's date already counts as a snooze that sticks (Stage 1).
+
+**Calendar (Tom chose: click to add, drag to move, week and month views; no Google Calendar sync):**
+- On Today, replacing the read-only This week strip; week view by default, month view on a toggle.
+- Click a day (and optionally a time) to add a to-do, call, meeting, event or deadline, optionally linked to a business. These are tasks with the matching category, so they show everywhere tasks do.
+- Drag an item to another day: its date changes everywhere (Today, the business page, the desk email). For engine items the move is a snooze that sticks.
+- Renewals ending and invoices due show as markers that open their business; they are moved by acting on them, not by dragging.
+- Wednesdays are marked as newsletter days.
+
+**Newsletter list (Tom chose: one list to build from, ticking off when used; the newsletter goes out weekly on Wednesday):**
+- One list, "For Wednesday's newsletter", on Today and from the calendar's Wednesday: open "For Newsletter" to-dos, routine "include in the newsletter" commitments, and editorial "promote my event" emails.
+- Tick each off once it has gone in; it leaves the list.
+- A "For newsletter" button on emails, businesses and to-dos adds an item (a "For Newsletter" task linked to its source).
+
+**Cohesion:** these read and write the same tasks the desk email and routines read; check both the next day.
+
+## Businesses spreadsheet upgrades (Stage 13)
+
+Agreed 22 Oct 2026. Tom asked to brainstorm making the spreadsheet better and chose all four upgrades and all four colour treatments:
+- **Edit in the cell:** outreach status, action date and notes, with Mastersheet-style drop-downs. Only fields Tom owns: not status, deal or last in touch, which Stage 11 works out.
+- **Choose your columns:** show, hide and reorder, saved with a view.
+- **Quick actions on a row:** log an email or call, add a to-do, mark "for newsletter".
+- **Download** any view as Excel or CSV.
+- **Colours:** deal-type pills, outreach-status pills, date warnings (red overdue, orange close, green fine), and a row tint by state (for example a red wash for anything needing attention).
 
 ## One source of truth (Stage 11)
 
@@ -200,6 +231,8 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 | 9 | Retire the Mastersheet: audit what exists only in the sheet, bring across what Tom chooses, then freeze it read-only and switch off the sync (spec below) | 3 | Done 22 Oct |
 | 10 | Finish: switch off the task engine's reply, renewal and invoice rules once nothing reads them; update the routines' instructions; final docs; one logged-in walk-through with Tom. (CLAUDE.md refreshed early on 22 Oct; `cc-live-export` is switched off, so it no longer needs bringing into the repo) | all | Not started; last |
 | 11 | One source of truth, in three parts: **11a** shared truth layer (derived status, current deal, main contact, last in touch, category, read by everything; desk email rebuilt from Today's source); **11b** clean-up reviews; **11c** Insights and Data health (spec below) | 6b, 9 | Not started; next after 6b |
+| 12 | Work calendar and newsletter list on Today (spec below) | 7, 6b | Not started; alongside 11a |
+| 13 | Businesses spreadsheet upgrades: edit in the cell, choose columns, row actions, download, Mastersheet colours (spec below) | 11 | Not started; after 11 |
 
 ### Per stage: change, risk, verify, rollback
 
@@ -306,3 +339,4 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **22 Oct 2026, Stage 6b migration `20261022_001_club_card_pages` live (Tom approved):** applied through MCP `apply_migration`. Before: `v_business_attention` md5 `ba87751…` (the tested base); none of the new objects existed; `get_attention_count`: 55 businesses, total 74. After: the md5 of `v_business_attention` (`d894790…`), `v_club_card_members` (`7da7578…`), and the source of `get_attention_count`, `cc_phone_digits` and `cc_postcode` match the locally tested copies exactly; anon can't read the new table or the view; RLS on. **Found on live, missed locally:** with no pages read yet, every member without a matched page counts as "no page", so `get_attention_count` went to 109 businesses (54 `club_card`), and production's Stage 7 code shows a blank reason label for those rows (Businesses table, business page). Nav badge and Today's lists unaffected (the reason isn't a Do now rule and Today only lists known groups). **Fix built and tested locally, not live:** migration `20261022_002_club_card_no_page_wait` replaces only `v_club_card_members` (same columns): "no page" needs a successful website read first, and isn't flagged while a page suggested for that business waits on the matching page. Local: no read → 0 "no page"; every page only suggested → 7 (not 80); after Tom's matches → 7. `v_business_attention` md5 unchanged. Waiting on Tom's go-ahead to apply it; if he'd rather, the rollback file restores the old view exactly.
 - **22 Oct 2026, Stage 6b fix `20261022_002_club_card_no_page_wait` live (Tom approved):** applied through MCP `apply_migration`. `v_club_card_members` md5 (`02c01af…`) matches the locally tested copy; `v_business_attention` md5 unchanged (`d894790…`); anon still can't read it. `get_attention_count` is back to the pre-6b numbers: 55 businesses, total 74, Club Card 0, so production's blank labels are gone. Club Card items appear only after the merge (cron 02:30 UTC reads the website) and Tom's matching. **Next session starts here (Stage 6b):** waiting on Tom's go-ahead to merge `ui-overhaul` into `main`. After the merge: the next 02:30 UTC run (or a manual call with `CRON_SECRET`, with Tom's go-ahead) should write about 101 rows to `club_card_pages` and an ok row in `club_card_sync_runs`; if it gets a 403, the Vercel IPs are blocked after all and the options go to Tom (routine, firewall allow-rule, built-in browser). Then Tom matches pages at /businesses/club-card-pages.
 - **22 Oct 2026, Stage 6b code live (Tom approved the merge):** merged in a temporary worktree (the shared folder stays on `ui-overhaul`): `main` `42be2f2` → `f9c59b4`, pushed. The only app code it brought was Stage 6b (the Stage 9 archive link was already on `main` as a cherry-pick, identical code) plus the CLAUDE.md refresh. Vercel production deployment `dpl_2djBYxQXDQU2merjeXzPpvDB7DSK` built and is serving; rollback candidate `dpl_4aLvDZG9z544JsTWJncZgba9c6pu` (`42be2f2`). Signed out: `/api/cron/club-card-pages` answers 401 without `CRON_SECRET`; `/businesses/club-card-pages` renders only "Unauthorized" (no data), like `/businesses`; `/`, `/businesses`, `/login` 200, `/today` 307. No runtime errors since the deploy. **Next session starts here (Stage 6b):** after 02:30 UTC on 23 Oct, check `club_card_sync_runs` (expect one ok row, about 101 pages) and `club_card_pages`. If the run failed with a 403, Vercel is blocked after all: give Tom the options (routine, firewall allow-rule, built-in browser). If it worked, Tom matches the pages at /businesses/club-card-pages, then check Today's Club Card groups and that the badge is unchanged.
+- **22 Oct 2026, calendar, newsletter list and spreadsheet upgrades agreed:** Tom found the Status filter showing no Formers (cause: filters narrow within the current view, and All active has none; 91 Former exist). Added Stage 12 (work calendar and newsletter list) and Stage 13 (spreadsheet upgrades) with Tom's answers; order updated. Filter fix done straight away (see next entry).
