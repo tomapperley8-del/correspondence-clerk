@@ -28,7 +28,7 @@ export const REASON_LABEL: Record<TodayReason, string> = {
   todo: 'To-do',
 }
 
-const REASON_WEIGHT: Record<TodayReason, number> = { money_owed: 400, renewal: 300, waiting_on_you: 200, todo: 100 }
+const REASON_WEIGHT: Record<TodayReason, number> = { money_owed: 4, renewal: 3, waiting_on_you: 2, todo: 1 }
 
 /** Whole days from `since` to `today` (both YYYY-MM-DD); negative when `since` is in the future. */
 export function daysFrom(since: string | null, today: string): number | null {
@@ -65,8 +65,8 @@ export function isDoNow(item: TodayItem, today: string): boolean {
 
 /** Most pressing first: money, renewal, reply, to-do, then the oldest. */
 export function pressingOrder(a: TodayItem, b: TodayItem, today: string): number {
-  const score = (i: TodayItem) => REASON_WEIGHT[i.reason] + Math.min(Math.max(daysFrom(i.since, today) ?? 0, -99), 99)
-  return score(b) - score(a) || (a.business_name ?? '').localeCompare(b.business_name ?? '', 'en-GB')
+  const age = (i: TodayItem) => daysFrom(i.since, today) ?? 0
+  return REASON_WEIGHT[b.reason] - REASON_WEIGHT[a.reason] || age(b) - age(a) || (a.business_name ?? '').localeCompare(b.business_name ?? '', 'en-GB')
 }
 
 export function splitDoNow(items: TodayItem[], today: string): { doNow: TodayItem[]; rest: TodayItem[] } {

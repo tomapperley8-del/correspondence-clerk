@@ -42,8 +42,8 @@ const entryAt = (e: Correspondence) => new Date(e.entry_date || e.created_at).ge
 
 /**
  * The email a routine's draft answers: a received email with the same subject
- * in the 60 days before it, else the latest received email in the 30 days
- * before it. Null when there is none (a renewal or check-in out of the blue).
+ * in the 60 days before it, else a received email from the 7 days before it.
+ * Null when there is none (a renewal or check-in out of the blue).
  * `received` is newest first.
  */
 function answeredEmail(draft: RoutineDraft, received: Correspondence[]): Correspondence | null {
@@ -53,7 +53,7 @@ function answeredEmail(draft: RoutineDraft, received: Correspondence[]): Corresp
   const same = subject ? before.find((e) => bareSubject(e.subject) === subject) : undefined
   if (same) return same
   const latest = before[0]
-  return latest && at - entryAt(latest) <= 30 * 86_400_000 ? latest : null
+  return latest && at - entryAt(latest) <= 7 * 86_400_000 ? latest : null
 }
 
 function noteInvoiceId(entry: Correspondence): string | null {

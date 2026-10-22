@@ -62,7 +62,15 @@ export function TodayClient({ data }: { data: TodayData }) {
   const [gone, setGone] = useState<Set<string>>(new Set())
   const [moving, setMoving] = useState<string | null>(null)
   const [moveTo, setMoveTo] = useState('')
+  const [shownData, setShownData] = useState(data)
   const { today } = data
+
+  // Lines cleared here are hidden until fresh data arrives, which already
+  // leaves them out (and brings back anything woken from a snooze).
+  if (data !== shownData) {
+    setShownData(data)
+    setGone(new Set())
+  }
 
   const items = useMemo(() => data.items.filter((i) => !gone.has(i.key)), [data.items, gone])
   const { doNow, rest } = useMemo(() => splitDoNow(items, today), [items, today])
@@ -226,16 +234,21 @@ export function TodayClient({ data }: { data: TodayData }) {
 
       <section aria-labelledby="week-h" className="space-y-2">
         <h2 id="week-h" className="text-2xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>This week</h2>
-        <div className="overflow-x-auto border border-black/[0.06] rounded-sm bg-brand-warm">
-          <div className="grid grid-cols-7 min-w-[560px]">
+        {/* Seven columns on a wide screen; on a phone, a list of the days that have something on. */}
+        <div className="border border-black/[0.06] rounded-sm bg-brand-warm">
+          <div className="grid grid-cols-1 sm:grid-cols-7">
             {weekDays.map((d, k) => {
               const events = data.week.filter((e) => e.date === d)
               const name = new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' })
               return (
-                <div key={d} className={`p-2 min-w-0 ${k < 6 ? 'border-r border-black/[0.06]' : ''}`}>
+                <div
+                  key={d}
+                  className={`p-2 min-w-0 border-black/[0.06] ${k < 6 ? 'border-b sm:border-b-0 sm:border-r' : ''} ${events.length === 0 && k > 0 ? 'hidden sm:block' : ''}`}
+                >
                   <div className={`text-[11px] uppercase tracking-wide ${k === 0 ? 'text-brand-navy font-semibold' : 'text-gray-500'}`}>
                     {k === 0 ? 'Today' : name}
                   </div>
+                  {events.length === 0 && <p className="mt-1.5 text-[11.5px] text-gray-500 sm:hidden">Nothing dated today.</p>}
                   {events.map((e, n) => {
                     const cls = `block mt-1.5 text-[11.5px] leading-tight px-1.5 py-1 rounded-sm break-words ${eventTone[e.kind]}`
                     return e.business_id ? (
