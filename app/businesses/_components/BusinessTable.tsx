@@ -285,6 +285,10 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
     setSettings((s) => ({ ...s, ...patch }))
   }
 
+  // A filter searches every business: inside a view it could only ever narrow it
+  // (Status: Former within All active found nothing), so it moves to Everything.
+  const filterBy = (patch: Partial<Settings>) => update({ ...patch, view: 'everything' })
+
   const chooseView = (key: ViewKey) => {
     setLimit(PAGE_SIZE)
     setSettings((s) => ({ ...defaults(key), q: s.q }))
@@ -419,7 +423,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
           <span className="block text-xs font-semibold text-gray-600 mb-1">Deal</span>
           <select
             value={settings.deal}
-            onChange={(e) => update({ deal: e.target.value as DealFilter })}
+            onChange={(e) => filterBy({ deal: e.target.value as DealFilter })}
             className="px-2 py-2 text-sm border border-black/10 rounded-sm bg-white"
           >
             <option value="any">Any</option>
@@ -433,7 +437,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
           <span className="block text-xs font-semibold text-gray-600 mb-1">Status</span>
           <select
             value={settings.status}
-            onChange={(e) => update({ status: e.target.value })}
+            onChange={(e) => filterBy({ status: e.target.value })}
             className="px-2 py-2 text-sm border border-black/10 rounded-sm bg-white"
           >
             <option value="">Any</option>
@@ -447,7 +451,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
           <span className="block text-xs font-semibold text-gray-600 mb-1">Type</span>
           <select
             value={settings.type}
-            onChange={(e) => update({ type: e.target.value })}
+            onChange={(e) => filterBy({ type: e.target.value })}
             className="px-2 py-2 text-sm border border-black/10 rounded-sm bg-white"
           >
             <option value="">Any</option>
