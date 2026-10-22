@@ -56,6 +56,13 @@ export type TableRow = {
   last_direction: string | null
   last_subject: string | null
   last_type: string | null
+  /** Direction of the latest email or call that has one (Mastersheet "Outreach status"). */
+  last_email_direction: string | null
+  /** Outreach disposition set on the business, and its follow-up date (Mastersheet "Action date"). */
+  disposition: string | null
+  follow_up_after: string | null
+  /** Deal types in force today, e.g. ['club_card', 'advertiser']. */
+  deal_types_in_force: string[]
   attention: Pick<AttentionRow, 'reason' | 'detail' | 'since' | 'is_overdue' | 'reasons' | 'priority' | 'is_snoozed' | 'attention_snoozed_until'> | null
   /** Club Card or advertising deal in force, or ended in the last 60 days and not marked not renewing. */
   is_active: boolean
@@ -110,6 +117,8 @@ type BizRow = {
   business_type: string | null
   renewal_stage: string | null
   outreach_stage: string | null
+  disposition: string | null
+  follow_up_after: string | null
 }
 type ContractRow = {
   business_id: string
@@ -144,7 +153,7 @@ async function loadAll(supabase: Supabase, orgId: string) {
     fetchAll<BizRow>((from, to) =>
       supabase
         .from('businesses')
-        .select('id, name, status, business_type, renewal_stage, outreach_stage')
+        .select('id, name, status, business_type, renewal_stage, outreach_stage, disposition, follow_up_after')
         .eq('organization_id', orgId)
         .is('merged_into', null)
         .or(`status.is.null,status.neq."${NOT_A_BUSINESS}"`)
@@ -249,9 +258,13 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
   // Latest entry per business, and the latest named person they were in touch with.
   const latestBy = new Map<string, EntryRow>()
   const latestPersonBy = new Map<string, string>()
+  const latestDirectionBy = new Map<string, string>()
   for (const e of entries) {
     if (e.qbo) continue
     if (!latestBy.has(e.business_id)) latestBy.set(e.business_id, e)
+    if ((e.direction === 'sent' || e.direction === 'received') && !latestDirectionBy.has(e.business_id)) {
+      latestDirectionBy.set(e.business_id, e.direction)
+    }
     if (e.contact_id && !latestPersonBy.has(e.business_id)) {
       const person = contactById.get(e.contact_id)
       if (person && person.business_id === e.business_id && !person.name_is_placeholder && person.is_active !== false) {
@@ -287,9 +300,10 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
 
     const bizContracts = contractsBy.get(b.id) ?? []
     const activeDeals = bizContracts.filter((c) => ACTIVE_DEAL_TYPES.includes(c.membership_type ?? ''))
-    const dealInForce = activeDeals.some(
+    const inForceDeals = bizContracts.filter(
       (c) => c.is_current && (!c.contract_start || c.contract_start <= today) && (!c.contract_end || c.contract_end >= today)
     )
+    const dealInForce = inForceDeals.some((c) => ACTIVE_DEAL_TYPES.includes(c.membership_type ?? ''))
     const lastEnd = activeDeals.reduce<string | null>((max, c) => (c.contract_end && (!max || c.contract_end > max) ? c.contract_end : max), null)
     const recentlyEnded = !dealInForce && !!lastEnd && lastEnd < today && lastEnd >= graceStart && b.renewal_stage !== 'not_renewing'
     const currentEnds = activeDeals.filter((c) => c.is_current && c.contract_end).map((c) => c.contract_end as string)
@@ -316,6 +330,10 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
       last_direction: latest?.direction ?? null,
       last_subject: latest?.subject ?? null,
       last_type: latest?.type ?? null,
+      last_email_direction: latestDirectionBy.get(b.id) ?? null,
+      disposition: b.disposition,
+      follow_up_after: b.follow_up_after,
+      deal_types_in_force: [...new Set(inForceDeals.map((c) => c.membership_type).filter((t): t is string => !!t))],
       attention: att
         ? {
             reason: att.reason,

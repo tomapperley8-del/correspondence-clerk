@@ -31,6 +31,24 @@
   --color-brand-paper: var(--main-bg);          /* #FAFAF8 → bg-brand-paper */
   --color-brand-warm: var(--sidebar-bg);        /* #F8F7F4 → bg-brand-warm */
 
+  /* Mastersheet look for the Businesses table (Tom, 22 Oct 2026): the sheet's
+     dark green header and name band, pill colours and date-cell states. */
+  --color-ms-header: #1E4D2B;      /* header row */
+  --color-ms-band: #274E13;        /* sticky business-name column */
+  --color-ms-band-hover: #38761D;
+  --color-ms-grid: #D9D9D9;        /* cell borders */
+  --color-ms-clubcard: #2E7D32;    /* Club Card pill (white text) */
+  --color-ms-both-text: #1E4D2B;   /* Club Card + Advertiser: white pill, green text */
+  --color-ms-advertiser: #FFE599;  --color-ms-advertiser-text: #7F6000;
+  --color-ms-prospect: #E4D7F5;    --color-ms-prospect-text: #4A2C6E;
+  --color-ms-former: #D6E0EA;      --color-ms-former-text: #34495E;
+  --color-ms-muted: #EEEEEE;       --color-ms-muted-text: #555555;
+  --color-ms-blue: #CFE2F3;        --color-ms-blue-text: #1C4587;
+  --color-ms-green: #D9EAD3;       --color-ms-green-text: #274E13;
+  --color-ms-orange: #FCE5CD;      --color-ms-orange-text: #B45F06;
+  --color-ms-red: #F4CCCC;         --color-ms-red-text: #990000;
+  --color-ms-yellow: #FFF2CC;      --color-ms-yellow-text: #7F6000;
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);

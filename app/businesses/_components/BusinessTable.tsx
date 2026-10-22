@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import type { BusinessTable as TableData, TableRow } from '@/app/actions/business-table'
-import type { AttentionReason } from '@/app/actions/attention'
-import { formatDateGB } from '@/lib/utils'
 import type { ProspectLead } from '@/app/actions/leads'
 import { ProspectBoard } from '@/components/pipeline/ProspectBoard'
+import { MastersheetTable, type SortKey } from './MastersheetTable'
 import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 
 // The business table (UI overhaul Stage 5): Mastersheet-style, one row per
@@ -16,7 +14,6 @@ import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 // To-dos Contracts and Outreach tabs. A Club Card view comes in Stage 6b.
 
 type ViewKey = 'active' | 'attention' | 'renewals' | 'outreach' | 'leads' | 'unreviewed' | 'prospects' | 'former' | 'internal' | 'everything'
-type SortKey = 'name' | 'contact' | 'deal' | 'last' | 'attention'
 type DealFilter = 'any' | 'club_card' | 'advertiser' | 'other' | 'none'
 
 type Settings = {
@@ -114,23 +111,6 @@ const VIEWS: { key: ViewKey; label: string; hint: string; sort: SortKey; dir: 'a
   },
 ]
 
-const REASON_LABEL: Record<AttentionReason, string> = {
-  money_owed: 'Money owed',
-  renewal: 'Renewal',
-  waiting_on_you: 'Waiting on you',
-  todo: 'To-do',
-}
-
-const RENEWAL_STAGE_LABEL: Record<string, string> = {
-  not_started: 'To contact',
-  contacted: 'Contacted',
-  in_discussion: 'In discussion',
-  in_progress: 'In discussion',
-  agreed: 'Agreed',
-  invoice_paid: 'Invoice paid',
-  not_renewing: 'Not renewing',
-}
-
 const SAVED_KEY = 'business_table_saved_views'
 const PAGE_SIZE = 200
 
@@ -159,22 +139,6 @@ function writeSaved(views: SavedView[]) {
   } catch {
     // Storage blocked: the view lasts until the page is closed.
   }
-}
-
-function dateGB(iso: string): string {
-  return formatDateGB(`${iso.slice(0, 10)}T12:00:00Z`)
-}
-
-function daysBetween(from: string, to: string): number {
-  return Math.round((Date.parse(`${to.slice(0, 10)}T00:00:00Z`) - Date.parse(`${from.slice(0, 10)}T00:00:00Z`)) / 86400000)
-}
-
-function ago(date: string, today: string): string {
-  const d = daysBetween(date, today)
-  if (d === 0) return 'today'
-  if (d === 1) return 'yesterday'
-  if (d > 0) return `${d} days ago`
-  return d === -1 ? 'tomorrow' : `in ${-d} days`
 }
 
 function dealLabel(value: string | null, labels: Map<string, string>): string {
@@ -524,32 +488,15 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
         {shown.length} {shown.length === 1 ? 'business' : 'businesses'}
       </p>
 
-      {/* The table scrolls sideways on its own on a narrow screen; the page does not. */}
-      <div className="overflow-x-auto border border-black/[0.06] rounded-sm bg-white" style={{ boxShadow: 'var(--shadow-sm)' }}>
-        <table className="w-full min-w-[960px] text-sm">
-          <thead className="bg-brand-warm text-left">
-            <tr className="border-b border-black/[0.06]">
-              <SortHeader label="Business" sortKey="name" settings={settings} onSort={sortBy} className="w-[22%]" />
-              <SortHeader label="Main contact" sortKey="contact" settings={settings} onSort={sortBy} className="w-[22%]" />
-              <SortHeader label="Deal" sortKey="deal" settings={settings} onSort={sortBy} className="w-[16%]" />
-              <SortHeader label="Last in touch" sortKey="last" settings={settings} onSort={sortBy} className="w-[20%]" />
-              <SortHeader label="Needs attention" sortKey="attention" settings={settings} onSort={sortBy} className="w-[20%]" />
-            </tr>
-          </thead>
-          <tbody>
-            {shown.slice(0, limit).map((r) => (
-              <Row key={r.id} row={r} today={today} membershipLabels={membershipLabels} />
-            ))}
-            {shown.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-gray-500">
-                  No businesses match. {settings.q || filtersSet ? 'Try clearing the search or filters.' : ''}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <MastersheetTable
+        rows={shown.slice(0, limit)}
+        today={today}
+        membershipLabels={membershipLabels}
+        sort={settings.sort}
+        dir={settings.dir}
+        onSort={sortBy}
+        emptyText={`No businesses match.${settings.q || filtersSet ? ' Try clearing the search or filters.' : ''}`}
+      />
       {shown.length > limit && (
         <button
           type="button"
@@ -561,131 +508,5 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
       )}
       </>)}
     </div>
-  )
-}
-
-function SortHeader({
-  label,
-  sortKey,
-  settings,
-  onSort,
-  className = '',
-}: {
-  label: string
-  sortKey: SortKey
-  settings: Settings
-  onSort: (k: SortKey) => void
-  className?: string
-}) {
-  const active = settings.sort === sortKey
-  return (
-    <th
-      scope="col"
-      className={`px-3 py-2 font-semibold text-gray-700 ${className}`}
-      aria-sort={active ? (settings.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-    >
-      <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 hover:text-brand-navy">
-        {label}
-        <span className="text-xs text-gray-500">{active ? (settings.dir === 'asc' ? '▲' : '▼') : ''}</span>
-      </button>
-    </th>
-  )
-}
-
-function Row({ row: r, today, membershipLabels }: { row: TableRow; today: string; membershipLabels: Map<string, string> }) {
-  const sub = [r.status, r.business_type_label].filter(Boolean).join(' · ')
-  return (
-    <tr className="border-b border-black/[0.06] align-top hover:bg-brand-paper">
-      <td className="px-3 py-2.5">
-        <Link href={`/businesses/${r.id}`} className="font-semibold text-brand-navy hover:underline">
-          {r.name}
-        </Link>
-        {sub && <div className="text-xs text-gray-500 mt-0.5">{sub}</div>}
-      </td>
-
-      <td className="px-3 py-2.5 min-w-0">
-        {r.contact ? (
-          <div className="space-y-0.5">
-            <div>
-              <span className="font-medium text-gray-900">{r.contact.name}</span>
-              {r.contact.role && <span className="text-gray-500">, {r.contact.role}</span>}
-            </div>
-            {!r.contact.is_primary && (
-              <div className="text-xs text-gray-500">
-                {r.contact.is_placeholder ? 'No named person on file' : 'Not chosen as main contact'}
-              </div>
-            )}
-            {r.contact.email && (
-              <a href={`mailto:${r.contact.email}`} className="block text-xs break-all" style={{ color: 'var(--link-blue)' }}>
-                {r.contact.email}
-              </a>
-            )}
-            {r.contact.phone && <div className="text-xs text-gray-700">{r.contact.phone}</div>}
-          </div>
-        ) : (
-          <span className="text-xs text-gray-500">No contact on file</span>
-        )}
-      </td>
-
-      <td className="px-3 py-2.5">
-        {r.deal ? (
-          <div className="space-y-0.5">
-            <div className="font-medium text-gray-900">{dealLabel(r.deal.membership_type, membershipLabels)}</div>
-            {r.deal.contract_end ? (
-              <div className={`text-xs ${!r.deal.in_force ? 'text-red-700' : daysBetween(today, r.deal.contract_end) <= 45 ? 'text-amber-700' : 'text-gray-600'}`}>
-                {r.deal.contract_end < today ? 'Ended' : 'Ends'} {dateGB(r.deal.contract_end)} ({ago(r.deal.contract_end, today)})
-              </div>
-            ) : (
-              <div className="text-xs text-gray-500">No end date</div>
-            )}
-            {r.in_renewal_window && r.renewal_stage && (
-              <div className="text-xs text-gray-600">Renewal: {RENEWAL_STAGE_LABEL[r.renewal_stage] ?? r.renewal_stage}</div>
-            )}
-          </div>
-        ) : (
-          <span className="text-xs text-gray-500">No deal on file</span>
-        )}
-      </td>
-
-      <td className="px-3 py-2.5">
-        {r.last_in_touch ? (
-          <div className="space-y-0.5">
-            <div className="text-gray-900">
-              {dateGB(r.last_in_touch)} <span className="text-xs text-gray-500">({ago(r.last_in_touch, today)})</span>
-            </div>
-            <div className="text-xs text-gray-600">
-              {r.last_direction === 'received' ? 'From them' : r.last_direction === 'sent' ? 'From you' : (r.last_type ?? 'Entry')}
-              {r.last_subject ? <span className="text-gray-500 italic">: {r.last_subject}</span> : null}
-            </div>
-          </div>
-        ) : (
-          <span className="text-xs text-gray-500">Nothing filed</span>
-        )}
-      </td>
-
-      <td className="px-3 py-2.5">
-        {r.attention ? (
-          <div className="space-y-0.5">
-            <div className={`font-medium ${r.attention.is_snoozed ? 'text-gray-500' : r.attention.is_overdue ? 'text-red-700' : 'text-gray-900'}`}>
-              {REASON_LABEL[r.attention.reason]}
-              {r.attention.since && !r.attention.is_snoozed && (
-                <span className="text-xs font-normal text-gray-500"> · {ago(r.attention.since, today)}</span>
-              )}
-            </div>
-            <div className="text-xs text-gray-600 line-clamp-2">{r.attention.detail}</div>
-            {r.attention.is_snoozed && r.attention.attention_snoozed_until && (
-              <div className="text-xs text-gray-500">Snoozed until {dateGB(r.attention.attention_snoozed_until)}</div>
-            )}
-            {r.attention.reasons.length > 1 && (
-              <div className="text-xs text-gray-500">
-                Also: {r.attention.reasons.filter((x) => x !== r.attention!.reason).map((x) => REASON_LABEL[x]).join(', ')}
-              </div>
-            )}
-          </div>
-        ) : (
-          <span className="text-xs text-gray-400">Nothing</span>
-        )}
-      </td>
-    </tr>
   )
 }
