@@ -25,7 +25,8 @@ import { SuccessBanner } from '@/components/SuccessBanner'
 import { OpenThreadsCard } from '@/components/OpenThreadsCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { retryFormatting } from '@/app/actions/ai-formatter'
-import { createTask, createTaskFromCorrespondence } from '@/app/actions/tasks'
+import { createTask, createTaskFromCorrespondence, updateTask } from '@/app/actions/tasks'
+import { getBusinessGlance, type BusinessGlance as GlanceData } from '@/app/actions/business-glance'
 import { createUnformattedCorrespondence } from '@/app/actions/ai-formatter'
 import { type MembershipType } from '@/app/actions/membership-types'
 import { formatDateGB } from '@/lib/utils'
@@ -41,6 +42,8 @@ import { useCorrespondence } from './useCorrespondence'
 import { PipelineStatusCard } from './PipelineStatusCard'
 import { BusinessArticles } from './BusinessArticles'
 import { BusinessReviewBar } from './BusinessReviewBar'
+import { BusinessGlance } from './BusinessGlance'
+import { BusinessTimeline } from './BusinessTimeline'
 
 function formatRelativeTime(isoString: string): string {
   const diffMs = Date.now() - new Date(isoString).getTime()
@@ -71,6 +74,7 @@ interface Props {
   businessId: string
   routineDrafts: RoutineDraft[]
   oneOffSales: OneOffSale[]
+  initialGlance: GlanceData | null
   aiEnabled: boolean
   saved?: string
   fromTodos: boolean
@@ -86,6 +90,7 @@ export function BusinessDetailClient({
   businessId,
   routineDrafts,
   oneOffSales,
+  initialGlance,
   aiEnabled,
   saved,
   fromTodos,
@@ -103,6 +108,28 @@ export function BusinessDetailClient({
   useEffect(() => { setContacts(initialContacts) }, [initialContacts])
   useEffect(() => { setThreads(initialThreads) }, [initialThreads])
   useEffect(() => { setDuplicates(initialDuplicates) }, [initialDuplicates])
+
+  // At-a-glance layout (UI overhaul Stage 6). The classic page stays one click
+  // away until Stage 7; the choice is remembered per browser.
+  const [layout, setLayout] = useState<'glance' | 'classic'>('glance')
+  const [glanceTab, setGlanceTab] = useState<'history' | 'contacts' | 'details' | 'files'>('history')
+  const [glance, setGlance] = useState<GlanceData | null>(initialGlance)
+  const [busyTaskId, setBusyTaskId] = useState<string | null>(null)
+  useEffect(() => { setGlance(initialGlance) }, [initialGlance])
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('business_page_layout') === 'classic') setLayout('classic')
+    } catch { /* storage unavailable: keep the default */ }
+  }, [])
+  const chooseLayout = useCallback((next: 'glance' | 'classic') => {
+    setLayout(next)
+    try { localStorage.setItem('business_page_layout', next) } catch { /* ignore */ }
+    window.scrollTo({ top: 0 })
+  }, [])
+  const refreshGlance = useCallback(async () => {
+    const result = await getBusinessGlance(businessId)
+    if (result.data) setGlance(result.data)
+  }, [businessId])
 
   // Correspondence data, filters, pagination, and derived sections
   const {
@@ -466,7 +493,8 @@ export function BusinessDetailClient({
     } else {
       router.refresh()
     }
-  }, [businessId, router])
+    await refreshGlance()
+  }, [businessId, router, refreshGlance])
 
   const handlePin = useCallback(async (entryId: string, _isPinned: boolean) => {
     await togglePinCorrespondence(entryId)
@@ -528,6 +556,15 @@ export function BusinessDetailClient({
     }
   }, [business.name])
 
+  const handleTaskDone = useCallback(async (taskId: string) => {
+    setBusyTaskId(taskId)
+    const result = await updateTask(taskId, { status: 'done' })
+    setBusyTaskId(null)
+    if (result.error) { toast.error(result.error); return }
+    toast.success('To-do done')
+    await refreshGlance()
+  }, [refreshGlance])
+
   // Common props passed to both AllEntriesView and ThreadsView
   const entryPassthroughProps = {
     contacts,
@@ -558,15 +595,8 @@ export function BusinessDetailClient({
     onCreateTodo: handleCreateTodo,
   }
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <Breadcrumbs items={[
-        fromTodos
-          ? { label: 'To-dos', href: '/todos' }
-          : { label: 'Businesses', href: '/dashboard' },
-        { label: business.name },
-      ]} />
-
+  const topBanners = (
+    <>
       {/* Success Banner */}
       {saved && <SuccessBanner message="Entry saved successfully" />}
 
@@ -606,6 +636,304 @@ export function BusinessDetailClient({
           businessId={businessId}
         />
       )}
+    </>
+  )
+
+  const quickActionsBar = (
+    <div className="sticky top-0 z-10 bg-white border border-gray-200 px-4 py-2.5 mb-6 flex items-center gap-3">
+      <Link
+        href={`/new-entry?businessId=${businessId}`}
+        className="text-xs font-semibold px-3 py-1.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
+      >
+        + Entry
+      </Link>
+      {!quickTaskOpen ? (
+        <button
+          onClick={() => setQuickTaskOpen(true)}
+          className="text-xs font-semibold px-3 py-1.5 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors"
+        >
+          + Task
+        </button>
+      ) : (
+        <form
+          className="flex items-center gap-2 flex-1"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            if (!quickTaskTitle.trim()) return
+            setQuickSaving(true)
+            const result = await createTask({ title: quickTaskTitle.trim(), category: 'work', business_id: businessId })
+            setQuickSaving(false)
+            if (result.error) toast.error(result.error)
+            else { toast.success('Task added'); setQuickTaskTitle(''); setQuickTaskOpen(false); await refreshGlance() }
+          }}
+        >
+          <input
+            autoFocus
+            type="text"
+            value={quickTaskTitle}
+            onChange={(e) => setQuickTaskTitle(e.target.value)}
+            placeholder="Task title..."
+            className="text-sm px-2 py-1 border border-gray-300 flex-1 min-w-0 focus:outline-none focus:border-brand-navy"
+          />
+          <button type="submit" disabled={quickSaving} className="text-xs font-semibold px-2 py-1 bg-brand-navy text-white">
+            {quickSaving ? '...' : 'Add'}
+          </button>
+          <button type="button" onClick={() => { setQuickTaskOpen(false); setQuickTaskTitle('') }} className="text-xs text-gray-500 hover:text-gray-700 px-1">
+            Cancel
+          </button>
+        </form>
+      )}
+      {!quickNoteOpen ? (
+        <button
+          onClick={() => setQuickNoteOpen(true)}
+          className="text-xs font-semibold px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          + Note
+        </button>
+      ) : (
+        <form
+          className="flex items-center gap-2 flex-1"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            if (!quickNoteText.trim()) return
+            setQuickSaving(true)
+            const result = await createUnformattedCorrespondence({
+              business_id: businessId,
+              raw_text_original: quickNoteText.trim(),
+              type: 'Note',
+              entry_date: new Date().toISOString(),
+            })
+            setQuickSaving(false)
+            if ('error' in result) toast.error(result.error || 'Failed to save note')
+            else { toast.success('Note saved'); setQuickNoteText(''); setQuickNoteOpen(false); await refreshCorrespondence() }
+          }}
+        >
+          <input
+            autoFocus
+            type="text"
+            value={quickNoteText}
+            onChange={(e) => setQuickNoteText(e.target.value)}
+            placeholder="Quick note..."
+            className="text-sm px-2 py-1 border border-gray-300 flex-1 min-w-0 focus:outline-none focus:border-brand-navy"
+          />
+          <button type="submit" disabled={quickSaving} className="text-xs font-semibold px-2 py-1 bg-brand-navy text-white">
+            {quickSaving ? '...' : 'Save'}
+          </button>
+          <button type="button" onClick={() => { setQuickNoteOpen(false); setQuickNoteText('') }} className="text-xs text-gray-500 hover:text-gray-700 px-1">
+            Cancel
+          </button>
+        </form>
+      )}
+    </div>
+  )
+
+  const businessDetailsBox = (
+    <div className="bg-gray-50 border border-black/[0.06] p-4 mb-6">
+      <div className="flex justify-between items-start mb-3">
+        <h3 className="text-sm font-bold text-brand-dark uppercase">Business Details</h3>
+        <EditBusinessDetailsButton
+          business={business}
+          onUpdate={async () => {
+            const result = await getBusinessById(businessId)
+            if (!('error' in result) && result.data) setBusiness(result.data)
+          }}
+        />
+      </div>
+      <div className="space-y-2 text-sm">
+        <div>
+          <span className="font-semibold text-gray-700">Address:</span>
+          <span className="ml-2 text-gray-900">{business.address || 'Not set'}</span>
+        </div>
+        <div>
+          <span className="font-semibold text-gray-700">Email:</span>
+          <span className="ml-2 text-gray-900">{business.email || 'Not set'}</span>
+        </div>
+        <div>
+          <span className="font-semibold text-gray-700">Phone:</span>
+          <span className="ml-2 text-gray-900">{business.phone || 'Not set'}</span>
+        </div>
+        {business.notes && (
+          <div className="pt-2 border-t border-black/[0.06] mt-2">
+            <span className="font-semibold text-gray-700">Notes:</span>
+            <p className="mt-1 text-gray-900 whitespace-pre-wrap">{business.notes}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  const confirmDialogs = (
+    <>
+    {/* Delete Contact Confirmation Dialog */}
+    <ConfirmDialog
+      open={showDeleteContactConfirm}
+      onOpenChange={setShowDeleteContactConfirm}
+      title="Delete Contact"
+      description={`Are you sure you want to delete contact "${contactToDelete?.name}"?`}
+      confirmLabel="Delete"
+      loadingLabel="Deleting..."
+      destructive
+      isLoading={isDeletingContact}
+      onConfirm={confirmDeleteContact}
+    />
+
+    {/* Delete Entry Confirmation Dialog */}
+    <ConfirmDialog
+      open={showDeleteEntryConfirm}
+      onOpenChange={setShowDeleteEntryConfirm}
+      title="Delete Entry"
+      description={`Are you sure you want to delete this entry${entryToDelete?.subject ? ` "${entryToDelete.subject}"` : ''}? This cannot be undone.`}
+      confirmLabel="Delete"
+      loadingLabel="Deleting..."
+      destructive
+      isLoading={isDeletingEntry}
+      onConfirm={confirmDeleteEntry}
+    />
+    </>
+  )
+
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const showTab = (tab: typeof glanceTab) => {
+    setGlanceTab(tab)
+    setTimeout(() => tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+  }
+  const filterContactName = contactFilter !== 'all' ? (contacts.find(c => c.id === contactFilter)?.name ?? 'one contact') : null
+  const filteredOut = contactFilter !== 'all' || directionFilter !== 'all'
+    ? `${directionFilter !== 'all' ? `${directionFilter} ` : ''}entries${filterContactName ? ` with ${filterContactName}` : ''}`
+    : null
+  const membershipLabelText = business.membership_type
+    ? (membershipTypes.find(t => t.value === business.membership_type)?.label ?? business.membership_type)
+    : null
+
+  if (layout === 'glance') {
+    const TABS: { key: typeof glanceTab; label: string }[] = [
+      { key: 'history', label: 'History' },
+      { key: 'contacts', label: `Contacts (${contacts.length})` },
+      { key: 'details', label: 'Deal and details' },
+      { key: 'files', label: 'Files and news' },
+    ]
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Breadcrumbs items={[
+          fromTodos
+            ? { label: 'To-dos', href: '/todos' }
+            : { label: 'Businesses', href: '/dashboard' },
+          { label: business.name },
+        ]} />
+
+        {topBanners}
+
+        <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-semibold text-brand-dark break-words" style={{ fontFamily: 'var(--font-serif)' }}>{business.name}</h1>
+            {(business.category || business.status || membershipLabelText) && (
+              <div className="flex flex-wrap gap-2 mt-1">
+                {business.category && <span className="text-xs bg-gray-100 px-2 py-0.5 text-gray-700 rounded-sm">{business.category}</span>}
+                {business.status && <span className="text-xs bg-gray-100 px-2 py-0.5 text-gray-700 rounded-sm">{business.status}</span>}
+                {membershipLabelText && <span className="text-xs bg-gray-100 px-2 py-0.5 text-gray-700 rounded-sm">{membershipLabelText}</span>}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <EditBusinessButton business={business} />
+            <button
+              type="button"
+              onClick={() => chooseLayout('classic')}
+              className="text-xs px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-sm transition-colors"
+              title="The old layout, kept while the new one settles in"
+            >
+              Classic page
+            </button>
+          </div>
+        </div>
+
+        <BusinessReviewBar business={business} />
+
+        <BusinessGlance
+          business={business}
+          contacts={contacts}
+          glance={glance}
+          correspondence={correspondence}
+          membershipTypes={membershipTypes}
+          onShowContacts={() => showTab('contacts')}
+          onShowDetails={() => showTab('details')}
+        />
+
+        {quickActionsBar}
+
+        <div ref={tabsRef} className="flex flex-wrap gap-1 mb-4 border-b border-black/[0.06] scroll-mt-16" role="tablist" aria-label="Business page sections">
+          {TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={glanceTab === key}
+              onClick={() => setGlanceTab(key)}
+              className={`text-sm px-3 py-2 -mb-px border-b-2 transition-colors ${
+                glanceTab === key ? 'border-brand-navy text-brand-navy font-semibold' : 'border-transparent text-gray-600 hover:text-brand-dark'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {glanceTab === 'history' && (
+          <BusinessTimeline
+            correspondence={correspondence}
+            glance={glance}
+            membershipTypes={membershipTypes}
+            loading={correspondenceLoading}
+            remainingInDB={remainingInDB}
+            isLoadingMore={isLoadingMore}
+            loadMore={loadMore}
+            filteredOut={filteredOut}
+            onClearFilters={() => { setContactFilter('all'); setDirectionFilter('all') }}
+            onTaskDone={handleTaskDone}
+            busyTaskId={busyTaskId}
+            threads={threads}
+            {...entryPassthroughProps}
+            setSearchQuery={setSearchQuery}
+          />
+        )}
+
+        {glanceTab === 'contacts' && (
+          <ContactsList contacts={contacts} business={business} onDeleteContact={handleDeleteContact} />
+        )}
+
+        {glanceTab === 'details' && (
+          <>
+            {businessDetailsBox}
+            <PipelineStatusCard business={business} />
+            <div className="mb-6">
+              <ContractDetailsCard business={business} onUpdate={handleContractUpdate} membershipTypes={membershipTypes} />
+            </div>
+            <BusinessOneOffs sales={oneOffSales} />
+            <BusinessDrafts drafts={routineDrafts} />
+          </>
+        )}
+
+        {glanceTab === 'files' && (
+          <>
+            <BusinessFiles businessId={business.id} />
+            <BusinessArticles businessId={business.id} />
+          </>
+        )}
+
+        {confirmDialogs}
+      </div>
+    )
+  }
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Breadcrumbs items={[
+        fromTodos
+          ? { label: 'To-dos', href: '/todos' }
+          : { label: 'Businesses', href: '/dashboard' },
+        { label: business.name },
+      ]} />
+
+      {topBanners}
 
       {/* Header */}
       <div className="mb-6">
@@ -634,7 +962,16 @@ export function BusinessDetailClient({
               </div>
             )}
           </div>
-          <EditBusinessButton business={business} />
+          <div className="flex items-center gap-2">
+            <EditBusinessButton business={business} />
+            <button
+              type="button"
+              onClick={() => chooseLayout('glance')}
+              className="text-xs px-3 py-1.5 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 rounded-sm transition-colors"
+            >
+              New at-a-glance page
+            </button>
+          </div>
         </div>
         {(business.category || business.status || business.membership_type) && (
           <div className="flex gap-2 mt-2">
@@ -666,126 +1003,9 @@ export function BusinessDetailClient({
       {/* Pipeline Status */}
       <PipelineStatusCard business={business} />
 
-      {/* Quick Actions Bar */}
-      <div className="sticky top-0 z-10 bg-white border border-gray-200 px-4 py-2.5 mb-6 flex items-center gap-3">
-        <Link
-          href={`/new-entry?businessId=${businessId}`}
-          className="text-xs font-semibold px-3 py-1.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
-        >
-          + Entry
-        </Link>
-        {!quickTaskOpen ? (
-          <button
-            onClick={() => setQuickTaskOpen(true)}
-            className="text-xs font-semibold px-3 py-1.5 border border-brand-navy/30 text-brand-navy hover:bg-brand-navy/5 transition-colors"
-          >
-            + Task
-          </button>
-        ) : (
-          <form
-            className="flex items-center gap-2 flex-1"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              if (!quickTaskTitle.trim()) return
-              setQuickSaving(true)
-              const result = await createTask({ title: quickTaskTitle.trim(), category: 'work', business_id: businessId })
-              setQuickSaving(false)
-              if (result.error) toast.error(result.error)
-              else { toast.success('Task added'); setQuickTaskTitle(''); setQuickTaskOpen(false) }
-            }}
-          >
-            <input
-              autoFocus
-              type="text"
-              value={quickTaskTitle}
-              onChange={(e) => setQuickTaskTitle(e.target.value)}
-              placeholder="Task title..."
-              className="text-sm px-2 py-1 border border-gray-300 flex-1 min-w-0 focus:outline-none focus:border-brand-navy"
-            />
-            <button type="submit" disabled={quickSaving} className="text-xs font-semibold px-2 py-1 bg-brand-navy text-white">
-              {quickSaving ? '...' : 'Add'}
-            </button>
-            <button type="button" onClick={() => { setQuickTaskOpen(false); setQuickTaskTitle('') }} className="text-xs text-gray-500 hover:text-gray-700 px-1">
-              Cancel
-            </button>
-          </form>
-        )}
-        {!quickNoteOpen ? (
-          <button
-            onClick={() => setQuickNoteOpen(true)}
-            className="text-xs font-semibold px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            + Note
-          </button>
-        ) : (
-          <form
-            className="flex items-center gap-2 flex-1"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              if (!quickNoteText.trim()) return
-              setQuickSaving(true)
-              const result = await createUnformattedCorrespondence({
-                business_id: businessId,
-                raw_text_original: quickNoteText.trim(),
-                type: 'Note',
-                entry_date: new Date().toISOString(),
-              })
-              setQuickSaving(false)
-              if ('error' in result) toast.error(result.error || 'Failed to save note')
-              else { toast.success('Note saved'); setQuickNoteText(''); setQuickNoteOpen(false); await refreshCorrespondence() }
-            }}
-          >
-            <input
-              autoFocus
-              type="text"
-              value={quickNoteText}
-              onChange={(e) => setQuickNoteText(e.target.value)}
-              placeholder="Quick note..."
-              className="text-sm px-2 py-1 border border-gray-300 flex-1 min-w-0 focus:outline-none focus:border-brand-navy"
-            />
-            <button type="submit" disabled={quickSaving} className="text-xs font-semibold px-2 py-1 bg-brand-navy text-white">
-              {quickSaving ? '...' : 'Save'}
-            </button>
-            <button type="button" onClick={() => { setQuickNoteOpen(false); setQuickNoteText('') }} className="text-xs text-gray-500 hover:text-gray-700 px-1">
-              Cancel
-            </button>
-          </form>
-        )}
-      </div>
+      {quickActionsBar}
 
-      {/* Business Details Box */}
-      <div className="bg-gray-50 border border-black/[0.06] p-4 mb-6">
-        <div className="flex justify-between items-start mb-3">
-          <h3 className="text-sm font-bold text-brand-dark uppercase">Business Details</h3>
-          <EditBusinessDetailsButton
-            business={business}
-            onUpdate={async () => {
-              const result = await getBusinessById(businessId)
-              if (!('error' in result) && result.data) setBusiness(result.data)
-            }}
-          />
-        </div>
-        <div className="space-y-2 text-sm">
-          <div>
-            <span className="font-semibold text-gray-700">Address:</span>
-            <span className="ml-2 text-gray-900">{business.address || 'Not set'}</span>
-          </div>
-          <div>
-            <span className="font-semibold text-gray-700">Email:</span>
-            <span className="ml-2 text-gray-900">{business.email || 'Not set'}</span>
-          </div>
-          <div>
-            <span className="font-semibold text-gray-700">Phone:</span>
-            <span className="ml-2 text-gray-900">{business.phone || 'Not set'}</span>
-          </div>
-          {business.notes && (
-            <div className="pt-2 border-t border-black/[0.06] mt-2">
-              <span className="font-semibold text-gray-700">Notes:</span>
-              <p className="mt-1 text-gray-900 whitespace-pre-wrap">{business.notes}</p>
-            </div>
-          )}
-        </div>
-      </div>
+      {businessDetailsBox}
 
       {/* Relationship Memory — AI-distilled summary, updated after each Insight generation */}
       {business.relationship_memory && (
@@ -978,31 +1198,7 @@ export function BusinessDetailClient({
         </button>
       )}
 
-      {/* Delete Contact Confirmation Dialog */}
-      <ConfirmDialog
-        open={showDeleteContactConfirm}
-        onOpenChange={setShowDeleteContactConfirm}
-        title="Delete Contact"
-        description={`Are you sure you want to delete contact "${contactToDelete?.name}"?`}
-        confirmLabel="Delete"
-        loadingLabel="Deleting..."
-        destructive
-        isLoading={isDeletingContact}
-        onConfirm={confirmDeleteContact}
-      />
-
-      {/* Delete Entry Confirmation Dialog */}
-      <ConfirmDialog
-        open={showDeleteEntryConfirm}
-        onOpenChange={setShowDeleteEntryConfirm}
-        title="Delete Entry"
-        description={`Are you sure you want to delete this entry${entryToDelete?.subject ? ` "${entryToDelete.subject}"` : ''}? This cannot be undone.`}
-        confirmLabel="Delete"
-        loadingLabel="Deleting..."
-        destructive
-        isLoading={isDeletingEntry}
-        onConfirm={confirmDeleteEntry}
-      />
+      {confirmDialogs}
     </div>
   )
 }

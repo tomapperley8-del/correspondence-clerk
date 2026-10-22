@@ -6,6 +6,7 @@ import { getThreadsByBusiness } from '@/app/actions/threads'
 import { getActiveMembershipTypes } from '@/app/actions/membership-types'
 import { getRoutineDraftsForBusiness } from '@/app/actions/leads'
 import { getOneOffSales } from '@/app/actions/contracts'
+import { getBusinessGlance } from '@/app/actions/business-glance'
 import { isAiEnabled } from '@/lib/ai/client'
 import { BusinessDetailClient } from './_components/BusinessDetailClient'
 
@@ -19,7 +20,7 @@ export default async function BusinessDetailPage({
   const { id } = await params
   const { saved, from } = await searchParams
 
-  const [businessResult, contactsResult, duplicatesResult, threadsResult, membershipTypesResult, openThreadsResult, draftsResult, oneOffsResult] =
+  const [businessResult, contactsResult, duplicatesResult, threadsResult, membershipTypesResult, openThreadsResult, draftsResult, oneOffsResult, glanceResult] =
     await Promise.all([
       getBusinessById(id),
       getContactsByBusiness(id),
@@ -29,6 +30,7 @@ export default async function BusinessDetailPage({
       getOpenThreads({ businessId: id }),
       getRoutineDraftsForBusiness(id).catch(() => ({ data: [] })),
       getOneOffSales(id).catch(() => ({ data: [] })),
+      getBusinessGlance(id).catch(() => ({ data: undefined })),
     ])
 
   if ('error' in businessResult || !businessResult.data) {
@@ -46,6 +48,7 @@ export default async function BusinessDetailPage({
       businessId={id}
       routineDrafts={draftsResult.data ?? []}
       oneOffSales={oneOffsResult.data ?? []}
+      initialGlance={glanceResult.data ?? null}
       aiEnabled={isAiEnabled()}
       saved={saved}
       fromTodos={from === 'todos'}
