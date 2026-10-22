@@ -191,6 +191,9 @@ export function Navigation() {
     { href: '/settings', label: 'Settings' },
   ]
 
+  // The CC Mastersheet, frozen as a read-only archive in Stage 9 (22 Oct 2026)
+  const mastersheetUrl = 'https://docs.google.com/spreadsheets/d/1cwQkGrtMverl-KJ5_7VvmaNLPL9MYyNmNgBeGO-2rgA/edit'
+
   const badgeEl = (n: number, tone: string, title?: string) => (
     <span
       title={title}
@@ -273,6 +276,15 @@ export function Navigation() {
                       {m.label}
                     </Link>
                   ))}
+                  <a
+                    href={mastersheetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    role="menuitem"
+                    className="block px-4 py-2 text-sm text-brand-dark hover:bg-brand-warm"
+                  >
+                    Mastersheet (archived)
+                  </a>
                   {aiEnabled && (
                     <button
                       type="button"
@@ -364,6 +376,14 @@ export function Navigation() {
                   {m.label}
                 </Link>
               ))}
+              <a
+                href={mastersheetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block px-5 py-3 text-sm text-white/80 hover:bg-brand-olive/20 transition-colors"
+              >
+                Mastersheet (archived)
+              </a>
               {aiEnabled && (
                 <button
                   type="button"
