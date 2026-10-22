@@ -62,6 +62,7 @@ Classification of the 173 open tasks on 21 Oct: about 66-74 actionable, 31 proba
 | 21 Oct | Auto-created businesses that are really a person at a business on file are moved, not hidden: their emails and the person go to that business (joined to the existing contact if the name or email matches), and the empty record is hidden. The review page offers Keep / Hide / Move. Going forward, an Unreviewed business gets a "Move to business" action in the app (Stage 3, built on `merge_businesses()`) |
 | 22 Oct | Club Card tab (Stage 6b) agreed, from Tom's answers: it spots problems and Tom fixes WordPress himself; lapsed pages are flagged and Tom decides; all Club Card page problems count towards needs attention. This is about the website pages; the halfway Club Card check-in stays a quiet reminder (Decision 21 Oct) |
 | 22 Oct | New layout (Stage 7), from Claude's recommendations, which Tom accepted after seeing a mockup (https://claude.ai/artifact/2QeGYeQQPta3NmwjRHYMmP): three places, Today / Businesses / Inbox; Briefing, To-dos and the separate Needs attention page are merged into Today; the Club Card tab becomes a Businesses view. Tom said he doesn't use Briefing and doesn't know where to go across the site. The nav badge number (Do now vs total) is decided after the Stage 4 comparison week |
+| 22 Oct | Tom ended the Stage 4 comparison week early ("forget the 28 October thing, lets crack on"). Stage 4 is done. Nav badge = the Today "Do now" number (at most 8), Claude's recommendation, changeable later. Next: Stage 7, then 6b |
 
 **Commitments ("You said you'd").** Automatic detection depends on routine tags, which are optional and have been unreliable. So: a one-click "I'll do this by [date]" on any email or business row creates a linked to-do, and that is the only thing that counts. Where a routine has tagged a promise, the business page shows it as a suggestion with an "Add as to-do" button; it never enters the count and can't reopen. Existing open commitment tasks are bulk-closed after a backup (Stage 1, with Tom's go-ahead).
 
@@ -98,7 +99,7 @@ Agreed 22 Oct 2026. Tom finds the site confusing and uses none of Briefing; Brie
 - **Inbox:** unchanged.
 - **Retired, with redirects so old links still work:** `/briefing` to Today, `/todos` to Today (and its Contracts and Outreach tabs to the matching Businesses views), `/attention` to Today, `/actions` if anything still points there.
 - **Engine tasks:** stop showing reply, renewal and invoice tasks in the app once Today works; the task engine keeps running in the background. Before the engine's rules are switched off, the morning desk email (`run_morning_pipeline`, `v_morning_desk`) and the Claude routines must be moved to the new source. Hand-written to-dos stay as tasks.
-- **Nav badge:** whether it shows the Do now number or the total is decided after the Stage 4 comparison week ends on 28 Oct.
+- **Nav badge:** the Do now number (at most 8). Decided 22 Oct.
 - **What isn't lost:** prospect leads, routine drafts and resources all keep a place (Leads view, business page, user menu).
 
 ## Club Card tab (Stage 6b)
@@ -115,7 +116,7 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **Needs attention:** all of these flags count. Proposed priority, accepted by Tom with the plan: a lapsed member with a live page ranks just after Renewal; the other Club Card problems come after Your to-dos.
 - **Matching businesses to pages:** a one-off review page like Stage 2's, with suggested matches Tom confirms or fixes; new pages are matched by the same rules and anything unclear goes to Tom.
 - **Refresh:** nightly, from the public page list; free.
-- **Timing:** after the Stage 4 comparison week (ends 28 Oct), so the count comparison is not disturbed.
+- **Timing:** after Stage 7 (both change Businesses views).
 
 ## Stages
 
@@ -125,11 +126,11 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 | 1 | Done sticks and honest dates in the task engine; bulk-close stale engine tasks | Local Supabase | **Done 21 Oct.** Engine dry run after all live changes reopens nothing (checked early at Tom's request). Live migration applied and fingerprint-matched to the tested version; 69 tasks bulk-closed with Tom's approval |
 | 2 | Stop junk at the source: `Unreviewed` status, notification-domain guard, personal-domain mappings | Local Supabase | **Done 21 Oct.** Migration, code and Tom's review cleanup all live. Regression items that need a logged-in look (business page, new entry, inbox, nav count) not yet checked by Tom |
 | 3 | Canonical record: primary contact, Internal/Community type, `merge_businesses()`, approved merges and cleanup | 2 | **Done 21 Oct.** Migration, Tom's review cleanup (17 merges, 44 types, 42 email lists) and the app side (review bar, main contact, placeholders, + Task fix) all live. Not yet looked at logged in by Tom |
-| 4 | `v_business_attention` and one consistent count, shown beside the old count for a week | 1, 2 | **Live 21 Oct** (migration and code). Comparison week running to 28 Oct. Tom has looked at it logged in (22 Oct: "looks great") |
+| 4 | `v_business_attention` and one consistent count, shown beside the old count for a week | 1, 2 | **Done 22 Oct** (comparison week ended early by Tom). Live 21 Oct (migration and code). Tom has looked at it logged in (22 Oct: "looks great") |
 | 5 | Table home and saved views (old pages still reachable); "On website?" from the Club Card page | 3, 4 | **Live 22 Oct** (code only, no migration). Not yet looked at logged in by Tom on production. Table at `/businesses`; not the home page and not in the nav yet (Tom switches after 28 Oct; nav is Stage 7). "On website?" moves to Stage 6b |
 | 6 | Business detail "at a glance" and one merged timeline | 3, 4 | **Live 22 Oct** (code only, no migration). Not yet looked at logged in by Tom on production |
-| 6b | Club Card view: every member's website page, offer, edit date and contract in one list, with problems flagged (spec below); a saved view in Businesses, not a nav tab (Decision 22 Oct) | 4 (after the comparison week ends 28 Oct), 5, 6 | Not started |
-| 7 | New layout: Today page, three-place nav, retire Briefing / To-dos / Needs attention pages, Contracts and Outreach into Businesses (spec "New layout (Stage 7)" below) | 4 (comparison week), 5, 6 | Not started |
+| 6b | Club Card view: every member's website page, offer, edit date and contract in one list, with problems flagged (spec below); a saved view in Businesses, not a nav tab (Decision 22 Oct) | 5, 6, 7 | Not started; after Stage 7 |
+| 7 | New layout: Today page, three-place nav, retire Briefing / To-dos / Needs attention pages, Contracts and Outreach into Businesses (spec "New layout (Stage 7)" below) | 4, 5, 6 | Not started; next |
 | 8 | Zero-credit drafting: templates and "Copy context pack" | 6 | Not started |
 | 9 | Mastersheet export keyed on `business_id`, one row per business, excludes Unreviewed; Apps Script update (Tom) | 2, 3 | Not started |
 | 10 | Docs: CLAUDE.md, bring `cc-live-export` into the repo | all | Not started |
@@ -213,3 +214,4 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **Next session starts here (Stage 5):** waiting on Tom to look at `/businesses` (on production once merged) and give the go-ahead to merge `ui-overhaul` into `main` (code only; safe to deploy at any time, before or after the comparison week). Switching the home page to the table is a separate later go-ahead after 28 Oct.
 - **22 Oct 2026, Stage 5 code live (Tom approved the merge):** `main` fast-forwarded from `686dfba` to `3cbda78` (4 commits: Stage 5 code `665e774` plus plan notes, including the Stage 6b plan entry) and pushed. The GitHub push started a Vercel build: production deployment `dpl_FhNm2puwNPZjrgpcq5kYSifLAf9u`, READY in about 90 seconds, aliased to correspondenceclerk.com. Rollback candidate: `dpl_66XcS234VCv5BnFUt2WQAt7JCpvw` (`686dfba`). `/businesses` answered 404 until the new build went live, then 200; `/login` 200; no runtime errors in the 30 minutes after. Signed out, `/businesses` shows "Could not load the table: Unauthorized" rather than redirecting, the same as `/attention` and `/dashboard` (the middleware leaves sign-in to each page); no data is read. Not checked logged in: Tom to open https://correspondenceclerk.com/businesses and say what's missing or wrong. Next for Stage 5: Tom's go-ahead, after 28 Oct, to make the table the home page (nav entry is Stage 7).
 - **22 Oct 2026, new layout agreed:** Tom asked whether Briefing, To-dos and Needs attention are all needed. Research showed they overlap and disagree (see the section "New layout (Stage 7)"). Tom asked for recommendations; Claude's were shown as a mockup with real data, and Tom accepted them. Stage 7 reshaped to carry them, Stage 6b becomes a Businesses view, and the nav badge number waits for the comparison week. Nothing built.
+- **22 Oct 2026, comparison week dropped:** Tom asked to stop waiting for 28 Oct and build. Stage 4 marked done; nav badge set to the Do now number; Stage 7 starts now in a fresh session, Stage 6b after it.
