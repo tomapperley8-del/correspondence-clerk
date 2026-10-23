@@ -51,48 +51,50 @@ export function TodayQuickAdd({ today, onAdded }: { today: string; onAdded: () =
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_auto_auto] items-end">
-      <label className="block">
-        <span className="block text-xs font-semibold text-gray-600 mb-1">I&apos;ll…</span>
+    <div className="@container">
+    <form onSubmit={submit} className="grid gap-2 grid-cols-[minmax(0,1fr)_auto] @3xl:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_auto_auto] items-end">
+      <label className="block col-span-2 @3xl:col-span-1">
+        <span className="block text-xs font-semibold text-gray-700 mb-1">I&apos;ll…</span>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="send the new rate card"
-          className="w-full text-sm border border-black/[0.12] rounded-sm px-2.5 py-2 bg-white"
+          className="w-full text-sm border border-black/[0.12] rounded-sm px-2.5 min-h-10 bg-white"
           required
         />
       </label>
-      <label className="block">
-        <span className="block text-xs font-semibold text-gray-600 mb-1">For a business (optional)</span>
+      <label className="block col-span-2 @3xl:col-span-1">
+        <span className="block text-xs font-semibold text-gray-700 mb-1">For a business (optional)</span>
         <input
           value={businessName}
           onChange={(e) => setBusinessName(e.target.value)}
           onFocus={loadNames}
           list="today-business-names"
           placeholder="Start typing a name"
-          className="w-full text-sm border border-black/[0.12] rounded-sm px-2.5 py-2 bg-white"
+          className="w-full text-sm border border-black/[0.12] rounded-sm px-2.5 min-h-10 bg-white"
         />
         <datalist id="today-business-names">
           {(names ?? []).map((b) => <option key={b.id} value={b.name} />)}
         </datalist>
       </label>
       <label className="block">
-        <span className="block text-xs font-semibold text-gray-600 mb-1">By</span>
+        <span className="block text-xs font-semibold text-gray-700 mb-1">By</span>
         <input
           type="date"
           value={due}
           min={today}
           onChange={(e) => setDue(e.target.value)}
-          className="text-sm border border-black/[0.12] rounded-sm px-2.5 py-2 bg-white"
+          className="text-sm border border-black/[0.12] rounded-sm px-2.5 min-h-10 bg-white"
         />
       </label>
       <button
         type="submit"
         disabled={saving || !title.trim()}
-        className="text-sm font-semibold px-4 py-2 rounded-sm bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors duration-200 ease-out disabled:opacity-50"
+        className="text-sm font-semibold px-4 min-h-10 rounded-sm bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors duration-200 ease-out disabled:opacity-50"
       >
         {saving ? 'Adding…' : 'Add to-do'}
       </button>
     </form>
+    </div>
   )
 }

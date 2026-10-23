@@ -24,7 +24,7 @@ export default async function TodayPage() {
     : [null, null]
 
   return (
-    <div className="mx-auto px-4 py-8 max-w-[980px]">
+    <div className="mx-auto px-4 py-8 max-w-[1440px]">
       {result.error || !result.data ? (
         <p className="text-sm text-red-700">Could not load Today: {result.error ?? 'no data'}</p>
       ) : (
