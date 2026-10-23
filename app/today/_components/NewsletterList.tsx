@@ -91,7 +91,6 @@ export function NewsletterList({
               <ItemRow
                 key={i.key}
                 tag={KIND_LABEL[i.kind]}
-                tagClassName="bg-brand-olive/15 text-brand-dark"
                 title={i.business_name ?? i.title}
                 href={i.business_id ? `/businesses/${i.business_id}` : null}
                 detail={i.business_name ? i.title : undefined}

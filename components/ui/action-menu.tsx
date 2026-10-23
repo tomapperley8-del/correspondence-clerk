@@ -25,7 +25,7 @@ export type MenuItem = {
 export type MenuEntry = MenuItem | { group: string; items: MenuItem[] }
 
 export const menuButtonClass =
-  'inline-flex items-center justify-center gap-1 text-xs font-semibold px-2.5 min-h-10 md:min-h-8 pointer-coarse:min-h-10 border border-black/[0.12] rounded-sm bg-white text-brand-navy hover:bg-brand-warm transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
+  'inline-flex items-center justify-center gap-1 text-xs font-semibold px-2.5 min-h-10 md:min-h-8 pointer-coarse:min-h-10 rounded-sm text-gray-700 hover:bg-black/[0.05] hover:text-brand-dark aria-expanded:bg-black/[0.05] transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
 
 const itemClass =
   'w-full text-left block px-3 py-2 min-h-10 text-sm text-brand-dark hover:bg-brand-warm focus:bg-brand-warm focus:outline-none aria-disabled:opacity-50 aria-disabled:pointer-events-none'

@@ -17,7 +17,7 @@ import { addToNewsletter } from '@/components/ForNewsletterButton'
 import { ActionMenu, type MenuEntry, type MenuItem } from '@/components/ui/action-menu'
 import { FilterChips, type Chip } from '@/components/ui/filter-chips'
 import { FullScreenPanel, useFullScreen } from '@/components/ui/full-screen-panel'
-import { ItemList, ItemRow, rowButtonClass } from '@/components/ui/item-row'
+import { ItemGroup, ItemList, ItemRow, rowButtonClass, rowQuietButtonClass } from '@/components/ui/item-row'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import type { CalendarItem, NewsletterItem } from '@/app/actions/calendar'
 
@@ -32,22 +32,26 @@ import type { CalendarItem, NewsletterItem } from '@/app/actions/calendar'
 
 const OUTLOOK_DRAFTS = 'https://outlook.office.com/mail/drafts'
 
-const TAG_TONE: Record<TodayReason, string> = {
-  money_owed: 'bg-red-50 text-red-800',
-  renewal: 'bg-amber-50 text-amber-800',
-  club_card_lapsed: 'bg-amber-50 text-amber-800',
-  waiting_on_you: 'bg-brand-navy/10 text-brand-navy',
-  todo: 'bg-brand-olive/15 text-brand-dark',
-  club_card: 'bg-gray-100 text-gray-700',
+// The dot beside each group heading; the heading's words say the kind.
+const DOT: Record<TodayReason, string> = {
+  money_owed: 'bg-red-600',
+  renewal: 'bg-amber-500',
+  club_card_lapsed: 'bg-amber-500',
+  waiting_on_you: 'bg-brand-navy',
+  todo: 'bg-brand-olive',
+  club_card: 'bg-gray-400',
 }
 
-const GROUPS: { reason: TodayReason; chip: string; hint: string }[] = [
-  { reason: 'money_owed', chip: 'Money owed', hint: 'QuickBooks invoices past due, with no chaser in the last 7 days.' },
-  { reason: 'renewal', chip: 'Renewals', hint: 'Ending in the next 45 days or ended in the last 60, with no outcome recorded.' },
-  { reason: 'club_card_lapsed', chip: 'Club Card ended', hint: 'The card ended more than 60 days ago (or is not renewing) but the website page is still up. Chase the renewal or take the page down.' },
-  { reason: 'waiting_on_you', chip: 'Waiting on you', hint: 'They wrote in the last 30 days and nothing has gone back.' },
-  { reason: 'todo', chip: 'To-dos', hint: 'Everything you have said you will do, and follow-up flags that are due.' },
-  { reason: 'club_card', chip: 'Club Card pages', hint: 'Member pages on the website to fix: no page, offer out of date, missing from the A-Z, map or a category, listed twice, or contact details that differ from the app.' },
+const CARD = 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] p-4 sm:p-5'
+const H2 = 'text-[1.6rem] leading-tight font-semibold text-brand-dark'
+
+const GROUPS: { reason: TodayReason; chip: string; heading: string; hint: string }[] = [
+  { reason: 'money_owed', chip: 'Money', heading: 'Money owed', hint: 'QuickBooks invoices past due, with no chaser in the last 7 days.' },
+  { reason: 'renewal', chip: 'Renewals', heading: 'Renewals', hint: 'Ending in the next 45 days or ended in the last 60, with no outcome recorded.' },
+  { reason: 'club_card_lapsed', chip: 'Lapsed cards', heading: 'Club Card ended, page still live', hint: 'The card ended more than 60 days ago (or is not renewing) but the website page is still up. Chase the renewal or take the page down.' },
+  { reason: 'waiting_on_you', chip: 'Waiting on you', heading: 'Waiting on you', hint: 'They wrote in the last 30 days and nothing has gone back.' },
+  { reason: 'todo', chip: 'To-dos', heading: 'Your to-dos', hint: 'Everything you have said you will do, and follow-up flags that are due.' },
+  { reason: 'club_card', chip: 'Card pages', heading: 'Club Card pages', hint: 'Member pages on the website to fix: no page, offer out of date, missing from the A-Z, map or a category, listed twice, or contact details that differ from the app.' },
 ]
 
 type FilterKey = 'all' | TodayReason | 'snoozed'
@@ -264,7 +268,7 @@ export function TodayClient({
           />
         </label>
         <button type="submit" disabled={busyKey === i.key || !pickDate} className={rowButtonClass}>{todo ? 'Save date' : 'Snooze'}</button>
-        <button type="button" onClick={() => setPicking(null)} className={rowButtonClass}>Cancel</button>
+        <button type="button" onClick={() => setPicking(null)} className={rowQuietButtonClass}>Cancel</button>
       </form>
     )
   }
@@ -278,13 +282,12 @@ export function TodayClient({
     return (
       <ItemRow
         key={i.key}
-        tag={REASON_LABEL[i.reason]}
-        tagClassName={TAG_TONE[i.reason]}
         title={title || 'To-do'}
         href={i.business_id ? `/businesses/${i.business_id}` : null}
         detail={detail}
-        meta={`${ageWords(i, today)}${i.since ? ` · ${dateGB(i.since)}` : ''}`}
-        metaClassName={late ? 'text-red-700 font-semibold' : undefined}
+        meta={ageWords(i, today)}
+        metaTitle={i.since ? dateGB(i.since) : undefined}
+        late={late}
         actions={
           <>
             {primary(i)}
@@ -312,16 +315,16 @@ export function TodayClient({
   )
 
   const side = (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <TodayCalendar today={today} initialItems={calendar} onChanged={() => { refreshNav(); router.refresh() }} />
       <NewsletterList initial={newsletter} onChanged={() => { refreshNav(); router.refresh() }} />
-      <section aria-labelledby="add-h" className="space-y-2">
-        <h2 id="add-h" className="text-2xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>I&apos;ll do this by…</h2>
+      <section aria-labelledby="add-h" className={`${CARD} space-y-3`}>
+        <h2 id="add-h" className={H2} style={{ fontFamily: 'var(--font-serif)' }}>I&apos;ll do this by…</h2>
         <TodayQuickAdd today={today} onAdded={() => { refreshNav(); router.refresh() }} />
       </section>
-      <section aria-labelledby="other-h" className="space-y-2">
-        <h2 id="other-h" className="text-2xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>Other things</h2>
-        <ul className="divide-y divide-black/[0.06] border-y border-black/[0.06] text-sm">
+      <section aria-labelledby="other-h" className={`${CARD} space-y-2`}>
+        <h2 id="other-h" className={H2} style={{ fontFamily: 'var(--font-serif)' }}>Other things</h2>
+        <ul className="divide-y divide-black/[0.05] text-sm">
           <li className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-semibold text-brand-dark">{data.newLeads} new lead{data.newLeads === 1 ? '' : 's'}</span>
             <span className="text-xs text-gray-600">from the prospecting routine</span>
@@ -353,7 +356,6 @@ export function TodayClient({
                   <ItemRow
                     key={q.id}
                     tag={QUIET_LABEL[q.kind]}
-                    tagClassName="bg-gray-100 text-gray-700"
                     title={q.title}
                     href={q.business_id ? `/businesses/${q.business_id}` : null}
                     meta={q.due_date ? dateGB(q.due_date) : undefined}
@@ -447,7 +449,7 @@ function WorkBody({
   const hint = GROUPS.find((g) => g.reason === active)?.hint
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="space-y-2">
         <details className="text-xs text-gray-700">
           <summary className="cursor-pointer text-brand-navy font-semibold inline-block min-h-8 py-1">How these are picked</summary>
@@ -459,12 +461,12 @@ function WorkBody({
         {doNow.length === 0 ? (
           <p className="text-sm text-gray-700 py-3">Nothing pressing. Everything else is below.</p>
         ) : (
-          <ItemList label="Do now">{doNow.map(row)}</ItemList>
+          <Grouped items={doNow} row={row} />
         )}
       </div>
 
       <section aria-labelledby="rest-h" className="space-y-2">
-        <h2 id="rest-h" className="text-2xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>Everything else</h2>
+        <h2 id="rest-h" className={H2} style={{ fontFamily: 'var(--font-serif)' }}>Everything else</h2>
         <FilterChips chips={chips} value={active} onChange={choose} label="Show" />
         {hint && <p className="text-xs text-gray-700">{hint}</p>}
         {active === 'snoozed' ? (
@@ -472,8 +474,6 @@ function WorkBody({
             {snoozed.map((s) => (
               <ItemRow
                 key={s.business_id}
-                tag="Snoozed"
-                tagClassName="bg-gray-100 text-gray-700"
                 title={s.business_name}
                 href={`/businesses/${s.business_id}`}
                 detail={REASON_LABEL[s.reason as TodayReason] ?? s.reason}
@@ -490,7 +490,7 @@ function WorkBody({
           <p className="text-sm text-gray-700 py-2">Nothing else waiting.</p>
         ) : (
           <>
-            <ItemList label="Everything else">{list.slice(0, limit).map(row)}</ItemList>
+            {active === 'all' ? <Grouped items={list.slice(0, limit)} row={row} counts={rest} /> : <ItemList label="Everything else">{list.slice(0, limit).map(row)}</ItemList>}
             {list.length > limit && (
               <button type="button" className={rowButtonClass} onClick={() => setShowAll(true)}>
                 Show all {list.length}
@@ -499,6 +499,30 @@ function WorkBody({
           </>
         )}
       </section>
+    </div>
+  )
+}
+
+/** Rows under small headings, one per kind, in the order they come. Counts are from `counts` when given (the whole list, not just what is shown). */
+function Grouped({ items, row, counts }: { items: TodayItem[]; row: (i: TodayItem) => React.ReactNode; counts?: TodayItem[] }) {
+  const runs: { reason: TodayReason; items: TodayItem[] }[] = []
+  for (const i of items) {
+    const last = runs[runs.length - 1]
+    if (last && last.reason === i.reason) last.items.push(i)
+    else runs.push({ reason: i.reason, items: [i] })
+  }
+  return (
+    <div>
+      {runs.map((r) => (
+        <ItemGroup
+          key={r.reason}
+          title={GROUPS.find((g) => g.reason === r.reason)?.heading ?? REASON_LABEL[r.reason]}
+          count={(counts ?? items).filter((i) => i.reason === r.reason).length}
+          dotClassName={DOT[r.reason]}
+        >
+          {r.items.map(row)}
+        </ItemGroup>
+      ))}
     </div>
   )
 }

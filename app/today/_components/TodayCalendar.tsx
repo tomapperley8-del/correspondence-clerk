@@ -35,21 +35,18 @@ const dateGB = (d: string) => formatDateGB(`${d}T12:00:00Z`)
 const dayName = (d: string, opts: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { ...opts, timeZone: 'UTC' })
 
 function tone(i: CalendarItem): string {
-  if (i.kind === 'renewal') return 'bg-amber-50 text-amber-800'
-  if (i.kind === 'invoice') return 'bg-red-50 text-red-800'
-  if (i.done) return 'bg-gray-100 text-gray-500 line-through'
+  // A coloured edge and plain text; the words ("invoice due", "Meeting:") say the kind.
+  if (i.kind === 'renewal') return 'border-l-2 border-amber-500 text-amber-800'
+  if (i.kind === 'invoice') return 'border-l-2 border-red-600 text-red-800'
+  if (i.done) return 'border-l-2 border-gray-300 text-gray-500 line-through'
   switch (i.category) {
     case 'Call':
     case 'Meeting':
-      return 'bg-brand-navy/10 text-brand-navy'
-    case 'Event':
-      return 'bg-brand-olive/25 text-brand-dark'
+      return 'border-l-2 border-brand-navy text-brand-dark'
     case 'Deadline':
-      return 'bg-red-50 text-red-800'
-    case 'For Newsletter':
-      return 'bg-brand-warm text-brand-dark border border-brand-olive/40'
+      return 'border-l-2 border-red-600 text-brand-dark'
     default:
-      return 'bg-brand-olive/15 text-brand-dark'
+      return 'border-l-2 border-brand-olive text-brand-dark'
   }
 }
 
@@ -164,7 +161,7 @@ export function TodayCalendar({
 
   function chip(i: CalendarItem, oneLine: boolean) {
     const movable = i.kind === 'task' && !i.done
-    const cls = `block w-full text-left mt-1 text-[11.5px] leading-tight px-1.5 py-1 ${view === 'week' ? 'min-h-10 md:min-h-0 pointer-coarse:min-h-10' : ''} rounded-sm break-words ${tone(i)} ${movable ? 'cursor-grab active:cursor-grabbing' : ''} ${dragKey === i.key ? 'opacity-40' : ''} ${oneLine ? 'truncate' : ''}`
+    const cls = `block w-full text-left mt-1 text-[12px] leading-tight px-2 py-1 bg-brand-warm/70 hover:bg-brand-warm ${view === 'week' ? 'min-h-10 md:min-h-0 pointer-coarse:min-h-10' : ''} rounded-sm break-words ${tone(i)} ${movable ? 'cursor-grab active:cursor-grabbing' : ''} ${dragKey === i.key ? 'opacity-40' : ''} ${oneLine ? 'truncate' : ''}`
     if (i.kind !== 'task') {
       return i.business_id ? (
         <Link key={i.key} href={`/businesses/${i.business_id}`} className={`${cls} hover:underline`} title={`${i.title}. Open the business to act on it`}>
@@ -211,7 +208,7 @@ export function TodayCalendar({
           setDropDay(null)
           if (item) move(item, d)
         }}
-        className={`p-1.5 min-w-0 border-black/[0.06] ${
+        className={`group/day p-1.5 min-w-0 border-black/[0.05] ${
           compact ? (full ? 'min-h-[calc((100vh-16rem)/6)]' : 'min-h-[92px]') : `flex gap-2 @2xl:block ${full ? '@2xl:min-h-[calc(100vh-16rem)]' : '@2xl:min-h-[150px]'}`
         } ${
           view === 'week' ? (k < 6 ? 'border-b @2xl:border-b-0 @2xl:border-r' : '') : `${k % 7 < 6 ? 'border-r' : ''} border-b`
@@ -234,7 +231,7 @@ export function TodayCalendar({
           <button
             type="button"
             onClick={() => { setAddingOn(addingOn === d ? null : d); setOpenKey(null) }}
-            className={`ml-auto text-[11px] font-semibold text-brand-navy hover:underline ${compact ? 'hidden @2xl:inline' : 'min-h-8 pointer-coarse:min-h-10 @2xl:min-h-0 px-1'}`}
+            className={`ml-auto text-[11px] font-semibold text-brand-navy hover:underline opacity-0 group-hover/day:opacity-100 focus:opacity-100 pointer-coarse:opacity-100 max-md:opacity-100 ${compact ? 'hidden @2xl:inline' : 'min-h-8 pointer-coarse:min-h-10 @2xl:min-h-0 px-1'}`}
             aria-label={`Add something on ${dateGB(d)}`}
           >
             + Add
@@ -257,7 +254,7 @@ export function TodayCalendar({
             <button
               type="button"
               onClick={() => setOpenDays((prev) => { const next = new Set(prev); if (next.has(d)) next.delete(d); else next.add(d); return next })}
-              className="mt-1 text-[11px] font-semibold text-brand-navy hover:underline"
+              className="mt-1 min-h-10 md:min-h-0 text-[11px] font-semibold text-brand-navy hover:underline"
             >
               {openDays.has(d) ? 'Show fewer' : `Show ${list.length - WEEK_DAY_LIMIT} more`}
             </button>
@@ -298,9 +295,9 @@ export function TodayCalendar({
             </div>
           </div>
 
-          <div className="@container border border-black/[0.06] rounded-sm bg-white">
+          <div className="@container border-y border-black/[0.05] -mx-1">
             {view === 'month' && (
-              <div className="grid grid-cols-7 border-b border-black/[0.06] bg-brand-warm">
+              <div className="grid grid-cols-7 border-b border-black/[0.05]">
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((n) => (
                   <div key={n} className="px-1.5 py-1 text-[11px] uppercase tracking-wide text-gray-600">{n}</div>
                 ))}

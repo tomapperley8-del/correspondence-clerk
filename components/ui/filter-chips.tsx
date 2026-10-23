@@ -23,7 +23,7 @@ export function FilterChips<K extends string>({
   className?: string
 }) {
   return (
-    <div role="group" aria-label={label} className={cn('flex flex-wrap gap-1.5', className)}>
+    <div role="group" aria-label={label} className={cn('flex flex-wrap gap-1', className)}>
       {chips.map((c) => {
         const on = c.key === value
         return (
@@ -34,8 +34,8 @@ export function FilterChips<K extends string>({
             aria-label={`${c.label}, ${c.count}`}
             onClick={() => onChange(c.key)}
             className={cn(
-              'inline-flex items-center gap-1.5 text-xs font-semibold px-3 min-h-10 md:min-h-8 pointer-coarse:min-h-10 rounded-full border transition-colors duration-200 ease-out whitespace-nowrap',
-              on ? 'bg-brand-navy border-brand-navy text-white' : 'bg-white border-black/[0.12] text-brand-dark hover:bg-brand-warm',
+              'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 min-h-10 md:min-h-7 pointer-coarse:min-h-10 rounded-full border transition-colors duration-200 ease-out whitespace-nowrap',
+              on ? 'bg-brand-navy border-brand-navy text-white' : 'bg-white border-black/[0.08] text-gray-700 hover:border-black/[0.16] hover:text-brand-dark',
             )}
           >
             {on && <span aria-hidden="true">✓</span>}
