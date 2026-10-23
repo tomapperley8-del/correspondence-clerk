@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { confirmClubCardSuggestions, setClubCardMatch, type ReviewPage } from '@/app/actions/club-card'
+import { confirmClubCardSuggestions, createBusinessForClubCardPage, setClubCardMatch, type ReviewPage } from '@/app/actions/club-card'
 import { toast } from '@/lib/toast'
 
 function refreshNav() {
@@ -30,6 +30,19 @@ export function ClubCardReview({ pages, businesses }: { pages: ReviewPage[]; bus
     setBusy(null)
     if (res.error) return toast.error(res.error)
     toast.success(businessId ? `${page.title}: matched to ${names.get(businessId)}` : `${page.title}: not a member page`)
+    refreshNav()
+    router.refresh()
+  }
+
+  async function addNew(page: ReviewPage, typedName: string) {
+    const name = typedName.trim()
+    if (!window.confirm(`Add "${name}" as a new business and match "${page.title}" to it? It starts as a Prospect until its Club Card contract is recorded.`)) return
+    setBusy(page.id)
+    const res = await createBusinessForClubCardPage(page.id, name)
+    setBusy(null)
+    if (res.error) return toast.error(res.error)
+    toast.success(`${name} added and matched`)
+    setChosen({ ...chosen, [page.id]: '' })
     refreshNav()
     router.refresh()
   }
@@ -86,7 +99,14 @@ export function ClubCardReview({ pages, businesses }: { pages: ReviewPage[]; bus
               aria-label={`Business for ${p.title}`}
               className="text-xs border border-black/[0.12] rounded-sm px-2 py-1 w-44 min-w-0"
             />
-            <button type="button" className={btn} disabled={!!busy || !typedId} onClick={() => typedId && save(p, typedId)}>Use this</button>
+            {typed.trim() && !typedId ? (
+              <button type="button" className={btn} disabled={!!busy} onClick={() => addNew(p, typed)}
+                title="No business with this name yet: add it, with the page's address and phone, and match the page to it">
+                Add as new business
+              </button>
+            ) : (
+              <button type="button" className={btn} disabled={!!busy || !typedId} onClick={() => typedId && save(p, typedId)}>Use this</button>
+            )}
             {p.match_status !== 'not_a_member' && (
               <button type="button" className={btn} disabled={!!busy} onClick={() => save(p, null)} title="Not a member's page: it won't be checked or counted">
                 Not a member page

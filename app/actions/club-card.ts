@@ -8,6 +8,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { createBusiness } from '@/app/actions/businesses'
 
 import type { ClubCardIssue } from '@/lib/club-card/labels'
 
@@ -172,6 +173,38 @@ export async function setClubCardMatch(pageId: string, businessId: string | null
   revalidatePath('/businesses/club-card-pages')
   revalidatePath('/today')
   return {}
+}
+
+/**
+ * A page whose business isn't on file yet: add the business (named by Tom,
+ * with the address and phone from the page) and match the page to it.
+ * Status starts as Prospect; recording the Club Card contract makes it Active.
+ */
+export async function createBusinessForClubCardPage(pageId: string, name: string): Promise<{ error?: string; businessId?: string }> {
+  const ctx = await orgOrError()
+  if ('error' in ctx) return { error: ctx.error }
+  const { data: page, error: pageError } = await ctx.supabase
+    .from('club_card_pages').select('id, page_address, page_phone')
+    .eq('id', pageId).eq('organization_id', ctx.orgId).maybeSingle()
+  if (pageError) return { error: pageError.message }
+  if (!page) return { error: 'Page not found' }
+
+  const created = await createBusiness({ name, status: 'Prospect' })
+  if (created.error || !created.data) return { error: created.error ?? 'Could not add the business' }
+  const businessId = created.data.id as string
+
+  const details: Record<string, string> = {}
+  if (page.page_address) details.address = page.page_address
+  if (page.page_phone) details.phone = page.page_phone
+  if (Object.keys(details).length) {
+    const { error } = await ctx.supabase.from('businesses').update(details).eq('id', businessId)
+    if (error) return { error: `Business added, but its details weren't saved: ${error.message}`, businessId }
+  }
+
+  const matched = await setClubCardMatch(pageId, businessId)
+  if (matched.error) return { error: `Business added, but the page wasn't matched: ${matched.error}`, businessId }
+  revalidatePath('/businesses')
+  return { businessId }
 }
 
 /** Confirm every suggestion Tom has left as it is, in one go. */
