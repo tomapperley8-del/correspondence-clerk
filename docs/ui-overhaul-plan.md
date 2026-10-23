@@ -105,15 +105,18 @@ Agreed 22 Oct 2026. Tom finds the site confusing and uses none of Briefing; Brie
 - **Nav badge:** the Do now number (at most 8). Decided 22 Oct.
 - **What isn't lost:** prospect leads, routine drafts and resources all keep a place (Leads view, business page, user menu).
 
-## Order of the remaining work (agreed 22 Oct, updated)
+## Order of the remaining work (agreed 22 Oct, updated 23 Oct)
 
-1. Businesses filter fix: done and live 22 Oct (`1fe4494`).
-2. 6b: live; first website read run early by Tom on 22 Oct (101 pages, 97 suggested matches); waiting on Tom's matching review at /businesses/club-card-pages.
-3. Stage 11a (shared truth layer) and Stage 12 (calendar and newsletter list) side by side: 11a works on database views and the desk email, 12 on Today and to-dos.
-4. Stage 11b, then 11c. Stage 14a (Today interface) can run alongside 11b: it touches only Today.
-5. Stage 13 (spreadsheet upgrades, including the interface pass for the Businesses table), after 11, because once status is derived the cells may only edit fields Tom owns. Stage 14b (business page and Inbox) after 14a.
-6. Stage 8 (drafting templates).
-7. Stage 10 (finish).
+Done: 0-7, 6b, 9, 11a (next-day check 24 Oct), 12 (next-day check 24 Oct), the Businesses filter fix.
+
+1. **14a Today redesign** (started 23 Oct) alongside **11b clean-up reviews** (running): different files.
+2. **11c** Insights and Data health.
+3. **13** Businesses spreadsheet upgrades, including the Stage 14 interface pass for that table (reuse 14a's row, menu, full-screen and resize patterns).
+4. **8** drafting templates (their buttons go into the 14a-style More menus).
+5. **14b** business page and Inbox, after 11b and 8 have added what they add there, so it is laid out once.
+6. **10** finish.
+
+Why this order (Tom agreed 23 Oct): Today is used every day and hurts most; 14a sets the patterns the later stages reuse; the table changes in 13 anyway; the business page gains things from 11b and 8. Running two sessions at once uses Tom's allowance faster.
 
 ## Who reads what (the cohesion rule)
 
@@ -261,7 +264,7 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 | 11 | One source of truth, in three parts: **11a** shared truth layer (derived status, current deal, main contact, last in touch, category, read by everything; desk email rebuilt from Today's source); **11b** clean-up reviews; **11c** Insights and Data health (spec below) | 6b, 9 | **11a live 23 Oct** (migration, backfill, code). Next-day checks on 24 Oct pending. 11b, 11c not started 11b, 11c not started |
 | 12 | Work calendar and newsletter list on Today (spec below) | 7, 6b | **Live 23 Oct** (tidy migration `20261023_002` and the code in merge `1a03d6c`, both approved by Tom). Waiting: next-day check on 24 Oct (first `tidy-calendar` run, routine heartbeats, desk email matches Today) |
 | 13 | Businesses spreadsheet upgrades: edit in the cell, choose columns, row actions, download, Mastersheet colours (spec below); also the Stage 14 interface pass for this table (one-line rows, row actions in a main button + More menu, consistent filters) | 11 | Not started; after 11 |
-| 14 | Interface pass: less scrolling, smart menus, consistent and accessible (spec below). **14a** Today; **14b** business page and Inbox; the Businesses table is done inside Stage 13 | 7, 12 | 14a: not started, can start now; 14b after 14a |
+| 14 | Interface pass: less scrolling, smart menus, consistent and accessible (spec below). **14a** Today; **14b** business page and Inbox; the Businesses table is done inside Stage 13 | 7, 12 | 14a: started 23 Oct; 14b after 8 |
 
 ### Per stage: change, risk, verify, rollback
 
@@ -387,3 +390,4 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **23 Oct 2026, Stage 11a routine instructions updated (Tom: "yeah do this" to the optional routine changes):** Before copies in `supabase/.local/11a/routines/` (`triggers_before.json`, `daily_desk_runbook_before.json`). None of the routines mentioned the desk email's old sections, so nothing to drop there. Changed through the claude.ai routines API: **CC member care drafts** (`trig_01StP874yVwk1toJgR5EsCrN`) step 2b now starts from the main contact (`v_businesses.main_contact_id`, with `main_contact_is_manual`), then everyone else; "prefer the person Tom corresponds with (usually the main contact)". **CC daily outreach** (`trig_016DYfDyes2wzdsTkTz7Yg7F`) reads status and deal from `v_businesses` in its lead filter and checks A and B (Active or Former, or `deal_state` not none, means not a cold prospect; Closed still blocks). Saved prompts checked equal to the intended text; schedule, connectors and the other routines unchanged. **Daily desk runbook** (`system_runbook.daily_desk`, read by `CC daily desk v2`): step 1c creates a new enquiry as `Prospect`, not `Active` (status is worked out from contracts; the nightly refresh would have turned it to Prospect anyway); md5 `d999535…` → `c3839b0…`. To undo: put the before copies back.
 - **23 Oct 2026, Stage 14 interface pass agreed:** Tom asked for less scrolling, smart drop-downs and an accessible, beautiful interface, and to be asked first. Answers recorded in "Interface pass (Stage 14)". 14a (Today) can start now alongside 11b; the Businesses table part goes into Stage 13; 14b (business page, Inbox) after 14a. Nothing built.
 - **23 Oct 2026, Stage 14 addition:** Tom asked for any panel (calendar, the Businesses spreadsheet and the rest) to expand to full screen, and for flexible sizes everywhere. Added to "Interface pass (Stage 14)": a Full screen button on every main panel, a draggable divider on Today and draggable table columns, sizes remembered per browser, keyboard-accessible.
+- **23 Oct 2026, order updated and 14a started:** Tom agreed the order 14a with 11b, then 11c, 13 (with the table interface pass), 8, 14b, 10 (see "Order of the remaining work"). Stage 14a started in a fresh session.
