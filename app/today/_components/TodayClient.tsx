@@ -36,8 +36,12 @@ import { ResizableSplit } from '@/components/ui/resizable-split'
 
 const OUTLOOK_DRAFTS = 'https://outlook.office.com/mail/drafts'
 const FILTER_STORE = 'cc.today.filter'
-/** The list shows this many rows, then "Show all" (full screen shows all). */
-const LIST_LIMIT = 40
+/** Which dropdown sections are open under All, remembered in this browser. */
+const OPEN_STORE = 'cc.today.open'
+const OVERDUE_HINT =
+  'The nav badge counts these: money more than 30 days overdue, a renewal ended in the last 30 days or ending within a week, an email waiting a week or more, a to-do past its date.'
+/** A list or section shows this many rows, then "Show all" (full screen shows all). */
+const LIST_LIMIT = 10
 
 type Kind = TodayReason | 'newsletter' | 'snoozed'
 type FilterKey = 'all' | 'overdue' | Kind
@@ -413,7 +417,13 @@ function OtherThings({
   )
 }
 
-/** The chips and the rows. Up and Down move the choice; Enter opens it (on a phone, under the row). */
+/**
+ * The chips and the rows. Under "All" the rows sit in dropdown sections:
+ * Overdue first (open unless closed), then one per kind holding the rest; which
+ * sections are open is remembered in this browser. A chip shows one plain list.
+ * Up and Down move the choice through the open sections; Enter opens it (on a
+ * phone, under the row).
+ */
 function AttentionList({
   rows,
   selected,
@@ -429,8 +439,9 @@ function AttentionList({
 }) {
   const full = useFullScreen()
   const [filter, setFilter] = useState<FilterKey>('all')
-  const [showAll, setShowAll] = useState(false)
-  const listRef = useRef<HTMLUListElement>(null)
+  const [showAll, setShowAll] = useState<Set<string>>(new Set())
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(['overdue']))
+  const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     try {
@@ -438,19 +449,34 @@ function AttentionList({
       const saved = fromUrl ?? (window.localStorage.getItem(FILTER_STORE) as FilterKey | null)
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of a saved preference on mount
       if (saved) setFilter(saved)
+      const groups = window.localStorage.getItem(OPEN_STORE)
+      if (groups !== null) setOpenGroups(new Set(groups.split(',').filter(Boolean)))
     } catch {
-      // storage blocked: start on All
+      // storage blocked: start on All, Overdue open
     }
   }, [])
   const pick = (k: FilterKey) => {
     setFilter(k)
-    setShowAll(false)
+    setShowAll(new Set())
     try {
       if (k === 'all') window.localStorage.removeItem(FILTER_STORE)
       else window.localStorage.setItem(FILTER_STORE, k)
     } catch {
       // storage blocked
     }
+  }
+  const toggleGroup = (key: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      try {
+        window.localStorage.setItem(OPEN_STORE, [...next].join(','))
+      } catch {
+        // storage blocked
+      }
+      return next
+    })
   }
 
   const live = rows.filter((r) => r.kind !== 'snoozed')
@@ -461,12 +487,17 @@ function AttentionList({
   ]
   const active: FilterKey = chips.some((c) => c.key === filter) ? filter : 'all'
   const shown = active === 'all' ? live : active === 'overdue' ? live.filter((r) => r.overdue) : rows.filter((r) => r.kind === active)
-  const limit = full || showAll ? Infinity : LIST_LIMIT
-  const hint = active === 'overdue'
-    ? 'The nav badge counts these: money more than 30 days overdue, a renewal ended in the last 30 days or ending within a week, an email waiting a week or more, a to-do past its date.'
-    : CHIPS.find((c) => c.key === active)?.hint
+  const hint = active === 'overdue' ? OVERDUE_HINT : active === 'all' ? undefined : CHIPS.find((c) => c.key === active)?.hint
 
-  function onKey(e: React.KeyboardEvent<HTMLUListElement>) {
+  // Under All: Overdue, then each kind with what is left.
+  const groups: { key: string; label: string; rows: Row[] }[] = active === 'all'
+    ? [
+        { key: 'overdue', label: 'Overdue', rows: live.filter((r) => r.overdue) },
+        ...CHIPS.filter((c) => c.key !== 'snoozed').map((c) => ({ key: c.key as string, label: c.label, rows: live.filter((r) => r.kind === c.key && !r.overdue) })),
+      ].filter((g) => g.rows.length > 0)
+    : []
+
+  function onKey(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return
     const buttons = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>('button[data-row]') ?? [])
     const at = buttons.findIndex((b) => b === document.activeElement)
@@ -478,58 +509,105 @@ function AttentionList({
     if (row) choose(row, false)
   }
 
-  const current = selected ?? shown[0]?.key ?? null
+  const visible = active === 'all' ? groups.filter((g) => openGroups.has(g.key)).flatMap((g) => g.rows) : shown
+  const current = selected ?? visible[0]?.key ?? null
+
+  function rowItem(r: Row) {
+    const on = r.key === current
+    return (
+      <li key={r.key} className="border-b border-ms-grid">
+        <button
+          type="button"
+          data-row={r.key}
+          aria-label={`${r.title}. ${KIND_LABEL[r.kind]}: ${r.detail}. ${r.pill.text}${r.overdue ? ', overdue' : ''}`}
+          aria-current={on ? 'true' : undefined}
+          aria-expanded={opened === r.key}
+          tabIndex={on ? 0 : -1}
+          onClick={(e) => {
+            choose(r, true)
+            // Enter on a computer: on to the detail panel's main action (Escape comes back).
+            if (e.detail === 0 && window.matchMedia('(min-width: 1024px)').matches) {
+              window.setTimeout(() => document.querySelector<HTMLElement>('#today-detail [data-main]')?.focus(), 50)
+            }
+          }}
+          className={cn(
+            'w-full text-left flex items-start gap-3 px-3 py-2.5 border-l-[3px] transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy',
+            on ? 'bg-ms-green/50 border-ms-band' : 'bg-white border-transparent hover:bg-brand-warm',
+          )}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold text-brand-dark truncate" title={r.title}>{r.title}</span>
+            <span className="block text-xs text-gray-600 truncate" title={r.detail}>
+              <span className="sr-only">{KIND_LABEL[r.kind]}: </span>{r.detail}
+            </span>
+          </span>
+          <span className={cn('shrink-0 mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', TONE[r.pill.tone])}>{r.pill.text}</span>
+        </button>
+        {opened === r.key && <div className="lg:hidden px-3 pb-3 pt-1 bg-ms-green/20">{renderInline(r)}</div>}
+      </li>
+    )
+  }
+
+  /** Rows with a "Show all" past the limit (full screen shows all). */
+  function rowList(key: string, list: Row[], label: string) {
+    const limit = full || showAll.has(key) ? Infinity : LIST_LIMIT
+    return (
+      <>
+        <ul aria-label={label} className="border-t border-ms-grid">{list.slice(0, limit).map(rowItem)}</ul>
+        {list.length > limit && (
+          <button type="button" className={cn(softBtn, 'mt-2')} onClick={() => setShowAll((prev) => new Set(prev).add(key))}>
+            Show all {list.length}
+          </button>
+        )}
+      </>
+    )
+  }
 
   return (
     <div className="space-y-2">
       <FilterChips chips={chips} value={active} onChange={pick} label="Show" />
       {hint && <p className="text-xs text-gray-700">{hint}</p>}
-      {shown.length === 0 ? (
-        <p className="text-sm text-gray-700 py-3">Nothing here.</p>
-      ) : (
-        <ul ref={listRef} onKeyDown={onKey} aria-label="Needs attention" className="border-t border-ms-grid">
-          {shown.slice(0, limit).map((r) => {
-            const on = r.key === current
-            return (
-              <li key={r.key} className="border-b border-ms-grid">
-                <button
-                  type="button"
-                  data-row={r.key}
-                  aria-label={`${r.title}. ${KIND_LABEL[r.kind]}: ${r.detail}. ${r.pill.text}${r.overdue ? ', overdue' : ''}`}
-                  aria-current={on ? 'true' : undefined}
-                  aria-expanded={opened === r.key}
-                  tabIndex={on ? 0 : -1}
-                  onClick={(e) => {
-                    choose(r, true)
-                    // Enter on a computer: on to the detail panel's main action (Escape comes back).
-                    if (e.detail === 0 && window.matchMedia('(min-width: 1024px)').matches) {
-                      window.setTimeout(() => document.querySelector<HTMLElement>('#today-detail [data-main]')?.focus(), 50)
-                    }
-                  }}
-                  className={cn(
-                    'w-full text-left flex items-start gap-3 px-3 py-2.5 border-l-[3px] transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy',
-                    on ? 'bg-ms-green/50 border-ms-band' : 'bg-white border-transparent hover:bg-brand-warm',
+      <div ref={listRef} onKeyDown={onKey}>
+        {shown.length === 0 ? (
+          <p className="text-sm text-gray-700 py-3">Nothing here.</p>
+        ) : active !== 'all' ? (
+          rowList(active, shown, 'Needs attention')
+        ) : (
+          <div className="space-y-2">
+            {groups.map((g) => {
+              const isOpen = openGroups.has(g.key)
+              const id = `today-group-${g.key}`
+              return (
+                <section key={g.key} className="border border-ms-grid rounded-sm bg-white">
+                  <h3>
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={id}
+                      onClick={() => toggleGroup(g.key)}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-3 min-h-11 text-left text-sm font-semibold transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy',
+                        g.key === 'overdue' ? 'bg-ms-red/40 text-ms-red-text hover:bg-ms-red/60' : 'bg-brand-warm text-brand-dark hover:bg-ms-green/40',
+                      )}
+                    >
+                      <span aria-hidden="true" className={cn('inline-block w-3 transition-transform duration-200', isOpen && 'rotate-90')}>▸</span>
+                      <span>{g.label}</span>
+                      <span className="tabular-nums font-normal">{g.rows.length}</span>
+                      <span className="ml-auto text-xs font-semibold text-brand-navy">{isOpen ? 'Hide' : 'Show'}</span>
+                    </button>
+                  </h3>
+                  {isOpen && (
+                    <div id={id} className="px-2 pb-2">
+                      {g.key === 'overdue' && <p className="text-xs text-gray-700 px-1 py-1.5">{OVERDUE_HINT}</p>}
+                      {rowList(g.key, g.rows, g.label)}
+                    </div>
                   )}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-semibold text-brand-dark truncate" title={r.title}>{r.title}</span>
-                    <span className="block text-xs text-gray-600 truncate" title={r.detail}>
-                      <span className="sr-only">{KIND_LABEL[r.kind]}: </span>{r.detail}
-                    </span>
-                  </span>
-                  <span className={cn('shrink-0 mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', TONE[r.pill.tone])}>{r.pill.text}</span>
-                </button>
-                {opened === r.key && <div className="lg:hidden px-3 pb-3 pt-1 bg-ms-green/20">{renderInline(r)}</div>}
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      {shown.length > limit && (
-        <button type="button" className={softBtn} onClick={() => setShowAll(true)}>
-          Show all {shown.length}
-        </button>
-      )}
+                </section>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
