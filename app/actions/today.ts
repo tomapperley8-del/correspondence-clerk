@@ -4,14 +4,12 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { isFeatureEnabled } from '@/lib/feature-flags'
-import type { AttentionRow } from '@/app/actions/attention'
+import { loadTodayCore } from '@/lib/today-source'
 import { splitDoNow, type TodayItem } from '@/lib/today'
 
 // Today (UI overhaul Stage 7): the home page. Built on v_business_attention
 // (Stage 4) plus hand-written to-dos. Engine tasks for replies, renewals and
 // invoices are not shown: the view works those out itself.
-
-type SupabaseServer = Awaited<ReturnType<typeof createClient>>
 
 export type QuietReminder = {
   id: string
@@ -34,70 +32,10 @@ export type TodayData = {
   quiet: QuietReminder[]
 }
 
-type ManualTask = {
-  id: string
-  title: string
-  due_date: string | null
-  business_id: string | null
-  business: { name: string } | { name: string }[] | null
-  task_category: { name: string } | { name: string }[] | null
-}
-
 const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v)
 
-async function getToday(supabase: SupabaseServer): Promise<string> {
-  const { data } = await supabase.rpc('cc_today')
-  return typeof data === 'string' ? data : new Date().toISOString().slice(0, 10)
-}
-
-async function loadCore(supabase: SupabaseServer, orgId: string) {
-  const [today, rowsRes, tasksRes] = await Promise.all([
-    getToday(supabase),
-    supabase.from('v_business_attention').select('*').eq('organization_id', orgId),
-    supabase
-      .from('tasks')
-      .select('id, title, due_date, business_id, business:businesses!tasks_business_id_fkey(name), task_category:task_categories(name)')
-      .eq('organization_id', orgId)
-      .eq('status', 'open')
-      .eq('source', 'manual')
-      .order('due_date', { ascending: true, nullsFirst: false }),
-  ])
-  if (rowsRes.error) throw new Error(rowsRes.error.message)
-  if (tasksRes.error) throw new Error(tasksRes.error.message)
-  const rows = (rowsRes.data ?? []) as AttentionRow[]
-  const tasks = (tasksRes.data ?? []) as ManualTask[]
-  return { today, rows, tasks, items: buildItems(rows, tasks) }
-}
-
-function buildItems(rows: AttentionRow[], tasks: ManualTask[]): TodayItem[] {
-  const items: TodayItem[] = []
-  const taskIds = new Set(tasks.map((t) => t.id))
-  for (const r of rows) {
-    if (r.is_snoozed) continue
-    const others = r.reasons.filter((x) => x !== r.reason)
-    if (r.reason !== 'todo') {
-      items.push({
-        key: `${r.reason}:${r.business_id}`, reason: r.reason, business_id: r.business_id, business_name: r.business_name,
-        detail: r.detail, since: r.since, ref_id: r.ref_id, other_reasons: others,
-      })
-    } else if (r.ref_id && !taskIds.has(r.ref_id)) {
-      // The view's to-do here is a "Follow up" flag on an email; hand-written
-      // to-dos are listed one by one below instead.
-      items.push({
-        key: `flag:${r.ref_id}`, reason: 'todo', todo_kind: 'flag', business_id: r.business_id, business_name: r.business_name,
-        detail: r.detail, since: r.since, ref_id: r.ref_id, other_reasons: others,
-      })
-    }
-  }
-  for (const t of tasks) {
-    items.push({
-      key: `task:${t.id}`, reason: 'todo', todo_kind: 'task', business_id: t.business_id, business_name: one(t.business)?.name ?? null,
-      detail: t.title, since: t.due_date, ref_id: t.id, other_reasons: [],
-      for_newsletter: one(t.task_category)?.name === 'For Newsletter',
-    })
-  }
-  return items
-}
+// Today's list is loaded in lib/today-source.ts, shared with the desk email (Stage 11a).
+const loadCore = loadTodayCore
 
 /** The nav badge: how many lines are in Do now (at most 8). Null when unavailable. */
 export async function getDoNowCount(): Promise<number | null> {

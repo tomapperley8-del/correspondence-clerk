@@ -54,6 +54,9 @@ export type Business = {
   notes: string | null
   last_contacted_at: string | null
   business_type: string | null
+  /** Stage 11a (v_businesses): the main contact, chosen by hand or automatically. */
+  main_contact_id?: string | null
+  main_contact_is_manual?: boolean
   relationship_memory: string | null
   relationship_memory_updated_at: string | null
   outreach_stage: string | null
@@ -131,7 +134,7 @@ export async function getBusinessById(id: string) {
   const { data, error } = await supabase
     // Stage 11a: status, deal, last in touch from the truth layer (writes still go to businesses)
     .from('v_businesses')
-    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, invoice_number, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, outreach_stage, outreach_identified_at, outreach_contacted_at, outreach_followed_up_at, outreach_in_discussion_at, outreach_won_at, outreach_invoice_paid_at, outreach_declined_at, renewal_stage, renewal_not_started_at, renewal_contacted_at, renewal_in_discussion_at, renewal_agreed_at, renewal_invoice_paid_at, renewal_declined_at, disposition, follow_up_after, mute_replies, mastersheet_source_ids, merged_into, organization_id, created_at, updated_at')
+    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, invoice_number, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, outreach_stage, outreach_identified_at, outreach_contacted_at, outreach_followed_up_at, outreach_in_discussion_at, outreach_won_at, outreach_invoice_paid_at, outreach_declined_at, renewal_stage, renewal_not_started_at, renewal_contacted_at, renewal_in_discussion_at, renewal_agreed_at, renewal_invoice_paid_at, renewal_declined_at, disposition, follow_up_after, mute_replies, mastersheet_source_ids, merged_into, organization_id, created_at, updated_at, main_contact_id, main_contact_is_manual')
     .eq('id', id)
     .single()
 

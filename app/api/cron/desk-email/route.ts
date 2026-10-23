@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { buildDeskEmail, type CareGap, type ClosedItem, type DeskLine, type DraftItem } from '@/lib/email/desk-email'
+import { loadTodayCore } from '@/lib/today-source'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -14,7 +15,8 @@ const FROM = process.env.RESEND_FROM_EMAIL || 'noreply@correspondenceclerk.com'
  *
  * 1. run_morning_pipeline(): QuickBooks to CRM, task engine refresh, automatic
  *    task closing and prospect matching, all in SQL.
- * 2. Read the desk views and send one email to Tom. No AI involved.
+ * 2. Read the desk views and send one email to Tom. No AI involved. The work
+ *    list is Today's own (lib/today-source.ts), so the email matches the app.
  *
  * ?dry=1 returns the email instead of sending it.
  */
@@ -37,6 +39,21 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.rpc('run_morning_pipeline')
     if (error) console.error('[desk-email] pipeline error:', error.message)
     else pipeline = data as Record<string, unknown>
+  }
+
+  // Today's list for the organisation (one organisation; DESK_EMAIL_ORG_ID picks one if there are more)
+  let orgId = process.env.DESK_EMAIL_ORG_ID ?? null
+  if (!orgId) {
+    const { data: org } = await supabase.from('organizations').select('id').order('created_at').limit(1).maybeSingle()
+    orgId = org?.id ?? null
+  }
+  if (!orgId) return NextResponse.json({ error: 'No organisation found' }, { status: 500 })
+  let todayCore: Awaited<ReturnType<typeof loadTodayCore>>
+  try {
+    todayCore = await loadTodayCore(supabase, orgId)
+  } catch (e) {
+    console.error('[desk-email] Today read error:', (e as Error).message)
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
 
   const since = new Date(now.getTime() - 24 * 3_600_000).toISOString()
@@ -109,6 +126,7 @@ export async function GET(request: NextRequest) {
     drafts,
     skippedCount,
     gaps: (gapsRes.data ?? []) as CareGap[],
+    today: { date: todayCore.today, items: todayCore.items },
   })
 
   if (dry) {

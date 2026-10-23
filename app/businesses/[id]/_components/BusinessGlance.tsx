@@ -155,8 +155,13 @@ export function BusinessGlance({ business, contacts, glance, correspondence, mem
     ? [...contracts].filter((c) => c.contract_end).sort((a, b) => (b.contract_end! > a.contract_end! ? 1 : -1))[0]
     : undefined
 
-  // Main contact; if none is chosen, the person on the most recent email.
-  const primary = contacts.find((c) => c.is_primary && c.is_active !== false)
+  // Main contact: chosen by hand, else automatically by v_businesses (the named,
+  // active contact with the most correspondence, Stage 11a); if there is none,
+  // the person on the most recent email.
+  const primary =
+    contacts.find((c) => c.is_primary && c.is_active !== false) ??
+    (business.main_contact_id ? contacts.find((c) => c.id === business.main_contact_id) : undefined)
+  const chosenAutomatically = !!primary && !primary.is_primary
   const latestEntries = [...correspondence].sort((a, b) =>
     new Date(b.entry_date || b.created_at).getTime() - new Date(a.entry_date || a.created_at).getTime()
   )
@@ -191,7 +196,10 @@ export function BusinessGlance({ business, contacts, glance, correspondence, mem
 
       <Card title="Main contact">
         {primary ? (
-          <ContactDetails contact={primary} />
+          <>
+            {chosenAutomatically && <p className="text-xs text-gray-500">Chosen automatically: most correspondence.</p>}
+            <ContactDetails contact={primary} />
+          </>
         ) : lastInTouch ? (
           <>
             <p className="text-xs text-gray-500">No main contact chosen. Last in touch:</p>
@@ -201,7 +209,7 @@ export function BusinessGlance({ business, contacts, glance, correspondence, mem
           <p className="text-gray-700">No main contact chosen.</p>
         )}
         <button type="button" onClick={onShowContacts} className="text-xs text-brand-navy hover:underline pt-1">
-          {primary ? `All contacts (${contacts.length})` : 'Choose main contact'}
+          {primary && !chosenAutomatically ? `All contacts (${contacts.length})` : 'Choose main contact'}
         </button>
       </Card>
 
