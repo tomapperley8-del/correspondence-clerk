@@ -108,6 +108,14 @@ function outreach(r: TableRow): { label: string; tone: Tone } {
   return { label: 'Not Contacted', tone: 'muted' }
 }
 
+/** The sheet's ON WEBSITE? column, from the Club Card pages read nightly (Stage 6b). */
+const ON_WEBSITE: Record<NonNullable<TableRow['on_website']>['state'], { label: string; tone: Tone; hint: string }> = {
+  live: { label: 'Active', tone: 'green', hint: 'Club Card page on the website.' },
+  lapsed: { label: 'Expired', tone: 'red', hint: 'Card ended but the page is still on the website.' },
+  no_card: { label: 'No card', tone: 'orange', hint: 'Page on the website but no Club Card on file.' },
+  missing: { label: 'No page', tone: 'red', hint: 'Club Card member with no page on the website.' },
+}
+
 /** Contract end colour and the sheet's REMINDER FLAG text. */
 function dealState(r: TableRow, today: string): { tone: Tone; flag: string } | null {
   const end = r.deal?.contract_end
@@ -138,7 +146,7 @@ const COLUMNS: Column[] = [
   { key: 'start', label: 'Contract start', width: 'w-[92px]' },
   { key: 'end', label: 'Contract end', sortKey: 'deal', width: 'w-[96px]' },
   { key: 'flag', label: 'Reminder flag', width: 'w-[170px]' },
-  // "On website?" goes here once Stage 6b supplies it (Active green / Expired red pill).
+  { key: 'website', label: 'On website?', width: 'w-[110px]' },
   { key: 'email', label: 'Email', width: 'w-[200px]' },
   { key: 'contact', label: 'Main contact', sortKey: 'contact', width: 'w-[210px]' },
   { key: 'last', label: 'Last in touch', sortKey: 'last', width: 'w-[150px]' },
@@ -272,6 +280,16 @@ function Row({ row: r, today, membershipLabels }: { row: TableRow; today: string
         {r.in_renewal_window && r.renewal_stage && (
           <span className="font-normal text-gray-600"> · {RENEWAL_STAGE_LABEL[r.renewal_stage] ?? r.renewal_stage}</span>
         )}
+      </td>
+
+      <td className={`${TD} group-hover:bg-brand-paper`}>
+        {r.on_website && (() => {
+          const w = ON_WEBSITE[r.on_website.state]
+          const pill = <Pill tone={w.tone}>{w.label}</Pill>
+          return r.on_website.link
+            ? <a href={r.on_website.link} target="_blank" rel="noopener noreferrer" title={`${w.hint} Opens the page on the website.`}>{pill}</a>
+            : <span title={w.hint}>{pill}</span>
+        })()}
       </td>
 
       <td className={`${TD} group-hover:bg-brand-paper max-w-[200px]`}>
