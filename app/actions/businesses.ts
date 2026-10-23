@@ -611,6 +611,12 @@ export async function promoteOutreachToContracts(
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
+  // The deal first: a deal in force already counts, otherwise a Club Card is recorded, as the
+  // tick used to be. Its insert trigger takes the business off Outreach, so the lead mirror
+  // (business_stage_mirrors_lead) sees the deal and marks the lead converted.
+  const deal = await recordDeal(supabase, orgId, businessId, null)
+  if (deal.error) return { error: deal.error }
+
   const update: Record<string, unknown> = {
     outreach_stage: null,
     outreach_identified_at: null,
@@ -631,10 +637,6 @@ export async function promoteOutreachToContracts(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
-
-  // a deal in force already counts; otherwise record a Club Card, as the tick used to
-  const deal = await recordDeal(supabase, orgId, businessId, null)
-  if (deal.error) return { error: deal.error }
 
   revalidatePath('/today')
   revalidatePath('/dashboard')
