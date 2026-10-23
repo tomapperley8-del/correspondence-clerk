@@ -65,6 +65,7 @@ Classification of the 173 open tasks on 21 Oct: about 66-74 actionable, 31 proba
 | 22 Oct | Tom ended the Stage 4 comparison week early ("forget the 28 October thing, lets crack on"). Stage 4 is done. Nav badge = the Today "Do now" number (at most 8), Claude's recommendation, changeable later. Next: Stage 7, then 6b |
 | 22 Oct | Stage 9 changed from keeping the Mastersheet export in sync to retiring the Mastersheet. Tom doesn't use it or keep it updated, but doesn't want to lose what's in it. It is a Google Sheet in Tom's Drive. Supersedes the 21 Oct decision to keep a read-only copy keyed on `business_id` during the rollout |
 | 22 Oct | Stage 11 (data) agreed from Tom's answers: status worked out from contracts; main contacts chosen automatically; categories become the website's 7 Club Card categories; one pipeline (the Outreach stage); old Outreach Engine tables mined, then archived; a fourth nav place, Insights. Runs after 6b and 9 |
+| 23 Oct | Stage 14 interface pass agreed from Tom's answers: Today in two columns (work on the left; week calendar, newsletter and quick add on the right); each row shows its most likely action as a button with the rest in a labelled "More" menu (Snooze with tomorrow / 3 days / 1 week / pick a date); Everything else becomes one list with filter chips and counts; then the same treatment for the whole site. Order: 14a Today now; Businesses table inside Stage 13; 14b business page and Inbox |
 
 **Commitments ("You said you'd").** Automatic detection depends on routine tags, which are optional and have been unreliable. So: a one-click "I'll do this by [date]" on any email or business row creates a linked to-do, and that is the only thing that counts. Where a routine has tagged a promise, the business page shows it as a suggestion with an "Add as to-do" button; it never enters the count and can't reopen. Existing open commitment tasks are bulk-closed after a backup (Stage 1, with Tom's go-ahead).
 
@@ -109,8 +110,8 @@ Agreed 22 Oct 2026. Tom finds the site confusing and uses none of Briefing; Brie
 1. Businesses filter fix: done and live 22 Oct (`1fe4494`).
 2. 6b: live; first website read run early by Tom on 22 Oct (101 pages, 97 suggested matches); waiting on Tom's matching review at /businesses/club-card-pages.
 3. Stage 11a (shared truth layer) and Stage 12 (calendar and newsletter list) side by side: 11a works on database views and the desk email, 12 on Today and to-dos.
-4. Stage 11b, then 11c.
-5. Stage 13 (spreadsheet upgrades), after 11, because once status is derived the cells may only edit fields Tom owns.
+4. Stage 11b, then 11c. Stage 14a (Today interface) can run alongside 11b: it touches only Today.
+5. Stage 13 (spreadsheet upgrades, including the interface pass for the Businesses table), after 11, because once status is derived the cells may only edit fields Tom owns. Stage 14b (business page and Inbox) after 14a.
 6. Stage 8 (drafting templates).
 7. Stage 10 (finish).
 
@@ -160,6 +161,26 @@ Agreed 22 Oct 2026. Tom asked to brainstorm making the spreadsheet better and ch
 - **Quick actions on a row:** log an email or call, add a to-do, mark "for newsletter".
 - **Download** any view as Excel or CSV.
 - **Colours:** deal-type pills, outreach-status pills, date warnings (red overdue, orange close, green fine), and a row tint by state (for example a red wash for anything needing attention).
+
+## Interface pass (Stage 14)
+
+Agreed 23 Oct 2026. Tom: "make the interface better, less scrolling, particularly on today page, use smart drop downs and stuff maybe, but be smart about this, make sure everything works, everything is accessible, everything is beautiful".
+
+**Found (Today, 23 Oct):** top to bottom: header, a full-width calendar (about a third of a screen), Do now (8 items, each three lines with up to three buttons), Everything else (one folded box per reason), "I'll do this by…", the newsletter list, Other things. Do now, the most important part, sits below the calendar, and each item takes a lot of height.
+
+**Tom's choices:**
+- **Today in two columns** on a computer: on the left, Do now and then Everything else (the work); on the right, a compact week calendar (Month on a toggle), the newsletter list for Wednesday, and "I'll do this by…". One column on a phone, Do now first. Most of it fits on one screen.
+- **Row actions:** every item is one line (business, short detail, age); the most likely action is a button (Chase, Log renewal, Reply, Done); the rest sit in a labelled "More" menu: Mark paid, No reply needed, Not renewing, Open business, and Snooze with Tomorrow / 3 days / 1 week / Pick a date. "Pick a date" uses the same snooze rules as before (per-business `attention_snoozed_until`; for tasks, moving the date is the sticking snooze).
+- **Everything else:** one list with filter chips and counts across the top (All, Money, Renewals, Waiting on you, To-dos, Club Card, and so on); click a chip to show just that kind.
+- **Scope:** whole site. 14a Today; the Businesses table inside Stage 13 (same row and menu patterns); 14b the business page and Inbox.
+
+**Standards for every page in this stage:**
+- Menus have text labels (Hard Rule 9: no icon-only buttons); every action reachable by keyboard (Tab, Enter, Escape closes, arrow keys in menus); proper roles (`menu`, `menuitem`) or native `<select>`/`<details>` where simpler; visible focus.
+- Colour contrast at least WCAG AA; nothing told by colour alone.
+- Phone width (375px) with no sideways scrolling; touch targets at least 40px.
+- Design tokens only; the app's fonts and palette (the Businesses table keeps its Mastersheet look, Tom's choice).
+- Nothing changes what an action does: same server actions, same data, same counts. Check the nav badge and Do now count before and after.
+- Check in the browser on a local copy at desktop and phone widths, then show Tom screenshots before going live.
 
 ## One source of truth (Stage 11)
 
@@ -233,7 +254,8 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 | 10 | Finish: switch off the task engine's reply, renewal and invoice rules once nothing reads them; update the routines' instructions; final docs; one logged-in walk-through with Tom. (CLAUDE.md refreshed early on 22 Oct; `cc-live-export` is switched off, so it no longer needs bringing into the repo) | all | Not started; last |
 | 11 | One source of truth, in three parts: **11a** shared truth layer (derived status, current deal, main contact, last in touch, category, read by everything; desk email rebuilt from Today's source); **11b** clean-up reviews; **11c** Insights and Data health (spec below) | 6b, 9 | **11a live 23 Oct** (migration, backfill, code). Next-day checks on 24 Oct pending. 11b, 11c not started 11b, 11c not started |
 | 12 | Work calendar and newsletter list on Today (spec below) | 7, 6b | **Live 23 Oct** (tidy migration `20261023_002` and the code in merge `1a03d6c`, both approved by Tom). Waiting: next-day check on 24 Oct (first `tidy-calendar` run, routine heartbeats, desk email matches Today) |
-| 13 | Businesses spreadsheet upgrades: edit in the cell, choose columns, row actions, download, Mastersheet colours (spec below) | 11 | Not started; after 11 |
+| 13 | Businesses spreadsheet upgrades: edit in the cell, choose columns, row actions, download, Mastersheet colours (spec below); also the Stage 14 interface pass for this table (one-line rows, row actions in a main button + More menu, consistent filters) | 11 | Not started; after 11 |
+| 14 | Interface pass: less scrolling, smart menus, consistent and accessible (spec below). **14a** Today; **14b** business page and Inbox; the Businesses table is done inside Stage 13 | 7, 12 | 14a: not started, can start now; 14b after 14a |
 
 ### Per stage: change, risk, verify, rollback
 
@@ -357,3 +379,4 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **23 Oct 2026, Stage 11a code live (Tom approved: "Yes, merge ui-overhaul into main, including Stage 12 and the 6b On website? column."):** Merged in a temporary worktree (the shared folder stays on `ui-overhaul`): `main` `8d6276b` → `1a03d6c`, pushed. Brought Stage 11a (truth layer readers in the app, desk email from Today's source, automatic main contact on the business page), Stage 12 (work calendar and newsletter list; its tidy migration was already live) and 6b's On website? column. tsc clean on the merged head beforehand. Vercel production deployment `dpl_AgbeQbUubggfqxSA1aCMHQXfU8vU` Ready; rollback candidate `dpl_53snfQDWbwfrmEVEBUF92hQQdHRM` (`8d6276b`). Signed out: `/`, `/login`, `/businesses` 200, `/today` 307, `/api/cron/desk-email` and `/api/businesses` 401, as before. No runtime errors since the deploy. **Next session starts here (Stage 11a), on 24 Oct:** (1) `cron.job_run_details` shows `refresh-business-truth` ran at 02:05 UTC and `v_businesses` has 0 rows differing from the stored status / last in touch; (2) `routine_heartbeat` has rows for `daily_desk`, `member_care`, `outreach` and `desk_email` dated 24 Oct; (3) the desk email (Tom's inbox, or `/api/cron/desk-email?dry=1` with `CRON_SECRET`, Tom's go-ahead) shows the same Do now as Today; (4) Tom looks at Today, Businesses and a business page logged in. Optional for Tom: routine prompts can read `v_businesses`; drop wording about the desk email's old sections.
 - **23 Oct 2026, alignment check:** `main` (`1a03d6c`) and `ui-overhaul` hold the same code; production serves `1a03d6c` (Ready, no runtime errors in 12 hours). All 8 overhaul migrations in the repo are applied on live and none are missing. Overnight jobs ran with no cron failures (`refresh-business-truth` is new from tonight). This morning's routines and desk email ran **before** Stage 11a went live (10:11), so 24 Oct is the first real check of 11a and 12 together: four heartbeats, the desk email matching Today, `refresh-business-truth` at 02:05 and `tidy-calendar` at 00:05. Stale rows fixed: 6b (done, all 101 pages matched) and 12 (live). Told the Stage 12 session to keep the combined merge (Tom approved it in the 11a session) and push nothing.
 - **23 Oct 2026, Stage 11a routine instructions updated (Tom: "yeah do this" to the optional routine changes):** Before copies in `supabase/.local/11a/routines/` (`triggers_before.json`, `daily_desk_runbook_before.json`). None of the routines mentioned the desk email's old sections, so nothing to drop there. Changed through the claude.ai routines API: **CC member care drafts** (`trig_01StP874yVwk1toJgR5EsCrN`) step 2b now starts from the main contact (`v_businesses.main_contact_id`, with `main_contact_is_manual`), then everyone else; "prefer the person Tom corresponds with (usually the main contact)". **CC daily outreach** (`trig_016DYfDyes2wzdsTkTz7Yg7F`) reads status and deal from `v_businesses` in its lead filter and checks A and B (Active or Former, or `deal_state` not none, means not a cold prospect; Closed still blocks). Saved prompts checked equal to the intended text; schedule, connectors and the other routines unchanged. **Daily desk runbook** (`system_runbook.daily_desk`, read by `CC daily desk v2`): step 1c creates a new enquiry as `Prospect`, not `Active` (status is worked out from contracts; the nightly refresh would have turned it to Prospect anyway); md5 `d999535…` → `c3839b0…`. To undo: put the before copies back.
+- **23 Oct 2026, Stage 14 interface pass agreed:** Tom asked for less scrolling, smart drop-downs and an accessible, beautiful interface, and to be asked first. Answers recorded in "Interface pass (Stage 14)". 14a (Today) can start now alongside 11b; the Businesses table part goes into Stage 13; 14b (business page, Inbox) after 14a. Nothing built.
