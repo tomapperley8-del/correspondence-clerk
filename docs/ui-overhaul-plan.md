@@ -66,6 +66,7 @@ Classification of the 173 open tasks on 21 Oct: about 66-74 actionable, 31 proba
 | 22 Oct | Stage 9 changed from keeping the Mastersheet export in sync to retiring the Mastersheet. Tom doesn't use it or keep it updated, but doesn't want to lose what's in it. It is a Google Sheet in Tom's Drive. Supersedes the 21 Oct decision to keep a read-only copy keyed on `business_id` during the rollout |
 | 22 Oct | Stage 11 (data) agreed from Tom's answers: status worked out from contracts; main contacts chosen automatically; categories become the website's 7 Club Card categories; one pipeline (the Outreach stage); old Outreach Engine tables mined, then archived; a fourth nav place, Insights. Runs after 6b and 9 |
 | 23 Oct | Stage 14 interface pass agreed from Tom's answers: Today in two columns (work on the left; week calendar, newsletter and quick add on the right); each row shows its most likely action as a button with the rest in a labelled "More" menu (Snooze with tomorrow / 3 days / 1 week / pick a date); Everything else becomes one list with filter chips and counts; then the same treatment for the whole site. Order: 14a Today now; Businesses table inside Stage 13; 14b business page and Inbox |
+| 23 Oct | Stage 8 (templates and "Copy context pack") dropped. Tom: "Drop Stage 8 from the plan." The member care and outreach routines already write per-business drafts (214 in the 30 days to 23 Oct), shown on the business page; templates would put wording into the app (Hard Rule 2). 14b now follows 13 |
 
 **Commitments ("You said you'd").** Automatic detection depends on routine tags, which are optional and have been unreliable. So: a one-click "I'll do this by [date]" on any email or business row creates a linked to-do, and that is the only thing that counts. Where a routine has tagged a promise, the business page shows it as a suggestion with an "Add as to-do" button; it never enters the count and can't reopen. Existing open commitment tasks are bulk-closed after a backup (Stage 1, with Tom's go-ahead).
 
@@ -107,16 +108,15 @@ Agreed 22 Oct 2026. Tom finds the site confusing and uses none of Briefing; Brie
 
 ## Order of the remaining work (agreed 22 Oct, updated 23 Oct)
 
-Done: 0-7, 6b, 9, 11a (next-day check 24 Oct), 12 (next-day check 24 Oct), the Businesses filter fix.
+Done: 0-7, 6b, 9, 11a (next-day check 24 Oct), 12 (next-day check 24 Oct), 14a (live 23 Oct), the Businesses filter fix. Dropped: 8 (Decision 23 Oct).
 
-1. **14a Today redesign** (started 23 Oct) alongside **11b clean-up reviews** (running): different files.
+1. **11b clean-up reviews** (running).
 2. **11c** Insights and Data health.
 3. **13** Businesses spreadsheet upgrades, including the Stage 14 interface pass for that table (reuse 14a's row, menu, full-screen and resize patterns).
-4. **8** drafting templates (their buttons go into the 14a-style More menus).
-5. **14b** business page and Inbox, after 11b and 8 have added what they add there, so it is laid out once.
-6. **10** finish.
+4. **14b** business page and Inbox, after 11b has added what it adds there, so it is laid out once.
+5. **10** finish.
 
-Why this order (Tom agreed 23 Oct): Today is used every day and hurts most; 14a sets the patterns the later stages reuse; the table changes in 13 anyway; the business page gains things from 11b and 8. Running two sessions at once uses Tom's allowance faster.
+Why this order (Tom agreed 23 Oct): Today is used every day and hurts most; 14a sets the patterns the later stages reuse; the table changes in 13 anyway; the business page gains things from 11b. Running two sessions at once uses Tom's allowance faster.
 
 ## Who reads what (the cohesion rule)
 
@@ -132,7 +132,7 @@ Readers found on 22 Oct (re-check with a query before each change; this list goe
 | Deal | `contracts` (copies on `businesses`) | copies still read by `get_contract_expiries`, `refresh_task_commitments`, `sync_business_flags_from_contracts` (writes them) |
 | Needs attention | `v_business_attention` | Today, nav badge, Businesses Needs attention view, business page; (6b adds Club Card reasons) |
 | Tasks | `tasks` (engine + hand-written) | nightly `refresh-system-tasks` (02:10), `morning-pipeline` (06:50) and the desk email, the routines; hidden in the app since Stage 7 except hand-written |
-| Main contact | `contacts.is_primary` | business page, Businesses table; (Stage 8 templates) |
+| Main contact | `contacts.is_primary` | business page, Businesses table; member care routine (via `v_businesses.main_contact_id`) |
 
 Scheduled jobs (pg_cron): `refresh-system-tasks` 02:10, `morning-pipeline` 06:50, `check-routine-heartbeats` 10:30. Vercel cron: desk email 07:00.
 
@@ -258,13 +258,13 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 | 6 | Business detail "at a glance" and one merged timeline | 3, 4 | **Done 22 Oct** (Tom looked at it logged in). Live 22 Oct (code only, no migration).  |
 | 6b | Club Card view: every member's website page, offer, edit date and contract in one list, with problems flagged (spec below); a saved view in Businesses, not a nav tab (Decision 22 Oct) | 5, 6, 7 | **Live 22-23 Oct** (migrations `20261022_001`, `_002`, the code, the sync fix, "Add as new business" and the On website? column, each approved by Tom). Nightly read runs 02:30 UTC and works; Tom matched all 101 pages on 23 Oct. Done |
 | 7 | New layout: Today page, three-place nav, retire Briefing / To-dos / Needs attention pages, Contracts and Outreach into Businesses (spec "New layout (Stage 7)" below) | 4, 5, 6 | **Done 22 Oct** (Tom looked at it logged in). Live 22 Oct (code only, no migration).  |
-| 8 | Zero-credit drafting: templates and "Copy context pack" | 11 (needs clean main contacts, deals and coverage) | Not started; after 11 |
+| 8 | Zero-credit drafting: templates and "Copy context pack" | 11 (needs clean main contacts, deals and coverage) | **Dropped 23 Oct** (Decision 23 Oct: the routines already draft) |
 | 9 | Retire the Mastersheet: audit what exists only in the sheet, bring across what Tom chooses, then freeze it read-only and switch off the sync (spec below) | 3 | Done 22 Oct |
 | 10 | Finish: switch off the task engine's reply, renewal and invoice rules once nothing reads them; update the routines' instructions; final docs; one logged-in walk-through with Tom. (CLAUDE.md refreshed early on 22 Oct; `cc-live-export` is switched off, so it no longer needs bringing into the repo) | all | Not started; last |
 | 11 | One source of truth, in three parts: **11a** shared truth layer (derived status, current deal, main contact, last in touch, category, read by everything; desk email rebuilt from Today's source); **11b** clean-up reviews; **11c** Insights and Data health (spec below) | 6b, 9 | **11a live 23 Oct** (migration, backfill, code). Next-day checks on 24 Oct pending. **11b:** re-audit done and review page with Tom (23 Oct); data scripts after his answers. 11c not started |
 | 12 | Work calendar and newsletter list on Today (spec below) | 7, 6b | **Live 23 Oct** (tidy migration `20261023_002` and the code in merge `1a03d6c`, both approved by Tom). Waiting: next-day check on 24 Oct (first `tidy-calendar` run, routine heartbeats, desk email matches Today) |
 | 13 | Businesses spreadsheet upgrades: edit in the cell, choose columns, row actions, download, Mastersheet colours (spec below); also the Stage 14 interface pass for this table (one-line rows, row actions in a main button + More menu, consistent filters) | 11 | Not started; after 11 |
-| 14 | Interface pass: less scrolling, smart menus, consistent and accessible (spec below). **14a** Today; **14b** business page and Inbox; the Businesses table is done inside Stage 13 | 7, 12 | 14a: **live 23 Oct** (merge `6225161`, code only). Waiting: Tom's logged-in look. 14b after 8 |
+| 14 | Interface pass: less scrolling, smart menus, consistent and accessible (spec below). **14a** Today; **14b** business page and Inbox; the Businesses table is done inside Stage 13 | 7, 12 | 14a: **live 23 Oct** (merge `6225161`, code only). Waiting: Tom's logged-in look. 14b after 13 |
 
 ### Per stage: change, risk, verify, rollback
 
@@ -274,7 +274,7 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **3.** `contacts.is_primary`, `businesses.merged_into`, `merge_businesses()`. Risk: wrong merge. Verify: run on local Supabase; row counts per foreign key before and after. Rollback: restore from `cc_phase0_backup`, pair by pair.
 - **4.** New view and nav count; old and new shown side by side for a week. Risk: a missed item. Verify: compare against the 21 Oct classification. Rollback: flag off.
 - **5-7.** New routes alongside the old ones, then redirects. Risk: a missing feature. Verify: regression checklist. Rollback: flag off, remove redirects.
-- **8.** Templates in the database; mailto and copy only. Rollback: hide the buttons.
+- **8.** Dropped 23 Oct (was: templates in the database; mailto and copy only).
 - **9.** Audit read-only, then a review page, then a data script for what Tom chooses (backed up like Stage 2), then the sync is switched off. Risk: losing something only the sheet holds. Verify: every sheet row is matched to a business or listed for Tom; nothing is changed in the sheet. Rollback: the data script's undo; re-enable the sync.
 
 ## Regression checklist (after every stage)
@@ -408,3 +408,4 @@ Agreed with Tom on 22 Oct 2026 after research (nothing built yet).
 - **23 Oct 2026, Stage 14a re-checked on a fresh copy:** the 11b session said the local copy was free, so it was rebuilt from a fresh dump of live (`supabase/.local/rebuild14a.sh`; 1,115 businesses, 0 schema and 0 data load errors) with a new local-only login (`supabase/.local/local_test_login.txt`, `stage14a-test@example.test`). Old code (port 3020) and new (3024) on that data: nav badge 8 and 8; the same 8 Do now businesses in the same order (Old Pack Horse, Bollo House, Busby's, Levent Borek, Oddono's, Rocks Lane, My Place, Killik); 136 in Everything else, per reason 1, 27, 7, 20, 27, 54 in both. Read only. Handed the copy to 11b part 2 afterwards.
 - **23 Oct 2026, Stage 14a live (Tom approved: "Yes, merge ui-overhaul into main for Stage 14a (8c4757a plus the plan-only commits)."):** Merged `9e13e91` in a temporary worktree (the shared folder stays on `ui-overhaul`): `main` `1a03d6c` → `6225161`, pushed. It carried `8c4757a` (14a code) and plan-only commits (11b's plan entries, the coordinator handover); the merged tree is identical to the tested `ui-overhaul` tree. Vercel production `dpl_GqfTDNCdC4Q7jPeUaqnYTrF734pv` Ready; rollback candidate `dpl_AgbeQbUubggfqxSA1aCMHQXfU8vU` (`1a03d6c`). Signed out: `/`, `/login`, `/businesses` 200, `/today` 307, `/api/businesses` and `/api/cron/desk-email` 401, as before; no runtime errors. **Next:** Tom looks at Today logged in (two columns, More menus, chips, full screen, the divider). The patterns in `components/ui/` are ready for Stage 13 and 14b.
 - **23 Oct 2026, coordinator: alignment check after the 14a merge.** `ui-overhaul` and `origin/main` hold the same files (`git diff` empty); production serves `6225161` (`dpl_GqfTDNCd…` Ready); the live migrations end at `20261023_002_calendar_tidy`, the same as `supabase/migrations/`; no failed `cron.job_run_details` runs in the last 3 days; no runtime errors in the last hour. Stage 11b part 2 (`local_429593be-…`) is still running; it asks Tom before each live step.
+- **23 Oct 2026, Stage 8 dropped (Tom: "Drop Stage 8 from the plan. Record it as a decision, and move 14b up so it follows 13."):** Decision recorded; Stages row 8 marked dropped; order is now 11b (running), 11c, 13, 14b, 10. Nothing had been built for it. Reason: the routines already write per-business drafts (`routine_drafts`: member care 206 and outreach 8 in the last 30 days), and templates would put wording into the app. The coordinator handover above still lists 8; this entry supersedes it.
