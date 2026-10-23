@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { ForNewsletterButton } from '@/components/ForNewsletterButton'
 import { type Correspondence } from '@/app/actions/correspondence'
 import { type Contact } from '@/app/actions/contacts'
 import { type ConversationThread } from '@/app/actions/threads'
@@ -234,7 +235,7 @@ export function BusinessTimeline(props: Props) {
         const done = t.status === 'done'
         const overdue = !done && t.due_date && t.due_date < today
         return (
-          <Row key={item.key} label={t.source === 'manual' ? 'To-do' : 'Task'} tone="bg-brand-olive/15 text-brand-dark" date={formatAt(item.at)}>
+          <Row key={item.key} label={t.source !== 'manual' ? 'Task' : t.task_category?.name === 'For Newsletter' ? 'Newsletter' : ['Call', 'Meeting', 'Event', 'Deadline'].includes(t.task_category?.name ?? '') ? t.task_category!.name : 'To-do'} tone="bg-brand-olive/15 text-brand-dark" date={formatAt(item.at)}>
             <p className={done ? 'line-through text-gray-500' : 'font-medium'}>{t.title}</p>
             {t.notes && <p className="text-gray-600 whitespace-pre-wrap mt-0.5">{t.notes}</p>}
             <div className="flex flex-wrap items-center gap-3 mt-1 text-xs">
@@ -253,6 +254,13 @@ export function BusinessTimeline(props: Props) {
                   >
                     {busyTaskId === t.id ? 'Saving…' : 'Mark done'}
                   </button>
+                  {t.source === 'manual' && t.task_category?.name !== 'For Newsletter' && (
+                    <ForNewsletterButton
+                      from="task"
+                      id={t.id}
+                      className="px-2 py-0.5 border border-brand-olive text-brand-dark hover:bg-brand-warm rounded-sm disabled:opacity-50"
+                    />
+                  )}
                 </>
               )}
               {t.source !== 'manual' && <span className="text-gray-500">Added automatically</span>}

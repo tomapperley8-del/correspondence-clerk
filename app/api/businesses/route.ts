@@ -9,7 +9,7 @@ export async function GET() {
 
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('businesses')
+    .from('v_businesses') // Stage 11a: derived status, deal and last in touch
     .select('*')
     .eq('organization_id', orgId)
     .order('name')

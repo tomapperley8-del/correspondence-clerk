@@ -153,7 +153,7 @@ export async function searchAll(query: string, filters?: SearchFilters) {
 
   // Search businesses by name (prioritized)
   const { data: businesses, error: businessError } = await supabase
-    .from('businesses')
+    .from('v_businesses') // Stage 11a: derived status
     .select('id, name, category, status')
     .eq('organization_id', orgId)
     .ilike('name', `%${trimmed}%`)

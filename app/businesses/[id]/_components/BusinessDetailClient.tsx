@@ -44,6 +44,7 @@ import { BusinessArticles } from './BusinessArticles'
 import { BusinessClubCard } from './BusinessClubCard'
 import { BusinessReviewBar } from './BusinessReviewBar'
 import { BusinessGlance } from './BusinessGlance'
+import { ForNewsletterButton } from '@/components/ForNewsletterButton'
 import { BusinessTimeline } from './BusinessTimeline'
 
 function formatRelativeTime(isoString: string): string {
@@ -689,6 +690,12 @@ export function BusinessDetailClient({
           </button>
         </form>
       )}
+      <ForNewsletterButton
+        from="business"
+        id={businessId}
+        onAdded={refreshGlance}
+        className="text-xs font-semibold px-3 py-1.5 border border-brand-olive text-brand-dark hover:bg-brand-warm transition-colors disabled:opacity-50"
+      />
       {!quickNoteOpen ? (
         <button
           onClick={() => setQuickNoteOpen(true)}

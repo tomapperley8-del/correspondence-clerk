@@ -130,7 +130,7 @@ async function fetchOrgContext(orgId: string, supabase: SupabaseClient) {
 
 async function fetchOrgBusinessSummaries(orgId: string, supabase: SupabaseClient, entriesPerBusiness = 5) {
   const { data: businesses } = await supabase
-    .from('businesses')
+    .from('v_businesses') // Stage 11a truth layer
     .select('id, name, category, status, membership_type, email, phone, contract_start, contract_end, contract_amount, last_contacted_at, notes')
     .eq('organization_id', orgId)
     .order('name')
@@ -238,7 +238,7 @@ async function fetchBuriedGoldCorrespondence(orgId: string, supabase: SupabaseCl
 
 async function fetchContractData(orgId: string, supabase: SupabaseClient) {
   const { data } = await supabase
-    .from('businesses')
+    .from('v_businesses') // Stage 11a truth layer
     .select('id, name, contract_start, contract_end, contract_amount, status, membership_type')
     .eq('organization_id', orgId)
     .not('contract_end', 'is', null)
@@ -252,7 +252,7 @@ async function fetchContractData(orgId: string, supabase: SupabaseClient) {
 
 async function fetchBusinessInsightData(orgId: string, businessId: string, supabase: SupabaseClient) {
   // First fetch business to check if relationship_memory exists (determines correspondence limit)
-  const { data: business } = await supabase.from('businesses')
+  const { data: business } = await supabase.from('v_businesses') // Stage 11a truth layer
     .select('id, name, category, status, membership_type, email, phone, address, notes, contract_start, contract_end, contract_amount, last_contacted_at, relationship_memory, relationship_memory_updated_at')
     .eq('id', businessId)
     .eq('organization_id', orgId)

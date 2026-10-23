@@ -21,16 +21,15 @@ export function EditBusinessButton({ business }: { business: Business }) {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   // Added automatically from an email and not looked at yet. Saving this form
-  // counts as the review: it becomes a Prospect unless that box is unticked.
+  // counts as the review. Status itself is worked out from contracts (Stage 11a),
+  // so there is no status choice here.
   const isUnreviewed = business.status === 'Unreviewed'
 
   const [formData, setFormData] = useState({
     name: business.name,
     category: business.category || '',
-    status: business.status || '',
     notes: business.notes || '',
   })
-  const [isProspect, setIsProspect] = useState(business.status === 'Prospect' || isUnreviewed)
   const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([])
   const [businessTypeValue, setBusinessTypeValue] = useState(business.business_type ?? '')
   const [disposition, setDisposition] = useState<string>(business.disposition ?? '')
@@ -52,10 +51,8 @@ export function EditBusinessButton({ business }: { business: Business }) {
     setFormData({
       name: business.name,
       category: business.category || '',
-      status: business.status || '',
       notes: business.notes || '',
     })
-    setIsProspect(business.status === 'Prospect' || isUnreviewed)
     setBusinessTypeValue(business.business_type ?? '')
     setDisposition(business.disposition ?? '')
     setFollowUpAfter(business.follow_up_after ?? '')
@@ -74,17 +71,11 @@ export function EditBusinessButton({ business }: { business: Business }) {
     setSaving(true)
     setError(null)
 
-    let newStatus: string | null = formData.status || null
-    if (isProspect) {
-      newStatus = 'Prospect'
-    } else if (business.status === 'Prospect' || isUnreviewed) {
-      newStatus = (business.is_club_card || business.is_advertiser) ? 'Active' : null
-    }
-
     const result = await updateBusiness(business.id, {
       name: formData.name,
       category: formData.category || null,
-      status: newStatus,
+      // Reviewing an Unreviewed business; the server re-derives the status at once
+      status: isUnreviewed ? 'Prospect' : undefined,
       notes: formData.notes || null,
       business_type: businessTypeValue || null,
       disposition: (disposition as 'follow_up_later' | 'not_interested') || null,
@@ -265,15 +256,10 @@ export function EditBusinessButton({ business }: { business: Business }) {
                   Saving marks it as reviewed.
                 </p>
               )}
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isProspect}
-                  onChange={(e) => setIsProspect(e.target.checked)}
-                  disabled={saving}
-                />
-                <span className="text-sm font-medium">Prospect</span>
-              </label>
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">Status: {isUnreviewed ? 'Unreviewed' : business.status || 'none'}</span>
+                <span className="text-xs text-gray-500"> (worked out from contracts: Active while a deal is in force or ended within 60 days, Former after, Prospect if never)</span>
+              </p>
 
               <label className="flex items-center gap-2 opacity-60" title="Controlled by contracts — add or remove a contract to change">
                 <input

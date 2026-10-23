@@ -68,6 +68,13 @@ export type TableRow = {
   is_active: boolean
   /** Club Card or advertising deal ending within 45 days or ended up to 60 days ago. */
   in_renewal_window: boolean
+  /**
+   * Mastersheet "On website?", from the Club Card pages (Stage 6b): live = a page
+   * matched to the business; lapsed = card ended but the page is still live;
+   * no_card = page but no Club Card on file; missing = member with no page.
+   * Null when the business is neither a member nor on the website.
+   */
+  on_website: { state: 'live' | 'lapsed' | 'no_card' | 'missing'; link: string | null } | null
 }
 
 export type BusinessTable = {
@@ -119,6 +126,8 @@ type BizRow = {
   outreach_stage: string | null
   disposition: string | null
   follow_up_after: string | null
+  main_contact_id: string | null
+  last_contacted_at: string | null
 }
 type ContractRow = {
   business_id: string
@@ -152,8 +161,9 @@ async function loadAll(supabase: Supabase, orgId: string) {
   return Promise.all([
     fetchAll<BizRow>((from, to) =>
       supabase
-        .from('businesses')
-        .select('id, name, status, business_type, renewal_stage, outreach_stage, disposition, follow_up_after')
+        // Stage 11a: status, main contact and last in touch come from the truth layer
+        .from('v_businesses')
+        .select('id, name, status, business_type, renewal_stage, outreach_stage, disposition, follow_up_after, main_contact_id, last_contacted_at')
         .eq('organization_id', orgId)
         .is('merged_into', null)
         .or(`status.is.null,status.neq."${NOT_A_BUSINESS}"`)
@@ -192,6 +202,7 @@ async function loadAll(supabase: Supabase, orgId: string) {
     supabase.from('v_business_attention').select('*').eq('organization_id', orgId),
     supabase.from('org_membership_types').select('value, label, sort_order').eq('org_id', orgId).order('sort_order'),
     supabase.from('org_business_types').select('value, label, is_commercial, sort_order').eq('org_id', orgId).order('sort_order'),
+    supabase.from('v_club_card_members').select('business_id, page_link, issues').eq('organization_id', orgId),
   ])
 }
 
@@ -228,7 +239,17 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Could not load the table' }
   }
-  const [businesses, contracts, contacts, entries, attentionRes, mtRes, btRes] = loaded
+  const [businesses, contracts, contacts, entries, attentionRes, mtRes, btRes, clubCardRes] = loaded
+  // The Club Card view can fail on its own (e.g. before its migration); the column is then just empty.
+  const onWebsiteBy = new Map<string, NonNullable<TableRow['on_website']>>()
+  for (const m of (clubCardRes.data ?? []) as { business_id: string; page_link: string | null; issues: string[] | null }[]) {
+    const issues = m.issues ?? []
+    const state = issues.includes('page_lapsed') ? 'lapsed'
+      : issues.includes('page_no_member') ? 'no_card'
+      : issues.includes('no_page') ? 'missing'
+      : m.page_link ? 'live' : null
+    if (state) onWebsiteBy.set(m.business_id, { state, link: m.page_link })
+  }
 
   const today = londonToday()
   const graceStart = addDays(today, -ACTIVE_GRACE_DAYS)
@@ -289,8 +310,9 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
 
   const rows: TableRow[] = businesses.map((b) => {
     const bizContacts = contactsBy.get(b.id) ?? []
-    // Main contact, else the person on the latest email, else the first named person with an email.
-    const primary = bizContacts.find((c) => c.is_primary)
+    // Main contact (chosen by hand, else automatically by v_businesses), else the
+    // person on the latest email, else the first named person with an email.
+    const primary = bizContacts.find((c) => c.id === b.main_contact_id)
     const latestPerson = latestPersonBy.get(b.id)
     const fallback =
       (latestPerson ? bizContacts.find((c) => c.id === latestPerson) : undefined) ??
@@ -326,7 +348,7 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
       contact: primary ? toContact(primary, true) : fallback ? toContact(fallback, false) : null,
       contact_count: bizContacts.length,
       deal: pickDeal(bizContracts, today),
-      last_in_touch: latest?.entry_date ?? null,
+      last_in_touch: b.last_contacted_at ?? latest?.entry_date ?? null,
       last_direction: latest?.direction ?? null,
       last_subject: latest?.subject ?? null,
       last_type: latest?.type ?? null,
@@ -348,6 +370,7 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
         : null,
       is_active: dealInForce || recentlyEnded,
       in_renewal_window: !!latestCurrentEnd && latestCurrentEnd >= renewalFrom && latestCurrentEnd <= renewalTo,
+      on_website: onWebsiteBy.get(b.id) ?? null,
     }
   })
 

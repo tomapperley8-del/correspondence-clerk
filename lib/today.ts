@@ -14,6 +14,8 @@ export type TodayItem = {
   since: string | null
   /** For to-dos: a hand-written task, or a "Follow up" flag on an email. */
   todo_kind?: 'task' | 'flag'
+  /** A hand-written to-do already on the newsletter list (Stage 12). */
+  for_newsletter?: boolean
   /** Task id, contract id, latest email id or flag email id, by reason. */
   ref_id: string | null
   other_reasons: TodayReason[]

@@ -5,7 +5,15 @@
  * compose this same email from the same views every morning. The routine now
  * does only the work that needs judgement (mail sweep, intent, hand-written
  * tasks); everything here is a read of v_morning_desk and friends.
+ *
+ * Stage 11a: the work list (Do now, money owed, renewals, waiting on you,
+ * to-dos, Club Card pages) comes from the same loader and rules as the Today
+ * page (lib/today-source.ts, lib/today.ts), so the two always agree. Only the
+ * sections Today doesn't hold (editorial, new businesses, story leads) still
+ * come from v_morning_desk.
  */
+
+import { ageWords, REASON_LABEL, splitDoNow, type TodayItem, type TodayReason } from '@/lib/today'
 
 export interface DeskLine {
   section: number
@@ -67,6 +75,41 @@ export interface DeskEmailInput {
   skippedCount?: number
   /** Anything that ought to be chased but is on no list. */
   gaps?: CareGap[]
+  /** Today's items (lib/today-source.ts) and the London date they were judged on. */
+  today: { date: string; items: TodayItem[] }
+}
+
+// Today's groups, in Today's order and with its titles (app/today/_components/TodayClient.tsx).
+const TODAY_GROUPS: { reason: TodayReason; title: string }[] = [
+  { reason: 'money_owed', title: 'Money owed' },
+  { reason: 'renewal', title: 'Renewals' },
+  { reason: 'club_card_lapsed', title: 'Club Card ended, page still live' },
+  { reason: 'waiting_on_you', title: 'Waiting on you' },
+  { reason: 'todo', title: 'Your to-dos' },
+  { reason: 'club_card', title: 'Club Card pages' },
+]
+
+const itemLine = (i: TodayItem, date: string) =>
+  `${i.business_name ? `${i.business_name}: ` : ''}${i.detail} (${ageWords(i, date)})`
+
+/** Do now and the groups exactly as Today shows them. */
+export function todaySections(date: string, items: TodayItem[], limit = 15): Section[] {
+  const { doNow, rest } = splitDoNow(items, date)
+  const out: Section[] = []
+  if (doNow.length > 0) {
+    out.push({
+      heading: `Do now (${doNow.length})`,
+      items: doNow.map((i) => `${REASON_LABEL[i.reason]}. ${itemLine(i, date)}`),
+    })
+  }
+  for (const g of TODAY_GROUPS) {
+    const rows = rest.filter((i) => i.reason === g.reason)
+    if (rows.length === 0) continue
+    const lines = rows.slice(0, limit).map((i) => itemLine(i, date))
+    if (rows.length > limit) lines.push(`and ${rows.length - limit} more in the app`)
+    out.push({ heading: `${g.title} (${rows.length})`, items: lines })
+  }
+  return out
 }
 
 const esc = (s: string) =>
@@ -100,7 +143,7 @@ function pick(lines: DeskLine[], section: number, limit: number, lead?: string):
 }
 
 export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: string; text: string } {
-  const { now, lines, brief, health, closed, missedRoutines, pipeline, drafts = [], skippedCount = 0, gaps = [] } = input
+  const { now, lines, brief, health, closed, missedRoutines, pipeline, drafts = [], skippedCount = 0, gaps = [], today } = input
 
   const sections: Section[] = []
   const add = (s: Section | null) => { if (s) sections.push(s) }
@@ -120,12 +163,10 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
     sections.push({ heading: `Drafts waiting in your Outlook (${drafts.length})`, items })
   }
 
-  add(pick(lines, 0, 15))                 // Your own list
-  add(pick(lines, 3, 10))                 // You said you would
-  add(pick(lines, 1, 15))                 // Waiting on you
-  add(pick(lines, 2, 15))                 // Money
-  add(pick(lines, 4, 10))                 // Due today or overdue
-  add(pick(lines, 5, 15))                 // Renewals in the next 30 days
+  // The work list, the same as Today. Replaces v_morning_desk sections 0-5
+  // (your own list, you said you would, waiting on you, money, due today,
+  // renewals), which were worked out separately and could disagree with Today.
+  sections.push(...todaySections(today.date, today.items))
   add(pick(lines, 6, 6, '{n} arrived'))   // Editorial arrivals
   add(pick(lines, 7, 10))                 // New businesses worth approaching
   add(pick(lines, 8, 8))                  // Story leads
@@ -151,9 +192,12 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
     })
   }
 
-  // Opening line
-  const opening = `${money(brief?.receivables_total)} is owed across ${brief?.businesses_owing ?? 0} businesses, ` +
-    `and ${brief?.awaiting_reply ?? 0} people are waiting on a reply from you.`
+  // Opening line: Today's numbers
+  const count = (r: TodayReason) => today.items.filter((i) => i.reason === r).length
+  const doNowCount = splitDoNow(today.items, today.date).doNow.length
+  const opening = `${doNowCount} thing${doNowCount === 1 ? '' : 's'} to do now. ` +
+    `${money(brief?.receivables_total)} is owed across ${brief?.businesses_owing ?? 0} businesses; ` +
+    `${count('waiting_on_you')} waiting on a reply from you, ${count('renewal')} renewals and ${count('todo')} to-dos.`
 
   // Closing line: system health in plain words
   const health_bits: string[] = []
