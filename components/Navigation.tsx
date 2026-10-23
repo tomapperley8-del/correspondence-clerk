@@ -18,7 +18,7 @@ export function Navigation() {
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [doNowCount, setDoNowCount] = useState<number | null>(null)
+  const [overdueCount, setOverdueCount] = useState<number | null>(null)
   const [inboundCount, setInboundCount] = useState(0)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -33,7 +33,7 @@ export function Navigation() {
   async function loadNavData() {
     const nav = await getNavData()
     setDisplayName(nav.displayName)
-    setDoNowCount(nav.doNowCount)
+    setOverdueCount(nav.overdueCount)
     setInboundCount(nav.inboundCount)
     setAiEnabled(nav.aiEnabled)
     if (nav.organizationId) {
@@ -64,7 +64,7 @@ export function Navigation() {
       } else {
         setOrganization(null)
         setDisplayName(null)
-        setDoNowCount(null)
+        setOverdueCount(null)
         setInboundCount(0)
       }
     })
@@ -161,8 +161,8 @@ export function Navigation() {
       href: '/today',
       label: 'Today',
       active: pathname === '/today',
-      badge: doNowCount && doNowCount > 0 ? doNowCount : null,
-      badgeTitle: `${doNowCount} to do now`,
+      badge: overdueCount && overdueCount > 0 ? overdueCount : null,
+      badgeTitle: `${overdueCount} overdue`,
       badgeTone: 'bg-amber-500',
     },
     {

@@ -46,6 +46,8 @@ export type GlanceInvoice = {
   is_paid: boolean | null
   private_memo: string | null
   line_description: string | null
+  /** Stage 14a v2: marked void in the app (balance is then 0 and the memo 'Voided'). */
+  voided_at?: string | null
 }
 
 export type BusinessGlance = {
@@ -106,7 +108,7 @@ export async function getBusinessGlance(businessId: string): Promise<{ data?: Bu
   if (customerIds.length > 0) {
     const { data } = await supabase
       .from('qbo_invoices')
-      .select('qbo_invoice_id, doc_number, txn_date, due_date, total_amount, balance, is_paid, private_memo, line_description')
+      .select('*')
       .eq('organization_id', orgId)
       .in('qbo_customer_id', customerIds)
       .order('txn_date', { ascending: false })

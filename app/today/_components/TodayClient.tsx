@@ -1,70 +1,89 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/lib/toast'
-import { formatDateGB } from '@/lib/utils'
+import { cn, formatDateGB } from '@/lib/utils'
 import { snoozeBusinessAttention, dismissWaitingReplies } from '@/app/actions/attention'
 import { updateBusinessRenewalStage } from '@/app/actions/businesses'
 import { updateTask } from '@/app/actions/tasks'
-import { clearFollowUpFlag, moveFollowUpFlag, type TodayData, type QuietReminder } from '@/app/actions/today'
-import { REASON_LABEL, addDays, ageWords, daysFrom, splitDoNow, type TodayItem, type TodayReason } from '@/lib/today'
+import {
+  clearFollowUpFlag, moveFollowUpFlag, getTodayDetail, deleteTodayTask, undoDeleteTodayTask, linkTaskToBusiness, getBusinessNames,
+  type TodayData, type TodayDetail, type QuietReminder,
+} from '@/app/actions/today'
+import { markInvoiceVoid } from '@/app/actions/invoices'
+import { markNewsletterUsed, type CalendarItem, type NewsletterItem } from '@/app/actions/calendar'
+import { REASON_LABEL, addDays, ageWords, daysFrom, isOverdue, todayOrder, type TodayItem, type TodayReason } from '@/lib/today'
 import { TodayQuickAdd } from './TodayQuickAdd'
-import { TodayCalendar } from './TodayCalendar'
-import { NewsletterList } from './NewsletterList'
+import { TodayCalendar, CALENDAR_CHANGED } from './TodayCalendar'
 import { addToNewsletter } from '@/components/ForNewsletterButton'
-import { ActionMenu, type MenuEntry, type MenuItem } from '@/components/ui/action-menu'
+import { ActionMenu, type MenuItem } from '@/components/ui/action-menu'
 import { FilterChips, type Chip } from '@/components/ui/filter-chips'
 import { FullScreenPanel, useFullScreen } from '@/components/ui/full-screen-panel'
-import { ItemGroup, ItemList, ItemRow, rowButtonClass, rowQuietButtonClass } from '@/components/ui/item-row'
 import { ResizableSplit } from '@/components/ui/resizable-split'
-import type { CalendarItem, NewsletterItem } from '@/app/actions/calendar'
 
-// Today (UI overhaul Stage 7; calendar and newsletter list Stage 12; two
-// columns, one-line rows and filter chips Stage 14a). On a computer: the work
-// on the left (Do now, then Everything else as one list with filter chips),
-// the calendar, newsletter list and quick add on the right, with a divider to
-// drag. One column on a phone, Do now first. Each line has its most likely
-// action as a button and the rest in a "More" menu. Nothing is ticked here
-// except to-dos: a line goes when its cause goes. The actions are the same
-// server actions as before; only the layout changed.
+// Today v2 (UI overhaul Stage 14a v2, mockup B, Tom 23 Oct). One list of
+// everything needing attention, overdue first and then most pressing, with
+// filter chips and "+ Add" above it. Each row is two lines: the name in bold
+// with a coloured age pill, and one grey line of detail. Choosing a row (click,
+// or Up/Down and Enter) fills the detail panel on the right: the deal, the main
+// contact (Hard Rule 4), the facts behind the reason and every action as a
+// labelled button. This week's calendar sits under the panel. On a phone the
+// detail opens under its row and the calendar follows the list. Colours are
+// the Mastersheet palette of the Businesses table. Nothing is ticked here but
+// to-dos and newsletter items: a line goes when its cause goes.
 
 const OUTLOOK_DRAFTS = 'https://outlook.office.com/mail/drafts'
+const FILTER_STORE = 'cc.today.filter'
+/** The list shows this many rows, then "Show all" (full screen shows all). */
+const LIST_LIMIT = 40
 
-// The dot beside each group heading; the heading's words say the kind.
-const DOT: Record<TodayReason, string> = {
-  money_owed: 'bg-red-600',
-  renewal: 'bg-amber-500',
-  club_card_lapsed: 'bg-amber-500',
-  waiting_on_you: 'bg-brand-navy',
-  todo: 'bg-brand-olive',
-  club_card: 'bg-gray-400',
+type Kind = TodayReason | 'newsletter' | 'snoozed'
+type FilterKey = 'all' | 'overdue' | Kind
+
+type Row = {
+  key: string
+  kind: Kind
+  business_id: string | null
+  business_name: string | null
+  title: string
+  detail: string
+  pill: { text: string; tone: Tone }
+  overdue: boolean
+  item?: TodayItem
+  nl?: NewsletterItem
+  snooze?: TodayData['snoozed'][number]
 }
 
-const CARD = 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] p-4 sm:p-5'
-const H2 = 'text-[1.6rem] leading-tight font-semibold text-brand-dark'
+type Tone = 'red' | 'orange' | 'yellow' | 'blue' | 'green' | 'muted'
+const TONE: Record<Tone, string> = {
+  red: 'bg-ms-red text-ms-red-text',
+  orange: 'bg-ms-orange text-ms-orange-text',
+  yellow: 'bg-ms-yellow text-ms-yellow-text',
+  blue: 'bg-ms-blue text-ms-blue-text',
+  green: 'bg-ms-green text-ms-green-text',
+  muted: 'bg-ms-muted text-ms-muted-text',
+}
 
-const GROUPS: { reason: TodayReason; chip: string; heading: string; hint: string }[] = [
-  { reason: 'money_owed', chip: 'Money', heading: 'Money owed', hint: 'QuickBooks invoices past due, with no chaser in the last 7 days.' },
-  { reason: 'renewal', chip: 'Renewals', heading: 'Renewals', hint: 'Ending in the next 45 days or ended in the last 60, with no outcome recorded.' },
-  { reason: 'club_card_lapsed', chip: 'Lapsed cards', heading: 'Club Card ended, page still live', hint: 'The card ended more than 60 days ago (or is not renewing) but the website page is still up. Chase the renewal or take the page down.' },
-  { reason: 'waiting_on_you', chip: 'Waiting on you', heading: 'Waiting on you', hint: 'They wrote in the last 30 days and nothing has gone back.' },
-  { reason: 'todo', chip: 'To-dos', heading: 'Your to-dos', hint: 'Everything you have said you will do, and follow-up flags that are due.' },
-  { reason: 'club_card', chip: 'Card pages', heading: 'Club Card pages', hint: 'Member pages on the website to fix: no page, offer out of date, missing from the A-Z, map or a category, listed twice, or contact details that differ from the app.' },
+const CHIPS: { key: Kind; label: string; hint: string }[] = [
+  { key: 'money_owed', label: 'Money', hint: 'QuickBooks invoices past due, with no chaser in the last 7 days.' },
+  { key: 'renewal', label: 'Renewals', hint: 'Ending in the next 45 days or ended in the last 60, with no outcome recorded.' },
+  { key: 'club_card_lapsed', label: 'Lapsed cards', hint: 'The card ended more than 60 days ago (or is not renewing) but the website page is still up.' },
+  { key: 'waiting_on_you', label: 'Waiting on you', hint: 'They wrote in the last 30 days and nothing has gone back.' },
+  { key: 'todo', label: 'To-dos', hint: 'Everything you have said you will do, and follow-up flags that are due.' },
+  { key: 'club_card', label: 'Card pages', hint: 'Member pages on the website to fix: no page, offer out of date, missing from the A-Z, map or a category, listed twice, or details that differ.' },
+  { key: 'newsletter', label: 'Newsletter', hint: "For Wednesday's newsletter. Mark each \"It has gone in\" once it has." },
+  { key: 'snoozed', label: 'Snoozed', hint: 'Hidden until the date shown. Wake one to put it back now.' },
 ]
 
-type FilterKey = 'all' | TodayReason | 'snoozed'
+const KIND_LABEL: Record<Kind, string> = { ...REASON_LABEL, newsletter: 'Newsletter', snoozed: 'Snoozed' }
 
-const FILTER_STORE = 'cc.today.filter'
-/** Everything else shows this many lines, then "Show all" (full screen shows all). */
-const REST_LIMIT = 20
-
-const SNOOZE_DAYS = [
-  { days: 1, label: 'Tomorrow' },
-  { days: 3, label: '3 days' },
-  { days: 7, label: '1 week' },
-]
+const NL_LABEL: Record<NewsletterItem['kind'], string> = {
+  task: 'For newsletter',
+  commitment: 'You said you would',
+  editorial: 'Promote my event',
+}
 
 const QUIET_LABEL: Record<QuietReminder['kind'], string> = {
   checkin: 'Club Card check-in',
@@ -72,22 +91,91 @@ const QUIET_LABEL: Record<QuietReminder['kind'], string> = {
   editorial: 'Editorial',
 }
 
+const SNOOZE_DAYS = [
+  { days: 1, label: 'Tomorrow' },
+  { days: 3, label: '3 days' },
+  { days: 7, label: '1 week' },
+]
+
+const H2 = 'text-[1.6rem] leading-tight font-semibold text-brand-dark'
+const CARD = 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)]'
+const btnBase =
+  'inline-flex items-center justify-center text-sm font-semibold px-3 min-h-10 md:min-h-9 pointer-coarse:min-h-10 rounded-sm transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
+/** The main action in the detail panel: Mastersheet green. */
+const mainBtn = `${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`
+const softBtn = `${btnBase} bg-white border border-black/[0.12] text-brand-dark hover:bg-brand-warm`
+const linkBtn = 'text-xs font-semibold text-brand-navy hover:underline inline-flex items-center min-h-10 md:min-h-8'
+
 const dateGB = (d: string) => formatDateGB(`${d}T12:00:00Z`)
+const moneyGB = (n: number | null) => (n === null ? '' : `£${Number(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
 
 function refreshNav() {
   window.dispatchEvent(new Event('cc:nav-refresh'))
 }
 
-const groupIndex = (r: TodayReason) => GROUPS.findIndex((g) => g.reason === r)
-
-function groupOrder(a: TodayItem, b: TodayItem): number {
-  if (a.reason !== b.reason) return groupIndex(a.reason) - groupIndex(b.reason)
-  if (a.reason === 'todo') {
-    // Dated to-dos first, soonest first; undated last.
-    if (!a.since !== !b.since) return a.since ? -1 : 1
-    return (a.since ?? '').localeCompare(b.since ?? '')
+/** The age pill: red only past a real deadline; orange close to one; blue for later dates. */
+function pillFor(i: TodayItem, today: string): Row['pill'] {
+  const age = daysFrom(i.since, today)
+  const text = ageWords(i, today)
+  if (age === null) return { text, tone: 'muted' }
+  switch (i.reason) {
+    case 'money_owed':
+      return { text, tone: age > 0 ? 'red' : 'orange' }
+    case 'renewal':
+      return { text, tone: age > 0 ? 'red' : age >= -14 ? 'orange' : 'blue' }
+    case 'waiting_on_you':
+      return { text, tone: age >= 7 ? 'orange' : 'yellow' }
+    case 'todo':
+      return { text, tone: age >= 1 ? 'red' : age === 0 ? 'orange' : 'blue' }
+    case 'club_card_lapsed':
+    case 'club_card':
+      return { text, tone: 'muted' }
   }
-  return (a.since ?? '').localeCompare(b.since ?? '')
+}
+
+function itemRow(i: TodayItem, today: string): Row {
+  const also = i.other_reasons.length > 0 ? `Also: ${i.other_reasons.map((r) => REASON_LABEL[r]).join(', ')}` : ''
+  return {
+    key: i.key,
+    kind: i.reason,
+    business_id: i.business_id,
+    business_name: i.business_name,
+    title: i.business_name ?? i.detail,
+    detail: [i.business_name ? i.detail : REASON_LABEL[i.reason], also].filter(Boolean).join(' · '),
+    pill: pillFor(i, today),
+    overdue: isOverdue(i, today),
+    item: i,
+  }
+}
+
+function newsletterRow(n: NewsletterItem, asTodo: TodayItem | undefined, today: string): Row {
+  // A newsletter task past its date counts as overdue, like any to-do (the badge counts it too).
+  const late = !!asTodo && isOverdue(asTodo, today)
+  return {
+    key: `nl:${n.key}`,
+    kind: 'newsletter',
+    business_id: n.business_id,
+    business_name: n.business_name,
+    title: n.business_name ?? n.title,
+    detail: n.business_name ? `${NL_LABEL[n.kind]}: ${n.title}` : NL_LABEL[n.kind],
+    pill: late ? { text: ageWords(asTodo!, today), tone: 'red' } : { text: n.date ? `newsletter ${dateGB(n.date).slice(0, 5)}` : 'newsletter', tone: 'green' },
+    overdue: late,
+    nl: n,
+  }
+}
+
+function snoozedRow(s: TodayData['snoozed'][number]): Row {
+  return {
+    key: `snoozed:${s.business_id}`,
+    kind: 'snoozed',
+    business_id: s.business_id,
+    business_name: s.business_name,
+    title: s.business_name,
+    detail: REASON_LABEL[s.reason as TodayReason] ?? s.reason,
+    pill: { text: s.until ? `until ${dateGB(s.until).slice(0, 5)}` : 'snoozed', tone: 'muted' },
+    overdue: false,
+    snooze: s,
+  }
 }
 
 export function TodayClient({
@@ -101,282 +189,164 @@ export function TodayClient({
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
-  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
   const [gone, setGone] = useState<Set<string>>(new Set())
-  const [picking, setPicking] = useState<string | null>(null)
-  const [pickDate, setPickDate] = useState('')
   const [shownData, setShownData] = useState(data)
+  const [details, setDetails] = useState<Map<string, TodayDetail | 'loading' | 'error'>>(new Map())
+  const [selected, setSelected] = useState<string | null>(null)
+  /** On a phone the detail opens under its row only once a row is chosen. */
+  const [opened, setOpened] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [showQuiet, setShowQuiet] = useState(false)
   const { today } = data
 
-  // Lines cleared here are hidden until fresh data arrives, which already
-  // leaves them out (and brings back anything woken from a snooze).
+  // Rows cleared here stay hidden until fresh data arrives, which leaves them
+  // out by itself; fresh data also means the cached details are stale.
   if (data !== shownData) {
     setShownData(data)
     setGone(new Set())
+    setDetails(new Map())
   }
 
-  const items = useMemo(() => data.items.filter((i) => !gone.has(i.key)), [data.items, gone])
-  const { doNow, rest } = useMemo(() => splitDoNow(items, today), [items, today])
-  const quiet = data.quiet.filter((q) => !gone.has(`quiet:${q.id}`))
-  const snoozed = data.snoozed.filter((s) => !gone.has(`wake:${s.business_id}`))
+  const rows = useMemo<Row[]>(() => {
+    // A newsletter task shows once, under Newsletter, not again as a to-do.
+    const onNewsletter = new Set(newsletter.items.filter((n) => n.kind !== 'commitment').map((n) => n.ref_id))
+    const list = todayOrder(data.items.filter((i) => !(i.todo_kind === 'task' && i.ref_id && onNewsletter.has(i.ref_id))), today).map((i) => itemRow(i, today))
+    const asTodo = new Map(data.items.filter((i) => i.todo_kind === 'task' && i.ref_id).map((i) => [i.ref_id!, i]))
+    list.push(...newsletter.items.map((n) => newsletterRow(n, n.kind === 'commitment' ? undefined : asTodo.get(n.ref_id), today)))
+    list.push(...data.snoozed.map(snoozedRow))
+    return list.filter((r) => !gone.has(r.key))
+  }, [data.items, data.snoozed, newsletter.items, today, gone])
 
-  function run(key: string, action: () => Promise<{ error?: string | null; success?: boolean; data?: unknown }>, message: string, clears = true) {
-    setBusyKey(key)
+  const overdueCount = rows.filter((r) => r.overdue).length
+  const quiet = data.quiet.filter((q) => !gone.has(`quiet:${q.id}`))
+
+  function changed() {
+    refreshNav()
+    window.dispatchEvent(new Event(CALENDAR_CHANGED))
+    router.refresh()
+  }
+
+  function run(key: string, action: () => Promise<{ error?: string | null }>, message: string, clears = true) {
+    setBusy(key)
     startTransition(async () => {
       const result = await action()
-      setBusyKey(null)
+      setBusy(null)
       if (result.error) {
         toast.error(result.error)
         return
       }
       toast.success(message)
       if (clears) setGone((prev) => new Set(prev).add(key))
-      setPicking(null)
-      refreshNav()
-      router.refresh()
+      changed()
     })
   }
 
-  // Snooze: a business's line is hidden until the date (attention_snoozed_until);
-  // a to-do's date moves, which is the snooze that sticks for tasks.
-  function snoozeTo(i: TodayItem, date: string) {
-    if (i.reason === 'todo') {
-      run(
-        i.key,
-        () => (i.todo_kind === 'flag' ? moveFollowUpFlag(i.ref_id!, date) : updateTask(i.ref_id!, { due_date: date })),
-        `Moved to ${dateGB(date)}`,
-        false,
-      )
-    } else {
-      run(i.key, () => snoozeBusinessAttention(i.business_id!, date), `${i.business_name} snoozed until ${dateGB(date)}`)
-    }
-  }
-
-  function snoozeGroup(i: TodayItem): MenuEntry | null {
-    if (i.reason === 'todo' ? !i.ref_id : !i.business_id) return null
-    const items: MenuItem[] = SNOOZE_DAYS.map(({ days, label }) => ({
-      label,
-      hint: dateGB(addDays(today, days)),
-      onSelect: () => snoozeTo(i, addDays(today, days)),
-    }))
-    items.push({
-      label: 'Pick a date…',
-      onSelect: () => {
-        setPicking(i.key)
-        setPickDate(i.reason === 'todo' && i.since && i.since > today ? i.since : addDays(today, 7))
-      },
-    })
-    return { group: i.reason === 'todo' ? 'Snooze (moves the date)' : 'Snooze', items }
-  }
-
-  function primary(i: TodayItem): React.ReactNode {
-    const busy = busyKey === i.key
-    const biz = i.business_id ? `/businesses/${i.business_id}` : null
-    switch (i.reason) {
-      case 'todo':
-        return (
-          <button
-            type="button"
-            disabled={busy}
-            className={rowButtonClass}
-            onClick={() => run(i.key, () => (i.todo_kind === 'flag' ? clearFollowUpFlag(i.ref_id!) : updateTask(i.ref_id!, { status: 'done' })), 'Done')}
-          >
-            {busy ? 'Saving…' : 'Done'}
-          </button>
-        )
-      case 'money_owed':
-        return <Link href={biz!} className={rowButtonClass} title="Open the business to see the contact and write a chaser">Chase</Link>
-      case 'renewal':
-        return <Link href={`${biz}?tab=details`} className={rowButtonClass} title="Open the deal to record the new contract">Log renewal</Link>
-      case 'waiting_on_you':
-        return <Link href={biz!} className={rowButtonClass} title="Open the business to read the email and reply">Reply</Link>
-      case 'club_card_lapsed':
-      case 'club_card':
-        return i.ref_id ? (
-          <a href={`https://chiswickcalendar.co.uk/?page_id=${i.ref_id}`} target="_blank" rel="noopener noreferrer" className={rowButtonClass} title="Open the member page on the website (new tab)">
-            Open page
-          </a>
-        ) : (
-          <Link href={`${biz}?tab=details`} className={rowButtonClass} title="Open the business's Club Card section">Club Card details</Link>
-        )
-    }
-  }
-
-  function more(i: TodayItem): MenuEntry[] {
-    const biz = i.business_id ? `/businesses/${i.business_id}` : null
-    const list: MenuEntry[] = []
-    if (i.reason === 'money_owed') {
-      list.push({
-        label: 'Mark paid',
-        hint: 'Hidden for 7 days while QuickBooks catches up',
-        onSelect: () => run(i.key, () => snoozeBusinessAttention(i.business_id!, addDays(today, 7)), `${i.business_name}: hidden for 7 days while QuickBooks catches up`),
-      })
-    }
-    if (i.reason === 'renewal') {
-      list.push({
-        label: 'Not renewing',
-        onSelect: () => {
-          if (!window.confirm(`Mark ${i.business_name} as not renewing?`)) return
-          run(i.key, () => updateBusinessRenewalStage(i.business_id!, 'not_renewing'), `${i.business_name}: not renewing`)
-        },
-      })
-    }
-    if (i.reason === 'waiting_on_you') {
-      list.push({
-        label: 'No reply needed',
-        onSelect: () => run(i.key, () => dismissWaitingReplies(i.business_id!), `${i.business_name}: no reply needed`),
-      })
-    }
-    if ((i.reason === 'club_card_lapsed' || i.reason === 'club_card') && i.ref_id && biz) {
-      list.push({ label: 'Club Card details', href: `${biz}?tab=details` })
-    }
-    if (i.reason === 'todo' && i.todo_kind === 'task' && !i.for_newsletter && i.ref_id) {
-      list.push({ label: 'For newsletter', hint: "Add to Wednesday's list", onSelect: () => { addToNewsletter('task', i.ref_id!).then((ok) => ok && router.refresh()) } })
-    }
-    if (biz) list.push({ label: 'Open business', href: biz })
-    const s = snoozeGroup(i)
-    if (s) list.push(s)
-    return list
-  }
-
-  function pickForm(i: TodayItem) {
-    const todo = i.reason === 'todo'
-    return (
-      <form
-        className="flex flex-wrap gap-2 items-end bg-brand-warm border border-black/[0.06] rounded-sm p-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (pickDate) snoozeTo(i, pickDate)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            setPicking(null)
-          }
-        }}
-      >
-        <label className="block">
-          <span className="block text-xs font-semibold text-gray-700 mb-1">{todo ? 'Move to' : 'Snooze until'}</span>
-          <input
-            type="date"
-            autoFocus
-            value={pickDate}
-            min={todo ? today : addDays(today, 1)}
-            onChange={(e) => setPickDate(e.target.value)}
-            className="text-sm border border-black/[0.12] rounded-sm px-2 min-h-10 md:min-h-8 bg-white"
-            required
-          />
-        </label>
-        <button type="submit" disabled={busyKey === i.key || !pickDate} className={rowButtonClass}>{todo ? 'Save date' : 'Snooze'}</button>
-        <button type="button" onClick={() => setPicking(null)} className={rowQuietButtonClass}>Cancel</button>
-      </form>
-    )
-  }
-
-  function row(i: TodayItem) {
-    const age = daysFrom(i.since, today)
-    const late = i.reason !== 'waiting_on_you' && age !== null && age > 0
-    const also = i.other_reasons.length > 0 ? `Also: ${i.other_reasons.map((r) => REASON_LABEL[r]).join(', ')}` : ''
-    const title = i.business_name ?? i.detail
-    const detail = [i.business_name ? i.detail : '', also].filter(Boolean).join(' · ')
-    return (
-      <ItemRow
-        key={i.key}
-        title={title || 'To-do'}
-        href={i.business_id ? `/businesses/${i.business_id}` : null}
-        detail={detail}
-        meta={ageWords(i, today)}
-        metaTitle={i.since ? dateGB(i.since) : undefined}
-        late={late}
-        actions={
-          <>
-            {primary(i)}
-            <ActionMenu entries={more(i)} accessibleLabel={`More actions for ${title}`} />
-          </>
+  function remove(row: Row, taskId: string) {
+    setBusy(row.key)
+    startTransition(async () => {
+      const result = await deleteTodayTask(taskId)
+      setBusy(null)
+      if (result.error || result.backupId === undefined) {
+        toast.error(result.error ?? 'Not deleted')
+        return
+      }
+      setGone((prev) => new Set(prev).add(row.key))
+      const backupId = result.backupId
+      toast.undo(`Deleted: ${row.nl?.title ?? row.item?.detail ?? row.title}`, async () => {
+        const undo = await undoDeleteTodayTask(backupId)
+        if (undo.error) toast.error(undo.error)
+        else {
+          toast.success('Put back')
+          setGone((prev) => {
+            const next = new Set(prev)
+            next.delete(row.key)
+            return next
+          })
+          changed()
         }
-        below={picking === i.key ? pickForm(i) : undefined}
-      />
-    )
+      })
+      changed()
+    })
   }
 
-  const total = items.length
+  async function loadDetail(businessId: string, force = false) {
+    if (!force && details.has(businessId) && details.get(businessId) !== 'error') return
+    setDetails((m) => new Map(m).set(businessId, 'loading'))
+    const result = await getTodayDetail(businessId)
+    setDetails((m) => new Map(m).set(businessId, result.data ?? 'error'))
+  }
 
-  const work = (
-    <FullScreenPanel title="Do now" headingId="donow-h">
-      <WorkBody
-        doNow={doNow}
-        rest={rest}
-        snoozed={snoozed}
-        row={row}
-        wake={(id, name) => run(`wake:${id}`, () => snoozeBusinessAttention(id, null), `${name} is back on the list`)}
-        busyKey={busyKey}
-      />
+  function choose(row: Row, open: boolean) {
+    setSelected(row.key)
+    if (open) setOpened((o) => (o === row.key ? null : row.key))
+    if (row.business_id) loadDetail(row.business_id)
+  }
+
+  const actions: PanelActions = { run, remove, busy, today, changed, wednesday: newsletter.wednesday }
+
+  const list = (
+    <FullScreenPanel
+      title="Needs attention"
+      headingId="attention-h"
+      controls={
+        <button type="button" className={`${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`} aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
+          + Add
+        </button>
+      }
+    >
+      <div className="space-y-3">
+        {adding && (
+          <div className="bg-ms-green/40 border border-ms-green rounded-sm p-3">
+            <TodayQuickAdd
+              today={today}
+              wednesday={newsletter.wednesday}
+              onCancel={() => setAdding(false)}
+              onAdded={() => {
+                setAdding(false)
+                changed()
+              }}
+            />
+          </div>
+        )}
+        <OtherThings data={data} quiet={quiet} showQuiet={showQuiet} setShowQuiet={setShowQuiet} busy={busy} run={run} />
+        <AttentionList
+          rows={rows}
+          selected={selected}
+          opened={opened}
+          choose={choose}
+          renderInline={(row) => <DetailPanel row={row} detail={row.business_id ? details.get(row.business_id) : undefined} actions={actions} inline />}
+        />
+      </div>
     </FullScreenPanel>
   )
 
+  const current = rows.find((r) => r.key === selected) ?? rows.find((r) => r.kind !== 'snoozed') ?? null
+  // The panel follows the first row until one is chosen.
+  useEffect(() => {
+    if (!selected && current?.business_id) loadDetail(current.business_id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per first row
+  }, [current?.key, selected])
+
   const side = (
     <div className="space-y-5">
+      <section
+        id="today-detail"
+        aria-label="Detail"
+        className={cn(CARD, 'hidden lg:block p-4 sm:p-5')}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && !e.defaultPrevented && (e.target as HTMLElement).closest('[role="menu"]') === null) {
+            document.querySelector<HTMLElement>('button[data-row][aria-current="true"], button[data-row][tabindex="0"]')?.focus()
+          }
+        }}
+      >
+        {current ? (
+          <DetailPanel row={current} detail={current.business_id ? details.get(current.business_id) : undefined} actions={actions} />
+        ) : (
+          <p className="text-sm text-gray-700">Nothing needs attention. Choose a row to see it here.</p>
+        )}
+      </section>
       <TodayCalendar today={today} initialItems={calendar} onChanged={() => { refreshNav(); router.refresh() }} />
-      <NewsletterList initial={newsletter} onChanged={() => { refreshNav(); router.refresh() }} />
-      <section aria-labelledby="add-h" className={`${CARD} space-y-3`}>
-        <h2 id="add-h" className={H2} style={{ fontFamily: 'var(--font-serif)' }}>I&apos;ll do this by…</h2>
-        <TodayQuickAdd today={today} onAdded={() => { refreshNav(); router.refresh() }} />
-      </section>
-      <section aria-labelledby="other-h" className={`${CARD} space-y-2`}>
-        <h2 id="other-h" className={H2} style={{ fontFamily: 'var(--font-serif)' }}>Other things</h2>
-        <ul className="divide-y divide-black/[0.05] text-sm">
-          <li className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="font-semibold text-brand-dark">{data.newLeads} new lead{data.newLeads === 1 ? '' : 's'}</span>
-            <span className="text-xs text-gray-600">from the prospecting routine</span>
-            <Link href="/businesses?view=leads" className="ml-auto inline-flex items-center min-h-10 md:min-h-8 text-xs font-semibold text-brand-navy hover:underline">Open Leads</Link>
-          </li>
-          {data.clubCardToMatch > 0 && (
-            <li className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-semibold text-brand-dark">{data.clubCardToMatch} Club Card page{data.clubCardToMatch === 1 ? '' : 's'} to match</span>
-              <Link href="/businesses/club-card-pages" className="ml-auto inline-flex items-center min-h-10 md:min-h-8 text-xs font-semibold text-brand-navy hover:underline">Match them</Link>
-            </li>
-          )}
-          <li className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="font-semibold text-brand-dark">{data.draftsReady} draft{data.draftsReady === 1 ? '' : 's'} ready</span>
-            <span className="text-xs text-gray-600">from the routines, last 14 days; each is on its business page</span>
-            <a href={OUTLOOK_DRAFTS} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center min-h-10 md:min-h-8 text-xs font-semibold text-brand-navy hover:underline">
-              Open Outlook Drafts<span className="sr-only"> (opens in a new tab)</span>
-            </a>
-          </li>
-          <li className="py-2">
-            <details className="group">
-              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex flex-wrap items-center gap-x-3 gap-y-1 min-h-8">
-                <span className="font-semibold text-brand-dark">{quiet.length} quiet reminder{quiet.length === 1 ? '' : 's'}</span>
-                <span className="text-xs text-gray-600">stats, check-ins and editorial; not counted</span>
-                <span className="ml-auto text-xs font-semibold text-brand-navy group-open:hidden">Show</span>
-                <span className="ml-auto text-xs font-semibold text-brand-navy hidden group-open:inline">Hide</span>
-              </summary>
-              <ItemList className="mt-2">
-                {quiet.map((q) => (
-                  <ItemRow
-                    key={q.id}
-                    tag={QUIET_LABEL[q.kind]}
-                    title={q.title}
-                    href={q.business_id ? `/businesses/${q.business_id}` : null}
-                    meta={q.due_date ? dateGB(q.due_date) : undefined}
-                    actions={
-                      <button
-                        type="button"
-                        disabled={busyKey === `quiet:${q.id}`}
-                        className={rowButtonClass}
-                        onClick={() => run(`quiet:${q.id}`, () => updateTask(q.id, { status: 'done' }), 'Done')}
-                      >
-                        Done
-                      </button>
-                    }
-                  />
-                ))}
-                {quiet.length === 0 && <li className="py-2 text-xs text-gray-600">None.</li>}
-              </ItemList>
-            </details>
-          </li>
-        </ul>
-      </section>
     </div>
   )
 
@@ -385,47 +355,94 @@ export function TodayClient({
       <header>
         <h1 className="text-4xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>Today</h1>
         <p className="text-sm text-gray-700 mt-1">
-          <strong className="text-brand-dark">{doNow.length} to do now.</strong>{' '}
-          {total - doNow.length} more in Everything else, nothing hidden.
+          <strong className="text-ms-red-text">{overdueCount} overdue.</strong>{' '}
+          {rows.filter((r) => r.kind !== 'snoozed').length} in the list, nothing hidden.
           {data.owed > 0 && <> £{data.owed.toLocaleString('en-GB', { maximumFractionDigits: 2 })} owed.</>}
         </p>
       </header>
-      <ResizableSplit storageKey="cc.today.split" defaultPercent={58} label="Resize the Today columns" first={work} second={side} />
+      <ResizableSplit storageKey="cc.today.split.v2" defaultPercent={55} label="Resize the list and the detail panel" first={list} second={side} />
     </div>
   )
 }
 
-/** Do now and Everything else: the body of the work panel, which can go full screen. */
-function WorkBody({
-  doNow,
-  rest,
-  snoozed,
-  row,
-  wake,
-  busyKey,
+/** Leads, card pages to match, drafts and quiet reminders: one small line of links. */
+function OtherThings({
+  data,
+  quiet,
+  showQuiet,
+  setShowQuiet,
+  busy,
+  run,
 }: {
-  doNow: TodayItem[]
-  rest: TodayItem[]
-  snoozed: TodayData['snoozed']
-  row: (i: TodayItem) => React.ReactNode
-  wake: (businessId: string, name: string) => void
-  busyKey: string | null
+  data: TodayData
+  quiet: QuietReminder[]
+  showQuiet: boolean
+  setShowQuiet: (v: boolean) => void
+  busy: string | null
+  run: PanelActions['run']
+}) {
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
+  return (
+    <div className="text-xs text-gray-700">
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-0">
+        <Link href="/businesses?view=leads" className={linkBtn}>{plural(data.newLeads, 'new lead')}</Link>
+        {data.clubCardToMatch > 0 && <Link href="/businesses/club-card-pages" className={linkBtn}>{plural(data.clubCardToMatch, 'card page')} to match</Link>}
+        <a href={OUTLOOK_DRAFTS} target="_blank" rel="noopener noreferrer" className={linkBtn}>
+          {plural(data.draftsReady, 'draft')} ready in Outlook<span className="sr-only"> (opens in a new tab)</span>
+        </a>
+        <button type="button" className={linkBtn} aria-expanded={showQuiet} onClick={() => setShowQuiet(!showQuiet)}>
+          {plural(quiet.length, 'quiet reminder')} {showQuiet ? '(hide)' : '(show)'}
+        </button>
+      </p>
+      {showQuiet && (
+        <ul className="mt-1 divide-y divide-black/[0.05] border-y border-black/[0.05]">
+          {quiet.map((q) => (
+            <li key={q.id} className="py-1.5 flex flex-wrap items-center gap-x-3">
+              <span className="text-ms-muted-text">{QUIET_LABEL[q.kind]}</span>
+              {q.business_id ? <Link href={`/businesses/${q.business_id}`} className="font-semibold text-brand-dark hover:underline">{q.title}</Link> : <span className="font-semibold text-brand-dark">{q.title}</span>}
+              {q.due_date && <span>{dateGB(q.due_date)}</span>}
+              <button type="button" disabled={busy === `quiet:${q.id}`} className={`${linkBtn} ml-auto`} onClick={() => run(`quiet:${q.id}`, () => updateTask(q.id, { status: 'done' }), 'Done')}>
+                Done<span className="sr-only">: {q.title}</span>
+              </button>
+            </li>
+          ))}
+          {quiet.length === 0 && <li className="py-1.5">None. Stats, check-ins and editorial reminders show here; they are not counted.</li>}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/** The chips and the rows. Up and Down move the choice; Enter opens it (on a phone, under the row). */
+function AttentionList({
+  rows,
+  selected,
+  opened,
+  choose,
+  renderInline,
+}: {
+  rows: Row[]
+  selected: string | null
+  opened: string | null
+  choose: (row: Row, open: boolean) => void
+  renderInline: (row: Row) => React.ReactNode
 }) {
   const full = useFullScreen()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [showAll, setShowAll] = useState(false)
+  const listRef = useRef<HTMLUListElement>(null)
 
-  // The chosen chip is remembered in this browser.
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(FILTER_STORE) as FilterKey | null
+      const fromUrl = new URLSearchParams(window.location.search).get('show') as FilterKey | null
+      const saved = fromUrl ?? (window.localStorage.getItem(FILTER_STORE) as FilterKey | null)
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of a saved preference on mount
       if (saved) setFilter(saved)
     } catch {
       // storage blocked: start on All
     }
   }, [])
-  const choose = (k: FilterKey) => {
+  const pick = (k: FilterKey) => {
     setFilter(k)
     setShowAll(false)
     try {
@@ -436,93 +453,425 @@ function WorkBody({
     }
   }
 
-  const sorted = useMemo(() => [...rest].sort(groupOrder), [rest])
+  const live = rows.filter((r) => r.kind !== 'snoozed')
   const chips: Chip<FilterKey>[] = [
-    { key: 'all', label: 'All', count: rest.length },
-    ...GROUPS.map((g) => ({ key: g.reason as FilterKey, label: g.chip, count: rest.filter((i) => i.reason === g.reason).length })).filter((c) => c.count > 0),
-    ...(snoozed.length > 0 ? [{ key: 'snoozed' as FilterKey, label: 'Snoozed', count: snoozed.length }] : []),
+    { key: 'all', label: 'All', count: live.length },
+    { key: 'overdue', label: 'Overdue', count: live.filter((r) => r.overdue).length },
+    ...CHIPS.map((c) => ({ key: c.key as FilterKey, label: c.label, count: rows.filter((r) => r.kind === c.key).length })).filter((c) => c.count > 0),
   ]
-  // A remembered chip that has nothing in it today falls back to All.
   const active: FilterKey = chips.some((c) => c.key === filter) ? filter : 'all'
-  const list = active === 'all' || active === 'snoozed' ? sorted : sorted.filter((i) => i.reason === active)
-  const limit = full || showAll ? Infinity : REST_LIMIT
-  const hint = GROUPS.find((g) => g.reason === active)?.hint
+  const shown = active === 'all' ? live : active === 'overdue' ? live.filter((r) => r.overdue) : rows.filter((r) => r.kind === active)
+  const limit = full || showAll ? Infinity : LIST_LIMIT
+  const hint = active === 'overdue'
+    ? 'The nav badge counts these: money more than 30 days overdue, a renewal ended in the last 30 days or ending within a week, an email waiting a week or more, a to-do past its date.'
+    : CHIPS.find((c) => c.key === active)?.hint
+
+  function onKey(e: React.KeyboardEvent<HTMLUListElement>) {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return
+    const buttons = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>('button[data-row]') ?? [])
+    const at = buttons.findIndex((b) => b === document.activeElement)
+    if (at < 0) return
+    e.preventDefault()
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : Math.min(buttons.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))
+    buttons[next].focus()
+    const row = shown.find((r) => r.key === buttons[next].dataset.row)
+    if (row) choose(row, false)
+  }
+
+  const current = selected ?? shown[0]?.key ?? null
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <details className="text-xs text-gray-700">
-          <summary className="cursor-pointer text-brand-navy font-semibold inline-block min-h-8 py-1">How these are picked</summary>
-          <p className="max-w-[70ch] border-l-[3px] border-brand-olive pl-3 mt-1">
-            At most 8, picked by plain rules: money more than 30 days overdue, a renewal that ended in the last 30 days or ends within a week,
-            an email waiting a week or more, a to-do past its date. Most pressing first. Each line goes by itself when the thing is done.
-          </p>
-        </details>
-        {doNow.length === 0 ? (
-          <p className="text-sm text-gray-700 py-3">Nothing pressing. Everything else is below.</p>
-        ) : (
-          <Grouped items={doNow} row={row} />
-        )}
-      </div>
-
-      <section aria-labelledby="rest-h" className="space-y-2">
-        <h2 id="rest-h" className={H2} style={{ fontFamily: 'var(--font-serif)' }}>Everything else</h2>
-        <FilterChips chips={chips} value={active} onChange={choose} label="Show" />
-        {hint && <p className="text-xs text-gray-700">{hint}</p>}
-        {active === 'snoozed' ? (
-          <ItemList label="Snoozed">
-            {snoozed.map((s) => (
-              <ItemRow
-                key={s.business_id}
-                title={s.business_name}
-                href={`/businesses/${s.business_id}`}
-                detail={REASON_LABEL[s.reason as TodayReason] ?? s.reason}
-                meta={s.until ? `until ${dateGB(s.until)}` : undefined}
-                actions={
-                  <button type="button" disabled={busyKey === `wake:${s.business_id}`} className={rowButtonClass} onClick={() => wake(s.business_id, s.business_name)}>
-                    Wake now
-                  </button>
-                }
-              />
-            ))}
-          </ItemList>
-        ) : list.length === 0 ? (
-          <p className="text-sm text-gray-700 py-2">Nothing else waiting.</p>
-        ) : (
-          <>
-            {active === 'all' ? <Grouped items={list.slice(0, limit)} row={row} counts={rest} /> : <ItemList label="Everything else">{list.slice(0, limit).map(row)}</ItemList>}
-            {list.length > limit && (
-              <button type="button" className={rowButtonClass} onClick={() => setShowAll(true)}>
-                Show all {list.length}
-              </button>
-            )}
-          </>
-        )}
-      </section>
+    <div className="space-y-2">
+      <FilterChips chips={chips} value={active} onChange={pick} label="Show" />
+      {hint && <p className="text-xs text-gray-700">{hint}</p>}
+      {shown.length === 0 ? (
+        <p className="text-sm text-gray-700 py-3">Nothing here.</p>
+      ) : (
+        <ul ref={listRef} onKeyDown={onKey} aria-label="Needs attention" className="border-t border-ms-grid">
+          {shown.slice(0, limit).map((r) => {
+            const on = r.key === current
+            return (
+              <li key={r.key} className="border-b border-ms-grid">
+                <button
+                  type="button"
+                  data-row={r.key}
+                  aria-label={`${r.title}. ${KIND_LABEL[r.kind]}: ${r.detail}. ${r.pill.text}${r.overdue ? ', overdue' : ''}`}
+                  aria-current={on ? 'true' : undefined}
+                  aria-expanded={opened === r.key}
+                  tabIndex={on ? 0 : -1}
+                  onClick={(e) => {
+                    choose(r, true)
+                    // Enter on a computer: on to the detail panel's main action (Escape comes back).
+                    if (e.detail === 0 && window.matchMedia('(min-width: 1024px)').matches) {
+                      window.setTimeout(() => document.querySelector<HTMLElement>('#today-detail [data-main]')?.focus(), 50)
+                    }
+                  }}
+                  className={cn(
+                    'w-full text-left flex items-start gap-3 px-3 py-2.5 border-l-[3px] transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy',
+                    on ? 'bg-ms-green/50 border-ms-band' : 'bg-white border-transparent hover:bg-brand-warm',
+                  )}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold text-brand-dark truncate" title={r.title}>{r.title}</span>
+                    <span className="block text-xs text-gray-600 truncate" title={r.detail}>
+                      <span className="sr-only">{KIND_LABEL[r.kind]}: </span>{r.detail}
+                    </span>
+                  </span>
+                  <span className={cn('shrink-0 mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', TONE[r.pill.tone])}>{r.pill.text}</span>
+                </button>
+                {opened === r.key && <div className="lg:hidden px-3 pb-3 pt-1 bg-ms-green/20">{renderInline(r)}</div>}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {shown.length > limit && (
+        <button type="button" className={softBtn} onClick={() => setShowAll(true)}>
+          Show all {shown.length}
+        </button>
+      )}
     </div>
   )
 }
 
-/** Rows under small headings, one per kind, in the order they come. Counts are from `counts` when given (the whole list, not just what is shown). */
-function Grouped({ items, row, counts }: { items: TodayItem[]; row: (i: TodayItem) => React.ReactNode; counts?: TodayItem[] }) {
-  const runs: { reason: TodayReason; items: TodayItem[] }[] = []
-  for (const i of items) {
-    const last = runs[runs.length - 1]
-    if (last && last.reason === i.reason) last.items.push(i)
-    else runs.push({ reason: i.reason, items: [i] })
+type PanelActions = {
+  run: (key: string, action: () => Promise<{ error?: string | null }>, message: string, clears?: boolean) => void
+  remove: (row: Row, taskId: string) => void
+  busy: string | null
+  today: string
+  wednesday: string
+  changed: () => void
+}
+
+/** The detail for one row: the deal, the main contact, the reason's facts and every action. */
+function DetailPanel({ row, detail, actions, inline = false }: { row: Row; detail: TodayDetail | 'loading' | 'error' | undefined; actions: PanelActions; inline?: boolean }) {
+  const { run, remove, busy, today } = actions
+  const [picking, setPicking] = useState(false)
+  const [pickDate, setPickDate] = useState('')
+  const isBusy = busy === row.key
+  const i = row.item
+  const biz = row.business_id ? `/businesses/${row.business_id}` : null
+  const loaded = detail && detail !== 'loading' && detail !== 'error' ? detail : null
+  const glance = loaded?.glance
+
+  // The deal from contracts (Stage 11b: the only source).
+  const current = glance?.contracts.filter((c) => c.is_current) ?? []
+  const types = new Set(current.map((c) => c.membership_type))
+  const dealPill = types.has('club_card') && types.has('advertiser')
+    ? { text: 'Club Card + Advertiser', cls: 'bg-white border border-ms-both-text text-ms-both-text' }
+    : types.has('club_card')
+      ? { text: 'Club Card', cls: 'bg-ms-clubcard text-white' }
+      : types.has('advertiser')
+        ? { text: 'Advertiser', cls: 'bg-ms-advertiser text-ms-advertiser-text' }
+        : null
+  const unpaid = (glance?.invoices ?? []).filter((v) => (v.balance ?? 0) > 0 && !v.voided_at)
+
+  function snoozeTo(date: string) {
+    if (!i) return
+    setPicking(false)
+    if (i.reason === 'todo') {
+      run(i.key, () => (i.todo_kind === 'flag' ? moveFollowUpFlag(i.ref_id!, date) : updateTask(i.ref_id!, { due_date: date })), `Moved to ${dateGB(date)}`, false)
+    } else {
+      run(i.key, () => snoozeBusinessAttention(i.business_id!, date), `${i.business_name} snoozed until ${dateGB(date)}`)
+    }
   }
+
+  const snoozeItems: MenuItem[] = SNOOZE_DAYS.map(({ days, label }) => ({ label, hint: dateGB(addDays(today, days)), onSelect: () => snoozeTo(addDays(today, days)) }))
+  snoozeItems.push({
+    label: 'Pick a date…',
+    onSelect: () => {
+      setPicking(true)
+      setPickDate(i?.reason === 'todo' && i.since && i.since > today ? i.since : addDays(today, 7))
+    },
+  })
+  const canSnooze = i && (i.reason === 'todo' ? !!i.ref_id : !!i.business_id)
+
+  // The main action, then the rest, all labelled (Hard Rule 9).
+  const main: React.ReactNode = (() => {
+    if (row.snooze) {
+      return (
+        <button type="button" disabled={isBusy} data-main className={mainBtn} onClick={() => run(row.key, () => snoozeBusinessAttention(row.business_id!, null), `${row.business_name} is back on the list`)}>
+          Wake now
+        </button>
+      )
+    }
+    if (row.nl) {
+      const n = row.nl
+      return (
+        <button type="button" disabled={isBusy} data-main className={mainBtn} onClick={() => run(row.key, () => markNewsletterUsed(n.kind, n.ref_id), 'Ticked off: it has gone in')}>
+          {isBusy ? 'Saving…' : 'It has gone in'}
+        </button>
+      )
+    }
+    if (!i) return null
+    switch (i.reason) {
+      case 'todo':
+        return (
+          <button type="button" disabled={isBusy} data-main className={mainBtn} onClick={() => run(i.key, () => (i.todo_kind === 'flag' ? clearFollowUpFlag(i.ref_id!) : updateTask(i.ref_id!, { status: 'done' })), 'Done')}>
+            {isBusy ? 'Saving…' : 'Done'}
+          </button>
+        )
+      case 'money_owed':
+        return <Link href={biz!} data-main className={mainBtn}>Chase: open the business</Link>
+      case 'renewal':
+        return <Link href={`${biz}?tab=details`} data-main className={mainBtn}>Log renewal</Link>
+      case 'waiting_on_you':
+        return <Link href={biz!} data-main className={mainBtn}>Reply: open the email</Link>
+      case 'club_card_lapsed':
+      case 'club_card':
+        return i.ref_id ? (
+          <a href={`https://chiswickcalendar.co.uk/?page_id=${i.ref_id}`} target="_blank" rel="noopener noreferrer" data-main className={mainBtn}>
+            Open the page<span className="sr-only"> on the website (new tab)</span>
+          </a>
+        ) : (
+          <Link href={`${biz}?tab=details`} data-main className={mainBtn}>Club Card details</Link>
+        )
+    }
+  })()
+
+  const more: React.ReactNode[] = []
+  if (i?.reason === 'money_owed') {
+    more.push(
+      <button key="paid" type="button" disabled={isBusy} className={softBtn}
+        onClick={() => run(i.key, () => snoozeBusinessAttention(i.business_id!, addDays(today, 7)), `${i.business_name}: hidden for 7 days while QuickBooks catches up`)}>
+        Mark paid
+      </button>,
+    )
+  }
+  if (i?.reason === 'renewal') {
+    more.push(
+      <button key="nr" type="button" disabled={isBusy} className={softBtn}
+        onClick={() => {
+          if (!window.confirm(`Mark ${i.business_name} as not renewing?`)) return
+          run(i.key, () => updateBusinessRenewalStage(i.business_id!, 'not_renewing'), `${i.business_name}: not renewing`)
+        }}>
+        Not renewing
+      </button>,
+    )
+  }
+  if (i?.reason === 'waiting_on_you') {
+    more.push(
+      <button key="nrn" type="button" disabled={isBusy} className={softBtn} onClick={() => run(i.key, () => dismissWaitingReplies(i.business_id!), `${i.business_name}: no reply needed`)}>
+        No reply needed
+      </button>,
+    )
+  }
+  if (i?.reason === 'todo' && i.todo_kind === 'task' && !i.for_newsletter && i.ref_id) {
+    more.push(
+      <button key="nl" type="button" className={softBtn} onClick={() => { addToNewsletter('task', i.ref_id!).then((ok) => ok && actions.changed()) }}>
+        For newsletter
+      </button>,
+    )
+  } else if (i && i.reason !== 'todo' && i.business_id) {
+    more.push(
+      <button key="nlb" type="button" className={softBtn} onClick={() => { addToNewsletter('business', i.business_id!).then((ok) => ok && actions.changed()) }}>
+        For newsletter
+      </button>,
+    )
+  }
+  // Delete: hand-written to-dos and newsletter items that are tasks.
+  const deletable = i?.reason === 'todo' && i.todo_kind === 'task' && i.ref_id ? i.ref_id : row.nl?.kind === 'task' ? row.nl.ref_id : null
+  if (deletable) {
+    more.push(
+      <button key="del" type="button" disabled={isBusy} className={`${softBtn} text-ms-red-text`} onClick={() => remove(row, deletable)}>
+        Delete
+      </button>,
+    )
+  }
+  if (biz) more.push(<Link key="open" href={biz} className={softBtn}>Open business</Link>)
+
+  // A to-do or newsletter task with no business can be attached to one.
+  const attachable = !row.business_id ? (i?.todo_kind === 'task' ? i.ref_id : row.nl?.kind === 'task' ? row.nl.ref_id : null) : null
+  const Heading = inline ? 'h3' : 'h2'
+
   return (
-    <div>
-      {runs.map((r) => (
-        <ItemGroup
-          key={r.reason}
-          title={GROUPS.find((g) => g.reason === r.reason)?.heading ?? REASON_LABEL[r.reason]}
-          count={(counts ?? items).filter((i) => i.reason === r.reason).length}
-          dotClassName={DOT[r.reason]}
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Heading className={inline ? 'text-lg font-semibold text-brand-dark' : H2} style={inline ? undefined : { fontFamily: 'var(--font-serif)' }}>
+            {biz ? <Link href={biz} className="hover:underline">{row.title}</Link> : row.title}
+          </Heading>
+          {dealPill && <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', dealPill.cls)}>{dealPill.text}</span>}
+        </div>
+        <p className="text-sm text-gray-700">
+          <span className="font-semibold text-brand-dark">{KIND_LABEL[row.kind]}</span>
+          {' · '}
+          <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', TONE[row.pill.tone])}>{row.pill.text}</span>
+          {row.overdue && <span className="sr-only"> (overdue)</span>}
+        </p>
+      </div>
+
+      {/* The facts behind the reason */}
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+        {i && <Fact term={i.reason === 'todo' ? 'To-do' : 'Why'}>{i.detail}</Fact>}
+        {i?.since && <Fact term={i.reason === 'renewal' ? 'Contract end' : i.reason === 'money_owed' ? 'Due' : i.reason === 'waiting_on_you' ? 'Since' : 'Date'}>{dateGB(i.since)}</Fact>}
+        {row.nl && <Fact term="Item">{row.nl.title}</Fact>}
+        {row.nl?.date && <Fact term="For">{dateGB(row.nl.date)}</Fact>}
+        {row.snooze?.until && <Fact term="Snoozed until">{dateGB(row.snooze.until)}</Fact>}
+        {i?.reason === 'renewal' && current.map((c) => (
+          <Fact key={c.id} term="Deal">
+            {c.membership_type === 'club_card' ? 'Club Card' : c.membership_type === 'advertiser' ? 'Advertiser' : c.membership_type ?? 'Deal'}
+            {c.contract_start && c.contract_end ? `, ${dateGB(c.contract_start)} to ${dateGB(c.contract_end)}` : ''}
+            {c.contract_amount ? `, ${moneyGB(c.contract_amount)}` : ''}
+          </Fact>
+        ))}
+        {loaded?.latestEmail && (
+          <Fact term="Latest email">
+            {loaded.latestEmail.direction === 'received' ? 'From them' : 'From you'}, {formatDateGB(loaded.latestEmail.entry_date)}
+            {loaded.latestEmail.subject ? `: ${loaded.latestEmail.subject}` : ''}
+          </Fact>
+        )}
+      </dl>
+
+      {unpaid.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-gray-700">Unpaid invoices</p>
+          <ul className="border-t border-ms-grid text-sm">
+            {unpaid.map((v) => {
+              const late = v.due_date ? (daysFrom(v.due_date, today) ?? 0) > 0 : false
+              const key = `void:${v.qbo_invoice_id}`
+              return (
+                <li key={v.qbo_invoice_id} className="border-b border-ms-grid py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="font-semibold text-brand-dark">{v.doc_number ? `No. ${v.doc_number}` : 'Invoice'}</span>
+                  <span>{moneyGB(v.balance)}</span>
+                  {v.due_date && <span className={late ? 'text-ms-red-text' : 'text-gray-600'}>due {dateGB(v.due_date)}</span>}
+                  <button
+                    type="button"
+                    disabled={busy === key}
+                    className={`${linkBtn} ml-auto`}
+                    onClick={() => {
+                      if (!window.confirm(`Mark invoice ${v.doc_number ?? ''} void? It stops counting as owed everywhere in the app. Void it in QuickBooks yourself as well.`)) return
+                      run(key, () => markInvoiceVoid(v.qbo_invoice_id), `Invoice ${v.doc_number ?? ''} marked void`, false)
+                    }}
+                  >
+                    Mark void<span className="sr-only">: invoice {v.doc_number}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Main contact, always with role, email and phone (Hard Rule 4) */}
+      {row.business_id && (
+        <div className="text-sm space-y-0.5">
+          <p className="text-xs font-semibold text-gray-700">Main contact</p>
+          {detail === 'loading' || detail === undefined ? (
+            <p className="text-gray-600">Loading…</p>
+          ) : detail === 'error' ? (
+            <p className="text-ms-red-text">Could not load the contact. <Link href={biz!} className="underline">Open the business</Link></p>
+          ) : loaded?.contact ? (
+            <>
+              <p>
+                <span className="font-semibold text-brand-dark">{loaded.contact.name}</span>
+                {loaded.contact.role ? `, ${loaded.contact.role}` : <span className="text-gray-600">, no role recorded</span>}
+                {!loaded.contact.manual && <span className="text-xs text-gray-600"> (chosen automatically)</span>}
+              </p>
+              <p>
+                Email:{' '}
+                {loaded.contact.emails.length > 0
+                  ? loaded.contact.emails.map((e, n) => <span key={e}>{n > 0 && ', '}<a href={`mailto:${e}`} className="text-brand-navy hover:underline break-all">{e}</a></span>)
+                  : <span className="text-gray-600">none recorded</span>}
+              </p>
+              <p>
+                Phone:{' '}
+                {loaded.contact.phones.length > 0
+                  ? loaded.contact.phones.map((p, n) => <span key={p}>{n > 0 && ', '}<a href={`tel:${p.replace(/\s/g, '')}`} className="text-brand-navy hover:underline">{p}</a></span>)
+                  : <span className="text-gray-600">none recorded</span>}
+              </p>
+            </>
+          ) : (
+            <p className="text-gray-600">No named contact yet. <Link href={biz!} className="text-brand-navy hover:underline">Add one on the business page</Link></p>
+          )}
+          {loaded?.website && (
+            <p>Website: <a href={loaded.website.startsWith('http') ? loaded.website : `https://${loaded.website}`} target="_blank" rel="noopener noreferrer" className="text-brand-navy hover:underline break-all">{loaded.website}</a></p>
+          )}
+        </div>
+      )}
+
+      {attachable && <AttachBusiness taskId={attachable} onDone={actions.changed} />}
+
+      <div className="flex flex-wrap gap-2 items-center">
+        {main}
+        {more}
+        {canSnooze && <ActionMenu label="Snooze" accessibleLabel={`Snooze ${row.title}`} entries={[{ group: i!.reason === 'todo' ? 'Snooze (moves the date)' : 'Snooze', items: snoozeItems }]} />}
+      </div>
+
+      {picking && (
+        <form
+          className="flex flex-wrap gap-2 items-end bg-brand-warm border border-black/[0.06] rounded-sm p-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (pickDate) snoozeTo(pickDate)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              setPicking(false)
+            }
+          }}
         >
-          {r.items.map(row)}
-        </ItemGroup>
-      ))}
+          <label className="block">
+            <span className="block text-xs font-semibold text-gray-700 mb-1">{i?.reason === 'todo' ? 'Move to' : 'Snooze until'}</span>
+            <input type="date" autoFocus value={pickDate} min={i?.reason === 'todo' ? today : addDays(today, 1)} onChange={(e) => setPickDate(e.target.value)} className="text-sm border border-black/[0.12] rounded-sm px-2 min-h-10 md:min-h-8 bg-white" required />
+          </label>
+          <button type="submit" disabled={isBusy || !pickDate} data-main className={mainBtn}>{i?.reason === 'todo' ? 'Save date' : 'Snooze'}</button>
+          <button type="button" onClick={() => setPicking(false)} className={softBtn}>Cancel</button>
+        </form>
+      )}
     </div>
+  )
+}
+
+function Fact({ term, children }: { term: string; children: React.ReactNode }) {
+  return (
+    <>
+      <dt className="text-gray-600">{term}</dt>
+      <dd className="text-brand-dark min-w-0 break-words">{children}</dd>
+    </>
+  )
+}
+
+/** Attach a to-do or newsletter item to a business by name. */
+function AttachBusiness({ taskId, onDone }: { taskId: string; onDone: () => void }) {
+  const [names, setNames] = useState<{ id: string; name: string }[] | null>(null)
+  const [value, setValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const listId = `attach-${taskId}`
+  return (
+    <form
+      className="flex flex-wrap gap-2 items-end"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        const match = (names ?? []).find((b) => b.name.toLowerCase() === value.trim().toLowerCase())
+        if (!match) {
+          toast.error('Pick the business from the list')
+          return
+        }
+        setSaving(true)
+        const result = await linkTaskToBusiness(taskId, match.id)
+        setSaving(false)
+        if (result.error) toast.error(result.error)
+        else {
+          toast.success(`Attached to ${match.name}`)
+          onDone()
+        }
+      }}
+    >
+      <label className="block flex-1 min-w-[180px]">
+        <span className="block text-xs font-semibold text-gray-700 mb-1">Attach to a business</span>
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onFocus={() => { if (!names) getBusinessNames().then(setNames).catch(() => setNames([])) }}
+          list={listId}
+          placeholder="Start typing a name"
+          className="w-full text-sm border border-black/[0.12] rounded-sm px-2.5 min-h-10 bg-white"
+        />
+        <datalist id={listId}>{(names ?? []).map((b) => <option key={b.id} value={b.name} />)}</datalist>
+      </label>
+      <button type="submit" disabled={saving || !value.trim()} className={softBtn}>{saving ? 'Saving…' : 'Attach'}</button>
+    </form>
   )
 }
