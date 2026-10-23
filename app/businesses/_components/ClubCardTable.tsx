@@ -98,6 +98,11 @@ export function ClubCardTable({ rows, lastRun, toMatch }: { rows: ClubCardRow[];
                       {yesNo((r.categories ?? []).length > 0, (r.categories ?? []).join(', ') || 'Category', 'Category')}{' '}
                       {r.in_latest_offers && <span className={CHECK}>✓ Latest Offers</span>}
                     </p>
+                    {r.category_differs && (
+                      <p>
+                        <span className={CROSS}>✗ Category differs: {r.category_in_app || 'none'} here, {(r.category_on_website ?? []).join(', ')} on the website</span>
+                      </p>
+                    )}
                     <p>
                       {(r.contact_mismatch ?? []).length > 0
                         ? <span className={CROSS}>✗ Differs: {(r.contact_mismatch ?? []).join(', ')}</span>

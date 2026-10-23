@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { categoryOptions } from '@/lib/categories'
 import { createBusiness } from '@/app/actions/businesses'
 import { useRouter } from 'next/navigation'
 import { appEvents } from '@/lib/events'
@@ -91,15 +92,18 @@ export function AddBusinessButton() {
             <Label htmlFor="category" className="block mb-2 font-semibold">
               Category
             </Label>
-            <Input
+            <select
               id="category"
-              type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               disabled={isLoading}
-              className="w-full"
-              placeholder="e.g. Restaurant, Retail, Professional Services"
-            />
+              className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none bg-white"
+            >
+              <option value="">— no category —</option>
+              {categoryOptions(category).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
 
           <div>

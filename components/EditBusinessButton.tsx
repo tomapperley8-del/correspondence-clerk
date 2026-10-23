@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { categoryOptions } from '@/lib/categories'
 import { updateBusiness, deleteBusiness, type Business } from '@/app/actions/businesses'
 import { getActiveBusinessTypes, type BusinessType } from '@/app/actions/business-types'
 import { useRouter } from 'next/navigation'
@@ -171,14 +172,17 @@ export function EditBusinessButton({ business }: { business: Business }) {
               <label htmlFor="editBusinessCategory" className="block text-sm font-semibold text-gray-900 mb-2">
                 Category
               </label>
-              <Input
+              <select
                 id="editBusinessCategory"
-                type="text"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="e.g., Food & Drink, Collaborator, Health & Wellness"
-                className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
-              />
+                className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy focus:outline-none bg-white"
+              >
+                <option value="">— no category —</option>
+                {categoryOptions(formData.category).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
 
             {/* Contact Type */}

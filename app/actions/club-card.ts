@@ -37,6 +37,10 @@ export type ClubCardMember = {
   page_website: string | null
   page_email: string | null
   contact_mismatch: string[] | null
+  /** Stage 11b: the app's category, the website's (in the app's words), and whether they differ */
+  category_in_app?: string | null
+  category_on_website?: string[] | null
+  category_differs?: boolean
   issues: ClubCardIssue[]
 }
 

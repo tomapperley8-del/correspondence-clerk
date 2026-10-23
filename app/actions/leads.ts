@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { guessCategory } from '@/lib/categories'
 
 export type NewsLeadStatus = 'new' | 'reviewing' | 'writing' | 'published' | 'killed'
 export type ProspectLeadStatus = 'new' | 'reviewing' | 'outreach_planned' | 'contacted' | 'converted' | 'rejected'
@@ -108,6 +110,94 @@ export async function updateProspectLeadStatus(
   if (error) return { error: error.message }
   revalidatePath('/today')
   return { error: null }
+}
+
+/**
+ * Accept a prospect lead (Stage 11b, one pipeline): it becomes a business at the Outreach stage
+ * "Identified", or is linked to the business that already has its name. From then on the lead
+ * follows that business's Outreach stage (business_stage_mirrors_lead).
+ */
+export async function acceptProspectLead(
+  id: string
+): Promise<{ data?: { business_id: string; business_name: string; created: boolean }; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { data: lead, error: leadError } = await supabase.from('prospect_leads').select('*').eq('id', id).single()
+  if (leadError || !lead) return { error: leadError?.message ?? 'Lead not found' }
+
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+  // The routine sometimes adds a description in brackets: "The Alchemy Tribe (health food café & gym)"
+  const name = (lead.business_name as string).replace(/\s*\([^)]*\)\s*/g, ' ').trim() || (lead.business_name as string)
+
+  let businessId = lead.matched_business_id as string | null
+  let created = false
+  if (!businessId) {
+    const { data: same } = await supabase
+      .from('v_businesses')
+      .select('id')
+      .eq('organization_id', orgId)
+      .is('merged_into', null)
+      .ilike('name', name)
+      .limit(1)
+    businessId = same?.[0]?.id ?? null
+  }
+
+  if (!businessId) {
+    const found = [lead.found_at ? `found ${new Date(lead.found_at).toLocaleDateString('en-GB')}` : null, lead.source_name ? `on ${lead.source_name}` : null]
+      .filter(Boolean).join(' ')
+    const note = [`From a prospect lead${found ? ` ${found}` : ''}${lead.source_url ? ` (${lead.source_url})` : ''}: ${lead.business_name}`,
+      lead.snippet, lead.opportunity_notes].filter((x) => x && String(x).trim()).join('\n')
+    const { data: made, error: insertError } = await supabase
+      .from('businesses')
+      .insert({
+        name,
+        normalized_name: name.toLowerCase(),
+        category: guessCategory(lead.business_category),
+        status: 'Prospect',
+        address: lead.address,
+        notes: note,
+        organization_id: orgId,
+        outreach_stage: 'identified',
+        outreach_identified_at: today,
+      })
+      .select('id')
+      .single()
+    if (insertError) {
+      return { error: insertError.code === '23505' ? `A business called ${name} already exists` : insertError.message }
+    }
+    businessId = made.id as string
+    created = true
+  } else {
+    // An existing business with no deal and no Outreach stage joins Outreach at Identified
+    const { data: biz } = await supabase.from('v_businesses').select('outreach_stage, deal_state').eq('id', businessId).single()
+    if (biz && !biz.outreach_stage && biz.deal_state === 'none') {
+      const { error: stageError } = await supabase
+        .from('businesses')
+        .update({ outreach_stage: 'identified', outreach_identified_at: today })
+        .eq('id', businessId)
+        .eq('organization_id', orgId)
+      if (stageError) return { error: stageError.message }
+    }
+  }
+
+  const { data: biz } = await supabase.from('v_businesses').select('name, deal_state').eq('id', businessId).single()
+  const matchType = created ? 'new_business'
+    : biz?.deal_state === 'none' ? 'existing_no_deal'
+    : biz?.deal_state === 'ended' ? 'existing_expired'
+    : lead.match_type
+  const { error: linkError } = await supabase
+    .from('prospect_leads')
+    .update({ matched_business_id: businessId, match_type: matchType, status: lead.status === 'new' ? 'reviewing' : lead.status })
+    .eq('id', id)
+  if (linkError) return { error: linkError.message }
+
+  revalidatePath('/businesses')
+  revalidatePath('/today')
+  return { data: { business_id: businessId, business_name: (biz?.name as string) ?? name, created } }
 }
 
 // ---- Drafts written by the routines ----

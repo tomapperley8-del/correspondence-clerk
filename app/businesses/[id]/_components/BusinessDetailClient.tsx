@@ -758,6 +758,16 @@ export function BusinessDetailClient({
           <span className="ml-2 text-gray-900">{business.address || 'Not set'}</span>
         </div>
         <div>
+          <span className="font-semibold text-gray-700">Website:</span>
+          {business.website ? (
+            <a href={/^https?:\/\//i.test(business.website) ? business.website : `https://${business.website}`} target="_blank" rel="noopener noreferrer" className="ml-2 text-brand-navy underline break-all">
+              {business.website.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')}
+            </a>
+          ) : (
+            <span className="ml-2 text-gray-900">Not set</span>
+          )}
+        </div>
+        <div>
           <span className="font-semibold text-gray-700">Email:</span>
           <span className="ml-2 text-gray-900">{business.email || 'Not set'}</span>
         </div>
