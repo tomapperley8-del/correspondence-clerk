@@ -42,6 +42,8 @@ export async function markBusinessReviewed(id: string): Promise<ReviewResult> {
 
   if (error) return { error: error.message }
   if (!data) return { error: 'This business has already been reviewed' }
+  // Stage 11a: a reviewed business with a deal on file is Active or Former, not Prospect
+  await auth.supabase.rpc('refresh_business_truth', { p_business_id: id })
   revalidateBusinessViews(id)
   return { name: data.name }
 }

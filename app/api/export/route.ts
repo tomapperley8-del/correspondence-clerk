@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   if (type === 'businesses') {
     const { data, error } = await supabase
-      .from('businesses')
+      .from('v_businesses') // Stage 11a: derived status and last in touch
       .select('name,category,status,membership_type,email,phone,address,notes,last_contacted_at,created_at')
       .eq('organization_id', orgId)
       .order('name')
