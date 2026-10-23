@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { ProspectLead, ProspectLeadStatus, ProspectMatchType } from '@/app/actions/leads'
-import { updateProspectLeadStatus } from '@/app/actions/leads'
+import { acceptProspectLead, updateProspectLeadStatus } from '@/app/actions/leads'
 import { PROSPECT_COLUMNS, MATCH_TYPE_META, sourceBadgeClass, timeAgo } from '@/lib/lead-meta'
 import { toast } from '@/lib/toast'
 
@@ -45,6 +45,22 @@ export function ProspectBoard({ initialLeads }: { initialLeads: ProspectLead[] }
       setLeads(prev => prev.map(l => (l.id === id ? { ...l, status: previous } : l)))
       toast.error(result.error)
     }
+  }
+
+  const [accepting, setAccepting] = useState<string | null>(null)
+  async function accept(id: string) {
+    setAccepting(id)
+    const result = await acceptProspectLead(id)
+    setAccepting(null)
+    if (result.error || !result.data) {
+      toast.error(result.error ?? 'Could not accept the lead')
+      return
+    }
+    const { business_id, business_name, created } = result.data
+    setLeads(prev => prev.map(l => (l.id === id
+      ? { ...l, matched_business_id: business_id, matched_business: { id: business_id, name: business_name }, status: l.status === 'new' ? 'reviewing' : l.status }
+      : l)))
+    toast.success(created ? `${business_name} added to Outreach at Identified` : `Linked to ${business_name}`)
   }
 
   return (
@@ -186,6 +202,16 @@ export function ProspectBoard({ initialLeads }: { initialLeads: ProspectLead[] }
                             )}
                             <p className="text-[10px] text-gray-400">Found {timeAgo(lead.found_at)}</p>
                           </div>
+                        )}
+                        {!lead.matched_business && (
+                          <button
+                            type="button"
+                            onClick={() => accept(lead.id)}
+                            disabled={accepting === lead.id}
+                            className="mt-2 w-full border border-brand-navy text-brand-navy hover:bg-brand-navy hover:text-white px-2 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50"
+                          >
+                            {accepting === lead.id ? 'Accepting...' : 'Accept: add to Outreach'}
+                          </button>
                         )}
                         <div className="mt-2">
                           <select

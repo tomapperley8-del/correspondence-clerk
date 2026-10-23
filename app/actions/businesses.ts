@@ -9,9 +9,6 @@ const createBusinessSchema = z.object({
   name: z.string().min(1, 'Business name is required').max(200, 'Business name too long'),
   category: z.string().max(100).optional(),
   status: z.string().max(100).optional(),
-  is_club_card: z.boolean().optional(),
-  is_advertiser: z.boolean().optional(),
-  membership_type: z.string().nullable().optional(),
   business_type: z.string().nullable().optional(),
 })
 
@@ -19,11 +16,9 @@ const updateBusinessSchema = z.object({
   name: z.string().min(1, 'Business name is required').max(200).optional(),
   category: z.string().max(100).nullable().optional(),
   status: z.string().max(100).nullable().optional(),
-  is_club_card: z.boolean().optional(),
-  is_advertiser: z.boolean().optional(),
-  membership_type: z.string().nullable().optional(),
   business_type: z.string().nullable().optional(),
   address: z.string().max(500).nullable().optional(),
+  website: z.string().max(500).nullable().optional(),
   email: z.string().email('Invalid email format').max(254).or(z.literal('')).nullable().optional(),
   phone: z.string().max(50).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
@@ -49,6 +44,8 @@ export type Business = {
   payment_structure: string | null
   contract_amount: number | null
   address: string | null
+  /** Stage 11b: the business's own website. */
+  website?: string | null
   email: string | null
   phone: string | null
   notes: string | null
@@ -134,7 +131,7 @@ export async function getBusinessById(id: string) {
   const { data, error } = await supabase
     // Stage 11a: status, deal, last in touch from the truth layer (writes still go to businesses)
     .from('v_businesses')
-    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, invoice_number, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, outreach_stage, outreach_identified_at, outreach_contacted_at, outreach_followed_up_at, outreach_in_discussion_at, outreach_won_at, outreach_invoice_paid_at, outreach_declined_at, renewal_stage, renewal_not_started_at, renewal_contacted_at, renewal_in_discussion_at, renewal_agreed_at, renewal_invoice_paid_at, renewal_declined_at, disposition, follow_up_after, mute_replies, mastersheet_source_ids, merged_into, organization_id, created_at, updated_at, main_contact_id, main_contact_is_manual')
+    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, contract_start, contract_end, contract_currency, deal_terms, payment_structure, contract_amount, invoice_number, address, email, phone, notes, last_contacted_at, relationship_memory, relationship_memory_updated_at, outreach_stage, outreach_identified_at, outreach_contacted_at, outreach_followed_up_at, outreach_in_discussion_at, outreach_won_at, outreach_invoice_paid_at, outreach_declined_at, renewal_stage, renewal_not_started_at, renewal_contacted_at, renewal_in_discussion_at, renewal_agreed_at, renewal_invoice_paid_at, renewal_declined_at, disposition, follow_up_after, mute_replies, mastersheet_source_ids, merged_into, organization_id, created_at, updated_at, main_contact_id, main_contact_is_manual, website')
     .eq('id', id)
     .single()
 
@@ -149,6 +146,7 @@ export async function createBusiness(formData: {
   name: string
   category?: string
   status?: string
+  /** Ticked on the Add Business form: recorded as a contract (Stage 11b) */
   is_club_card?: boolean
   is_advertiser?: boolean
 }) {
@@ -183,8 +181,6 @@ export async function createBusiness(formData: {
       normalized_name,
       category: formData.category || null,
       status: formData.status || null,
-      is_club_card: formData.is_club_card || false,
-      is_advertiser: formData.is_advertiser || false,
       organization_id: organizationId,
     })
     .select()
@@ -198,6 +194,12 @@ export async function createBusiness(formData: {
     return { error: error.message }
   }
 
+  for (const type of [formData.is_club_card && 'club_card', formData.is_advertiser && 'advertiser'] as const) {
+    if (!type) continue
+    const deal = await recordDeal(supabase, organizationId, data.id, type)
+    if (deal.error) return { error: `Business added, but its ${type === 'club_card' ? 'Club Card' : 'advertising'} contract wasn't recorded: ${deal.error}` }
+  }
+
   revalidatePath('/dashboard')
   return { data }
 }
@@ -208,10 +210,9 @@ export async function updateBusiness(
     name?: string
     category?: string | null
     status?: string | null
-    is_club_card?: boolean
-    is_advertiser?: boolean
     business_type?: string | null
     address?: string | null
+    website?: string | null
     email?: string | null
     phone?: string | null
     notes?: string | null
@@ -250,11 +251,8 @@ export async function updateBusiness(
   if (formData.category !== undefined) updateData.category = formData.category
   if (formData.status !== undefined) updateData.status = formData.status
   if (formData.business_type !== undefined) updateData.business_type = formData.business_type
-  if (formData.is_club_card !== undefined)
-    updateData.is_club_card = formData.is_club_card
-  if (formData.is_advertiser !== undefined)
-    updateData.is_advertiser = formData.is_advertiser
   if (formData.address !== undefined) updateData.address = formData.address
+  if (formData.website !== undefined) updateData.website = formData.website?.trim() || null
   if (formData.email !== undefined) updateData.email = formData.email
   if (formData.phone !== undefined) updateData.phone = formData.phone
   if (formData.notes !== undefined) updateData.notes = formData.notes
@@ -342,17 +340,30 @@ export async function getContractBusinesses(): Promise<{ data?: ContractBusiness
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
+  // Stage 11b: the deal comes from contracts (v_businesses), not the copies on businesses
   const { data, error } = await supabase
-    .from('businesses')
-    .select('id, name, is_club_card, is_advertiser, renewal_stage, renewal_not_started_at, renewal_contacted_at, renewal_in_discussion_at, renewal_agreed_at, renewal_invoice_paid_at, renewal_declined_at, contracts(id, contract_start, contract_end, contract_amount, contract_currency, invoice_paid, is_current)')
+    .from('v_businesses')
+    .select('id, name, is_club_card, is_advertiser, renewal_stage, renewal_not_started_at, renewal_contacted_at, renewal_in_discussion_at, renewal_agreed_at, renewal_invoice_paid_at, renewal_declined_at')
     .eq('organization_id', orgId)
     .or('is_club_card.eq.true,is_advertiser.eq.true')
     .order('name', { ascending: true })
 
   if (error) return { error: error.message }
 
+  type Term = { id: string; business_id: string; contract_start: string | null; contract_end: string | null; contract_amount: number | null; contract_currency: string | null; invoice_paid: boolean; is_current: boolean }
+  const ids = (data ?? []).map((b) => b.id as string)
+  const terms: Term[] = []
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data: rows, error: termsError } = await supabase
+      .from('contracts')
+      .select('id, business_id, contract_start, contract_end, contract_amount, contract_currency, invoice_paid, is_current')
+      .in('business_id', ids.slice(i, i + 200))
+    if (termsError) return { error: termsError.message }
+    terms.push(...((rows ?? []) as Term[]))
+  }
+
   const mapped: ContractBusiness[] = (data ?? []).map((b: Record<string, unknown>) => {
-    const contracts = (b.contracts as { id: string; contract_start: string | null; contract_end: string | null; contract_amount: number | null; contract_currency: string | null; invoice_paid: boolean; is_current: boolean }[]) || []
+    const contracts = terms.filter((c) => c.business_id === b.id)
     const currentContracts = contracts.filter(c => c.is_current)
     const current = currentContracts.length > 0
       ? currentContracts.reduce((earliest, c) => {
@@ -451,20 +462,44 @@ export async function addBusinessToContracts(
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const update = type === 'club_card'
-    ? { is_club_card: true }
-    : { is_advertiser: true }
-
-  const { error } = await supabase
-    .from('businesses')
-    .update(update)
-    .eq('id', businessId)
-    .eq('organization_id', orgId)
-
-  if (error) return { error: error.message }
+  const { error } = await recordDeal(supabase, orgId, businessId, type)
+  if (error) return { error }
   revalidatePath('/today')
   revalidatePath('/dashboard')
   return {}
+}
+
+/**
+ * Stage 11b: deals live only in contracts. Adding a business to Renewals, or marking an outreach
+ * business won, records a current contract of that type starting today (unless one is already
+ * current); its dates and amount are filled in on the business page. The contract trigger then
+ * takes it off the outreach board, opens a renewal cycle and works out the status.
+ */
+async function recordDeal(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  businessId: string,
+  type: 'club_card' | 'advertiser' | null
+): Promise<{ error?: string }> {
+  const { data: current, error: readError } = await supabase
+    .from('contracts')
+    .select('membership_type')
+    .eq('business_id', businessId)
+    .eq('organization_id', orgId)
+    .eq('is_current', true)
+  if (readError) return { error: readError.message }
+  if ((current ?? []).some((c) => type === null || c.membership_type === type)) return {}
+
+  const { error } = await supabase.from('contracts').insert({
+    business_id: businessId,
+    organization_id: orgId,
+    membership_type: type ?? 'club_card',
+    contract_start: new Date().toISOString().slice(0, 10),
+    contract_currency: 'GBP',
+    billing_frequency: 'annual',
+    is_current: true,
+  })
+  return error ? { error: error.message } : {}
 }
 
 export type OutreachBusiness = {
@@ -491,7 +526,7 @@ export async function getOutreachBusinesses(): Promise<{ data?: OutreachBusiness
   if (!orgId) return { error: 'No organization found' }
 
   const { data, error } = await supabase
-    .from('businesses')
+    .from('v_businesses')
     .select('id, name, is_club_card, is_advertiser, outreach_stage, outreach_identified_at, outreach_contacted_at, outreach_followed_up_at, outreach_in_discussion_at, outreach_won_at, outreach_invoice_paid_at, outreach_declined_at')
     .eq('organization_id', orgId)
     .not('outreach_stage', 'is', null)
@@ -576,13 +611,6 @@ export async function promoteOutreachToContracts(
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const { data: biz } = await supabase
-    .from('businesses')
-    .select('is_club_card, is_advertiser')
-    .eq('id', businessId)
-    .eq('organization_id', orgId)
-    .single()
-
   const update: Record<string, unknown> = {
     outreach_stage: null,
     outreach_identified_at: null,
@@ -596,10 +624,6 @@ export async function promoteOutreachToContracts(
     renewal_not_started_at: new Date().toISOString().slice(0, 10),
   }
 
-  if (!biz?.is_club_card && !biz?.is_advertiser) {
-    update.is_club_card = true
-  }
-
   const { error } = await supabase
     .from('businesses')
     .update(update)
@@ -607,6 +631,11 @@ export async function promoteOutreachToContracts(
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
+
+  // a deal in force already counts; otherwise record a Club Card, as the tick used to
+  const deal = await recordDeal(supabase, orgId, businessId, null)
+  if (deal.error) return { error: deal.error }
+
   revalidatePath('/today')
   revalidatePath('/dashboard')
   return {}
@@ -697,17 +726,8 @@ export async function addBusinessToContractsFromDetail(
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const update = type === 'club_card'
-    ? { is_club_card: true, renewal_stage: 'not_started', renewal_not_started_at: new Date().toISOString().slice(0, 10) }
-    : { is_advertiser: true, renewal_stage: 'not_started', renewal_not_started_at: new Date().toISOString().slice(0, 10) }
-
-  const { error } = await supabase
-    .from('businesses')
-    .update(update)
-    .eq('id', businessId)
-    .eq('organization_id', orgId)
-
-  if (error) return { error: error.message }
+  const { error } = await recordDeal(supabase, orgId, businessId, type)
+  if (error) return { error }
 
   revalidatePath('/today')
   revalidatePath('/dashboard')

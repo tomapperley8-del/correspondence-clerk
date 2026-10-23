@@ -19,6 +19,7 @@ export function EditBusinessDetailsButton({
 
   const [formData, setFormData] = useState({
     address: business.address || '',
+    website: business.website || '',
     email: business.email || '',
     phone: business.phone || '',
     notes: business.notes || '',
@@ -32,6 +33,7 @@ export function EditBusinessDetailsButton({
 
     const result = await updateBusiness(business.id, {
       address: formData.address || null,
+      website: formData.website || null,
       email: formData.email || null,
       phone: formData.phone || null,
       notes: formData.notes || null,
@@ -52,6 +54,7 @@ export function EditBusinessDetailsButton({
   const handleCancel = () => {
     setFormData({
       address: business.address || '',
+    website: business.website || '',
       email: business.email || '',
       phone: business.phone || '',
       notes: business.notes || '',
@@ -94,6 +97,21 @@ export function EditBusinessDetailsButton({
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               placeholder="Business physical address"
+              className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
+            />
+          </div>
+
+          {/* Website */}
+          <div className="mb-4">
+            <label htmlFor="editBusinessWebsite" className="block text-sm font-semibold text-gray-900 mb-2">
+              Website
+            </label>
+            <Input
+              id="editBusinessWebsite"
+              type="url"
+              value={formData.website}
+              onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+              placeholder="https://"
               className="w-full px-3 py-2 border border-gray-200 focus:border-brand-navy"
             />
           </div>

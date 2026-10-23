@@ -1,5 +1,6 @@
 'use client'
 
+import { BUSINESS_CATEGORIES } from '@/lib/categories'
 import { useEffect, useState, useMemo, useDeferredValue } from 'react'
 import Link from 'next/link'
 import type { BusinessListItem } from '@/app/actions/businesses'
@@ -139,13 +140,12 @@ export function DashboardClient({ initialBusinesses, initialMembershipTypes, ini
     if (filterType === 'unreviewed' && unreviewedCount === 0) setFilterType('all')
   }, [filterType, unreviewedCount])
 
-  // Get unique categories (memoized)
-  const categories = useMemo(() =>
-    Array.from(
-      new Set(businesses.map((b) => b.category).filter((c): c is string => Boolean(c)))
-    ).sort(),
-    [businesses]
-  )
+  // The seven categories (Stage 11b), plus any older value still on a business
+  const categories = useMemo(() => {
+    const seven: string[] = [...BUSINESS_CATEGORIES]
+    const older = businesses.map((b) => b.category).filter((c): c is string => Boolean(c) && !seven.includes(c!))
+    return [...seven, ...Array.from(new Set(older)).sort()]
+  }, [businesses])
 
   // Filter and sort businesses (memoized, deferred so typing stays responsive)
   const filtered = useMemo(() => {

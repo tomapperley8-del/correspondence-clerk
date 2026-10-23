@@ -183,14 +183,16 @@ export async function deleteMembershipType(
 
   if (typeErr || !typeData) return { error: 'Type not found' }
 
+  // Stage 11b: deals live in contracts (a past deal keeps its type there too)
   const { count, error: countErr } = await supabase
-    .from('businesses')
+    .from('contracts')
     .select('id', { count: 'exact', head: true })
-    .eq('membership_type', typeData.value)
+    .eq('organization_id', orgId)
+    .in('membership_type', [typeData.value, `former_${typeData.value}`])
 
   if (countErr) return { error: countErr.message }
   if (count && count > 0) {
-    return { error: `Cannot delete — ${count} business${count === 1 ? '' : 'es'} use this type. Change them first.` }
+    return { error: `Cannot delete — ${count} contract${count === 1 ? "" : "s"} use this type. Change them first.` }
   }
 
   const { error } = await supabase
