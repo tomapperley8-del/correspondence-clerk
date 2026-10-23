@@ -17,7 +17,7 @@ export function useFullScreen() {
 }
 
 export const panelButtonClass =
-  'inline-flex items-center justify-center text-xs font-semibold px-2.5 min-h-10 md:min-h-8 pointer-coarse:min-h-10 border border-black/[0.12] rounded-sm bg-white text-brand-navy hover:bg-brand-warm transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
+  'inline-flex items-center justify-center text-xs font-semibold px-2.5 min-h-10 md:min-h-8 pointer-coarse:min-h-10 rounded-sm text-brand-navy hover:bg-brand-navy/[0.07] transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -28,6 +28,7 @@ export function FullScreenPanel({
   children,
   className,
   id,
+  card = true,
 }: {
   title: React.ReactNode
   headingId: string
@@ -37,6 +38,8 @@ export function FullScreenPanel({
   children: React.ReactNode | ((full: boolean) => React.ReactNode)
   className?: string
   id?: string
+  /** Drawn as a white card on the page (default); full screen fills the window instead. */
+  card?: boolean
 }) {
   const [full, setFull] = useState(false)
   const panel = useRef<HTMLElement>(null)
@@ -89,12 +92,14 @@ export function FullScreenPanel({
         aria-modal={full || undefined}
         onKeyDown={trapTab}
         className={cn(
-          full ? 'fixed inset-0 m-0 z-[70] overflow-y-auto bg-brand-paper px-4 py-4 sm:px-8 sm:py-6' : 'min-w-0',
+          full
+            ? 'fixed inset-0 m-0 z-[70] overflow-y-auto bg-brand-paper px-4 py-4 sm:px-8 sm:py-6'
+            : cn('min-w-0', card && 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] p-4 sm:p-5'),
           className,
         )}
       >
         <div className={cn('flex flex-wrap items-center gap-2 mb-2', full && 'mx-auto max-w-[1800px]')}>
-          <h2 id={headingId} className="text-2xl font-semibold text-brand-dark mr-auto" style={{ fontFamily: 'var(--font-serif)' }}>
+          <h2 id={headingId} className="text-[1.6rem] leading-tight font-semibold text-brand-dark mr-auto" style={{ fontFamily: 'var(--font-serif)' }}>
             {title}
           </h2>
           {controls}

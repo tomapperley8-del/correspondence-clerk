@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { loadTodayCore } from '@/lib/today-source'
-import { splitDoNow, type TodayItem } from '@/lib/today'
+import { overdueItems, type TodayItem } from '@/lib/today'
+import { getBusinessGlance, type BusinessGlance } from '@/app/actions/business-glance'
 
 // Today (UI overhaul Stage 7): the home page. Built on v_business_attention
 // (Stage 4) plus hand-written to-dos. Engine tasks for replies, renewals and
@@ -37,15 +38,15 @@ const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? nul
 // Today's list is loaded in lib/today-source.ts, shared with the desk email (Stage 11a).
 const loadCore = loadTodayCore
 
-/** The nav badge: how many lines are in Do now (at most 8). Null when unavailable. */
-export async function getDoNowCount(): Promise<number | null> {
+/** The nav badge: how many items are overdue (Stage 14a v2, no cap). Null when unavailable. */
+export async function getOverdueCount(): Promise<number | null> {
   if (!isFeatureEnabled('attentionView')) return null
   const supabase = await createClient()
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return null
   try {
     const { today, items } = await loadCore(supabase, orgId)
-    return splitDoNow(items, today).doNow.length
+    return overdueItems(items, today).length
   } catch {
     return null
   }
@@ -172,4 +173,119 @@ export async function moveFollowUpFlag(correspondenceId: string, date: string) {
   if (error) return { error: error.message }
   revalidatePath('/today')
   return { success: true }
+}
+
+// ---- Stage 14a v2: the detail panel, Delete with Undo, newsletter links ----
+
+export type TodayDetail = {
+  glance: BusinessGlance
+  website: string | null
+  contact: { id: string; name: string; role: string | null; emails: string[]; phones: string[]; manual: boolean } | null
+  latestEmail: { id: string; subject: string | null; entry_date: string; direction: string | null } | null
+}
+
+/** Everything the detail panel shows for one business: the at-a-glance data, main contact and latest email. */
+export async function getTodayDetail(businessId: string): Promise<{ data?: TodayDetail; error?: string }> {
+  const supabase = await createClient()
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+  const [glanceRes, bizRes, emailRes] = await Promise.all([
+    getBusinessGlance(businessId),
+    supabase.from('v_businesses').select('website, main_contact_id, main_contact_is_manual').eq('id', businessId).eq('organization_id', orgId).maybeSingle(),
+    supabase
+      .from('correspondence')
+      .select('id, subject, entry_date, direction')
+      .eq('business_id', businessId)
+      .eq('organization_id', orgId)
+      .in('type', ['Email', 'Email Thread'])
+      .order('entry_date', { ascending: false })
+      .limit(1),
+  ])
+  if (glanceRes.error || !glanceRes.data) return { error: glanceRes.error ?? 'Could not load' }
+  let contact: TodayDetail['contact'] = null
+  const contactId = bizRes.data?.main_contact_id as string | null | undefined
+  if (contactId) {
+    const { data: c } = await supabase.from('contacts').select('id, name, role, emails, phones').eq('id', contactId).maybeSingle()
+    if (c) {
+      contact = {
+        id: c.id, name: c.name, role: c.role,
+        emails: Array.isArray(c.emails) ? (c.emails as string[]) : [],
+        phones: Array.isArray(c.phones) ? (c.phones as string[]) : [],
+        manual: !!bizRes.data?.main_contact_is_manual,
+      }
+    }
+  }
+  return {
+    data: {
+      glance: glanceRes.data,
+      website: (bizRes.data?.website as string | null) ?? null,
+      contact,
+      latestEmail: (emailRes.data?.[0] as TodayDetail['latestEmail']) ?? null,
+    },
+  }
+}
+
+/**
+ * Delete a hand-written to-do or newsletter item. The whole row is copied to
+ * cc_phase0_backup first, so Undo (and anyone later) can put it back.
+ * Tasks the engine made can't be deleted here: it would make them again.
+ */
+export async function deleteTodayTask(taskId: string): Promise<{ backupId?: number; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+  const { data: row, error: readError } = await supabase.from('tasks').select('*').eq('id', taskId).eq('organization_id', orgId).maybeSingle()
+  if (readError) return { error: readError.message }
+  if (!row) return { error: 'Already gone' }
+  if (row.source !== 'manual') return { error: 'This one was made automatically and would come back. Use "It has gone in" or Done instead.' }
+  const { data: backup, error: backupError } = await supabase
+    .from('cc_phase0_backup')
+    .insert({ table_name: 'tasks', row_id: taskId, before_row: row, reason: `today_delete ${user.id}` })
+    .select('id')
+    .single()
+  if (backupError) return { error: `Not deleted: the backup failed (${backupError.message})` }
+  const { error } = await supabase.from('tasks').delete().eq('id', taskId).eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  revalidatePath('/today')
+  if (row.business_id) revalidatePath(`/businesses/${row.business_id}`)
+  return { backupId: backup.id as number }
+}
+
+/** Undo a Delete: put the backed-up row back exactly as it was. */
+export async function undoDeleteTodayTask(backupId: number): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+  const { data: backup, error: readError } = await supabase
+    .from('cc_phase0_backup')
+    .select('before_row')
+    .eq('id', backupId)
+    .eq('table_name', 'tasks')
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  const row = backup?.before_row as Record<string, unknown> | undefined
+  if (!row || row.organization_id !== orgId) return { error: 'Nothing to undo' }
+  const { error } = await supabase.from('tasks').insert(row)
+  if (error) return { error: error.message }
+  revalidatePath('/today')
+  if (row.business_id) revalidatePath(`/businesses/${row.business_id as string}`)
+  return {}
+}
+
+/** Attach a to-do or newsletter item to a business (or detach it with null). */
+export async function linkTaskToBusiness(taskId: string, businessId: string | null): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+  const { error } = await supabase.from('tasks').update({ business_id: businessId }).eq('id', taskId).eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  revalidatePath('/today')
+  if (businessId) revalidatePath(`/businesses/${businessId}`)
+  return {}
 }

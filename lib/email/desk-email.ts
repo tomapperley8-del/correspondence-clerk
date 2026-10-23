@@ -6,14 +6,14 @@
  * does only the work that needs judgement (mail sweep, intent, hand-written
  * tasks); everything here is a read of v_morning_desk and friends.
  *
- * Stage 11a: the work list (Do now, money owed, renewals, waiting on you,
+ * Stage 11a: the work list (overdue, money owed, renewals, waiting on you,
  * to-dos, Club Card pages) comes from the same loader and rules as the Today
  * page (lib/today-source.ts, lib/today.ts), so the two always agree. Only the
  * sections Today doesn't hold (editorial, new businesses, story leads) still
  * come from v_morning_desk.
  */
 
-import { ageWords, REASON_LABEL, splitDoNow, type TodayItem, type TodayReason } from '@/lib/today'
+import { ageWords, REASON_LABEL, overdueItems, type TodayItem, type TodayReason } from '@/lib/today'
 
 export interface DeskLine {
   section: number
@@ -92,14 +92,20 @@ const TODAY_GROUPS: { reason: TodayReason; title: string }[] = [
 const itemLine = (i: TodayItem, date: string) =>
   `${i.business_name ? `${i.business_name}: ` : ''}${i.detail} (${ageWords(i, date)})`
 
-/** Do now and the groups exactly as Today shows them. */
+/**
+ * Overdue, then the groups, as Today lists them (Stage 14a v2). Overdue is the
+ * nav badge's rule with no cap, so it is never cut short; the groups hold the
+ * rest and show `limit` lines each.
+ */
 export function todaySections(date: string, items: TodayItem[], limit = 15): Section[] {
-  const { doNow, rest } = splitDoNow(items, date)
+  const overdue = overdueItems(items, date)
+  const chosen = new Set(overdue.map((i) => i.key))
+  const rest = items.filter((i) => !chosen.has(i.key))
   const out: Section[] = []
-  if (doNow.length > 0) {
+  if (overdue.length > 0) {
     out.push({
-      heading: `Do now (${doNow.length})`,
-      items: doNow.map((i) => `${REASON_LABEL[i.reason]}. ${itemLine(i, date)}`),
+      heading: `Overdue (${overdue.length})`,
+      items: overdue.map((i) => `${REASON_LABEL[i.reason]}. ${itemLine(i, date)}`),
     })
   }
   for (const g of TODAY_GROUPS) {
@@ -194,8 +200,8 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
 
   // Opening line: Today's numbers
   const count = (r: TodayReason) => today.items.filter((i) => i.reason === r).length
-  const doNowCount = splitDoNow(today.items, today.date).doNow.length
-  const opening = `${doNowCount} thing${doNowCount === 1 ? '' : 's'} to do now. ` +
+  const overdueCount = overdueItems(today.items, today.date).length
+  const opening = `${overdueCount} thing${overdueCount === 1 ? '' : 's'} overdue. ` +
     `${money(brief?.receivables_total)} is owed across ${brief?.businesses_owing ?? 0} businesses; ` +
     `${count('waiting_on_you')} waiting on a reply from you, ${count('renewal')} renewals and ${count('todo')} to-dos.`
 

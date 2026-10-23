@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { ToastVariant } from '@/lib/toast'
+import type { ToastAction, ToastVariant } from '@/lib/toast'
 
 type ToastItem = {
   id: number
   message: string
   variant: ToastVariant
+  action?: ToastAction
 }
 
 export function ToastContainer() {
@@ -14,12 +15,13 @@ export function ToastContainer() {
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const { message, variant } = (e as CustomEvent).detail
-      const id = Date.now()
-      setToasts((prev) => [...prev, { id, message, variant }])
+      const { message, variant, action } = (e as CustomEvent).detail
+      const id = Date.now() + Math.random()
+      setToasts((prev) => [...prev, { id, message, variant, action }])
+      // A toast with Undo stays long enough to reach the button.
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id))
-      }, 5000)
+      }, action ? 10000 : 5000)
     }
     window.addEventListener('app:toast', handler)
     return () => window.removeEventListener('app:toast', handler)
@@ -43,6 +45,17 @@ export function ToastContainer() {
         >
           <div className="flex items-center justify-between gap-3">
             <span>{t.message}</span>
+            {t.action && (
+              <button
+                onClick={() => {
+                  t.action!.onClick()
+                  setToasts((prev) => prev.filter((x) => x.id !== t.id))
+                }}
+                className="text-white font-semibold underline underline-offset-2 text-xs shrink-0"
+              >
+                {t.action.label}
+              </button>
+            )}
             <button
               onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
               className="text-white/70 hover:text-white text-xs font-medium shrink-0"

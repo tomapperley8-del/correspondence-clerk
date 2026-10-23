@@ -1,6 +1,7 @@
-// Today page rules (UI overhaul Stage 7). Pure functions, shared by the page
-// and the nav badge so both always show the same "Do now" number.
+// Today page rules (UI overhaul Stage 7). Pure functions, shared by the page,
+// the nav badge and the desk email so all three show the same overdue number.
 // The plan's section "New layout (Stage 7)" is the source of these rules.
+// Stage 14a v2: Do now (at most 8) is gone; the same rules, uncapped, are "overdue".
 
 export type TodayReason = 'money_owed' | 'renewal' | 'club_card_lapsed' | 'waiting_on_you' | 'todo' | 'club_card'
 
@@ -20,8 +21,6 @@ export type TodayItem = {
   ref_id: string | null
   other_reasons: TodayReason[]
 }
-
-export const DO_NOW_LIMIT = 8
 
 export const REASON_LABEL: Record<TodayReason, string> = {
   money_owed: 'Money owed',
@@ -50,10 +49,10 @@ export function addDays(date: string, days: number): string {
 }
 
 /**
- * Do now: money more than 30 days overdue; a renewal that ended in the last
+ * Overdue: money more than 30 days overdue; a renewal that ended in the last
  * 30 days or ends within 7; an email waiting 7 days or more; a to-do past its date.
  */
-export function isDoNow(item: TodayItem, today: string): boolean {
+export function isOverdue(item: TodayItem, today: string): boolean {
   const age = daysFrom(item.since, today)
   if (age === null) return false
   switch (item.reason) {
@@ -65,7 +64,7 @@ export function isDoNow(item: TodayItem, today: string): boolean {
       return age >= 7
     case 'todo':
       return age >= 1
-    // Club Card page problems are never Do now: they wait in Everything else
+    // Club Card page problems are never overdue: they have no deadline
     case 'club_card_lapsed':
     case 'club_card':
       return false
@@ -78,10 +77,15 @@ export function pressingOrder(a: TodayItem, b: TodayItem, today: string): number
   return REASON_WEIGHT[b.reason] - REASON_WEIGHT[a.reason] || age(b) - age(a) || (a.business_name ?? '').localeCompare(b.business_name ?? '', 'en-GB')
 }
 
-export function splitDoNow(items: TodayItem[], today: string): { doNow: TodayItem[]; rest: TodayItem[] } {
-  const doNow = items.filter((i) => isDoNow(i, today)).sort((a, b) => pressingOrder(a, b, today)).slice(0, DO_NOW_LIMIT)
-  const chosen = new Set(doNow.map((i) => i.key))
-  return { doNow, rest: items.filter((i) => !chosen.has(i.key)) }
+/** The overdue items, most pressing first: the nav badge, Today's count and the desk email's first section. */
+export function overdueItems(items: TodayItem[], today: string): TodayItem[] {
+  return items.filter((i) => isOverdue(i, today)).sort((a, b) => pressingOrder(a, b, today))
+}
+
+/** Today's one list: overdue first, then everything else, each most pressing first. */
+export function todayOrder(items: TodayItem[], today: string): TodayItem[] {
+  const rank = (i: TodayItem) => (isOverdue(i, today) ? 0 : 1)
+  return [...items].sort((a, b) => rank(a) - rank(b) || pressingOrder(a, b, today))
 }
 
 /** Plain words for how old an item is. */
