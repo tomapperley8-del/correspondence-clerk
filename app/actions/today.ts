@@ -5,20 +5,13 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import type { AttentionRow } from '@/app/actions/attention'
-import { addDays, splitDoNow, type TodayItem } from '@/lib/today'
+import { splitDoNow, type TodayItem } from '@/lib/today'
 
 // Today (UI overhaul Stage 7): the home page. Built on v_business_attention
 // (Stage 4) plus hand-written to-dos. Engine tasks for replies, renewals and
 // invoices are not shown: the view works those out itself.
 
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>
-
-export type WeekEvent = {
-  date: string
-  kind: 'renewal' | 'todo' | 'invoice'
-  label: string
-  business_id: string | null
-}
 
 export type QuietReminder = {
   id: string
@@ -33,7 +26,6 @@ export type TodayData = {
   today: string
   items: TodayItem[]
   snoozed: { business_id: string; business_name: string; until: string | null; reason: string }[]
-  week: WeekEvent[]
   owed: number
   newLeads: number
   draftsReady: number
@@ -48,6 +40,7 @@ type ManualTask = {
   due_date: string | null
   business_id: string | null
   business: { name: string } | { name: string }[] | null
+  task_category: { name: string } | { name: string }[] | null
 }
 
 const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v)
@@ -63,7 +56,7 @@ async function loadCore(supabase: SupabaseServer, orgId: string) {
     supabase.from('v_business_attention').select('*').eq('organization_id', orgId),
     supabase
       .from('tasks')
-      .select('id, title, due_date, business_id, business:businesses!tasks_business_id_fkey(name)')
+      .select('id, title, due_date, business_id, business:businesses!tasks_business_id_fkey(name), task_category:task_categories(name)')
       .eq('organization_id', orgId)
       .eq('status', 'open')
       .eq('source', 'manual')
@@ -100,6 +93,7 @@ function buildItems(rows: AttentionRow[], tasks: ManualTask[]): TodayItem[] {
     items.push({
       key: `task:${t.id}`, reason: 'todo', todo_kind: 'task', business_id: t.business_id, business_name: one(t.business)?.name ?? null,
       detail: t.title, since: t.due_date, ref_id: t.id, other_reasons: [],
+      for_newsletter: one(t.task_category)?.name === 'For Newsletter',
     })
   }
   return items
@@ -132,27 +126,10 @@ export async function getTodayData(): Promise<{ data?: TodayData; error?: string
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Could not load' }
   }
-  const { today, rows, tasks, items } = core
-  const weekEnd = addDays(today, 6)
+  const { today, rows, items } = core
   const draftsSince = new Date(Date.now() - 14 * 86_400_000).toISOString()
 
-  const [contractsRes, linksRes, invoicesRes, leadsRes, draftsRes, quietRes, toMatchRes] = await Promise.all([
-    supabase
-      .from('contracts')
-      .select('business_id, membership_type, contract_end')
-      .eq('organization_id', orgId)
-      .eq('is_current', true)
-      .in('membership_type', ['club_card', 'advertiser'])
-      .gte('contract_end', today)
-      .lte('contract_end', weekEnd),
-    supabase.from('qbo_links').select('business_id, qbo_customer_id').eq('organization_id', orgId),
-    supabase
-      .from('qbo_invoices')
-      .select('qbo_customer_id, doc_number, due_date, balance, private_memo')
-      .eq('organization_id', orgId)
-      .gt('balance', 0)
-      .gte('due_date', today)
-      .lte('due_date', weekEnd),
+  const [leadsRes, draftsRes, quietRes, toMatchRes] = await Promise.all([
     supabase.from('prospect_leads').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     supabase
       .from('routine_drafts')
@@ -176,43 +153,6 @@ export async function getTodayData(): Promise<{ data?: TodayData; error?: string
       .in('match_status', ['unmatched', 'suggested']),
   ])
 
-  // Business names for the week strip: the attention rows and to-dos carry most;
-  // fetch the rest by id.
-  const names = new Map<string, string>()
-  for (const r of rows) names.set(r.business_id, r.business_name)
-  for (const t of tasks) if (t.business_id && one(t.business)) names.set(t.business_id, one(t.business)!.name)
-  const customerToBusiness = new Map((linksRes.data ?? []).map((l) => [l.qbo_customer_id as string, l.business_id as string]))
-  const invoices = (invoicesRes.data ?? []).filter((i) => (i.private_memo ?? '') !== 'Voided')
-  const wanted = [
-    ...(contractsRes.data ?? []).map((c) => c.business_id as string),
-    ...invoices.map((i) => customerToBusiness.get(i.qbo_customer_id as string)).filter((id): id is string => !!id),
-  ].filter((id) => !names.has(id))
-  if (wanted.length > 0) {
-    const { data } = await supabase.from('businesses').select('id, name').in('id', [...new Set(wanted)])
-    for (const b of data ?? []) names.set(b.id, b.name)
-  }
-
-  const week: WeekEvent[] = []
-  for (const c of contractsRes.data ?? []) {
-    week.push({
-      date: c.contract_end as string, kind: 'renewal', business_id: c.business_id,
-      label: `${names.get(c.business_id) ?? 'A business'}: ${c.membership_type === 'club_card' ? 'Club Card' : 'advertising'} ends`,
-    })
-  }
-  for (const t of tasks) {
-    if (t.due_date && t.due_date >= today && t.due_date <= weekEnd) {
-      week.push({ date: t.due_date, kind: 'todo', business_id: t.business_id, label: t.title })
-    }
-  }
-  for (const i of invoices) {
-    const bid = customerToBusiness.get(i.qbo_customer_id as string) ?? null
-    week.push({
-      date: i.due_date as string, kind: 'invoice', business_id: bid,
-      label: `${bid ? names.get(bid) ?? 'A business' : 'A customer'}: invoice ${i.doc_number ? `${i.doc_number} ` : ''}due`,
-    })
-  }
-  week.sort((a, b) => a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind))
-
   const quiet: QuietReminder[] = (quietRes.data ?? []).map((t) => {
     const key = (t.signal_key as string | null) ?? ''
     const kind: QuietReminder['kind'] =
@@ -230,7 +170,6 @@ export async function getTodayData(): Promise<{ data?: TodayData; error?: string
       snoozed: rows
         .filter((r) => r.is_snoozed)
         .map((r) => ({ business_id: r.business_id, business_name: r.business_name, until: r.attention_snoozed_until, reason: r.reason })),
-      week,
       owed: rows.filter((r) => !r.is_snoozed).reduce((sum, r) => sum + (r.amount_owed ?? 0), 0),
       newLeads: leadsRes.count ?? 0,
       draftsReady: draftsRes.count ?? 0,

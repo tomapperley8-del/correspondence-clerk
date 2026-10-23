@@ -14,6 +14,7 @@ import { DuplicateCorrespondenceModal } from './DuplicateCorrespondenceModal'
 import { LinkCorrespondenceModal } from './LinkCorrespondenceModal'
 import { unlinkCorrespondenceFromBusiness } from '@/app/actions/correspondence'
 import { toast } from '@/lib/toast'
+import { ForNewsletterButton } from '@/components/ForNewsletterButton'
 
 interface CorrespondenceEntryProps {
   entry: Correspondence
@@ -361,6 +362,11 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
                   {creatingTodo ? 'Creating…' : 'Create to-do'}
                 </button>
               )}
+              <ForNewsletterButton
+                from="correspondence"
+                id={entry.id}
+                className="px-3 py-2 sm:py-1 text-xs border border-brand-olive text-brand-dark hover:bg-brand-warm disabled:opacity-50"
+              />
             </div>
           )}
           {entry.action_needed !== 'none' && (

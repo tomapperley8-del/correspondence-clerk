@@ -11,8 +11,12 @@ import { updateTask } from '@/app/actions/tasks'
 import { clearFollowUpFlag, moveFollowUpFlag, type TodayData, type QuietReminder } from '@/app/actions/today'
 import { REASON_LABEL, addDays, ageWords, daysFrom, splitDoNow, type TodayItem, type TodayReason } from '@/lib/today'
 import { TodayQuickAdd } from './TodayQuickAdd'
+import { TodayCalendar } from './TodayCalendar'
+import { NewsletterList } from './NewsletterList'
+import { ForNewsletterButton } from '@/components/ForNewsletterButton'
+import type { CalendarItem, NewsletterItem } from '@/app/actions/calendar'
 
-// Today (UI overhaul Stage 7): this week, Do now (at most 8, chosen by plain
+// Today (UI overhaul Stage 7; calendar and newsletter list Stage 12): the calendar, Do now (at most 8, chosen by plain
 // rules), everything else folded by reason, and small links. Nothing is ticked
 // here except to-dos: a line goes when its cause goes.
 
@@ -59,7 +63,15 @@ function groupOrder(a: TodayItem, b: TodayItem): number {
   return (a.since ?? '').localeCompare(b.since ?? '')
 }
 
-export function TodayClient({ data }: { data: TodayData }) {
+export function TodayClient({
+  data,
+  calendar,
+  newsletter,
+}: {
+  data: TodayData
+  calendar: CalendarItem[]
+  newsletter: { wednesday: string; items: NewsletterItem[] }
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [busyKey, setBusyKey] = useState<string | null>(null)
@@ -139,6 +151,7 @@ export function TodayClient({ data }: { data: TodayData }) {
           <button type="button" disabled={busy} className={btn} onClick={() => { setMoving(i.key); setMoveTo(i.since && i.since > today ? i.since : addDays(today, 7)) }}>
             Move date
           </button>
+          {i.todo_kind === 'task' && !i.for_newsletter && <ForNewsletterButton from="task" id={i.ref_id!} className={btn} />}
           {biz && i.todo_kind === 'flag' && <Link href={biz} className={btn}>Open</Link>}
         </>
       )
@@ -232,8 +245,6 @@ export function TodayClient({ data }: { data: TodayData }) {
   }
 
   const total = items.length
-  const weekDays = Array.from({ length: 7 }, (_, k) => addDays(today, k))
-  const eventTone = { renewal: 'bg-amber-50 text-amber-800', todo: 'bg-brand-olive/15 text-brand-dark', invoice: 'bg-red-50 text-red-800' }
 
   return (
     <div className="space-y-8">
@@ -246,38 +257,7 @@ export function TodayClient({ data }: { data: TodayData }) {
         </p>
       </header>
 
-      <section aria-labelledby="week-h" className="space-y-2">
-        <h2 id="week-h" className="text-2xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>This week</h2>
-        {/* Seven columns on a wide screen; on a phone, a list of the days that have something on. */}
-        <div className="border border-black/[0.06] rounded-sm bg-brand-warm">
-          <div className="grid grid-cols-1 sm:grid-cols-7">
-            {weekDays.map((d, k) => {
-              const events = data.week.filter((e) => e.date === d)
-              const name = new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' })
-              return (
-                <div
-                  key={d}
-                  className={`p-2 min-w-0 border-black/[0.06] ${k < 6 ? 'border-b sm:border-b-0 sm:border-r' : ''} ${events.length === 0 && k > 0 ? 'hidden sm:block' : ''}`}
-                >
-                  <div className={`text-[11px] uppercase tracking-wide ${k === 0 ? 'text-brand-navy font-semibold' : 'text-gray-500'}`}>
-                    {k === 0 ? 'Today' : name}
-                  </div>
-                  {events.length === 0 && <p className="mt-1.5 text-[11.5px] text-gray-500 sm:hidden">Nothing dated today.</p>}
-                  {events.map((e, n) => {
-                    const cls = `block mt-1.5 text-[11.5px] leading-tight px-1.5 py-1 rounded-sm break-words ${eventTone[e.kind]}`
-                    return e.business_id ? (
-                      <Link key={n} href={`/businesses/${e.business_id}`} className={`${cls} hover:underline`}>{e.label}</Link>
-                    ) : (
-                      <span key={n} className={cls}>{e.label}</span>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-        <p className="text-xs text-gray-500">Renewals ending, to-dos due and invoices falling due in the next seven days.</p>
-      </section>
+      <TodayCalendar today={today} initialItems={calendar} onChanged={() => { refreshNav(); router.refresh() }} />
 
       <section aria-labelledby="donow-h" className="space-y-2">
         <h2 id="donow-h" className="text-2xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>Do now</h2>
@@ -346,6 +326,8 @@ export function TodayClient({ data }: { data: TodayData }) {
         <h2 id="add-h" className="text-2xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>I&apos;ll do this by…</h2>
         <TodayQuickAdd today={today} onAdded={() => { refreshNav(); router.refresh() }} />
       </section>
+
+      <NewsletterList initial={newsletter} onChanged={() => { refreshNav(); router.refresh() }} />
 
       <section aria-label="Other things" className="grid gap-3 sm:grid-cols-3">
         <div className="border border-black/[0.06] rounded-sm bg-brand-warm px-3 py-2.5 text-sm">

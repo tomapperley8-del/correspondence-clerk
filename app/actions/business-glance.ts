@@ -32,6 +32,8 @@ export type GlanceTask = {
   due_date: string | null
   created_at: string
   completed_at: string | null
+  /** Stage 12: so a newsletter to-do doesn't offer "For newsletter" on itself. */
+  task_category?: { name: string } | null
 }
 
 export type GlanceInvoice = {
@@ -85,7 +87,7 @@ export async function getBusinessGlance(businessId: string): Promise<{ data?: Bu
     // (Stage 7): the header's Needs attention covers them.
     supabase
       .from('tasks')
-      .select('id, title, notes, status, source, signal_key, due_date, created_at, completed_at')
+      .select('id, title, notes, status, source, signal_key, due_date, created_at, completed_at, task_category:task_categories(name)')
       .eq('business_id', businessId)
       .eq('organization_id', orgId)
       .or('source.eq.manual,status.eq.open')
@@ -118,7 +120,7 @@ export async function getBusinessGlance(businessId: string): Promise<{ data?: Bu
       contracts: (contractsRes.data ?? []) as GlanceContract[],
       // A missing view (before its migration) just means no attention line.
       attention: attentionRes.error ? null : ((attentionRes.data as AttentionRow | null) ?? null),
-      tasks: tasksRes.error ? [] : ((tasksRes.data ?? []) as GlanceTask[]).filter((t) => !isHiddenEngineTask(t)),
+      tasks: tasksRes.error ? [] : ((tasksRes.data ?? []) as unknown as GlanceTask[]).filter((t) => !isHiddenEngineTask(t)),
       invoices,
     },
   }
