@@ -113,6 +113,52 @@ export async function updateProspectLeadStatus(
 }
 
 /**
+ * Delete a prospect lead (Stage 15). The whole row is copied to
+ * cc_phase0_backup first, so Undo (and anyone later) can put it back.
+ */
+export async function deleteProspectLead(id: string): Promise<{ backupId?: number; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data: row, error: readError } = await supabase.from('prospect_leads').select('*').eq('id', id).maybeSingle()
+  if (readError) return { error: readError.message }
+  if (!row) return { error: 'Already gone' }
+  const { data: backup, error: backupError } = await supabase
+    .from('cc_phase0_backup')
+    .insert({ table_name: 'prospect_leads', row_id: id, before_row: row, reason: `lead_delete ${user.id}` })
+    .select('id')
+    .single()
+  if (backupError) return { error: `Not deleted: the backup failed (${backupError.message})` }
+  const { error } = await supabase.from('prospect_leads').delete().eq('id', id)
+  if (error) return { error: error.message }
+  revalidatePath('/today')
+  revalidatePath('/businesses')
+  return { backupId: backup.id as number }
+}
+
+/** Undo a lead Delete: put the backed-up row back exactly as it was. */
+export async function undoDeleteProspectLead(backupId: number): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data: backup, error: readError } = await supabase
+    .from('cc_phase0_backup')
+    .select('before_row')
+    .eq('id', backupId)
+    .eq('table_name', 'prospect_leads')
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  if (!backup?.before_row) return { error: 'Nothing to undo' }
+  const { error } = await supabase.from('prospect_leads').insert(backup.before_row)
+  if (error) return { error: error.message }
+  revalidatePath('/today')
+  revalidatePath('/businesses')
+  return {}
+}
+
+/**
  * Accept a prospect lead (Stage 11b, one pipeline): it becomes a business at the Outreach stage
  * "Identified", or is linked to the business that already has its name. From then on the lead
  * follows that business's Outreach stage (business_stage_mirrors_lead).

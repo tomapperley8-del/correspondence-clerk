@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { ProspectLead, ProspectLeadStatus, ProspectMatchType } from '@/app/actions/leads'
-import { acceptProspectLead, updateProspectLeadStatus } from '@/app/actions/leads'
+import { acceptProspectLead, deleteProspectLead, undoDeleteProspectLead, updateProspectLeadStatus } from '@/app/actions/leads'
 import { PROSPECT_COLUMNS, MATCH_TYPE_META, sourceBadgeClass, timeAgo } from '@/lib/lead-meta'
 import { toast } from '@/lib/toast'
 
@@ -45,6 +45,26 @@ export function ProspectBoard({ initialLeads }: { initialLeads: ProspectLead[] }
       setLeads(prev => prev.map(l => (l.id === id ? { ...l, status: previous } : l)))
       toast.error(result.error)
     }
+  }
+
+  // Stage 15: Delete at once, with Undo in the toast (the lead is backed up first)
+  async function remove(lead: ProspectLead) {
+    setLeads(prev => prev.filter(l => l.id !== lead.id))
+    const result = await deleteProspectLead(lead.id)
+    if (result.error || !result.backupId) {
+      setLeads(prev => [...prev, lead])
+      toast.error(result.error ?? 'Not deleted')
+      return
+    }
+    const backupId = result.backupId
+    toast.undo(`Deleted lead: ${lead.business_name}`, async () => {
+      const undo = await undoDeleteProspectLead(backupId)
+      if (undo.error) toast.error(undo.error)
+      else {
+        setLeads(prev => [...prev, lead])
+        toast.success('Put back')
+      }
+    })
   }
 
   const [accepting, setAccepting] = useState<string | null>(null)
@@ -223,6 +243,13 @@ export function ProspectBoard({ initialLeads }: { initialLeads: ProspectLead[] }
                             {PROSPECT_COLUMNS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                           </select>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => remove(lead)}
+                          className="mt-2 w-full border border-gray-200 text-gray-600 hover:text-red-700 hover:border-red-300 px-2 py-1 text-[11px] font-semibold transition-colors"
+                        >
+                          Delete lead
+                        </button>
                       </div>
                     )
                   })

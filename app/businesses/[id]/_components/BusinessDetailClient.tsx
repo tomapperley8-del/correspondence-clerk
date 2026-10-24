@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { getBusinessById, type Business } from '@/app/actions/businesses'
 import { getContactsByBusiness, deleteContact, type Contact } from '@/app/actions/contacts'
-import { updateFormattedText, deleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, setCorrespondenceAction, type Correspondence } from '@/app/actions/correspondence'
+import { updateFormattedText, deleteCorrespondence, undoDeleteCorrespondence, deleteMultipleCorrespondence, updateCorrespondenceContact, findDuplicatesInBusiness, togglePinCorrespondence, setCorrespondenceAction, type Correspondence } from '@/app/actions/correspondence'
 import { getThreadsByBusiness, createThread, renameThread, deleteThread, assignCorrespondenceToThread, type ConversationThread } from '@/app/actions/threads'
 import { dismissDuplicatePair, dismissMultipleDuplicatePairs } from '@/app/actions/duplicate-dismissals'
 import { EditBusinessButton } from '@/components/EditBusinessButton'
@@ -166,10 +166,7 @@ export function BusinessDetailClient({
   const [actionError, setActionError] = useState<string | null>(null)
   const [showDeleteContactConfirm, setShowDeleteContactConfirm] = useState(false)
   const [contactToDelete, setContactToDelete] = useState<{id: string, name: string} | null>(null)
-  const [showDeleteEntryConfirm, setShowDeleteEntryConfirm] = useState(false)
-  const [entryToDelete, setEntryToDelete] = useState<{id: string, subject?: string} | null>(null)
   const [isDeletingContact, setIsDeletingContact] = useState(false)
-  const [isDeletingEntry, setIsDeletingEntry] = useState(false)
 
   // AI summary refresh trigger (for after contract update)
   const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0)
@@ -363,27 +360,30 @@ export function BusinessDetailClient({
     setContactToDelete(null)
   }, [contactToDelete, businessId])
 
+  // Stage 15: Delete at once, with Undo in the toast (the entry is backed up first)
   const handleDeleteEntry = useCallback(async (entryId: string, subject: string) => {
-    setEntryToDelete({ id: entryId, subject: subject || undefined })
-    setShowDeleteEntryConfirm(true)
-  }, [])
-
-  const confirmDeleteEntry = useCallback(async () => {
-    if (!entryToDelete) return
-    setIsDeletingEntry(true)
     setActionError(null)
-    const result = await deleteCorrespondence(entryToDelete.id)
+    const result = await deleteCorrespondence(entryId)
     if ('error' in result) {
-      setActionError(`Error deleting entry: ${result.error}`)
-    } else {
+      toast.error(`Not deleted: ${result.error}`)
+      return
+    }
+    const refreshAll = async () => {
       await refreshCorrespondence()
       const duplicatesResult = await findDuplicatesInBusiness(businessId)
       setDuplicates(duplicatesResult.duplicates || [])
     }
-    setIsDeletingEntry(false)
-    setShowDeleteEntryConfirm(false)
-    setEntryToDelete(null)
-  }, [entryToDelete, businessId, refreshCorrespondence])
+    await refreshAll()
+    const backupId = result.backupId
+    toast.undo(`Deleted${subject ? `: ${subject}` : ''}`, async () => {
+      const undo = await undoDeleteCorrespondence(backupId)
+      if (undo.error) toast.error(undo.error)
+      else {
+        toast.success('Put back')
+        await refreshAll()
+      }
+    })
+  }, [businessId, refreshCorrespondence])
 
   const handleDeleteDuplicate = useCallback(async (entryId: string, hash: string) => {
     setDeletingDuplicate(hash)
@@ -782,19 +782,6 @@ export function BusinessDetailClient({
       destructive
       isLoading={isDeletingContact}
       onConfirm={confirmDeleteContact}
-    />
-
-    {/* Delete Entry Confirmation Dialog */}
-    <ConfirmDialog
-      open={showDeleteEntryConfirm}
-      onOpenChange={setShowDeleteEntryConfirm}
-      title="Delete Entry"
-      description={`Are you sure you want to delete this entry${entryToDelete?.subject ? ` "${entryToDelete.subject}"` : ''}? This cannot be undone.`}
-      confirmLabel="Delete"
-      loadingLabel="Deleting..."
-      destructive
-      isLoading={isDeletingEntry}
-      onConfirm={confirmDeleteEntry}
     />
     </>
   )

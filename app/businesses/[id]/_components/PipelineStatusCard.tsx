@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Business } from '@/app/actions/businesses'
-import { addBusinessToOutreach, addBusinessToContractsFromDetail, removeBusinessFromOutreach, updateOutreachStage, updateBusinessRenewalStage } from '@/app/actions/businesses'
+import { addBusinessToOutreach, addBusinessToContractsFromDetail, removeBusinessFromOutreach,
+  undoRemoveFromOutreach, updateOutreachStage, updateBusinessRenewalStage } from '@/app/actions/businesses'
 import { formatDateShortGB } from '@/lib/utils'
 import { toast } from '@/lib/toast'
 
@@ -89,8 +90,16 @@ export function PipelineStatusCard({ business }: { business: Business }) {
   const handleRemoveFromOutreach = async () => {
     setLoading(true)
     const result = await removeBusinessFromOutreach(business.id)
-    if (result.error) toast.error(result.error)
-    else toast.success('Removed from outreach')
+    if (result.error || !result.backupId) toast.error(result.error ?? 'Not removed')
+    else {
+      const backupId = result.backupId
+      toast.undo(`${business.name} taken off outreach`, async () => {
+        const undo = await undoRemoveFromOutreach(backupId)
+        if (undo.error) toast.error(undo.error)
+        else toast.success('Back on outreach')
+        router.refresh()
+      })
+    }
     router.refresh()
     setLoading(false)
   }
@@ -184,7 +193,7 @@ export function PipelineStatusCard({ business }: { business: Business }) {
           <button
             onClick={handleRemoveFromOutreach}
             disabled={loading}
-            className="text-[10px] text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
+            className="text-xs font-semibold px-2 py-1 border border-gray-300 text-gray-700 hover:text-red-700 hover:border-red-300 transition-colors disabled:opacity-50"
           >
             Remove from outreach
           </button>

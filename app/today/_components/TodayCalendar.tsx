@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { toast } from '@/lib/toast'
 import { formatDateGB } from '@/lib/utils'
 import { updateTask } from '@/app/actions/tasks'
-import { getBusinessNames } from '@/app/actions/today'
+import { deleteTodayTask, getBusinessNames, undoDeleteTodayTask } from '@/app/actions/today'
 import { addCalendarItem, getCalendarItems, moveCalendarItem, type CalendarItem } from '@/app/actions/calendar'
 import { addDays } from '@/lib/today'
 import { FullScreenPanel, panelButtonClass } from '@/components/ui/full-screen-panel'
@@ -149,6 +149,31 @@ export function TodayCalendar({
     toast.success('Done')
     setOpenKey(null)
     changed()
+  }
+
+  // Hand-written items only: the engine would make its own again overnight.
+  async function remove(item: CalendarItem) {
+    if (!item.task_id || item.engine) return
+    const before = items
+    setItems((prev) => prev.filter((i) => i.key !== item.key))
+    setOpenKey(null)
+    const result = await deleteTodayTask(item.task_id)
+    if (result.error || !result.backupId) {
+      setItems(before)
+      toast.error(result.error ?? 'Not deleted')
+      return
+    }
+    const backupId = result.backupId
+    changed()
+    toast.undo(`Deleted: ${item.title}`, async () => {
+      const undo = await undoDeleteTodayTask(backupId)
+      if (undo.error) toast.error(undo.error)
+      else {
+        toast.success('Put back')
+        load()
+        changed()
+      }
+    })
   }
 
   const step = (n: number) => setAnchor((a) => (view === 'week' ? addDays(a, 7 * n) : addMonths(monthStart(a), n)))
@@ -308,7 +333,7 @@ export function TodayCalendar({
 
           {addingOn && <AddForm date={addingOn} onClose={() => setAddingOn(null)} onAdded={() => { setAddingOn(null); load(); changed() }} />}
           {open && (
-            <ItemPanel key={open.key} item={open} today={today} onClose={() => setOpenKey(null)} onMove={(d, t) => move(open, d, t)} onDone={() => done(open)} />
+            <ItemPanel key={open.key} item={open} today={today} onClose={() => setOpenKey(null)} onMove={(d, t) => move(open, d, t)} onDone={() => done(open)} onDelete={open.engine ? undefined : () => remove(open)} />
           )}
 
           <p className="text-xs text-gray-600">
@@ -402,12 +427,14 @@ function ItemPanel({
   onClose,
   onMove,
   onDone,
+  onDelete,
 }: {
   item: CalendarItem
   today: string
   onClose: () => void
   onMove: (date: string, time: string | null) => void
   onDone: () => void
+  onDelete?: () => void
 }) {
   const [date, setDate] = useState(item.date)
   const [time, setTime] = useState(item.time ?? '')
@@ -443,7 +470,11 @@ function ItemPanel({
           </label>
           <button type="submit" disabled={!date || (date === item.date && (time || null) === item.time)} className={btn}>Save date</button>
           <button type="button" onClick={onDone} className={btn}>Done</button>
+          {onDelete && <button type="button" onClick={onDelete} className={`${btn} text-red-700`}>Delete</button>}
         </form>
+      )}
+      {item.done && onDelete && (
+        <button type="button" onClick={onDelete} className={`${btn} text-red-700`}>Delete</button>
       )}
       {item.engine && !item.done && (
         <p className="text-xs text-gray-500">Moving this to a later date snoozes it until then, and the nightly refresh keeps it there.</p>

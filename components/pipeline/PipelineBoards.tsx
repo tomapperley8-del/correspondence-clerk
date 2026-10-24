@@ -10,6 +10,7 @@ import {
   updateOutreachStage,
   addBusinessToOutreach,
   removeBusinessFromOutreach,
+  undoRemoveFromOutreach,
   promoteOutreachToContracts,
   updateOutreachStageDate,
   updateRenewalStageDate,
@@ -190,16 +191,27 @@ export function PipelineBoard({ kind, allBusinessNames }: { kind: 'renewals' | '
 
   const handleRemoveOutreachBusiness = useCallback(
     async (businessId: string) => {
+      const before = outreachBusinesses
+      const name = before?.find((b) => b.id === businessId)?.name ?? 'Business'
       setOutreachBusinesses((prev) => (prev ?? []).filter((b) => b.id !== businessId))
       const result = await removeBusinessFromOutreach(businessId)
-      if (result.error) {
-        toast.error(result.error)
-        router.refresh()
-      } else {
-        toast.success('Removed from outreach')
+      if (result.error || !result.backupId) {
+        toast.error(result.error ?? 'Not removed')
+        setOutreachBusinesses(before)
+        return
       }
+      const backupId = result.backupId
+      toast.undo(`${name} taken off outreach`, async () => {
+        const undo = await undoRemoveFromOutreach(backupId)
+        if (undo.error) toast.error(undo.error)
+        else {
+          toast.success('Back on outreach')
+          setOutreachBusinesses(before)
+          router.refresh()
+        }
+      })
     },
-    [router]
+    [router, outreachBusinesses]
   )
 
   const handleOutreachDateChange = useCallback(
