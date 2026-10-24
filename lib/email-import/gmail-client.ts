@@ -23,7 +23,7 @@ function parseDateSafe(dateStr: string): string {
   return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
 }
 
-function makeOAuth2Client(tokens: GmailTokens) {
+export function makeOAuth2Client(tokens: GmailTokens) {
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
