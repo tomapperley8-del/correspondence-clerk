@@ -1,5 +1,5 @@
 import { fetchArchivedIssue, listArchive, NEWSLETTER_SUBJECT, NewsletterIssueIn } from './archive'
-import { FoundMention, matchIssues, MatchBusiness, MatchCardPage } from './match'
+import { FoundMention, matchIssues, MatchBusiness, MatchCardPage, MatchRules } from './match'
 
 /**
  * Reads new newsletter issues from Mailchimp's public archive into newsletter_issues and re-finds
@@ -32,15 +32,24 @@ async function pagedSelect<T>(build: (from: number, to: number) => PromiseLike<{
 export async function rematchOrg(supabase: ServiceClient, orgId: string): Promise<{ mentions_new: number; found: FoundMention[] }> {
   const issues = await pagedSelect<{ id: string; plain_text: string }>((a, b) =>
     supabase.from('newsletter_issues').select('id, plain_text').eq('organization_id', orgId).order('sent_at').range(a, b))
-  const businesses = await pagedSelect<{ id: string; name: string; status: string | null; website: string | null; merged_into: string | null }>((a, b) =>
-    supabase.from('businesses').select('id, name, status, website, merged_into').eq('organization_id', orgId).order('id').range(a, b))
+  const businesses = await pagedSelect<{ id: string; name: string; status: string | null; business_type: string | null; website: string | null; merged_into: string | null }>((a, b) =>
+    supabase.from('businesses').select('id, name, status, business_type, website, merged_into').eq('organization_id', orgId).order('id').range(a, b))
   const pages = await pagedSelect<{ business_id: string; link: string; page_website_host: string | null }>((a, b) =>
     supabase.from('club_card_pages').select('business_id, link, page_website_host').eq('organization_id', orgId).not('business_id', 'is', null).is('gone_at', null).order('id').range(a, b))
+  const ruleRows = await pagedSelect<{ kind: string; business_id: string | null; phrase: string | null }>((a, b) =>
+    supabase.from('newsletter_match_rules').select('kind, business_id, phrase').eq('organization_id', orgId).order('id').range(a, b))
+  const rules: MatchRules = {
+    always: new Set(ruleRows.filter((r) => r.kind === 'always' && r.business_id).map((r) => r.business_id!)),
+    never: new Set(ruleRows.filter((r) => r.kind === 'never' && r.business_id).map((r) => r.business_id!)),
+    aliases: ruleRows.filter((r) => r.kind === 'alias' && r.business_id && r.phrase).map((r) => ({ businessId: r.business_id!, phrase: r.phrase! })),
+    ignorePhrases: ruleRows.filter((r) => r.kind === 'ignore_phrase' && r.phrase).map((r) => r.phrase!),
+  }
 
   const found = matchIssues(
     issues.map((i) => ({ id: i.id, text: i.plain_text })),
-    businesses.filter((b) => !b.merged_into).map<MatchBusiness>((b) => ({ id: b.id, name: b.name, status: b.status, website: b.website })),
-    pages.map<MatchCardPage>((p) => ({ businessId: p.business_id, link: p.link, websiteHost: p.page_website_host }))
+    businesses.filter((b) => !b.merged_into).map<MatchBusiness>((b) => ({ id: b.id, name: b.name, status: b.status, businessType: b.business_type, website: b.website })),
+    pages.map<MatchCardPage>((p) => ({ businessId: p.business_id, link: p.link, websiteHost: p.page_website_host })),
+    rules
   )
 
   const existing = await pagedSelect<{ id: string; issue_id: string; business_id: string; match_kind: string; status: string; matched_text: string; unclear_reason: string | null; decided_at: string | null }>((a, b) =>

@@ -11,6 +11,11 @@
 --                            confirmed (a sure match, or Tom said yes), unclear (waiting for Tom),
 --                            rejected (Tom said no). Tom's decisions (decided_at set) are never
 --                            overwritten by a later read.
+--   newsletter_match_rules   Tom's standing rules for the matcher, from his review: always (count this
+--                            business's name matches as sure), never (don't match it by name; links
+--                            still count), alias (another name that means this business, e.g. Gtech
+--                            Community Stadium for Brentford FC), ignore_phrase (text that never counts
+--                            as a mention, e.g. "Jazz at George IV", our own event).
 --   newsletter_read_runs     one row per read, with what it found or why it stopped (for example
 --                            the archive not answering).
 --   v_business_newsletter    one row per business with a confirmed mention: last_in_newsletter (the
@@ -57,6 +62,22 @@ CREATE INDEX IF NOT EXISTS newsletter_mentions_business_idx ON public.newsletter
 CREATE INDEX IF NOT EXISTS newsletter_mentions_org_status_idx ON public.newsletter_mentions (organization_id, status);
 COMMENT ON TABLE public.newsletter_mentions IS 'Stage 16a: businesses mentioned in a newsletter issue, found by plain matching (no AI). unclear = waiting for Tom.';
 
+CREATE TABLE IF NOT EXISTS public.newsletter_match_rules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  kind text NOT NULL CHECK (kind IN ('always', 'never', 'alias', 'ignore_phrase')),
+  business_id uuid REFERENCES public.businesses(id) ON DELETE CASCADE,
+  phrase text,
+  note text,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (kind = 'ignore_phrase' OR business_id IS NOT NULL),
+  CHECK (kind NOT IN ('alias', 'ignore_phrase') OR length(trim(phrase)) > 0)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS newsletter_match_rules_uniq
+  ON public.newsletter_match_rules (organization_id, kind, coalesce(business_id::text, ''), lower(coalesce(phrase, '')));
+COMMENT ON TABLE public.newsletter_match_rules IS 'Stage 16a: Tom''s standing rules for newsletter mention matching (always / never / alias / ignore_phrase).';
+
 CREATE TABLE IF NOT EXISTS public.newsletter_read_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -73,6 +94,7 @@ CREATE INDEX IF NOT EXISTS newsletter_read_runs_org_idx ON public.newsletter_rea
 ALTER TABLE public.newsletter_issues ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.newsletter_mentions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.newsletter_read_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.newsletter_match_rules ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS newsletter_issues_org ON public.newsletter_issues;
 CREATE POLICY newsletter_issues_org ON public.newsletter_issues FOR SELECT TO authenticated
@@ -81,15 +103,21 @@ DROP POLICY IF EXISTS newsletter_mentions_org ON public.newsletter_mentions;
 CREATE POLICY newsletter_mentions_org ON public.newsletter_mentions TO authenticated
   USING (organization_id IN (SELECT organization_id FROM public.user_profiles WHERE id = auth.uid()))
   WITH CHECK (organization_id IN (SELECT organization_id FROM public.user_profiles WHERE id = auth.uid()));
+DROP POLICY IF EXISTS newsletter_match_rules_org ON public.newsletter_match_rules;
+CREATE POLICY newsletter_match_rules_org ON public.newsletter_match_rules TO authenticated
+  USING (organization_id IN (SELECT organization_id FROM public.user_profiles WHERE id = auth.uid()))
+  WITH CHECK (organization_id IN (SELECT organization_id FROM public.user_profiles WHERE id = auth.uid()));
 DROP POLICY IF EXISTS newsletter_read_runs_org ON public.newsletter_read_runs;
 CREATE POLICY newsletter_read_runs_org ON public.newsletter_read_runs FOR SELECT TO authenticated
   USING (organization_id IN (SELECT organization_id FROM public.user_profiles WHERE id = auth.uid()));
 
--- Issues and runs are written only by the server (service role); Tom's review decisions update mentions.
-REVOKE ALL ON public.newsletter_issues, public.newsletter_mentions, public.newsletter_read_runs FROM PUBLIC, anon, authenticated;
+-- Issues and runs are written only by the server (service role); Tom's review decisions update mentions
+-- and his rules.
+REVOKE ALL ON public.newsletter_issues, public.newsletter_mentions, public.newsletter_read_runs, public.newsletter_match_rules FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.newsletter_issues, public.newsletter_read_runs TO authenticated;
 GRANT SELECT, UPDATE ON public.newsletter_mentions TO authenticated;
-GRANT ALL ON public.newsletter_issues, public.newsletter_mentions, public.newsletter_read_runs TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.newsletter_match_rules TO authenticated;
+GRANT ALL ON public.newsletter_issues, public.newsletter_mentions, public.newsletter_read_runs, public.newsletter_match_rules TO service_role;
 
 CREATE OR REPLACE VIEW public.v_business_newsletter WITH (security_invoker = true) AS
 WITH m AS (
