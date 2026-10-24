@@ -345,7 +345,7 @@ function tidyBody(body: string, picture: string): string {
     .replace(/^.*(?:view (?:this (?:e-?mail|message|newsletter) )?(?:in|on) (?:your|a) (?:web )?browser|having trouble (?:reading|viewing) this).*$/gim, '')
     // Invisible spacer characters marketing emails pad their preview text with
     .replace(/[​-‍⁠﻿͏­]/g, '')
-    .replace(/^_{10,}$/gm, '')
+    .replace(/^(?:_{10,}|[*=~]{10,})$/gm, '')
     .replace(/[ \t ]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
