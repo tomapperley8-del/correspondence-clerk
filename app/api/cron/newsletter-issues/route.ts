@@ -4,19 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { readNewsletterForOrg } from '@/lib/newsletter/read'
 
-export const maxDuration = 300
+export const maxDuration = 120
 export const dynamic = 'force-dynamic'
 
 /**
  * Newsletter issues, weekly (UI overhaul Stage 16a). Vercel cron, Wednesday after it goes out.
  *
- * Reads new issues of The Chiswick Calendar Newsletter from the organisation's Gmail connection
- * (read-only), stores them in newsletter_issues and re-finds mentions. Free: Gmail API only, no AI.
- * Each run is recorded in newsletter_read_runs. If Gmail refuses the stored connection, the run
- * stops and records that Gmail needs reconnecting (Import emails, Connect Gmail).
- *
- * Also callable by a logged-in user for their own organisation (the back catalogue is read in
- * batches: call again while more_to_read is true).
+ * Reads new issues of The Chiswick Calendar Newsletter from Mailchimp's public archive (free, no
+ * login, no AI), stores them in newsletter_issues and re-finds mentions. Each run is recorded in
+ * newsletter_read_runs. Also callable by a logged-in user for their own organisation.
  */
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET

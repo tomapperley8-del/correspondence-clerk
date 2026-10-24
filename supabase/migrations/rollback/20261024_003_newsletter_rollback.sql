@@ -1,6 +1,6 @@
 -- Rollback for 20261024_003_newsletter (Stage 16a data half). Removes the newsletter tables and view.
--- The issues can be read from Gmail again; Tom's review decisions on unclear mentions would be lost,
--- so copy newsletter_mentions first if any have decided_at set.
+-- Mailchimp's archive keeps only the latest 20 issues, so older issues stored here would be lost, and so
+-- would Tom's decisions on unclear mentions: copy newsletter_issues and newsletter_mentions first.
 DROP VIEW IF EXISTS public.v_business_newsletter;
 DROP TABLE IF EXISTS public.newsletter_mentions;
 DROP TABLE IF EXISTS public.newsletter_read_runs;

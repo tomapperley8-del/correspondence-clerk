@@ -1,17 +1,18 @@
 -- Stage 16a (UI overhaul), data half: newsletter issues and who they mention.
 --
 --   newsletter_issues        one row per issue of "The Chiswick Calendar Newsletter", read from
---                            Tom's Gmail (sender info@thechiswickcalendar.co.uk) through the app's
---                            existing Gmail connection: sent date, subject, Gmail message id, the
---                            plain text, and the "view in browser" link (mailchi.mp/...). Read-only
---                            towards Gmail. Never stored as correspondence.
+--                            Mailchimp's public archive of the list (Tom's choice, 24 Oct: no Gmail
+--                            or Outlook access needed): sent date, subject, Mailchimp campaign id,
+--                            the text with each link's address kept, and the "view in browser" link
+--                            (mailchi.mp/...). The archive lists the latest 20 issues, so the store
+--                            starts in June 2026 and grows weekly. Never stored as correspondence.
 --   newsletter_mentions      one row per issue and business: how it matched (club_card_page, website,
 --                            name), the text that matched with a little context, and its status:
 --                            confirmed (a sure match, or Tom said yes), unclear (waiting for Tom),
 --                            rejected (Tom said no). Tom's decisions (decided_at set) are never
 --                            overwritten by a later read.
 --   newsletter_read_runs     one row per read, with what it found or why it stopped (for example
---                            Gmail needing to be reconnected).
+--                            the archive not answering).
 --   v_business_newsletter    one row per business with a confirmed mention: last_in_newsletter (the
 --                            date of the latest issue), its issue id and link, mentions in all and in
 --                            the last 12 months. A merged business's mentions count for the business
@@ -23,17 +24,18 @@
 CREATE TABLE IF NOT EXISTS public.newsletter_issues (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-  gmail_message_id text NOT NULL,
+  source text NOT NULL DEFAULT 'mailchimp_archive',
+  source_id text NOT NULL,
   sent_at timestamptz NOT NULL,
   subject text NOT NULL,
   plain_text text NOT NULL DEFAULT '',
   browser_url text,
   read_at timestamptz NOT NULL DEFAULT now(),
   matched_at timestamptz,
-  UNIQUE (organization_id, gmail_message_id)
+  UNIQUE (organization_id, source_id)
 );
 CREATE INDEX IF NOT EXISTS newsletter_issues_org_sent_idx ON public.newsletter_issues (organization_id, sent_at DESC);
-COMMENT ON TABLE public.newsletter_issues IS 'Stage 16a: issues of The Chiswick Calendar Newsletter, read from Gmail (read-only). Not correspondence.';
+COMMENT ON TABLE public.newsletter_issues IS 'Stage 16a: issues of The Chiswick Calendar Newsletter, read from Mailchimp''s public archive. source_id = Mailchimp campaign id. Not correspondence.';
 
 CREATE TABLE IF NOT EXISTS public.newsletter_mentions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -64,7 +66,6 @@ CREATE TABLE IF NOT EXISTS public.newsletter_read_runs (
   issues_seen integer,
   issues_new integer,
   mentions_new integer,
-  more_to_read boolean NOT NULL DEFAULT false,
   error text
 );
 CREATE INDEX IF NOT EXISTS newsletter_read_runs_org_idx ON public.newsletter_read_runs (organization_id, ran_at DESC);
@@ -85,7 +86,7 @@ CREATE POLICY newsletter_read_runs_org ON public.newsletter_read_runs FOR SELECT
   USING (organization_id IN (SELECT organization_id FROM public.user_profiles WHERE id = auth.uid()));
 
 -- Issues and runs are written only by the server (service role); Tom's review decisions update mentions.
-REVOKE ALL ON public.newsletter_issues, public.newsletter_mentions, public.newsletter_read_runs FROM PUBLIC, anon;
+REVOKE ALL ON public.newsletter_issues, public.newsletter_mentions, public.newsletter_read_runs FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.newsletter_issues, public.newsletter_read_runs TO authenticated;
 GRANT SELECT, UPDATE ON public.newsletter_mentions TO authenticated;
 GRANT ALL ON public.newsletter_issues, public.newsletter_mentions, public.newsletter_read_runs TO service_role;
@@ -110,5 +111,5 @@ FROM m
 ORDER BY m.business_id, m.sent_at DESC;
 COMMENT ON VIEW public.v_business_newsletter IS 'Stage 16a: last time each business was in the newsletter (confirmed mentions only). Join on business_id.';
 
-REVOKE ALL ON public.v_business_newsletter FROM PUBLIC, anon;
+REVOKE ALL ON public.v_business_newsletter FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.v_business_newsletter TO authenticated, service_role;

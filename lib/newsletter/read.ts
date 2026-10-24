@@ -1,12 +1,10 @@
-import { makeGmailTokenRefreshHandler } from '@/lib/email-import/token-helpers'
-import { GmailReconnectNeeded, fetchNewsletterIssue, listNewsletterMessageIds, NewsletterIssueIn } from './gmail'
+import { fetchArchivedIssue, listArchive, NEWSLETTER_SUBJECT, NewsletterIssueIn } from './archive'
 import { FoundMention, matchIssues, MatchBusiness, MatchCardPage } from './match'
 
 /**
- * Reads new newsletter issues from Gmail into newsletter_issues and re-finds mentions (Stage 16a).
- * Used by /api/cron/newsletter-issues (weekly, Wednesday) and for the one-off back catalogue
- * (the same call, repeated until more_to_read is false). Nothing is sent; Gmail is read-only.
- * Refreshing the Gmail token writes the new access token to user_profiles (as the bulk import does).
+ * Reads new newsletter issues from Mailchimp's public archive into newsletter_issues and re-finds
+ * mentions (Stage 16a). Used by /api/cron/newsletter-issues (weekly, Wednesday); the first run
+ * stores the 20 issues the archive lists. Public pages only; nothing is sent anywhere.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,8 +15,6 @@ export interface ReadResult {
   issues_seen?: number
   issues_new?: number
   mentions_new?: number
-  more_to_read?: boolean
-  reconnect_needed?: boolean
   error?: string
 }
 
@@ -82,49 +78,28 @@ export async function rematchOrg(supabase: ServiceClient, orgId: string): Promis
 export async function readNewsletterForOrg(
   supabase: ServiceClient,
   orgId: string,
-  opts: { maxNew?: number; trigger?: string } = {}
+  opts: { trigger?: string } = {}
 ): Promise<ReadResult> {
-  const maxNew = opts.maxNew ?? 60
   let result: ReadResult
   try {
-    // The org's Gmail connection (the bulk import's): the member with a refresh token, most recently refreshed
-    const { data: profiles, error: pErr } = await supabase
-      .from('user_profiles')
-      .select('id, google_access_token, google_refresh_token, google_token_expiry')
-      .eq('organization_id', orgId)
-      .not('google_refresh_token', 'is', null)
-      .order('google_token_expiry', { ascending: false, nullsFirst: false })
-      .limit(1)
-    if (pErr) throw new Error(pErr.message)
-    const profile = profiles?.[0]
-    if (!profile) throw new GmailReconnectNeeded('no Gmail connection saved for this organisation')
-
-    const tokens = {
-      accessToken: profile.google_access_token ?? '',
-      refreshToken: profile.google_refresh_token,
-      tokenExpiry: profile.google_token_expiry,
-    }
-    const onRefresh = makeGmailTokenRefreshHandler(supabase, profile.id)
-
-    const ids = await listNewsletterMessageIds(tokens, onRefresh)
-    const stored = await pagedSelect<{ gmail_message_id: string }>((a, b) =>
-      supabase.from('newsletter_issues').select('gmail_message_id').eq('organization_id', orgId).order('id').range(a, b))
-    const have = new Set(stored.map((s) => s.gmail_message_id))
-    const todo = ids.filter((id) => !have.has(id))
-    const batch = todo.slice(0, maxNew)
+    const listed = (await listArchive()).filter((l) => l.title.startsWith(NEWSLETTER_SUBJECT))
+    const stored = await pagedSelect<{ source_id: string; sent_at: string }>((a, b) =>
+      supabase.from('newsletter_issues').select('source_id, sent_at').eq('organization_id', orgId).order('id').range(a, b))
+    // The listing has no campaign id, so a listed issue is new unless one from that day is stored
+    const haveDays = new Set(stored.map((s) => new Date(s.sent_at).toISOString().slice(0, 10)))
+    const todo = listed.filter((l) => !haveDays.has(l.sentOn))
 
     const fetched: NewsletterIssueIn[] = []
-    for (let i = 0; i < batch.length; i += 10) {
-      const got = await Promise.all(batch.slice(i, i + 10).map((id) => fetchNewsletterIssue(tokens, id, onRefresh)))
-      fetched.push(...(got.filter(Boolean) as NewsletterIssueIn[]))
-    }
-    if (fetched.length) {
+    for (const l of todo) fetched.push(await fetchArchivedIssue(l))
+    const have = new Set(stored.map((s) => s.source_id))
+    const fresh = fetched.filter((f) => !have.has(f.sourceId))
+    if (fresh.length) {
       const { error } = await supabase.from('newsletter_issues').upsert(
-        fetched.map((f) => ({
-          organization_id: orgId, gmail_message_id: f.gmailMessageId, sent_at: f.sentAt,
+        fresh.map((f) => ({
+          organization_id: orgId, source: 'mailchimp_archive', source_id: f.sourceId, sent_at: f.sentAt,
           subject: f.subject, plain_text: f.plainText, browser_url: f.browserUrl,
         })),
-        { onConflict: 'organization_id,gmail_message_id', ignoreDuplicates: true }
+        { onConflict: 'organization_id,source_id', ignoreDuplicates: true }
       )
       if (error) throw new Error(`saving issues: ${error.message}`)
     }
@@ -133,18 +108,17 @@ export async function readNewsletterForOrg(
     let mentionsNew = 0
     const { count: unmatched } = await supabase.from('newsletter_issues').select('id', { count: 'exact', head: true })
       .eq('organization_id', orgId).is('matched_at', null)
-    if (fetched.length || (unmatched ?? 0) > 0) mentionsNew = (await rematchOrg(supabase, orgId)).mentions_new
+    if (fresh.length || (unmatched ?? 0) > 0) mentionsNew = (await rematchOrg(supabase, orgId)).mentions_new
 
-    result = { ok: true, issues_seen: ids.length, issues_new: fetched.length, mentions_new: mentionsNew, more_to_read: todo.length > batch.length }
+    result = { ok: true, issues_seen: listed.length, issues_new: fresh.length, mentions_new: mentionsNew }
   } catch (e) {
-    const reconnect = e instanceof GmailReconnectNeeded
-    result = { ok: false, reconnect_needed: reconnect, error: e instanceof Error ? e.message : String(e) }
+    result = { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 
   await supabase.from('newsletter_read_runs').insert({
     organization_id: orgId, ok: result.ok, trigger: opts.trigger ?? 'cron',
     issues_seen: result.issues_seen ?? null, issues_new: result.issues_new ?? null,
-    mentions_new: result.mentions_new ?? null, more_to_read: result.more_to_read ?? false, error: result.error ?? null,
+    mentions_new: result.mentions_new ?? null, error: result.error ?? null,
   })
   return result
 }

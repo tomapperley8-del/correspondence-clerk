@@ -6,7 +6,7 @@
  *                   website on its Club Card page)                                       -> confirmed,
  *                   unless several businesses share that website                          -> unclear
  *   name            the business name, written with a capital, as whole words             -> confirmed,
- *                   unless the name is short, one word, in most issues, only part of a
+ *                   unless the name is short, one word, in most issues (over 60%), only part of a
  *                   longer name found in the same place, or the business is unreviewed   -> unclear
  *
  * One mention per issue and business, the strongest kind first.
@@ -191,7 +191,8 @@ export function matchIssues(
     }
   })
   const nameInfo = new Map(names.map((n) => [n.b.id, n]))
-  const frequent = (id: string) => issues.length >= 20 && (issuesWithName.get(id) ?? 0) / issues.length > 0.25
+  // A name in most issues is a standing feature (a weekly listing, the council): Tom confirms it once
+  const frequent = (id: string) => issues.length >= 8 && (issuesWithName.get(id) ?? 0) / issues.length > 0.6
 
   const out: FoundMention[] = []
   texts.forEach((t, idx) => {
