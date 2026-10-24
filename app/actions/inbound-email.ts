@@ -5,7 +5,7 @@ import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { formatCorrespondence } from '@/lib/ai/formatter'
 import { isThreadSplitResponse } from '@/lib/ai/types'
 import { revalidatePath } from 'next/cache'
-import { isPersonalDomain, stripQuotedContent, getOwnDomains } from '@/lib/inbound/utils'
+import { isPersonalDomain, stripQuotedContent, getOwnDomains, plainEmailBody } from '@/lib/inbound/utils'
 
 export { isPersonalDomain, stripQuotedContent }
 
@@ -152,10 +152,11 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
   // AI format (single entry, no thread split)
   const formatResult = await formatCorrespondence(rawForAI, false)
 
-  let formattedText: string | null = null
+  // With AI off (or failing) the body is cleaned by rules, as the webhook does
+  let formattedText: string | null = plainEmailBody(rawForAI) || null
   let entryDate = emailDate
   let entrySubject = subject || '(No subject)'
-  let formattingStatus = 'unformatted'
+  let formattingStatus = formattedText ? 'cleaned' : 'unformatted'
 
   if (formatResult.success && !isThreadSplitResponse(formatResult.data)) {
     const ai = formatResult.data

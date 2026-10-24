@@ -10,30 +10,52 @@ import { markBusinessReviewed, markNotABusiness, moveBusinessInto, undoBusinessC
 import { toast } from '@/lib/toast'
 
 interface Props {
-  business: Pick<Business, 'id' | 'name' | 'status' | 'notes' | 'merged_into'>
+  business: Pick<Business, 'id' | 'name' | 'status' | 'merged_into'>
 }
 
-// Records the inbound email path creates carry this note (route.ts)
-const AUTO_CREATED_NOTE = 'Added automatically on '
+// Per-browser list of business ids whose review bar was dismissed
+const DISMISSED_KEY = 'review_bar_dismissed'
+
+function readDismissed(): string[] {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY)
+    return raw ? (JSON.parse(raw) as string[]) : []
+  } catch {
+    return []
+  }
+}
 
 /**
- * Review actions for a business added automatically from email: "This is a
- * business", "Not a business", or "Move to business" when it is really a
- * person at a business already on file. On a hidden or merged record it says
- * so and offers Undo instead.
+ * Review actions for a business added automatically from email, shown only
+ * while it is Unreviewed: "This is a business", "Not a business", or "Move to
+ * business" when it is really a person at a business already on file, plus
+ * Dismiss. On a hidden or merged record it says so and offers Undo instead.
  */
 export function BusinessReviewBar({ business }: Props) {
   const router = useRouter()
   const isUnreviewed = business.status === 'Unreviewed'
   const isHidden = business.status === 'Not a business'
-  // startsWith: a merge copies the source's notes onto the end of the target's
-  const isAutoCreated = (business.notes ?? '').startsWith(AUTO_CREATED_NOTE)
 
   const [busy, setBusy] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [targetId, setTargetId] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<'hide' | 'move' | null>(null)
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
+    setDismissed(readDismissed().includes(business.id))
+  }, [business.id])
+
+  const dismiss = () => {
+    setDismissed(true)
+    try {
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify([...readDismissed(), business.id]))
+    } catch {
+      // Private window: the bar just comes back next visit
+    }
+  }
 
   useEffect(() => {
     if (!moveOpen || businesses.length > 0) return
@@ -43,7 +65,8 @@ export function BusinessReviewBar({ business }: Props) {
     })
   }, [moveOpen, businesses.length, business.id])
 
-  if (!isUnreviewed && !isHidden && !isAutoCreated) return null
+  if (!isUnreviewed && !isHidden) return null
+  if (isUnreviewed && dismissed) return null
 
   const target = businesses.find((b) => b.id === targetId)
 
@@ -88,18 +111,14 @@ export function BusinessReviewBar({ business }: Props) {
   return (
     <div className="border border-amber-200 bg-amber-50 px-4 py-3 mb-6 text-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-gray-800">
-          {isUnreviewed ? 'Added automatically from an email and not reviewed yet.' : 'Added automatically from an email.'}
-        </span>
-        {isUnreviewed && (
-          <button
-            onClick={() => run(() => markBusinessReviewed(business.id), () => 'Marked as a business')}
-            disabled={busy}
-            className="text-xs font-semibold px-3 py-1.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
-          >
-            This is a business
-          </button>
-        )}
+        <span className="text-gray-800">Added automatically from an email and not reviewed yet.</span>
+        <button
+          onClick={() => run(() => markBusinessReviewed(business.id), () => 'Marked as a business')}
+          disabled={busy}
+          className="text-xs font-semibold px-3 py-1.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
+        >
+          This is a business
+        </button>
         <button
           onClick={() => setMoveOpen((open) => !open)}
           disabled={busy}
@@ -113,6 +132,13 @@ export function BusinessReviewBar({ business }: Props) {
           className="text-xs font-semibold px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
         >
           Not a business
+        </button>
+        <button
+          onClick={dismiss}
+          disabled={busy}
+          className="ml-auto text-xs font-semibold px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:underline transition-colors"
+        >
+          Dismiss
         </button>
       </div>
 

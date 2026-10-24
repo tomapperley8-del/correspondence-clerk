@@ -48,7 +48,7 @@ export type Correspondence = {
     | 'invoice'
     | 'renewal'
   due_at: string | null
-  formatting_status: 'formatted' | 'unformatted' | 'failed'
+  formatting_status: 'formatted' | 'unformatted' | 'failed' | 'cleaned'
   content_hash: string | null
   ai_metadata: Record<string, unknown> | null
   organization_id: string
@@ -491,24 +491,102 @@ export async function deleteCorrespondence(id: string) {
     return { error: 'No organization found' }
   }
 
-  const { data, error } = await supabase
+  // Stage 15: the whole row, and the rows a delete cascades to, are copied to
+  // cc_phase0_backup first, so Undo (and anyone later) can put them back.
+  const { data: row, error: readError } = await supabase
+    .from('correspondence')
+    .select('*')
+    .eq('id', id)
+    .eq('organization_id', organizationId)
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  if (!row) return { error: 'Already gone' }
+  const [dismissals, queue, scans] = await Promise.all([
+    supabase.from('duplicate_dismissals').select('*').or(`entry_id_1.eq.${id},entry_id_2.eq.${id}`),
+    supabase.from('import_queue').select('*').eq('correspondence_id', id),
+    supabase.from('mail_scan').select('id').eq('correspondence_id', id),
+  ])
+  const mailScanIds = (scans.data ?? []).map((s) => s.id as number)
+  // Worked out by the database when the row goes back in: search_vector by its
+  // trigger, thread_key as a generated column (which can't be written)
+  const { search_vector: _searchVector, thread_key: _threadKey, ...stored } = row as Record<string, unknown>
+  const { data: backup, error: backupError } = await supabase
+    .from('cc_phase0_backup')
+    .insert({
+      table_name: 'correspondence',
+      row_id: id,
+      before_row: {
+        ...stored,
+        __cascade: { duplicate_dismissals: dismissals.data ?? [], import_queue: queue.data ?? [], mail_scan_ids: mailScanIds },
+      },
+      reason: `entry_delete ${user.id}`,
+    })
+    .select('id')
+    .single()
+  if (backupError) return { error: `Not deleted: the backup failed (${backupError.message})` }
+
+  // The mailbox sweep's record of having seen this email stays (or it would
+  // file it again); only its link to the entry goes. It used to block deletes.
+  if (mailScanIds.length) {
+    const { error: unlinkError } = await supabase.from('mail_scan').update({ correspondence_id: null }).in('id', mailScanIds)
+    if (unlinkError) {
+      await supabase.from('cc_phase0_backup').delete().eq('id', backup.id)
+      return { error: unlinkError.message }
+    }
+  }
+
+  const { error } = await supabase
     .from('correspondence')
     .delete()
     .eq('id', id)
     .eq('organization_id', organizationId)
-    .select('business_id')
-    .maybeSingle()
 
   if (error) {
+    if (mailScanIds.length) await supabase.from('mail_scan').update({ correspondence_id: id }).in('id', mailScanIds)
+    await supabase.from('cc_phase0_backup').delete().eq('id', backup.id)
     return { error: error.message }
   }
 
-  if (data) revalidatePath(`/businesses/${data.business_id}`)
+  revalidatePath(`/businesses/${row.business_id}`)
   revalidatePath('/dashboard')
   revalidatePath('/search')
-  revalidatePath('/actions')
+  revalidatePath('/today')
 
-  return { success: true }
+  return { success: true, backupId: backup.id as number }
+}
+
+/** Undo a Delete: put the backed-up entry, and what cascaded with it, back as it was. */
+export async function undoDeleteCorrespondence(backupId: number): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const organizationId = await getCurrentUserOrganizationId()
+  if (!organizationId) return { error: 'No organization found' }
+
+  const { data: backup, error: readError } = await supabase
+    .from('cc_phase0_backup')
+    .select('before_row')
+    .eq('id', backupId)
+    .eq('table_name', 'correspondence')
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  const saved = backup?.before_row as Record<string, unknown> | undefined
+  if (!saved || saved.organization_id !== organizationId) return { error: 'Nothing to undo' }
+  const { __cascade, search_vector: _searchVector, thread_key: _threadKey, ...row } = saved as Record<string, unknown> & {
+    __cascade?: { duplicate_dismissals?: Record<string, unknown>[]; import_queue?: Record<string, unknown>[]; mail_scan_ids?: number[] }
+  }
+  const { error } = await supabase.from('correspondence').insert(row)
+  if (error) return { error: error.message }
+  if (__cascade?.duplicate_dismissals?.length) await supabase.from('duplicate_dismissals').insert(__cascade.duplicate_dismissals)
+  if (__cascade?.import_queue?.length) await supabase.from('import_queue').insert(__cascade.import_queue)
+  if (__cascade?.mail_scan_ids?.length) {
+    await supabase.from('mail_scan').update({ correspondence_id: row.id as string }).in('id', __cascade.mail_scan_ids)
+  }
+
+  revalidatePath(`/businesses/${row.business_id as string}`)
+  revalidatePath('/search')
+  revalidatePath('/today')
+  return {}
 }
 
 /**

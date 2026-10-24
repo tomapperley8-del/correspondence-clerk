@@ -643,9 +643,18 @@ export async function promoteOutreachToContracts(
   return {}
 }
 
+const OUTREACH_FIELDS = [
+  'outreach_stage', 'outreach_identified_at', 'outreach_contacted_at', 'outreach_followed_up_at',
+  'outreach_in_discussion_at', 'outreach_won_at', 'outreach_invoice_paid_at', 'outreach_declined_at',
+] as const
+
+/**
+ * Take a business off outreach. Its stage and stage dates are copied to
+ * cc_phase0_backup first (Stage 15), so Undo puts them back.
+ */
 export async function removeBusinessFromOutreach(
   businessId: string
-): Promise<{ error?: string }> {
+): Promise<{ backupId?: number; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
@@ -653,14 +662,60 @@ export async function removeBusinessFromOutreach(
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
+  const { data: before, error: readError } = await supabase
+    .from('businesses')
+    .select(['id', 'organization_id', ...OUTREACH_FIELDS].join(', '))
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  if (!before) return { error: 'Business not found' }
+  const { data: backup, error: backupError } = await supabase
+    .from('cc_phase0_backup')
+    .insert({ table_name: 'businesses', row_id: businessId, before_row: before, reason: `outreach_remove ${user.id}` })
+    .select('id')
+    .single()
+  if (backupError) return { error: `Not removed: the backup failed (${backupError.message})` }
+
   const { error } = await supabase
     .from('businesses')
-    .update({ outreach_stage: null, outreach_identified_at: null, outreach_contacted_at: null, outreach_followed_up_at: null, outreach_in_discussion_at: null, outreach_won_at: null, outreach_invoice_paid_at: null, outreach_declined_at: null })
+    .update(Object.fromEntries(OUTREACH_FIELDS.map((f) => [f, null])))
     .eq('id', businessId)
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
   revalidatePath('/today')
+  revalidatePath('/businesses')
+  revalidatePath(`/businesses/${businessId}`)
+  return { backupId: backup.id as number }
+}
+
+/** Undo "Remove from outreach": the stage and its dates back as they were. */
+export async function undoRemoveFromOutreach(backupId: number): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const orgId = await getCurrentUserOrganizationId()
+  if (!orgId) return { error: 'No organization found' }
+
+  const { data: backup, error: readError } = await supabase
+    .from('cc_phase0_backup')
+    .select('row_id, before_row')
+    .eq('id', backupId)
+    .eq('table_name', 'businesses')
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  const before = backup?.before_row as Record<string, unknown> | undefined
+  if (!backup || !before || before.organization_id !== orgId) return { error: 'Nothing to undo' }
+  const businessId = backup.row_id as string
+  const { error } = await supabase
+    .from('businesses')
+    .update(Object.fromEntries(OUTREACH_FIELDS.map((f) => [f, before[f] ?? null])))
+    .eq('id', businessId)
+    .eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  revalidatePath('/today')
+  revalidatePath('/businesses')
   revalidatePath(`/businesses/${businessId}`)
   return {}
 }

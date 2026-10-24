@@ -295,6 +295,11 @@ export function extractForwardedSender(rawBody: string): { email: string; name: 
  * with AI switched off 626 entries were saved with nothing readable in them at
  * all. This takes the header block off the top, cuts the quoted chain off the
  * bottom, and tidies Outlook's <mailto:> and <http> link noise.
+ *
+ * Since Stage 15 (Oct 2026) it also cuts at "Sent from my iPhone" and at legal
+ * disclaimers and mailing-list footers, drops picture placeholders, tracking
+ * links and "view in browser" lines, and unwraps Outlook safe links. The SQL
+ * twin plain_email_body() follows the same rules. Originals are never changed.
  */
 export function plainEmailBody(rawText: string | null | undefined): string {
   if (!rawText) return ''
@@ -309,26 +314,76 @@ export function plainEmailBody(rawText: string | null | undefined): string {
     body = body.replace(/^(?:(?:From|To|Cc|Date|Sent|Subject|Reply-To):[^\n]*\n)+/i, '')
   }
 
-  // Cut everything from the first sign of a quoted reply.
-  const cutPatterns = [
-    /\n_{10,}\s*\n+\s*From:/,
-    /\nFrom:[^\n]*\n\s*(?:Sent|Date):/i,
-    /\n-{3,}\s*Original Message\s*-{3,}/i,
-    /\n-{3,}\s*Forwarded message\s*-{3,}/i,
-    /\nOn .{5,120}\bwrote:/,
-    /\n-- \n/,
-  ]
-  for (const p of cutPatterns) {
-    const m = body.match(p)
-    if (m && m.index !== undefined) body = body.slice(0, m.index)
+  // Cut at the earliest of: the quoted reply, the phone sign-off (everything
+  // after "Sent from my iPhone" is the quoted chain), or a legal or mailing-list
+  // footer. Footers only count after the first 200 characters, so a short
+  // message that opens with "This email..." is never emptied.
+  let cut = -1
+  const earliest = (p: RegExp, from: number) => {
+    const m = p.exec(body.slice(from))
+    if (m && (cut < 0 || from + m.index < cut)) cut = from + m.index
   }
+  for (const p of QUOTE_CUTS) earliest(p, 0)
+  for (const p of FOOTER_CUTS) earliest(p, Math.min(200, body.length))
+  if (cut >= 0) body = body.slice(0, cut)
 
+  // Pictures ([https://...logo.png], [cid:image001.png@...], [image: Logo]) are
+  // logos and spacers, except in a message that is nothing but pictures, where
+  // a plain marker says something was sent.
+  const tidied = tidyBody(body, '')
+  return tidied || tidyBody(body, '[picture]')
+}
+
+function tidyBody(body: string, picture: string): string {
   return body
-    .replace(/<mailto:[^>]*>/gi, '')
+    .replace(SAFELINK, (_m, url: string) => safeDecode(url))
+    .replace(/<(?:mailto|tel|sms):[^>]*>/gi, '')
     .replace(/<https?:\/\/[^>]*>/gi, '')
-    .replace(/^_{10,}$/gm, '')
-    .replace(/[ \t]+$/gm, '')
+    .replace(/\[(?:https?:\/\/|cid:|image)[^\]\n]*\]/gi, picture)
+    // Bare mailing-list click counters
+    .replace(TRACKING_URL, '')
+    .replace(/^.*(?:view (?:this (?:e-?mail|message|newsletter) )?(?:in|on) (?:your|a) (?:web )?browser|having trouble (?:reading|viewing) this).*$/gim, '')
+    // Invisible spacer characters marketing emails pad their preview text with
+    .replace(/[​-‍⁠﻿͏­]/g, '')
+    .replace(/^(?:_{10,}|[*=~]{10,})$/gm, '')
+    .replace(/[ \t ]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
     .slice(0, 8000)
+}
+
+// The start of a quoted reply or forwarded chain.
+const QUOTE_CUTS = [
+  /\n_{10,}\s*\n+\s*From:/,
+  /\nFrom:[^\n]*\n\s*(?:Sent|Date):/i,
+  /\n-{3,}\s*Original Message\s*-{3,}/i,
+  /\n-{3,}\s*Forwarded message\s*-{3,}/i,
+  /\nOn .{5,120}\bwrote:/,
+  /\n-- \n/,
+  /\n[ \t]*(?:Sent from my (?:iPhone|iPad|Samsung|Galaxy|Android|BlackBerry|mobile|phone)|Sent from Outlook for (?:iOS|Android)|Get Outlook for (?:iOS|Android))\b/i,
+]
+
+// The first line of a legal disclaimer or mailing-list footer. Everything from
+// there down is boilerplate (the rest of the disclaimer, unsubscribe links).
+const FOOTER_CUTS = [
+  /\n[ \t]*(?:Disclaimer\b|DISCLAIMER|CONFIDENTIALITY\b|Confidentiality (?:notice|note)\b)/,
+  /\n[ \t]*(?:This|The) (?:e-?mail|message|communication)(?: and any (?:files|attachments)[^\n]{0,40})? (?:is|are|may be) (?:strictly )?(?:confidential|private|intended|legally privileged)/i,
+  /\n[ \t]*The (?:information|contents?) (?:contained )?in (?:this|the) (?:e-?mail|message|communication)/i,
+  /\n[ \t]*This (?:e-?mail|message) (?:has been|was) (?:scanned|sent to)/i,
+  /\n[ \t]*If you (?:are not the intended recipient|have received this (?:e-?mail|message) in error)/i,
+  /\n[ \t]*Please consider the environment before printing/i,
+  /\n[ \t]*(?:Want to change how you receive these emails|Unsubscribe from this list|You are receiving this (?:e-?mail|newsletter) because|To unsubscribe\b)/i,
+]
+
+// Outlook safe links wrap the real address in ?url=...; keep the real one.
+const SAFELINK = /https?:\/\/[a-z0-9.-]*safelinks\.protection\.outlook\.com\/\S*?[?&]url=([^&\s>]+)[^\s>]*/gi
+
+const TRACKING_URL = /https?:\/\/(?:[a-z0-9-]+\.)*(?:list-manage\.com|mailchi\.mp|awstrack\.me|sendgrid\.net|hubspotlinks\.com|mjt\.lu|createsend\d*\.com|klclick\d*\.com)\/\S*/gi
+
+function safeDecode(url: string): string {
+  try {
+    return decodeURIComponent(url)
+  } catch {
+    return url
+  }
 }
