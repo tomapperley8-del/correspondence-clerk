@@ -73,9 +73,9 @@ BEGIN
   body := regexp_replace(body, '\[(https?://|cid:|image)[^]\n]*\]', p, 'gi');
   body := regexp_replace(body, 'https?://([a-z0-9-]+\.)*(list-manage\.com|mailchi\.mp|awstrack\.me|sendgrid\.net|hubspotlinks\.com|mjt\.lu|createsend[0-9]*\.com|klclick[0-9]*\.com)/\S*', '', 'gi');
   body := regexp_replace(body, '^[^\n]*(view (this (e-?mail|message|newsletter) )?(in|on) (your|a) (web )?browser|having trouble (reading|viewing) this)[^\n]*$', '', 'gin');
-  body := regexp_replace(body, '[​-‍⁠﻿͏­]', '', 'g');
+  body := regexp_replace(body, '[\u200b-\u200d\u2060\ufeff\u034f\u00ad]', '', 'g');
   body := regexp_replace(body, '^(_{10,}|[*=~]{10,})$', '', 'ng');
-  body := regexp_replace(body, '[ \t ]+$', '', 'ng');
+  body := regexp_replace(body, '[ \t\u00a0]+$', '', 'ng');
   body := regexp_replace(body, E'\n{3,}', E'\n\n', 'g');
   body := regexp_replace(body, '^\s+|\s+$', '', 'g');
   RETURN left(body, 8000);
