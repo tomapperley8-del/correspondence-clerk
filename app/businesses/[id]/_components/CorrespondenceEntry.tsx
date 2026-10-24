@@ -25,8 +25,6 @@ interface CorrespondenceEntryProps {
   searchQuery: string
   isExpanded: boolean
   onToggleExpand: (id: string) => void
-  formattingInProgress: string | null
-  onFormat: (id: string) => void
   editingEntryId: string | null
   onStartEdit: (entry: Correspondence) => void
   onSaveEdit: (id: string, fields: EditFields) => Promise<void>
@@ -91,8 +89,6 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
   searchQuery,
   isExpanded,
   onToggleExpand,
-  formattingInProgress,
-  onFormat,
   editingEntryId,
   onStartEdit,
   onSaveEdit,
@@ -149,7 +145,8 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
       toast.success('Entry unlinked from this business')
     }
   }
-  const isUnformatted = entry.formatting_status !== 'formatted'
+  // App AI is off: bulk imports still waiting for the formatter say so; rule-cleaned and plain entries are normal
+  const isFormattingQueued = entry.formatting_status === 'unformatted' && !!entry.ai_metadata?.bulk_import
   const isEdited = entry.edited_at !== null
   const isEditing = editingEntryId === entry.id
   const extractedName = getExtractedName(entry)
@@ -159,30 +156,11 @@ export const CorrespondenceEntry = React.memo(function CorrespondenceEntry({
       {isContext && (
         <p className="text-xs text-amber-700 font-medium mb-2">Surrounding context</p>
       )}
-      {/* Unformatted indicator */}
-      {isUnformatted && (
-        entry.ai_metadata?.bulk_import ? (
-          <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-500">
-            <span className="inline-block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
-            Formatting queued…
-          </div>
-        ) : (
-          <div className="bg-orange-50 border-2 border-orange-600 p-3 mb-3">
-            <p className="text-sm text-orange-900 font-semibold mb-2">
-              ⚠ Unformatted Entry
-            </p>
-            <p className="text-xs text-orange-800 mb-2">
-              This entry was saved without AI formatting. The raw text is displayed below.
-            </p>
-            <Button
-              onClick={() => onFormat(entry.id)}
-              disabled={formattingInProgress === entry.id}
-              className="bg-orange-600 text-white hover:bg-orange-700 px-3 py-1 text-xs font-semibold"
-            >
-              {formattingInProgress === entry.id ? 'Formatting...' : 'Format Now'}
-            </Button>
-          </div>
-        )
+      {isFormattingQueued && (
+        <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-gray-50 border border-gray-200 text-xs text-gray-500">
+          <span className="inline-block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+          Formatting queued…
+        </div>
       )}
 
       {isLinkedEntry && (

@@ -34,8 +34,6 @@ interface AllEntriesViewProps {
   displayNames: Record<string, string>
   isExpandedEntry: (id: string) => boolean
   onToggleExpand: (id: string) => void
-  formattingInProgress: string | null
-  onFormat: (id: string) => void
   editingEntryId: string | null
   onStartEdit: (entry: Correspondence) => void
   onSaveEdit: (id: string, fields: EditFields) => Promise<void>
@@ -79,8 +77,6 @@ export const AllEntriesView = React.memo(function AllEntriesView({
   displayNames,
   isExpandedEntry,
   onToggleExpand,
-  formattingInProgress,
-  onFormat,
   editingEntryId,
   onStartEdit,
   onSaveEdit,
@@ -123,8 +119,6 @@ export const AllEntriesView = React.memo(function AllEntriesView({
     displayNames,
     searchQuery,
     onToggleExpand,
-    formattingInProgress,
-    onFormat,
     editingEntryId,
     onStartEdit,
     onSaveEdit,
@@ -151,7 +145,7 @@ export const AllEntriesView = React.memo(function AllEntriesView({
       {/* Bulk import formatting notice */}
       {(() => {
         const pending = correspondence.filter(e =>
-          e.formatting_status !== 'formatted' &&
+          e.formatting_status === 'unformatted' &&
           (e.ai_metadata as any)?.bulk_import === true
         ).length
         if (pending === 0) return null

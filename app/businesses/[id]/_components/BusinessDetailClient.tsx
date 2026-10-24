@@ -24,7 +24,6 @@ import type { OneOffSale } from '@/app/actions/contracts'
 import { SuccessBanner } from '@/components/SuccessBanner'
 import { OpenThreadsCard } from '@/components/OpenThreadsCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { retryFormatting } from '@/app/actions/ai-formatter'
 import { createTask, createTaskFromCorrespondence, updateTask } from '@/app/actions/tasks'
 import { getBusinessGlance, type BusinessGlance as GlanceData } from '@/app/actions/business-glance'
 import { createUnformattedCorrespondence } from '@/app/actions/ai-formatter'
@@ -159,7 +158,6 @@ export function BusinessDetailClient({
   } = useCorrespondence({ businessId })
 
   // UI state
-  const [formattingInProgress, setFormattingInProgress] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [contextEntryIds, setContextEntryIds] = useState<Set<string>>(new Set())
@@ -286,18 +284,6 @@ export function BusinessDetailClient({
   }, [searchQuery, contextEntryIds, filteredCorrespondence.archive])
 
   // --- Handlers ---
-
-  const handleFormatLater = useCallback(async (entryId: string) => {
-    setFormattingInProgress(entryId)
-    setActionError(null)
-    const result = await retryFormatting(entryId)
-    if ('error' in result) {
-      setActionError(`Formatting failed: ${result.error}`)
-    } else {
-      await refreshCorrespondence()
-    }
-    setFormattingInProgress(null)
-  }, [refreshCorrespondence])
 
   const handleStartEdit = useCallback((entry: Correspondence) => {
     setEditingEntryId(entry.id)
@@ -579,8 +565,6 @@ export function BusinessDetailClient({
     searchQuery,
     isExpandedEntry,
     onToggleExpand: handleToggleExpand,
-    formattingInProgress,
-    onFormat: handleFormatLater,
     editingEntryId,
     onStartEdit: handleStartEdit,
     onSaveEdit: handleSaveEdit,

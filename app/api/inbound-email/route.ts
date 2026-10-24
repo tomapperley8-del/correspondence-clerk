@@ -313,6 +313,7 @@ async function insertCorrespondenceServiceRole(
     if (existing) return null // already stored
   }
 
+  const body = plainEmailBody(opts.rawText) || null
   const { data: inserted, error: insertError } = await supabase
     .from('correspondence')
     .insert({
@@ -321,18 +322,18 @@ async function insertCorrespondenceServiceRole(
       contact_id: opts.contactId,
       user_id: opts.userId,
       raw_text_original: opts.rawText,
-      // A readable body from the raw text, with no AI. The AI formatter still
-      // overwrites this later when it is switched on; when it is off this is
-      // what the app and the routines read, instead of nothing at all.
-      formatted_text_original: plainEmailBody(opts.rawText) || null,
-      formatted_text_current: plainEmailBody(opts.rawText) || null,
+      // A readable body from the raw text, with no AI ('cleaned'). The AI
+      // formatter still overwrites this later when it is switched on; when it
+      // is off this is what the app and the routines read.
+      formatted_text_original: body,
+      formatted_text_current: body,
       entry_date: opts.entryDate,
       subject: opts.subject,
       type: 'Email',
       direction: opts.direction,
       action_needed: 'none',
       due_at: null,
-      formatting_status: 'unformatted',
+      formatting_status: body ? 'cleaned' : 'unformatted',
       content_hash: contentHash || null,
       ai_metadata: {
         source: opts.source ?? (opts.direction === 'sent' ? 'webhook_bcc' : 'webhook_inbound'),

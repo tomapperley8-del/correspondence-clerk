@@ -48,7 +48,7 @@ export type Correspondence = {
     | 'invoice'
     | 'renewal'
   due_at: string | null
-  formatting_status: 'formatted' | 'unformatted' | 'failed'
+  formatting_status: 'formatted' | 'unformatted' | 'failed' | 'cleaned'
   content_hash: string | null
   ai_metadata: Record<string, unknown> | null
   organization_id: string

@@ -90,8 +90,6 @@ interface Props {
   displayNames: Record<string, string>
   isExpandedEntry: (id: string) => boolean
   onToggleExpand: (id: string) => void
-  formattingInProgress: string | null
-  onFormat: (id: string) => void
   editingEntryId: string | null
   onStartEdit: (entry: Correspondence) => void
   onSaveEdit: (id: string, fields: EditFields) => Promise<void>
