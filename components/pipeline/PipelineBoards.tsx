@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   getContractBusinesses,
@@ -25,6 +25,8 @@ import { OutreachView } from './OutreachView'
 // The renewals and outreach boards (UI overhaul Stage 7): moved here from the
 // To-dos Contracts and Outreach tabs, which are retired. Shown by the Renewals
 // view's board toggle and the Outreach view in Businesses.
+// Stage 16b: `only` keeps the renewals board to one kind of deal, so Club Card
+// renewals show on the Club Card tab and not again in Businesses.
 
 function todayStr() {
   const d = new Date()
@@ -40,19 +42,23 @@ type RenewalContractFields = {
   membership_type: string
 }
 
-export function PipelineBoard({ kind, allBusinessNames }: { kind: 'renewals' | 'outreach'; allBusinessNames: { id: string; name: string }[] }) {
+export function PipelineBoard({ kind, allBusinessNames, only }: { kind: 'renewals' | 'outreach'; allBusinessNames: { id: string; name: string }[]; only?: 'club_card' | 'advertiser' }) {
   const router = useRouter()
   const [contractBusinesses, setContractBusinesses] = useState<ContractBusiness[] | null>(null)
   const [outreachBusinesses, setOutreachBusinesses] = useState<OutreachBusiness[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  // A mounted flag rather than a per-run one: in development React runs this
+  // twice and the second server action can wait behind the first, so the
+  // first answer must still count if the board is on screen.
+  const mounted = useRef(true)
   useEffect(() => {
-    let cancelled = false
+    mounted.current = true
     const load = kind === 'renewals'
-      ? getContractBusinesses().then((r) => { if (!cancelled) { if (r.error) setLoadError(r.error); setContractBusinesses(r.data ?? []) } })
-      : getOutreachBusinesses().then((r) => { if (!cancelled) { if (r.error) setLoadError(r.error); setOutreachBusinesses(r.data ?? []) } })
-    load.catch(() => { if (!cancelled) setLoadError('Could not load the board') })
-    return () => { cancelled = true }
+      ? getContractBusinesses().then((r) => { if (mounted.current) { if (r.error) setLoadError(r.error); setContractBusinesses(r.data ?? []) } })
+      : getOutreachBusinesses().then((r) => { if (mounted.current) { if (r.error) setLoadError(r.error); setOutreachBusinesses(r.data ?? []) } })
+    load.catch(() => { if (mounted.current) setLoadError('Could not load the board') })
+    return () => { mounted.current = false }
   }, [kind])
 
   const handleStageChange = useCallback(
@@ -232,7 +238,7 @@ export function PipelineBoard({ kind, allBusinessNames }: { kind: 'renewals' | '
     if (!contractBusinesses) return <p className="text-sm text-gray-500">Loading the board…</p>
     return (
       <ContractsView
-        businesses={contractBusinesses}
+        businesses={only ? contractBusinesses.filter((b) => (only === 'club_card' ? b.is_club_card : b.is_advertiser)) : contractBusinesses}
         today={todayStr()}
         onStageChange={handleStageChange}
         onRenew={handleRenew}

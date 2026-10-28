@@ -240,5 +240,6 @@ export async function setClubCardOffer(pageId: string, change: { offer_ends_set?
   const { error } = await ctx.supabase.from('club_card_pages').update(update).eq('id', pageId).eq('organization_id', ctx.orgId)
   if (error) return { error: error.message }
   revalidatePath('/today')
+  revalidatePath('/club-card')
   return {}
 }

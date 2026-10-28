@@ -154,8 +154,11 @@ export function Navigation() {
     return null
   }
 
-  // Three places (UI overhaul Stage 7): Today, Businesses, Inbox. Everything
-  // else lives under the user menu.
+  // Tabs across the top (UI overhaul Stage 16, Tom's order): Today, Club Card,
+  // Advertising, Newsletter, Outreach, Businesses, Inbox, Insights. A tab is
+  // added here when it is built (Tom, 28 Oct: hide the rest until then).
+  // Everything else lives under the user menu.
+  const onClubCard = !!pathname?.startsWith('/club-card') || !!pathname?.startsWith('/businesses/club-card-pages')
   const places: { href: string; label: string; active: boolean; badge: number | null; badgeTitle?: string; badgeTone: string }[] = [
     {
       href: '/today',
@@ -166,9 +169,16 @@ export function Navigation() {
       badgeTone: 'bg-amber-500',
     },
     {
+      href: '/club-card',
+      label: 'Club Card',
+      active: onClubCard,
+      badge: null,
+      badgeTone: '',
+    },
+    {
       href: '/businesses',
       label: 'Businesses',
-      active: !!pathname?.startsWith('/businesses') || pathname === '/dashboard',
+      active: (!!pathname?.startsWith('/businesses') && !onClubCard) || pathname === '/dashboard',
       badge: null,
       badgeTone: '',
     },
@@ -203,12 +213,26 @@ export function Navigation() {
     </span>
   )
 
+  const tabLinks = (size: string) => places.map((p) => (
+    <Link
+      key={p.href}
+      href={p.href}
+      aria-current={p.active ? 'page' : undefined}
+      className={`${size} shrink-0 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 whitespace-nowrap ${
+        p.active ? 'text-white bg-brand-olive' : 'text-white hover:bg-brand-olive/20'
+      }`}
+    >
+      {p.label}
+      {p.badge !== null && badgeEl(p.badge, p.badgeTone, p.badgeTitle)}
+    </Link>
+  ))
+
   return (
     <>
     <nav aria-label="Main navigation" className="bg-brand-dark border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex items-center space-x-8">
+          <div className="flex items-center space-x-6">
             <Link
               href="/today"
               className="text-xl font-bold text-white flex items-center gap-2"
@@ -218,21 +242,7 @@ export function Navigation() {
               <span className="lg:hidden">Clerk</span>
             </Link>
 
-            <div className="hidden md:flex h-16">
-              {places.map((p) => (
-                <Link
-                  key={p.href}
-                  href={p.href}
-                  aria-current={p.active ? 'page' : undefined}
-                  className={`px-4 flex items-center gap-2 text-sm font-medium transition-colors border-r border-white/20 ${
-                    p.active ? 'text-white bg-brand-olive' : 'text-white hover:bg-brand-olive/20'
-                  }`}
-                >
-                  {p.label}
-                  {p.badge !== null && badgeEl(p.badge, p.badgeTone, p.badgeTitle)}
-                </Link>
-              ))}
-            </div>
+            <div className="hidden xl:flex h-16">{tabLinks('h-16 px-4')}</div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -317,6 +327,10 @@ export function Navigation() {
             </button>
           </div>
         </div>
+      </div>
+      {/* Narrower screens, phones too: the tabs in their own strip, scrolling sideways */}
+      <div className="xl:hidden border-t border-white/10 overflow-x-auto">
+        <div className="flex min-w-max px-2 sm:px-4">{tabLinks('h-11 px-3')}</div>
       </div>
 
     </nav>
