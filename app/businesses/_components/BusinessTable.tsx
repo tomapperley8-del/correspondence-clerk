@@ -11,7 +11,7 @@ import { FullScreenPanel } from '@/components/ui/full-screen-panel'
 import { FilterChips } from '@/components/ui/filter-chips'
 import { ActionMenu } from '@/components/ui/action-menu'
 import { downloadSheet } from '@/lib/spreadsheet-export'
-import { updateBusiness, removeBusinessFromOutreach, undoRemoveFromOutreach } from '@/app/actions/businesses'
+import { updateBusiness, removeBusinessFromOutreach, undoRemoveFromOutreach, addBusinessToOutreach, updateOutreachStage, updateBusinessRenewalStage } from '@/app/actions/businesses'
 import { markNotABusiness, undoBusinessChange } from '@/app/actions/business-review'
 import { addForNewsletter } from '@/app/actions/calendar'
 import { toast } from '@/lib/toast'
@@ -135,7 +135,8 @@ const VIEWS: { key: ViewKey; label: string; hint: string; sort: SortKey; dir: 'a
 ]
 
 const SAVED_KEY = 'business_table_saved_views'
-const COLUMNS_KEY = 'business_table_columns'
+// v2 (Stage 13b): new defaults for everyone; a 13 choice is not carried over.
+const COLUMNS_KEY = 'business_table_columns_v2'
 const WIDTHS_KEY = 'business_table_column_widths'
 const PAGE_SIZE = 200
 
@@ -152,7 +153,8 @@ function defaults(view: ViewKey): Settings {
 function cleanColumns(value: unknown): ColumnKey[] | null {
   if (!Array.isArray(value)) return null
   const known = new Set<string>(COLUMN_DEFS.map((c) => c.key))
-  const list = value.filter((k): k is ColumnKey => known.has(k))
+  // Stage 13b: Action date became Next to-do.
+  const list = value.map((k) => (k === 'action' ? 'todo' : k)).filter((k): k is ColumnKey => known.has(k))
   return list.length ? [...new Set(list)] : null
 }
 
@@ -220,8 +222,12 @@ function compare(a: TableRow, b: TableRow, sort: SortKey): number {
       return str(a.deal?.contract_end, b.deal?.contract_end)
     case 'last':
       return str(a.last_in_touch, b.last_in_touch)
-    case 'action':
-      return str(a.follow_up_after, b.follow_up_after)
+    case 'todo':
+      return str(a.next_todo?.due_date, b.next_todo?.due_date)
+    case 'amount':
+      return (a.deal?.amount ?? 0) - (b.deal?.amount ?? 0)
+    case 'money':
+      return (a.money?.open_balance ?? 0) - (b.money?.open_balance ?? 0)
     case 'newsletter':
       return str(a.newsletter?.date, b.newsletter?.date)
     case 'attention': {
@@ -245,8 +251,12 @@ function hasBlank(r: TableRow, sort: SortKey): boolean {
       return !r.last_in_touch
     case 'attention':
       return !r.attention
-    case 'action':
-      return !r.follow_up_after
+    case 'todo':
+      return !r.next_todo?.due_date
+    case 'amount':
+      return r.deal?.amount == null
+    case 'money':
+      return !r.money
     case 'newsletter':
       return !r.newsletter
   }
@@ -390,9 +400,9 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
     })
 
   const actions: RowActions = {
-    // The same server action as Edit business; only the fields Tom owns.
+    // The same server action as Edit business; only the notes now (Stage 13b).
     edit: async (row, p) => {
-      const before = { disposition: row.disposition, follow_up_after: row.follow_up_after, notes: row.notes }
+      const before = { notes: row.notes }
       patch(row.id, p)
       const result = await updateBusiness(row.id, p)
       if (result.error) {
@@ -402,6 +412,34 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
       }
       toast.success(`Saved for ${row.name}`)
     },
+    // The Outreach board's own actions, so the board, the leads and the outreach routine see it.
+    setOutreach: async (row, stage) => {
+      if (stage === null) return actions.offOutreach(row)
+      const before = row.outreach_stage
+      patch(row.id, { outreach_stage: stage })
+      let result: { error?: string } = {}
+      if (!before) result = await addBusinessToOutreach(row.id)
+      if (!result.error && stage !== 'identified') result = await updateOutreachStage(row.id, stage)
+      if (result.error) {
+        patch(row.id, { outreach_stage: before })
+        toast.error(`Not saved: ${result.error}`)
+        return
+      }
+      toast.success(`${row.name}: outreach stage saved`)
+    },
+    // The Renewals board's own action.
+    setRenewal: async (row, stage) => {
+      const before = row.renewal_stage
+      patch(row.id, { renewal_stage: stage })
+      const result = await updateBusinessRenewalStage(row.id, stage)
+      if (result.error) {
+        patch(row.id, { renewal_stage: before })
+        toast.error(`Not saved: ${result.error}`)
+        return
+      }
+      toast.success(`${row.name}: renewal stage saved`)
+    },
+    editTodo: (row) => setDialog({ kind: row.next_todo ? 'move' : 'todo', row }),
     editNotes: (row) => setDialog({ kind: 'notes', row }),
     addTodo: (row) => setDialog({ kind: 'todo', row }),
     forNewsletter: async (row) => {
@@ -702,8 +740,8 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
         full={full}
       />
       <p className="mt-2 text-xs text-gray-600">
-        Row colours: <span className="px-1 bg-ms-red/45">red</span> needs attention and overdue, <span className="px-1 bg-ms-orange/45">orange</span> needs attention,{' '}
-        <span className="px-1 bg-ms-muted/70">grey</span> unreviewed. Outreach status, action date and notes can be changed in the cell.
+        Row colours: <span className="px-1 bg-ms-red/35">red</span> needs attention and overdue, <span className="px-1 bg-ms-orange/25">orange</span> needs attention,{' '}
+        <span className="px-1 bg-ms-muted/70">grey</span> unreviewed. Changes in the cells go everywhere: outreach stage moves the Outreach board, renewal stage the Renewals board, and Next to-do is a to-do on Today and the calendar.
       </p>
       {shown.length > limit && (
         <button
@@ -715,7 +753,18 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
         </button>
       )}
       </>)}
-      <RowDialogs dialog={dialog} onClose={() => setDialog(null)} onSaveNotes={(row, notes) => actions.edit(row, { notes })} />
+      <RowDialogs
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        onSaveNotes={(row, notes) => actions.edit(row, { notes })}
+        onTodoSaved={(row, todo) => {
+          // Show it at once: the earlier of the new to-do and the one already shown.
+          const cur = row.next_todo
+          const first = !cur || (todo.due_date ?? '9999') < (cur.due_date ?? '9999') || cur.id === todo.id
+          if (cur?.id === todo.id) patch(row.id, { next_todo: { ...cur, due_date: todo.due_date } })
+          else patch(row.id, { next_todo: first ? { ...todo, more: cur ? cur.more + 1 : 0 } : { ...cur, more: cur.more + 1 } })
+        }}
+      />
       </>)}
     </FullScreenPanel>
   )

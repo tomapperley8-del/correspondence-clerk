@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import type { TableRow } from '@/app/actions/business-table'
-import { addCalendarItem } from '@/app/actions/calendar'
+import { addCalendarItem, moveCalendarItem } from '@/app/actions/calendar'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from '@/lib/toast'
 
 // The two row actions that need a form (Stage 13): the business's notes, and a
 // to-do linked to the business (the same to-do as Today's "+ Add to-do", so it
 // shows on Today, the calendar, the business page and the desk email). Above
-// the full-screen table, hence the raised layer.
+// the full-screen table, hence the raised layer. Stage 13b adds "move": the
+// Next to-do cell changes that to-do's date (the calendar's own action).
 
-export type RowDialog = { kind: 'notes' | 'todo'; row: TableRow }
+export type RowDialog = { kind: 'notes' | 'todo' | 'move'; row: TableRow }
+type SavedTodo = { id: string; title: string; due_date: string | null }
 
 const field = 'w-full px-3 py-2 text-sm border border-black/10 rounded-sm bg-white focus:outline-none focus:border-brand-navy'
 const primary = 'px-4 py-2 text-sm font-semibold bg-brand-navy text-white rounded-sm hover:bg-brand-navy-hover disabled:opacity-50'
@@ -25,10 +27,12 @@ export function RowDialogs({
   dialog,
   onClose,
   onSaveNotes,
+  onTodoSaved,
 }: {
   dialog: RowDialog | null
   onClose: () => void
   onSaveNotes: (row: TableRow, notes: string | null) => Promise<string | void>
+  onTodoSaved?: (row: TableRow, todo: SavedTodo) => void
 }) {
   const [notes, setNotes] = useState('')
   const [title, setTitle] = useState('')
@@ -41,7 +45,7 @@ export function RowDialogs({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotes(dialog.row.notes ?? '')
     setTitle('')
-    setDate(londonToday())
+    setDate(dialog.kind === 'move' ? dialog.row.next_todo?.due_date ?? londonToday() : londonToday())
     setSaving(false)
   }, [dialog])
 
@@ -57,13 +61,27 @@ export function RowDialogs({
       if (!err) onClose()
       return
     }
+    if (dialog.kind === 'move' && row.next_todo) {
+      const todo = row.next_todo
+      const moved = await moveCalendarItem(todo.id, date)
+      setSaving(false)
+      if (moved.error) {
+        toast.error(moved.error)
+        return
+      }
+      toast.success(`To-do moved to ${date.split('-').reverse().join('/')}`)
+      onTodoSaved?.(row, { id: todo.id, title: todo.title, due_date: date })
+      onClose()
+      return
+    }
     const result = await addCalendarItem({ kind: 'todo', title, date, business_id: row.id })
     setSaving(false)
-    if (result.error) {
-      toast.error(result.error)
+    if (result.error || !result.id) {
+      toast.error(result.error ?? 'Not added')
       return
     }
     toast.success(`To-do added for ${row.name}`)
+    onTodoSaved?.(row, { id: result.id, title: title.trim(), due_date: date })
     onClose()
   }
 
@@ -74,12 +92,14 @@ export function RowDialogs({
           <form onSubmit={save} className="grid gap-4">
             <DialogHeader>
               <DialogTitle style={{ fontFamily: 'var(--font-serif)' }} className="text-2xl text-brand-dark">
-                {dialog.kind === 'notes' ? `Notes: ${row.name}` : `Add a to-do: ${row.name}`}
+                {dialog.kind === 'notes' ? `Notes: ${row.name}` : dialog.kind === 'move' ? `Next to-do: ${row.name}` : `Add a to-do: ${row.name}`}
               </DialogTitle>
               <DialogDescription>
                 {dialog.kind === 'notes'
                   ? 'Your notes on the business, the same as in Edit business.'
-                  : 'Shows on Today, the calendar and the business page.'}
+                  : dialog.kind === 'move'
+                    ? `${row.next_todo?.title ?? ''}. A new date moves it on Today and the calendar too; tick it off on Today when it is done.`
+                    : 'Shows on Today, the calendar and the business page.'}
               </DialogDescription>
             </DialogHeader>
             {dialog.kind === 'notes' ? (
@@ -98,6 +118,11 @@ export function RowDialogs({
                 />
                 <span className="block text-xs text-gray-500 mt-1">Ctrl+Enter saves.</span>
               </label>
+            ) : dialog.kind === 'move' ? (
+              <label>
+                <span className="block text-xs font-semibold text-gray-600 mb-1">Date</span>
+                <input type="date" autoFocus required value={date} onChange={(e) => setDate(e.target.value)} className={field} />
+              </label>
             ) : (
               <>
                 <label>
@@ -114,8 +139,8 @@ export function RowDialogs({
               <button type="button" className={secondary} onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className={primary} disabled={saving || (dialog.kind === 'todo' && (!title.trim() || !date))}>
-                {saving ? 'Saving…' : dialog.kind === 'notes' ? 'Save notes' : 'Add to-do'}
+              <button type="submit" className={primary} disabled={saving || (dialog.kind === 'todo' && (!title.trim() || !date)) || (dialog.kind === 'move' && !date)}>
+                {saving ? 'Saving…' : dialog.kind === 'notes' ? 'Save notes' : dialog.kind === 'move' ? 'Move to-do' : 'Add to-do'}
               </button>
             </DialogFooter>
           </form>

@@ -37,6 +37,8 @@ export type TableDeal = {
   contract_start: string | null
   contract_end: string | null
   in_force: boolean
+  /** The contract's amount (GBP), when recorded. */
+  amount: number | null
 }
 
 export type TableRow = {
@@ -65,6 +67,13 @@ export type TableRow = {
   notes: string | null
   /** Last confirmed mention in the newsletter, from v_business_newsletter (Stage 16a). */
   newsletter: { date: string; url: string | null } | null
+  /**
+   * The next open hand-written to-do (Stage 13b), the same tasks Today's
+   * "Your to-dos" reads: earliest date first, then oldest.
+   */
+  next_todo: { id: string; title: string; due_date: string | null; more: number } | null
+  /** QuickBooks open balance from v_business_financials (voided invoices left out). */
+  money: { open_balance: number; days_overdue: number | null } | null
   /** Deal types in force today, e.g. ['club_card', 'advertiser']. */
   deal_types_in_force: string[]
   attention: Pick<AttentionRow, 'reason' | 'detail' | 'since' | 'is_overdue' | 'reasons' | 'priority' | 'is_snoozed' | 'attention_snoozed_until'> | null
@@ -140,7 +149,9 @@ type ContractRow = {
   contract_start: string | null
   contract_end: string | null
   is_current: boolean
+  contract_amount: number | string | null
 }
+type TaskRow = { id: string; business_id: string; title: string; due_date: string | null; created_at: string }
 type ContactRow = {
   id: string
   business_id: string
@@ -178,7 +189,7 @@ async function loadAll(supabase: Supabase, orgId: string) {
     fetchAll<ContractRow>((from, to) =>
       supabase
         .from('contracts')
-        .select('business_id, membership_type, contract_start, contract_end, is_current')
+        .select('business_id, membership_type, contract_start, contract_end, is_current, contract_amount')
         .eq('organization_id', orgId)
         .order('id')
         .range(from, to)
@@ -210,6 +221,19 @@ async function loadAll(supabase: Supabase, orgId: string) {
     supabase.from('v_club_card_members').select('business_id, page_link, issues').eq('organization_id', orgId),
     // RLS scopes it to the organisation; the view has no organization_id column.
     supabase.from('v_business_newsletter').select('business_id, last_in_newsletter, last_issue_url'),
+    // Stage 13b: the same open to-dos as v_business_attention's "Your to-dos".
+    fetchAll<TaskRow>((from, to) =>
+      supabase
+        .from('tasks')
+        .select('id, business_id, title, due_date, created_at')
+        .eq('organization_id', orgId)
+        .eq('status', 'open')
+        .eq('source', 'manual')
+        .not('business_id', 'is', null)
+        .order('id')
+        .range(from, to)
+    ),
+    supabase.from('v_business_financials').select('business_id, open_balance, days_overdue').gt('open_balance', 0),
   ])
 }
 
@@ -230,7 +254,14 @@ function pickDeal(contracts: ContractRow[], today: string): TableDeal | null {
     return (b.contract_end ?? '9999').localeCompare(a.contract_end ?? '9999')
   })
   const c = sorted[0]
-  return { membership_type: c.membership_type, contract_start: c.contract_start, contract_end: c.contract_end, in_force: inForce(c) }
+  const amount = c.contract_amount === null || c.contract_amount === '' ? null : Number(c.contract_amount)
+  return {
+    membership_type: c.membership_type,
+    contract_start: c.contract_start,
+    contract_end: c.contract_end,
+    in_force: inForce(c),
+    amount: amount !== null && Number.isFinite(amount) ? amount : null,
+  }
 }
 
 export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?: string }> {
@@ -246,7 +277,7 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Could not load the table' }
   }
-  const [businesses, contracts, contacts, entries, attentionRes, mtRes, btRes, clubCardRes, newsletterRes] = loaded
+  const [businesses, contracts, contacts, entries, attentionRes, mtRes, btRes, clubCardRes, newsletterRes, openTasks, financialsRes] = loaded
   // The Club Card view can fail on its own (e.g. before its migration); the column is then just empty.
   const onWebsiteBy = new Map<string, NonNullable<TableRow['on_website']>>()
   for (const m of (clubCardRes.data ?? []) as { business_id: string; page_link: string | null; issues: string[] | null }[]) {
@@ -262,6 +293,29 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
   const newsletterBy = new Map<string, NonNullable<TableRow['newsletter']>>()
   for (const n of (newsletterRes.data ?? []) as { business_id: string; last_in_newsletter: string; last_issue_url: string | null }[]) {
     newsletterBy.set(n.business_id, { date: n.last_in_newsletter, url: n.last_issue_url })
+  }
+
+  // Next to-do per business: earliest date first (undated last), then oldest.
+  const todosBy = new Map<string, TaskRow[]>()
+  for (const t of openTasks) {
+    const list = todosBy.get(t.business_id) ?? []
+    list.push(t)
+    todosBy.set(t.business_id, list)
+  }
+  const nextTodo = (id: string): TableRow['next_todo'] => {
+    const list = todosBy.get(id)
+    if (!list?.length) return null
+    const first = [...list].sort(
+      (a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || a.created_at.localeCompare(b.created_at)
+    )[0]
+    return { id: first.id, title: first.title, due_date: first.due_date, more: list.length - 1 }
+  }
+
+  // Missing view or no QuickBooks link: the column is just empty.
+  const moneyBy = new Map<string, NonNullable<TableRow['money']>>()
+  for (const f of (financialsRes.data ?? []) as { business_id: string; open_balance: number | string; days_overdue: number | null }[]) {
+    const balance = Number(f.open_balance)
+    if (Number.isFinite(balance) && balance > 0) moneyBy.set(f.business_id, { open_balance: balance, days_overdue: f.days_overdue })
   }
 
   const today = londonToday()
@@ -370,6 +424,8 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
       follow_up_after: b.follow_up_after,
       notes: b.notes,
       newsletter: newsletterBy.get(b.id) ?? null,
+      next_todo: nextTodo(b.id),
+      money: moneyBy.get(b.id) ?? null,
       deal_types_in_force: [...new Set(inForceDeals.map((c) => c.membership_type).filter((t): t is string => !!t))],
       attention: att
         ? {
