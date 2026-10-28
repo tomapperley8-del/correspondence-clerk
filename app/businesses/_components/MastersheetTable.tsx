@@ -19,8 +19,14 @@ import { formatDateGB } from '@/lib/utils'
 // never status, deal or last in touch, which are worked out), each row has a
 // main action and a labelled More menu, rows are tinted by state, and the same
 // list gives the text for the Excel and CSV download.
+//
+// Stage 13b: every editable cell writes what the rest of the site reads. The
+// outreach column is the Outreach board's stage, the renewal column the
+// Renewals board's stage (the same server actions as the boards), and Next
+// to-do is a real to-do (Today, the calendar, the business page, the desk
+// email). Deal amount and money owed come from contracts and QuickBooks.
 
-export type SortKey = 'name' | 'contact' | 'deal' | 'last' | 'attention' | 'action' | 'newsletter'
+export type SortKey = 'name' | 'contact' | 'deal' | 'last' | 'attention' | 'todo' | 'newsletter' | 'amount' | 'money'
 
 /** Days a deal counts as close to its end (the renewal window in the plan). */
 const ENDING_SOON_DAYS = 45
@@ -108,13 +114,33 @@ function relationship(r: TableRow, labels: Map<string, string>): { label: string
   return { label: r.status ?? '—', tone: 'muted' }
 }
 
-/** The sheet's OUTREACH STATUS: the disposition first, then who wrote last. */
-function outreach(r: TableRow): { label: string; tone: Tone } {
-  if (r.disposition === 'not_interested') return { label: 'Not Interested', tone: 'red' }
-  if (r.disposition === 'follow_up_later') return { label: 'Follow Up Later', tone: 'yellow' }
-  if (r.last_email_direction === 'received') return { label: 'In Conversation', tone: 'green' }
-  if (r.last_email_direction === 'sent') return { label: 'Awaiting Reply', tone: 'blue' }
-  return { label: 'Not Contacted', tone: 'muted' }
+/** The Outreach board's stages (OutreachView), in board order, with Mastersheet pill colours. */
+export const OUTREACH_STAGES: { key: string; label: string; tone: Tone }[] = [
+  { key: 'identified', label: 'Identified', tone: 'muted' },
+  { key: 'contacted', label: 'Contacted', tone: 'blue' },
+  { key: 'followed_up', label: 'Followed up', tone: 'prospect' },
+  { key: 'in_discussion', label: 'In discussion', tone: 'yellow' },
+  { key: 'won', label: 'Won', tone: 'green' },
+  { key: 'invoice_paid', label: 'Invoice paid', tone: 'green' },
+  { key: 'not_interested', label: 'Not interested', tone: 'red' },
+]
+
+/** The Renewals board's stages (ContractsView), without its "Renewed" step, which starts a new term on the board. */
+export const RENEWAL_STAGES: { key: string; label: string; tone: Tone }[] = [
+  { key: 'not_started', label: 'To contact', tone: 'muted' },
+  { key: 'contacted', label: 'Contacted', tone: 'blue' },
+  { key: 'in_discussion', label: 'In discussion', tone: 'yellow' },
+  { key: 'agreed', label: 'Agreed', tone: 'green' },
+  { key: 'invoice_paid', label: 'Invoice paid', tone: 'green' },
+  { key: 'not_renewing', label: 'Not renewing', tone: 'red' },
+]
+
+const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 })
+
+/** A renewal stage only means something for a Club Card or advertising deal. */
+function hasRenewal(r: TableRow): boolean {
+  const t = r.deal?.membership_type?.replace(/^former_/, '') ?? ''
+  return r.deal_types_in_force.length > 0 || ((t === 'club_card' || t === 'advertiser') && r.is_active)
 }
 
 /** The sheet's ON WEBSITE? column, from the Club Card pages read nightly (Stage 6b). */
@@ -148,8 +174,14 @@ const TD = 'border-b border-r border-ms-grid px-2 py-1 whitespace-nowrap align-m
 
 /** What the table can do to a row; BusinessTable supplies these. */
 export type RowActions = {
-  /** Saves a field Tom owns; resolves to an error message, or nothing when saved. */
-  edit: (row: TableRow, patch: { disposition?: 'follow_up_later' | 'not_interested' | null; follow_up_after?: string | null; notes?: string | null }) => Promise<string | void>
+  /** Saves the notes; resolves to an error message, or nothing when saved. */
+  edit: (row: TableRow, patch: { notes?: string | null }) => Promise<string | void>
+  /** Moves the business on the Outreach board; null takes it off (with Undo). */
+  setOutreach: (row: TableRow, stage: string | null) => Promise<void>
+  /** Moves the business on the Renewals board. */
+  setRenewal: (row: TableRow, stage: string) => Promise<void>
+  /** Opens the Next to-do dialog: move the date, or add one. */
+  editTodo: (row: TableRow) => void
   editNotes: (row: TableRow) => void
   addTodo: (row: TableRow) => void
   forNewsletter: (row: TableRow) => void
@@ -160,7 +192,7 @@ export type RowActions = {
 type Ctx = { today: string; labels: Map<string, string> }
 
 export type ColumnKey =
-  | 'actions' | 'relationship' | 'outreach' | 'action' | 'notes' | 'start' | 'end' | 'flag' | 'website'
+  | 'actions' | 'relationship' | 'outreach' | 'todo' | 'renewal' | 'amount' | 'money' | 'notes' | 'start' | 'end' | 'flag' | 'website'
   | 'email' | 'contact' | 'last' | 'attention' | 'newsletter' | 'type'
 
 type ColumnDef = {
@@ -187,11 +219,20 @@ function lastWho(r: TableRow): string {
 export const COLUMN_DEFS: ColumnDef[] = [
   { key: 'actions', label: 'Actions', width: 128, text: () => '', noExport: true },
   { key: 'relationship', label: 'Relationship type', width: 150, text: (r, c) => relationship(r, c.labels).label },
-  { key: 'outreach', label: 'Outreach status', width: 175, text: (r) => outreach(r).label },
-  { key: 'action', label: 'Action date', sortKey: 'action', width: 128, text: (r) => (r.follow_up_after ? dateGB(r.follow_up_after) : '') },
+  { key: 'outreach', label: 'Outreach stage', width: 140, text: (r) => OUTREACH_STAGES.find((s) => s.key === r.outreach_stage)?.label ?? '' },
+  {
+    key: 'todo',
+    label: 'Next to-do',
+    sortKey: 'todo',
+    width: 210,
+    text: (r) => (r.next_todo ? [r.next_todo.due_date ? dateGB(r.next_todo.due_date) : null, r.next_todo.title].filter(Boolean).join(' ') : ''),
+  },
+  { key: 'renewal', label: 'Renewal stage', width: 130, text: (r) => (hasRenewal(r) ? RENEWAL_STAGE_LABEL[r.renewal_stage ?? 'not_started'] ?? '' : '') },
+  { key: 'amount', label: 'Deal amount', sortKey: 'amount', width: 100, text: (r) => (r.deal?.amount != null ? String(r.deal.amount) : '') },
+  { key: 'money', label: 'Money owed', sortKey: 'money', width: 110, text: (r) => (r.money ? String(r.money.open_balance) : '') },
   { key: 'notes', label: 'Notes', width: 220, text: (r) => r.notes ?? '' },
   { key: 'start', label: 'Contract start', width: 96, text: (r) => (r.deal?.contract_start ? dateGB(r.deal.contract_start) : '') },
-  { key: 'end', label: 'Contract end', sortKey: 'deal', width: 100, text: (r) => (r.deal?.contract_end ? dateGB(r.deal.contract_end) : '') },
+  { key: 'end', label: 'Contract end', sortKey: 'deal', width: 175, text: (r) => (r.deal?.contract_end ? dateGB(r.deal.contract_end) : '') },
   {
     key: 'flag',
     label: 'Reminder flag',
@@ -222,8 +263,12 @@ export const COLUMN_DEFS: ColumnDef[] = [
   { key: 'type', label: 'Type', width: 140, text: (r) => r.business_type_label ?? '' },
 ]
 
-/** The Mastersheet's order, then what the app adds. Newsletter and Type start hidden. */
-export const DEFAULT_COLUMNS: ColumnKey[] = ['actions', 'relationship', 'outreach', 'action', 'notes', 'start', 'end', 'flag', 'website', 'email', 'contact', 'last', 'attention']
+/**
+ * Stage 13b defaults (Tom, 28 Oct): the work first, then the deal and money,
+ * contact and history. Contract start, Reminder flag (folded into Contract end),
+ * On website? and Type are hidden but can be ticked under Columns.
+ */
+export const DEFAULT_COLUMNS: ColumnKey[] = ['actions', 'relationship', 'outreach', 'todo', 'renewal', 'end', 'amount', 'money', 'notes', 'email', 'contact', 'last', 'attention', 'newsletter']
 
 export const NAME_WIDTH = 230
 
@@ -404,81 +449,74 @@ function HeaderCell({
   )
 }
 
-const OUTREACH_OPTIONS: { value: '' | 'follow_up_later' | 'not_interested'; tone?: Tone; label: string }[] = [
-  { value: 'follow_up_later', tone: 'yellow', label: 'Follow Up Later' },
-  { value: 'not_interested', tone: 'red', label: 'Not Interested' },
-]
-
-/** Outreach status as a Mastersheet-style drop-down. Blank = worked out from the emails. */
-function OutreachCell({ row, actions }: { row: TableRow; actions: RowActions }) {
+/** A Mastersheet-style drop-down pill that saves through a board's own action. */
+function StageSelect({
+  value,
+  options,
+  blank,
+  label,
+  onChange,
+}: {
+  value: string
+  options: { key: string; label: string; tone: Tone }[]
+  /** The choice for "none", e.g. "Not on outreach". */
+  blank?: string
+  label: string
+  onChange: (v: string) => Promise<void>
+}) {
   const [busy, setBusy] = useState(false)
-  const shown = outreach(row)
-  const derived = outreach({ ...row, disposition: null })
+  const tone = options.find((o) => o.key === value)?.tone ?? 'muted'
   return (
     <select
-      value={row.disposition ?? ''}
+      value={value}
       disabled={busy}
-      aria-label={`Outreach status for ${row.name}`}
-      title="(auto) = worked out from the emails. Follow Up Later and Not Interested are set by you; a new email from them clears it."
+      aria-label={label}
       onChange={async (e) => {
         setBusy(true)
-        await actions.edit(row, { disposition: (e.target.value || null) as 'follow_up_later' | 'not_interested' | null })
+        await onChange(e.target.value)
         setBusy(false)
       }}
-      className={`max-w-full rounded-full pl-2 pr-1 py-px text-[11px] font-semibold leading-4 border-0 cursor-pointer focus:outline-2 focus:outline-brand-navy disabled:opacity-60 ${PILL[shown.tone]}`}
+      className={`max-w-full rounded-full pl-2 pr-1 py-px text-[11px] font-semibold leading-4 border-0 cursor-pointer focus:outline-2 focus:outline-brand-navy disabled:opacity-60 ${
+        value ? PILL[tone] : 'bg-transparent text-gray-400'
+      }`}
     >
-      <option value="">{derived.label} (auto)</option>
-      {OUTREACH_OPTIONS.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
+      {blank !== undefined && <option value="">{blank}</option>}
+      {options.map((o) => (
+        <option key={o.key} value={o.key}>{o.label}</option>
       ))}
     </select>
   )
 }
 
-/** Action date, edited in the cell: plain text until clicked, then a date field. Saved on leaving it or Enter. */
-function ActionDateCell({ row, actions }: { row: TableRow; actions: RowActions }) {
-  const saved = row.follow_up_after?.slice(0, 10) ?? ''
-  const [editing, setEditing] = useState(false)
-  const button = useRef<HTMLButtonElement>(null)
-  const commit = async (v: string) => {
-    setEditing(false)
-    if (v === saved || (v && !/^(19|20)\d\d-\d\d-\d\d$/.test(v))) return
-    await actions.edit(row, { follow_up_after: v || null })
-  }
-  if (!editing) {
-    return (
-      <button
-        ref={button}
-        type="button"
-        onClick={() => setEditing(true)}
-        aria-label={`Action date for ${row.name}: ${saved ? dateGB(saved) : 'none'}. Change`}
-        className="block w-full text-left min-h-6 focus:outline-2 focus:outline-brand-navy rounded-sm hover:underline"
-      >
-        {saved ? dateGB(saved) : <span className="text-gray-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">Set date</span>}
-      </button>
-    )
-  }
+/** Next to-do: the date (coloured by how close) and what it is; click to move it or add one. */
+function TodoCell({ row, today, actions }: { row: TableRow; today: string; actions: RowActions }) {
+  const t = row.next_todo
   return (
-    <input
-      type="date"
-      autoFocus
-      defaultValue={saved}
-      aria-label={`Action date for ${row.name}`}
-      onBlur={(e) => commit(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          commit((e.target as HTMLInputElement).value)
-          setTimeout(() => button.current?.focus())
-        }
-        if (e.key === 'Escape') {
-          e.preventDefault()
-          setEditing(false)
-          setTimeout(() => button.current?.focus())
-        }
-      }}
-      className="w-full bg-white text-[13px] leading-5 px-0 py-0 border-0 focus:outline-2 focus:outline-brand-navy rounded-sm"
-    />
+    <button
+      type="button"
+      onClick={() => actions.editTodo(row)}
+      aria-label={t ? `Next to-do for ${row.name}: ${t.title}${t.due_date ? `, ${dateGB(t.due_date)}` : ''}. Change the date` : `Add a to-do for ${row.name}`}
+      title={t ? `${t.title}${t.more ? ` (+${t.more} more)` : ''}` : 'Add a to-do'}
+      className="flex items-center gap-1.5 w-full min-w-0 text-left min-h-6 focus:outline-2 focus:outline-brand-navy rounded-sm hover:underline"
+    >
+      {t ? (
+        <>
+          {t.due_date && (
+            <span
+              className={`shrink-0 px-1 rounded-sm ${
+                t.due_date < today ? CELL.red : daysBetween(today, t.due_date) <= 7 ? CELL.orange : ''
+              }`}
+            >
+              {dateGB(t.due_date)}
+            </span>
+          )}
+          <span className="truncate">{t.title}</span>
+          {t.more > 0 && <span className="shrink-0 text-gray-500">+{t.more}</span>}
+        </>
+      ) : (
+        <span className="text-gray-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">Add to-do</span>
+      )}
+    </button>
   )
 }
 
@@ -535,13 +573,43 @@ function Row({
         return <td key={d.key} className={`${TD} ${plain}`}><Pill tone={rel.tone}>{rel.label}</Pill></td>
       }
       case 'outreach':
-        return <td key={d.key} className={`${TD} ${plain}`}><OutreachCell row={r} actions={actions} /></td>
-      case 'action': {
-        const overdue = !!r.follow_up_after && r.follow_up_after.slice(0, 10) < today
-        const soon = !overdue && !!r.follow_up_after && daysBetween(today, r.follow_up_after) <= 7
         return (
-          <td key={d.key} className={`${TD} py-0 ${overdue ? CELL.red : soon ? CELL.orange : plain}`} title={overdue ? 'Past the action date' : soon ? 'Within a week' : undefined}>
-            <ActionDateCell row={r} actions={actions} />
+          <td key={d.key} className={`${TD} ${plain}`}>
+            <StageSelect
+              value={r.outreach_stage ?? ''}
+              options={OUTREACH_STAGES}
+              blank="Not on outreach"
+              label={`Outreach stage for ${r.name}`}
+              onChange={(v) => actions.setOutreach(r, v || null)}
+            />
+          </td>
+        )
+      case 'todo':
+        return <td key={d.key} className={`${TD} ${plain} py-0`}><TodoCell row={r} today={today} actions={actions} /></td>
+      case 'renewal':
+        return (
+          <td key={d.key} className={`${TD} ${plain}`}>
+            {hasRenewal(r) && (
+              <StageSelect
+                value={r.renewal_stage && RENEWAL_STAGE_LABEL[r.renewal_stage] ? (r.renewal_stage === 'in_progress' ? 'in_discussion' : r.renewal_stage) : 'not_started'}
+                options={RENEWAL_STAGES}
+                label={`Renewal stage for ${r.name}`}
+                onChange={(v) => actions.setRenewal(r, v)}
+              />
+            )}
+          </td>
+        )
+      case 'amount':
+        return <td key={d.key} className={`${TD} ${plain} text-right tabular-nums`}>{r.deal?.amount != null ? money.format(r.deal.amount) : ''}</td>
+      case 'money': {
+        const overdue = !!r.money && (r.money.days_overdue ?? 0) > 0
+        return (
+          <td
+            key={d.key}
+            className={`${TD} text-right tabular-nums ${overdue ? CELL.red : plain}`}
+            title={r.money ? (overdue ? `Overdue by ${r.money.days_overdue} days (QuickBooks)` : 'Open, not yet due (QuickBooks)') : undefined}
+          >
+            {r.money ? `${money.format(r.money.open_balance)}${overdue ? ' overdue' : ''}` : ''}
           </td>
         )
       }
@@ -564,8 +632,9 @@ function Row({
       case 'end': {
         const state = dealState(r, today)
         return (
-          <td key={d.key} className={`${TD} ${state ? CELL[state.tone] : plain}`} title={r.deal ? dealName(r.deal.membership_type, membershipLabels) : undefined}>
+          <td key={d.key} className={`${TD} ${state ? CELL[state.tone] : plain}`} title={r.deal ? `${dealName(r.deal.membership_type, membershipLabels)}${state ? ` · ${state.flag}` : ''}` : undefined}>
             {r.deal?.contract_end ? dateGB(r.deal.contract_end) : ''}
+            {state && state.tone !== 'green' && <span className="font-semibold"> · {state.tone === 'red' ? 'Ended' : state.flag.replace(' remaining', ' left')}</span>}
           </td>
         )
       }
