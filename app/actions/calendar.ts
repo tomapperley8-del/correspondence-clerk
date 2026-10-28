@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { isHiddenEngineTask } from '@/lib/today'
+import { deleteTodayTask, undoDeleteTodayTask } from '@/app/actions/today'
 import { CALENDAR_KINDS, NEWSLETTER_CATEGORY, nextWednesday, type CalendarKind } from '@/lib/calendar'
 
 // Work calendar and newsletter list (UI overhaul Stage 12). Everything here is
@@ -28,6 +29,8 @@ export type CalendarItem = {
   done: boolean
   /** Written by the task engine (check-ins, stats, editorial), not by hand. */
   engine: boolean
+  /** An engine "promote my event" task: on the newsletter list, can be taken off it. */
+  editorial: boolean
   task_id: string | null
 }
 
@@ -114,7 +117,7 @@ export async function getCalendarItems(from: string, to: string): Promise<{ data
       key: `task:${t.id}`, kind: 'task', date: t.due_date as string, time: (t.due_time as string | null) || null,
       title: t.title, category: one(t.task_category as { name: string } | { name: string }[] | null)?.name ?? null,
       business_id: t.business_id, business_name: one(t.business as { name: string } | { name: string }[] | null)?.name ?? null,
-      done: false, engine: t.source !== 'manual', task_id: t.id,
+      done: false, engine: t.source !== 'manual', editorial: ((t.signal_key as string | null) ?? '').startsWith('editorial:'), task_id: t.id,
     })
   }
   for (const c of contractsRes.data ?? []) {
@@ -122,7 +125,7 @@ export async function getCalendarItems(from: string, to: string): Promise<{ data
     items.push({
       key: `renewal:${c.id}`, kind: 'renewal', date: c.contract_end as string, time: null,
       title: `${name ?? 'A business'}: ${c.membership_type === 'club_card' ? 'Club Card' : 'advertising'} ends`,
-      category: null, business_id: c.business_id, business_name: name, done: false, engine: false, task_id: null,
+      category: null, business_id: c.business_id, business_name: name, done: false, engine: false, editorial: false, task_id: null,
     })
   }
   const invoices = (invoicesRes.data ?? []).filter((i) => (i.private_memo ?? '') !== 'Voided')
@@ -140,7 +143,7 @@ export async function getCalendarItems(from: string, to: string): Promise<{ data
       items.push({
         key: `invoice:${i.qbo_invoice_id ?? i.doc_number}`, kind: 'invoice', date: i.due_date as string, time: null,
         title: `${name ?? 'A customer'}: invoice ${i.doc_number ? `${i.doc_number} ` : ''}due`,
-        category: null, business_id: bid, business_name: name, done: false, engine: false, task_id: null,
+        category: null, business_id: bid, business_name: name, done: false, engine: false, editorial: false, task_id: null,
       })
     }
   }
@@ -234,7 +237,7 @@ export async function getNewsletterList(): Promise<{ data?: { wednesday: string;
     // For Newsletter to-dos, and hand-written to-dos that say "newsletter" but were filed elsewhere
     supabase
       .from('tasks')
-      .select('id, title, due_date, business_id, business:businesses!tasks_business_id_fkey(name)')
+      .select('id, title, due_date, task_category_id, signal_meta, business_id, business:businesses!tasks_business_id_fkey(name)')
       .eq('organization_id', orgId)
       .eq('status', 'open')
       .or(`${newsletterId ? `task_category_id.eq.${newsletterId},` : ''}and(source.eq.manual,title.ilike.*newsletter*)`),
@@ -259,6 +262,8 @@ export async function getNewsletterList(): Promise<{ data?: { wednesday: string;
 
   const items: NewsletterItem[] = []
   for (const t of tasksRes.data ?? []) {
+    // A to-do that says "newsletter" but was changed to another kind stays off the list.
+    if (t.task_category_id !== newsletterId && (t.signal_meta as { not_newsletter?: boolean } | null)?.not_newsletter) continue
     items.push({
       key: `task:${t.id}`, kind: 'task', title: t.title, date: t.due_date, ref_id: t.id,
       business_id: t.business_id, business_name: one(t.business as { name: string } | { name: string }[] | null)?.name ?? null,
@@ -267,7 +272,8 @@ export async function getNewsletterList(): Promise<{ data?: { wednesday: string;
   for (const t of editorialRes.data ?? []) {
     items.push({
       key: `editorial:${t.id}`, kind: 'editorial', title: t.title.replace(/^Editorial:\s*/, ''),
-      date: ((t.signal_meta as { received?: string } | null)?.received ?? t.due_date) || null, ref_id: t.id,
+      // Moved by Tom: the new date; otherwise the day it arrived.
+      date: (((t.signal_meta as { snooze_until?: string } | null)?.snooze_until ? t.due_date : null) ?? (t.signal_meta as { received?: string } | null)?.received ?? t.due_date) || null, ref_id: t.id,
       business_id: t.business_id, business_name: one(t.business as { name: string } | { name: string }[] | null)?.name ?? null,
     })
   }
@@ -325,6 +331,261 @@ export async function markNewsletterUsed(kind: NewsletterItem['kind'], refId: st
     .eq('signal_key', `commitment:${refId}`)
   refresh(entry.business_id)
   return {}
+}
+
+// ---- Newsletter items: delete, move and change kind (Tom, 28 Oct) ----
+// Each kind keeps one source: a task's own row, or for a routine promise the
+// email's intent_meta (`due`, `done`). Closing an engine task goes through the
+// write-back trigger, which marks its email as dealt with, so nothing comes
+// back on the nightly refresh. The email's text is never touched (Hard Rule 10).
+
+/** What Undo needs to put a deleted newsletter item back. */
+export type NewsletterUndo =
+  | { kind: 'task'; backupId: number }
+  | { kind: 'editorial'; taskId: string }
+  | { kind: 'commitment'; backupId: number; taskIds: string[] }
+
+type IntentMeta = Record<string, unknown>
+
+/** Close the open engine task(s) for a promise first, so the trigger's own mark is overwritten by ours. */
+async function closeCommitmentTasks(supabase: SupabaseServer, orgId: string, correspondenceId: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('tasks')
+    .update({ status: 'done' })
+    .eq('organization_id', orgId)
+    .eq('status', 'open')
+    .eq('signal_key', `commitment:${correspondenceId}`)
+    .select('id')
+  return (data ?? []).map((t) => t.id as string)
+}
+
+async function readCommitment(supabase: SupabaseServer, orgId: string, id: string) {
+  const { data, error } = await supabase
+    .from('correspondence')
+    .select('id, business_id, entry_date, intent_meta')
+    .eq('id', id)
+    .eq('organization_id', orgId)
+    .eq('intent', 'commitment')
+    .maybeSingle()
+  if (error) return { error: error.message }
+  if (!data) return { error: 'Email not found' }
+  return { entry: { ...data, intent_meta: (data.intent_meta ?? {}) as IntentMeta } }
+}
+
+/**
+ * Delete from the newsletter list. A hand-written item is deleted (backed up);
+ * a "promote my event" task is closed, which marks its email as dealt with; a
+ * routine promise is marked done (done_via 'newsletter_deleted'), the email
+ * itself kept as it is. All three can be undone.
+ */
+export async function deleteNewsletterItem(kind: NewsletterItem['kind'], refId: string): Promise<{ undo?: NewsletterUndo; error?: string }> {
+  if (kind === 'task') {
+    const result = await deleteTodayTask(refId)
+    if (result.error || result.backupId === undefined) return { error: result.error ?? 'Not deleted' }
+    return { undo: { kind: 'task', backupId: result.backupId } }
+  }
+  const ctx = await context()
+  if ('error' in ctx) return ctx
+  const { supabase, orgId } = ctx
+
+  if (kind === 'editorial') {
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ status: 'done' })
+      .eq('id', refId)
+      .eq('organization_id', orgId)
+      .eq('status', 'open')
+      .like('signal_key', 'editorial:%')
+      .select('business_id')
+      .maybeSingle()
+    if (error) return { error: error.message }
+    if (!data) return { error: 'Already gone' }
+    refresh(data.business_id)
+    return { undo: { kind: 'editorial', taskId: refId } }
+  }
+
+  const read = await readCommitment(supabase, orgId, refId)
+  if ('error' in read) return { error: read.error }
+  const { data: full } = await supabase.from('correspondence').select('*').eq('id', refId).eq('organization_id', orgId).single()
+  const { data: backup, error: backupError } = await supabase
+    .from('cc_phase0_backup')
+    .insert({ table_name: 'correspondence', row_id: refId, before_row: full, reason: 'newsletter_delete' })
+    .select('id')
+    .single()
+  if (backupError) return { error: `Not deleted: the backup failed (${backupError.message})` }
+  const taskIds = await closeCommitmentTasks(supabase, orgId, refId)
+  const meta = { ...read.entry.intent_meta, done: true, done_at: new Date().toISOString(), done_via: 'newsletter_deleted' }
+  const { error } = await supabase.from('correspondence').update({ intent_meta: meta }).eq('id', refId).eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  refresh(read.entry.business_id)
+  return { undo: { kind: 'commitment', backupId: backup.id as number, taskIds } }
+}
+
+/** Undo deleteNewsletterItem: put the item back exactly as it was. */
+export async function undoDeleteNewsletterItem(undo: NewsletterUndo): Promise<{ error?: string }> {
+  if (undo.kind === 'task') {
+    return undoDeleteTodayTask(undo.backupId)
+  }
+  const ctx = await context()
+  if ('error' in ctx) return ctx
+  const { supabase, orgId } = ctx
+
+  if (undo.kind === 'editorial') {
+    // Reopening runs the trigger the other way: the email is waiting again.
+    const { error } = await supabase.from('tasks').update({ status: 'open' }).eq('id', undo.taskId).eq('organization_id', orgId).like('signal_key', 'editorial:%')
+    if (error) return { error: error.message }
+    refresh()
+    return {}
+  }
+
+  const { data: backup } = await supabase
+    .from('cc_phase0_backup')
+    .select('row_id, before_row')
+    .eq('id', undo.backupId)
+    .eq('table_name', 'correspondence')
+    .maybeSingle()
+  const before = backup?.before_row as { organization_id?: string; intent_meta?: IntentMeta; business_id?: string } | undefined
+  if (!backup || !before || before.organization_id !== orgId) return { error: 'Nothing to undo' }
+  if (undo.taskIds.length > 0) {
+    await supabase
+      .from('tasks')
+      .update({ status: 'open' })
+      .in('id', undo.taskIds)
+      .eq('organization_id', orgId)
+      .eq('signal_key', `commitment:${backup.row_id}`)
+  }
+  // After the tasks: reopening strips `done`, then the saved meta goes back as it was.
+  const { error } = await supabase.from('correspondence').update({ intent_meta: before.intent_meta ?? null }).eq('id', backup.row_id).eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  refresh(before.business_id)
+  return {}
+}
+
+/**
+ * Move a newsletter item to another date. Tasks move their due date (an engine
+ * task's later date sticks as a snooze); a routine promise moves its
+ * intent_meta.due, and its open engine task follows.
+ */
+export async function moveNewsletterItem(kind: NewsletterItem['kind'], refId: string, date: string): Promise<{ error?: string }> {
+  if (kind !== 'commitment') return moveCalendarItem(refId, date)
+  if (!isDate(date)) return { error: 'Invalid date' }
+  const ctx = await context()
+  if ('error' in ctx) return ctx
+  const { supabase, orgId } = ctx
+  const read = await readCommitment(supabase, orgId, refId)
+  if ('error' in read) return { error: read.error }
+  const { error } = await supabase
+    .from('correspondence')
+    .update({ intent_meta: { ...read.entry.intent_meta, due: date } })
+    .eq('id', refId)
+    .eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  await supabase.from('tasks').update({ due_date: date }).eq('organization_id', orgId).eq('status', 'open').eq('signal_key', `commitment:${refId}`)
+  refresh(read.entry.business_id)
+  return {}
+}
+
+/**
+ * Change a task to another kind (To-do, Call, Meeting, Event, Deadline or For
+ * newsletter). A hand-written task changes its own category. A task the engine
+ * made gets a hand-written one of the new kind, linked to it, and is closed
+ * (its email marked as dealt with), so the engine doesn't make it again.
+ */
+export async function changeTaskKind(taskId: string, to: CalendarKind): Promise<{ id?: string; error?: string }> {
+  const kind = CALENDAR_KINDS.find((k) => k.value === to)
+  if (!kind) return { error: 'Unknown kind' }
+  const ctx = await context()
+  if ('error' in ctx) return ctx
+  const { supabase, orgId } = ctx
+  const { data: task, error: readError } = await supabase
+    .from('tasks')
+    .select('id, title, due_date, due_time, source, signal_key, signal_meta, business_id')
+    .eq('id', taskId)
+    .eq('organization_id', orgId)
+    .eq('status', 'open')
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  if (!task) return { error: 'That item is done or no longer exists' }
+  const categories = await categoryIds(supabase, orgId)
+  const categoryId = categories.get(kind.category.toLowerCase()) ?? null
+  const meta = (task.signal_meta ?? {}) as IntentMeta
+
+  if (task.source === 'manual') {
+    const rest = { ...meta }
+    delete rest.not_newsletter
+    const { error } = await supabase
+      .from('tasks')
+      .update({ task_category_id: categoryId, type: kind.type, signal_meta: to === 'newsletter' ? rest : { ...rest, not_newsletter: true } })
+      .eq('id', taskId)
+      .eq('organization_id', orgId)
+    if (error) return { error: error.message }
+    refresh(task.business_id)
+    return { id: taskId }
+  }
+
+  const today = await getToday(supabase)
+  const { data: made, error } = await supabase
+    .from('tasks')
+    .insert({
+      title: task.title.replace(/^Editorial:\s*/, ''),
+      due_date: task.due_date ?? today,
+      due_time: task.due_time ?? null,
+      category: 'work',
+      type: kind.type,
+      task_category_id: categoryId,
+      business_id: task.business_id,
+      status: 'open',
+      is_priority: false,
+      source: 'manual',
+      organization_id: orgId,
+      position: 0,
+      signal_meta: { changed_from: task.signal_key, from_task: task.id, ...(to === 'newsletter' ? {} : { not_newsletter: true }) },
+    })
+    .select('id')
+    .single()
+  if (error) return { error: error.message }
+  await supabase.from('tasks').update({ status: 'done' }).eq('id', taskId).eq('organization_id', orgId)
+  refresh(task.business_id)
+  return { id: made.id }
+}
+
+/** "Change to…" on the newsletter list: a routine promise becomes a hand-written task of that kind, linked to its email. */
+export async function changeNewsletterKind(kind: NewsletterItem['kind'], refId: string, to: CalendarKind): Promise<{ id?: string; error?: string }> {
+  if (kind !== 'commitment') return changeTaskKind(refId, to)
+  const found = CALENDAR_KINDS.find((k) => k.value === to)
+  if (!found || to === 'newsletter') return { error: 'Choose another kind' }
+  const ctx = await context()
+  if ('error' in ctx) return ctx
+  const { supabase, orgId } = ctx
+  const read = await readCommitment(supabase, orgId, refId)
+  if ('error' in read) return { error: read.error }
+  const { entry } = read
+  const [today, categories] = await Promise.all([getToday(supabase), categoryIds(supabase, orgId)])
+  const due = typeof entry.intent_meta.due === 'string' && isDate(entry.intent_meta.due) ? entry.intent_meta.due : today
+  const { data: made, error } = await supabase
+    .from('tasks')
+    .insert({
+      title: typeof entry.intent_meta.what === 'string' && entry.intent_meta.what.trim() ? entry.intent_meta.what : 'Newsletter item',
+      due_date: due,
+      category: 'work',
+      type: found.type,
+      task_category_id: categories.get(found.category.toLowerCase()) ?? null,
+      business_id: entry.business_id,
+      status: 'open',
+      is_priority: false,
+      source: 'manual',
+      organization_id: orgId,
+      position: 0,
+      signal_meta: { changed_from: `commitment:${refId}`, correspondence_id: refId, not_newsletter: true },
+    })
+    .select('id')
+    .single()
+  if (error) return { error: error.message }
+  await closeCommitmentTasks(supabase, orgId, refId)
+  const meta = { ...entry.intent_meta, done: true, done_at: new Date().toISOString(), done_via: 'changed_to_task', task_id: made.id }
+  await supabase.from('correspondence').update({ intent_meta: meta }).eq('id', refId).eq('organization_id', orgId)
+  refresh(entry.business_id)
+  return { id: made.id }
 }
 
 /**

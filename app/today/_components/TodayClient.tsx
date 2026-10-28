@@ -13,7 +13,11 @@ import {
   type TodayData, type TodayDetail, type QuietReminder,
 } from '@/app/actions/today'
 import { markInvoiceVoid } from '@/app/actions/invoices'
-import { markNewsletterUsed, type CalendarItem, type NewsletterItem } from '@/app/actions/calendar'
+import {
+  markNewsletterUsed, deleteNewsletterItem, undoDeleteNewsletterItem, moveNewsletterItem, changeNewsletterKind, changeTaskKind,
+  type CalendarItem, type NewsletterItem,
+} from '@/app/actions/calendar'
+import { CALENDAR_KINDS, type CalendarKind } from '@/lib/calendar'
 import { REASON_LABEL, addDays, ageWords, daysFrom, isOverdue, todayOrder, type TodayItem, type TodayReason } from '@/lib/today'
 import { TodayQuickAdd } from './TodayQuickAdd'
 import { TodayCalendar, CALENDAR_CHANGED } from './TodayCalendar'
@@ -77,7 +81,7 @@ const CHIPS: { key: Kind; label: string; hint: string }[] = [
   { key: 'waiting_on_you', label: 'Waiting on you', hint: 'They wrote in the last 30 days and nothing has gone back.' },
   { key: 'todo', label: 'To-dos', hint: 'Everything you have said you will do, and follow-up flags that are due.' },
   { key: 'club_card', label: 'Card pages', hint: 'Member pages on the website to fix: no page, offer out of date, missing from the A-Z, map or a category, listed twice, or details that differ.' },
-  { key: 'newsletter', label: 'Newsletter', hint: "For Wednesday's newsletter. Mark each \"It has gone in\" once it has." },
+  { key: 'newsletter', label: 'Newsletter', hint: "For Wednesday's newsletter. Mark each \"It has gone in\" once it has; Snooze moves one to another date, Change to makes it a to-do, call, meeting, event or deadline." },
   { key: 'snoozed', label: 'Snoozed', hint: 'Hidden until the date shown. Wake one to put it back now.' },
 ]
 
@@ -274,6 +278,35 @@ export function TodayClient({
     })
   }
 
+  /** Delete a newsletter item of any kind, with Undo (Tom, 28 Oct). */
+  function removeNewsletter(row: Row, n: NewsletterItem) {
+    setBusy(row.key)
+    startTransition(async () => {
+      const result = await deleteNewsletterItem(n.kind, n.ref_id)
+      setBusy(null)
+      if (result.error || !result.undo) {
+        toast.error(result.error ?? 'Not deleted')
+        return
+      }
+      setGone((prev) => new Set(prev).add(row.key))
+      const undo = result.undo
+      toast.undo(`Taken off the newsletter: ${n.title}`, async () => {
+        const back = await undoDeleteNewsletterItem(undo)
+        if (back.error) toast.error(back.error)
+        else {
+          toast.success('Put back')
+          setGone((prev) => {
+            const next = new Set(prev)
+            next.delete(row.key)
+            return next
+          })
+          changed()
+        }
+      })
+      changed()
+    })
+  }
+
   async function loadDetail(businessId: string, force = false) {
     if (!force && details.has(businessId) && details.get(businessId) !== 'error') return
     setDetails((m) => new Map(m).set(businessId, 'loading'))
@@ -287,7 +320,7 @@ export function TodayClient({
     if (row.business_id) loadDetail(row.business_id)
   }
 
-  const actions: PanelActions = { run, remove, busy, today, changed, wednesday: newsletter.wednesday }
+  const actions: PanelActions = { run, remove, removeNewsletter, busy, today, changed, wednesday: newsletter.wednesday }
 
   const list = (
     <FullScreenPanel
@@ -615,6 +648,7 @@ function AttentionList({
 type PanelActions = {
   run: (key: string, action: () => Promise<{ error?: string | null }>, message: string, clears?: boolean) => void
   remove: (row: Row, taskId: string) => void
+  removeNewsletter: (row: Row, n: NewsletterItem) => void
   busy: string | null
   today: string
   wednesday: string
@@ -623,7 +657,7 @@ type PanelActions = {
 
 /** The detail for one row: the deal, the main contact, the reason's facts and every action. */
 function DetailPanel({ row, detail, actions, inline = false }: { row: Row; detail: TodayDetail | 'loading' | 'error' | undefined; actions: PanelActions; inline?: boolean }) {
-  const { run, remove, busy, today } = actions
+  const { run, remove, removeNewsletter, busy, today } = actions
   const [picking, setPicking] = useState(false)
   const [pickDate, setPickDate] = useState('')
   const isBusy = busy === row.key
@@ -645,8 +679,13 @@ function DetailPanel({ row, detail, actions, inline = false }: { row: Row; detai
   const unpaid = (glance?.invoices ?? []).filter((v) => (v.balance ?? 0) > 0 && !v.voided_at)
 
   function snoozeTo(date: string) {
-    if (!i) return
     setPicking(false)
+    if (row.nl) {
+      const n = row.nl
+      run(row.key, () => moveNewsletterItem(n.kind, n.ref_id, date), `Moved to ${dateGB(date)}`, false)
+      return
+    }
+    if (!i) return
     if (i.reason === 'todo') {
       run(i.key, () => (i.todo_kind === 'flag' ? moveFollowUpFlag(i.ref_id!, date) : updateTask(i.ref_id!, { due_date: date })), `Moved to ${dateGB(date)}`, false)
     } else {
@@ -659,10 +698,25 @@ function DetailPanel({ row, detail, actions, inline = false }: { row: Row; detai
     label: 'Pick a date…',
     onSelect: () => {
       setPicking(true)
-      setPickDate(i?.reason === 'todo' && i.since && i.since > today ? i.since : addDays(today, 7))
+      setPickDate(row.nl?.date && row.nl.date > today ? row.nl.date : i?.reason === 'todo' && i.since && i.since > today ? i.since : addDays(today, 7))
     },
   })
-  const canSnooze = i && (i.reason === 'todo' ? !!i.ref_id : !!i.business_id)
+  const canSnooze = !!row.nl || (i && (i.reason === 'todo' ? !!i.ref_id : !!i.business_id))
+  /** Dates move rather than hide for to-dos and newsletter items. */
+  const moves = !!row.nl || i?.reason === 'todo'
+
+  // "Change to…": a newsletter item or hand-written to-do becomes another kind (Tom, 28 Oct).
+  const changeRef = row.nl ? row.nl : i?.reason === 'todo' && i.todo_kind === 'task' && i.ref_id ? i : null
+  const changeItems: MenuItem[] = changeRef
+    ? CALENDAR_KINDS.filter((k) => (row.nl ? k.value !== 'newsletter' : true)).map((k) => ({
+        label: k.value === 'newsletter' ? 'Newsletter item' : k.label,
+        onSelect: () => {
+          const to = k.value as CalendarKind
+          const said = k.value === 'newsletter' ? 'a newsletter item' : `a ${k.label.toLowerCase()}`
+          run(row.key, () => (row.nl ? changeNewsletterKind(row.nl.kind, row.nl.ref_id, to) : changeTaskKind(i!.ref_id!, to)), `Changed to ${said}`)
+        },
+      }))
+    : []
 
   // The main action, then the rest, all labelled (Hard Rule 9).
   const main: React.ReactNode = (() => {
@@ -747,9 +801,16 @@ function DetailPanel({ row, detail, actions, inline = false }: { row: Row; detai
       </button>,
     )
   }
-  // Delete: hand-written to-dos and newsletter items that are tasks.
-  const deletable = i?.reason === 'todo' && i.todo_kind === 'task' && i.ref_id ? i.ref_id : row.nl?.kind === 'task' ? row.nl.ref_id : null
-  if (deletable) {
+  // Delete: hand-written to-dos here; every newsletter item below.
+  const deletable = i?.reason === 'todo' && i.todo_kind === 'task' && i.ref_id ? i.ref_id : null
+  if (row.nl) {
+    const n = row.nl
+    more.push(
+      <button key="del" type="button" disabled={isBusy} className={`${softBtn} text-ms-red-text`} onClick={() => removeNewsletter(row, n)}>
+        Delete
+      </button>,
+    )
+  } else if (deletable) {
     more.push(
       <button key="del" type="button" disabled={isBusy} className={`${softBtn} text-ms-red-text`} onClick={() => remove(row, deletable)}>
         Delete
@@ -873,7 +934,8 @@ function DetailPanel({ row, detail, actions, inline = false }: { row: Row; detai
       <div className="flex flex-wrap gap-2 items-center">
         {main}
         {more}
-        {canSnooze && <ActionMenu label="Snooze" accessibleLabel={`Snooze ${row.title}`} entries={[{ group: i!.reason === 'todo' ? 'Snooze (moves the date)' : 'Snooze', items: snoozeItems }]} />}
+        {canSnooze && <ActionMenu label="Snooze" accessibleLabel={`Snooze ${row.title}`} entries={[{ group: moves ? 'Snooze (moves the date)' : 'Snooze', items: snoozeItems }]} />}
+        {changeItems.length > 0 && <ActionMenu label="Change to" accessibleLabel={`Change to: ${row.title}`} entries={[{ group: 'Change it to', items: changeItems }]} />}
       </div>
 
       {picking && (
@@ -891,10 +953,10 @@ function DetailPanel({ row, detail, actions, inline = false }: { row: Row; detai
           }}
         >
           <label className="block">
-            <span className="block text-xs font-semibold text-gray-700 mb-1">{i?.reason === 'todo' ? 'Move to' : 'Snooze until'}</span>
-            <input type="date" autoFocus value={pickDate} min={i?.reason === 'todo' ? today : addDays(today, 1)} onChange={(e) => setPickDate(e.target.value)} className="text-sm border border-black/[0.12] rounded-sm px-2 min-h-10 md:min-h-8 bg-white" required />
+            <span className="block text-xs font-semibold text-gray-700 mb-1">{moves ? 'Move to' : 'Snooze until'}</span>
+            <input type="date" autoFocus value={pickDate} min={moves ? today : addDays(today, 1)} onChange={(e) => setPickDate(e.target.value)} className="text-sm border border-black/[0.12] rounded-sm px-2 min-h-10 md:min-h-8 bg-white" required />
           </label>
-          <button type="submit" disabled={isBusy || !pickDate} data-main className={mainBtn}>{i?.reason === 'todo' ? 'Save date' : 'Snooze'}</button>
+          <button type="submit" disabled={isBusy || !pickDate} data-main className={mainBtn}>{moves ? 'Save date' : 'Snooze'}</button>
           <button type="button" onClick={() => setPicking(false)} className={softBtn}>Cancel</button>
         </form>
       )}
