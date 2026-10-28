@@ -16,18 +16,17 @@ import { markNotABusiness, undoBusinessChange } from '@/app/actions/business-rev
 import { addForNewsletter } from '@/app/actions/calendar'
 import { toast } from '@/lib/toast'
 import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
-import type { ClubCardRow } from '@/app/actions/club-card'
-import { ClubCardTable } from './ClubCardTable'
 
 // The business table (UI overhaul Stage 5): Mastersheet-style, one row per
 // business, with built-in views from the plan's Decisions plus views Tom saves
 // himself (kept in this browser). Stage 7 adds Leads (prospect leads from the
 // routine) and Outreach, and a board for Renewals and Outreach, replacing the
-// To-dos Contracts and Outreach tabs. A Club Card view comes in Stage 6b.
+// To-dos Contracts and Outreach tabs. The Club Card view (Stage 6b) moved to
+// the Club Card tab in Stage 16b, with the Club Card half of the Renewals board.
 // Stage 13: full screen, download, chosen columns (saved with a view), edits in
 // the cell and row actions; the views are the 14a filter chips.
 
-type ViewKey = 'active' | 'attention' | 'renewals' | 'outreach' | 'leads' | 'club_card' | 'unreviewed' | 'prospects' | 'former' | 'internal' | 'everything'
+type ViewKey = 'active' | 'attention' | 'renewals' | 'outreach' | 'leads' | 'unreviewed' | 'prospects' | 'former' | 'internal' | 'everything'
 type DealFilter = 'any' | 'club_card' | 'advertiser' | 'other' | 'none'
 
 type Settings = {
@@ -63,7 +62,7 @@ const VIEWS: { key: ViewKey; label: string; hint: string; sort: SortKey; dir: 'a
   {
     key: 'renewals',
     label: 'Renewals',
-    hint: 'Club Card and advertising deals ending in the next 45 days or ended in the last 60, whatever their renewal stage.',
+    hint: 'Club Card and advertising deals ending in the next 45 days or ended in the last 60, whatever their renewal stage. The board here shows advertisers; Club Card renewals have their own board on the Club Card tab.',
     sort: 'deal',
     dir: 'asc',
     match: (r) => r.in_renewal_window && r.is_commercial,
@@ -75,14 +74,6 @@ const VIEWS: { key: ViewKey; label: string; hint: string; sort: SortKey; dir: 'a
     sort: 'last',
     dir: 'desc',
     match: (r) => !!r.outreach_stage,
-  },
-  {
-    key: 'club_card',
-    label: 'Club Card',
-    hint: 'Every Club Card member and every business with a member page on the website: the page, its offer, when it was last edited, the card, the A-Z, map and category listings, contact details and news. Read from the website every night; fix the website yourself.',
-    sort: 'name',
-    dir: 'asc',
-    match: () => false,
   },
   {
     key: 'leads',
@@ -254,14 +245,13 @@ function hasBlank(r: TableRow, sort: SortKey): boolean {
 
 const BOARD_VIEWS: ViewKey[] = ['renewals', 'outreach']
 
-export function BusinessTable({ data, initialView, initialQuery, initialBoard, leads, leadsError, clubCard }: {
+export function BusinessTable({ data, initialView, initialQuery, initialBoard, leads, leadsError }: {
   data: TableData
   initialView?: string
   initialQuery?: string
   initialBoard?: boolean
   leads: ProspectLead[]
   leadsError?: string
-  clubCard: { rows: ClubCardRow[]; lastRun: { ran_at: string; ok: boolean } | null; toMatch: number; error?: string }
 }) {
   const { today } = data
 
@@ -312,9 +302,8 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
     const c = {} as Record<ViewKey, number>
     for (const v of VIEWS) c[v.key] = rows.filter(v.match).length
     c.leads = leads.filter((l) => l.status === 'new' || l.status === 'reviewing').length
-    c.club_card = clubCard.rows.length
     return c
-  }, [rows, leads, clubCard.rows])
+  }, [rows, leads])
   const allBusinessNames = useMemo(() => rows.map((r) => ({ id: r.id, name: r.name })), [rows])
 
   const shown = useMemo(() => {
@@ -475,8 +464,8 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
 
   const filtersSet = settings.deal !== 'any' || !!settings.status || !!settings.type
   const view = viewDef(settings.view)
-  const mode: 'table' | 'board' | 'leads' | 'club_card' =
-    settings.view === 'leads' ? 'leads' : settings.view === 'club_card' ? 'club_card' : board && BOARD_VIEWS.includes(settings.view) ? 'board' : 'table'
+  const mode: 'table' | 'board' | 'leads' =
+    settings.view === 'leads' ? 'leads' : board && BOARD_VIEWS.includes(settings.view) ? 'board' : 'table'
 
   return (
     <FullScreenPanel
@@ -574,13 +563,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
         )
       )}
 
-      {mode === 'club_card' && (
-        clubCard.error
-          ? <p className="text-sm text-red-700">Could not load the Club Card view: {clubCard.error}</p>
-          : <ClubCardTable rows={clubCard.rows} lastRun={clubCard.lastRun} toMatch={clubCard.toMatch} />
-      )}
-
-      {mode === 'board' && <PipelineBoard kind={settings.view === 'outreach' ? 'outreach' : 'renewals'} allBusinessNames={allBusinessNames} />}
+      {mode === 'board' && <PipelineBoard kind={settings.view === 'outreach' ? 'outreach' : 'renewals'} only={settings.view === 'renewals' ? 'advertiser' : undefined} allBusinessNames={allBusinessNames} />}
 
       {mode === 'table' && (<>
 

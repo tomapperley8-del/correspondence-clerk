@@ -48,7 +48,10 @@ export function BusinessClubCard({ businessId }: { businessId: string }) {
 
   return (
     <section id="club-card" aria-labelledby="club-card-h" className="mb-6 border border-black/[0.06] rounded-sm bg-brand-warm p-4 text-sm">
-      <h3 id="club-card-h" className="text-lg font-semibold text-brand-dark mb-1" style={{ fontFamily: 'var(--font-serif)' }}>Club Card page</h3>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 mb-1">
+        <h3 id="club-card-h" className="text-lg font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>Club Card page</h3>
+        <Link href={`/club-card?b=${businessId}`} className="text-xs font-semibold text-brand-navy hover:underline">Open in the Club Card tab</Link>
+      </div>
       {m && (
         <p className={`text-xs mb-2 ${m.card_state === 'member' ? 'text-gray-600' : 'text-red-700'}`}>
           {CARD_STATE_LABEL[m.card_state]}

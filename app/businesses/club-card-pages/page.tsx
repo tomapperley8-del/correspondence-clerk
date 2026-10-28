@@ -16,7 +16,7 @@ export default async function ClubCardPagesPage() {
     <div className="mx-auto px-4 py-8 max-w-[1100px]">
       <div className="mb-5">
         <p className="text-sm mb-2">
-          <Link href="/businesses?view=club_card" className="text-brand-navy hover:underline">← Club Card view</Link>
+          <Link href="/club-card" className="text-brand-navy hover:underline">← Club Card tab</Link>
         </p>
         <h1 className="text-3xl font-bold mb-1" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
           Match Club Card pages
