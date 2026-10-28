@@ -61,6 +61,10 @@ export type TableRow = {
   /** Outreach disposition set on the business, and its follow-up date (Mastersheet "Action date"). */
   disposition: string | null
   follow_up_after: string | null
+  /** The business's own notes (Tom's, edited in the cell, Stage 13). */
+  notes: string | null
+  /** Last confirmed mention in the newsletter, from v_business_newsletter (Stage 16a). */
+  newsletter: { date: string; url: string | null } | null
   /** Deal types in force today, e.g. ['club_card', 'advertiser']. */
   deal_types_in_force: string[]
   attention: Pick<AttentionRow, 'reason' | 'detail' | 'since' | 'is_overdue' | 'reasons' | 'priority' | 'is_snoozed' | 'attention_snoozed_until'> | null
@@ -126,6 +130,7 @@ type BizRow = {
   outreach_stage: string | null
   disposition: string | null
   follow_up_after: string | null
+  notes: string | null
   main_contact_id: string | null
   last_contacted_at: string | null
 }
@@ -163,7 +168,7 @@ async function loadAll(supabase: Supabase, orgId: string) {
       supabase
         // Stage 11a: status, main contact and last in touch come from the truth layer
         .from('v_businesses')
-        .select('id, name, status, business_type, renewal_stage, outreach_stage, disposition, follow_up_after, main_contact_id, last_contacted_at')
+        .select('id, name, status, business_type, renewal_stage, outreach_stage, disposition, follow_up_after, notes, main_contact_id, last_contacted_at')
         .eq('organization_id', orgId)
         .is('merged_into', null)
         .or(`status.is.null,status.neq."${NOT_A_BUSINESS}"`)
@@ -203,6 +208,8 @@ async function loadAll(supabase: Supabase, orgId: string) {
     supabase.from('org_membership_types').select('value, label, sort_order').eq('org_id', orgId).order('sort_order'),
     supabase.from('org_business_types').select('value, label, is_commercial, sort_order').eq('org_id', orgId).order('sort_order'),
     supabase.from('v_club_card_members').select('business_id, page_link, issues').eq('organization_id', orgId),
+    // RLS scopes it to the organisation; the view has no organization_id column.
+    supabase.from('v_business_newsletter').select('business_id, last_in_newsletter, last_issue_url'),
   ])
 }
 
@@ -239,7 +246,7 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Could not load the table' }
   }
-  const [businesses, contracts, contacts, entries, attentionRes, mtRes, btRes, clubCardRes] = loaded
+  const [businesses, contracts, contacts, entries, attentionRes, mtRes, btRes, clubCardRes, newsletterRes] = loaded
   // The Club Card view can fail on its own (e.g. before its migration); the column is then just empty.
   const onWebsiteBy = new Map<string, NonNullable<TableRow['on_website']>>()
   for (const m of (clubCardRes.data ?? []) as { business_id: string; page_link: string | null; issues: string[] | null }[]) {
@@ -249,6 +256,12 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
       : issues.includes('no_page') ? 'missing'
       : m.page_link ? 'live' : null
     if (state) onWebsiteBy.set(m.business_id, { state, link: m.page_link })
+  }
+
+  // Missing before the Stage 16a migration: the column is then just empty.
+  const newsletterBy = new Map<string, NonNullable<TableRow['newsletter']>>()
+  for (const n of (newsletterRes.data ?? []) as { business_id: string; last_in_newsletter: string; last_issue_url: string | null }[]) {
+    newsletterBy.set(n.business_id, { date: n.last_in_newsletter, url: n.last_issue_url })
   }
 
   const today = londonToday()
@@ -355,6 +368,8 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
       last_email_direction: latestDirectionBy.get(b.id) ?? null,
       disposition: b.disposition,
       follow_up_after: b.follow_up_after,
+      notes: b.notes,
+      newsletter: newsletterBy.get(b.id) ?? null,
       deal_types_in_force: [...new Set(inForceDeals.map((c) => c.membership_type).filter((t): t is string => !!t))],
       attention: att
         ? {
