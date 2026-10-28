@@ -4,7 +4,17 @@ import { useEffect, useMemo, useState } from 'react'
 import type { BusinessTable as TableData, TableRow } from '@/app/actions/business-table'
 import type { ProspectLead } from '@/app/actions/leads'
 import { ProspectBoard } from '@/components/pipeline/ProspectBoard'
-import { MastersheetTable, type SortKey } from './MastersheetTable'
+import { MastersheetTable, COLUMN_DEFS, DEFAULT_COLUMNS, rowsAsSheet, type ColumnKey, type RowActions, type SortKey } from './MastersheetTable'
+import { ColumnChooser } from './ColumnChooser'
+import { RowDialogs, type RowDialog } from './RowDialogs'
+import { FullScreenPanel } from '@/components/ui/full-screen-panel'
+import { FilterChips } from '@/components/ui/filter-chips'
+import { ActionMenu } from '@/components/ui/action-menu'
+import { downloadSheet } from '@/lib/spreadsheet-export'
+import { updateBusiness, removeBusinessFromOutreach, undoRemoveFromOutreach } from '@/app/actions/businesses'
+import { markNotABusiness, undoBusinessChange } from '@/app/actions/business-review'
+import { addForNewsletter } from '@/app/actions/calendar'
+import { toast } from '@/lib/toast'
 import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 import type { ClubCardRow } from '@/app/actions/club-card'
 import { ClubCardTable } from './ClubCardTable'
@@ -14,6 +24,8 @@ import { ClubCardTable } from './ClubCardTable'
 // himself (kept in this browser). Stage 7 adds Leads (prospect leads from the
 // routine) and Outreach, and a board for Renewals and Outreach, replacing the
 // To-dos Contracts and Outreach tabs. A Club Card view comes in Stage 6b.
+// Stage 13: full screen, download, chosen columns (saved with a view), edits in
+// the cell and row actions; the views are the 14a filter chips.
 
 type ViewKey = 'active' | 'attention' | 'renewals' | 'outreach' | 'leads' | 'club_card' | 'unreviewed' | 'prospects' | 'former' | 'internal' | 'everything'
 type DealFilter = 'any' | 'club_card' | 'advertiser' | 'other' | 'none'
@@ -26,6 +38,7 @@ type Settings = {
   type: string
   sort: SortKey
   dir: 'asc' | 'desc'
+  columns: ColumnKey[]
 }
 
 type SavedView = Settings & { name: string }
@@ -122,6 +135,8 @@ const VIEWS: { key: ViewKey; label: string; hint: string; sort: SortKey; dir: 'a
 ]
 
 const SAVED_KEY = 'business_table_saved_views'
+const COLUMNS_KEY = 'business_table_columns'
+const WIDTHS_KEY = 'business_table_column_widths'
 const PAGE_SIZE = 200
 
 function viewDef(key: ViewKey) {
@@ -130,7 +145,33 @@ function viewDef(key: ViewKey) {
 
 function defaults(view: ViewKey): Settings {
   const v = viewDef(view)
-  return { view: v.key, q: '', deal: 'any', status: '', type: '', sort: v.sort, dir: v.dir }
+  return { view: v.key, q: '', deal: 'any', status: '', type: '', sort: v.sort, dir: v.dir, columns: DEFAULT_COLUMNS }
+}
+
+/** A saved column list, with unknown keys dropped (columns can be renamed or retired). */
+function cleanColumns(value: unknown): ColumnKey[] | null {
+  if (!Array.isArray(value)) return null
+  const known = new Set<string>(COLUMN_DEFS.map((c) => c.key))
+  const list = value.filter((k): k is ColumnKey => known.has(k))
+  return list.length ? [...new Set(list)] : null
+}
+
+function readJson(key: string): unknown {
+  try {
+    const raw = window.localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function writeJson(key: string, value: unknown) {
+  try {
+    if (value === null) window.localStorage.removeItem(key)
+    else window.localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // Storage blocked: the choice lasts until the page is closed.
+  }
 }
 
 function readSaved(): SavedView[] {
@@ -179,6 +220,10 @@ function compare(a: TableRow, b: TableRow, sort: SortKey): number {
       return str(a.deal?.contract_end, b.deal?.contract_end)
     case 'last':
       return str(a.last_in_touch, b.last_in_touch)
+    case 'action':
+      return str(a.follow_up_after, b.follow_up_after)
+    case 'newsletter':
+      return str(a.newsletter?.date, b.newsletter?.date)
     case 'attention': {
       const pa = a.attention ? a.attention.priority : 99
       const pb = b.attention ? b.attention.priority : 99
@@ -200,6 +245,10 @@ function hasBlank(r: TableRow, sort: SortKey): boolean {
       return !r.last_in_touch
     case 'attention':
       return !r.attention
+    case 'action':
+      return !r.follow_up_after
+    case 'newsletter':
+      return !r.newsletter
   }
 }
 
@@ -214,7 +263,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
   leadsError?: string
   clubCard: { rows: ClubCardRow[]; lastRun: { ran_at: string; ok: boolean } | null; toMatch: number; error?: string }
 }) {
-  const { today, rows } = data
+  const { today } = data
 
   const [settings, setSettings] = useState<Settings>(() => {
     const view = VIEWS.some((v) => v.key === initialView) ? (initialView as ViewKey) : 'active'
@@ -225,12 +274,26 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
   const [naming, setNaming] = useState(false)
   const [newName, setNewName] = useState('')
   const [board, setBoard] = useState(!!initialBoard)
+  const [widths, setWidths] = useState<Partial<Record<ColumnKey | 'name', number>>>({})
+  // Edits made here, shown at once without reloading the whole table.
+  const [patches, setPatches] = useState<Record<string, Partial<TableRow>>>({})
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set())
+  const [dialog, setDialog] = useState<RowDialog | null>(null)
 
   useEffect(() => {
-    // Saved views live in this browser only; read after mount so the server render matches.
+    // Saved views, columns and widths live in this browser only; read after mount so the server render matches.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSaved(readSaved())
+    const columns = cleanColumns(readJson(COLUMNS_KEY))
+    if (columns) setSettings((s) => ({ ...s, columns }))
+    const w = readJson(WIDTHS_KEY)
+    if (w && typeof w === 'object') setWidths(w as Record<string, number>)
   }, [])
+
+  const rows = useMemo(
+    () => data.rows.filter((r) => !hidden.has(r.id)).map((r) => (patches[r.id] ? { ...r, ...patches[r.id] } : r)),
+    [data.rows, patches, hidden],
+  )
 
   // Keep the view and search in the address, so a view can be bookmarked or shared.
   useEffect(() => {
@@ -289,9 +352,104 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
   // (Status: Former within All active found nothing), so it moves to Everything.
   const filterBy = (patch: Partial<Settings>) => update({ ...patch, view: 'everything' })
 
+  // Choosing a view keeps the columns you have chosen; a saved view brings its own.
   const chooseView = (key: ViewKey) => {
     setLimit(PAGE_SIZE)
-    setSettings((s) => ({ ...defaults(key), q: s.q }))
+    setSettings((s) => ({ ...defaults(key), q: s.q, columns: s.columns }))
+  }
+
+  const setColumns = (columns: ColumnKey[] | null) => {
+    update({ columns: columns ?? DEFAULT_COLUMNS })
+    writeJson(COLUMNS_KEY, columns)
+  }
+
+  const setWidth = (key: ColumnKey | 'name', width: number | null) => {
+    setWidths((w) => {
+      const next = { ...w }
+      if (width === null) delete next[key]
+      else next[key] = width
+      writeJson(WIDTHS_KEY, Object.keys(next).length ? next : null)
+      return next
+    })
+  }
+
+  const patch = (id: string, p: Partial<TableRow> | null) =>
+    setPatches((all) => {
+      const next = { ...all }
+      if (p === null) delete next[id]
+      else next[id] = { ...next[id], ...p }
+      return next
+    })
+
+  const hide = (id: string, on: boolean) =>
+    setHidden((h) => {
+      const next = new Set(h)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
+
+  const actions: RowActions = {
+    // The same server action as Edit business; only the fields Tom owns.
+    edit: async (row, p) => {
+      const before = { disposition: row.disposition, follow_up_after: row.follow_up_after, notes: row.notes }
+      patch(row.id, p)
+      const result = await updateBusiness(row.id, p)
+      if (result.error) {
+        patch(row.id, before)
+        toast.error(`Not saved: ${result.error}`)
+        return result.error
+      }
+      toast.success(`Saved for ${row.name}`)
+    },
+    editNotes: (row) => setDialog({ kind: 'notes', row }),
+    addTodo: (row) => setDialog({ kind: 'todo', row }),
+    forNewsletter: async (row) => {
+      const result = await addForNewsletter('business', row.id)
+      if (result.error) toast.error(result.error)
+      else toast.success(result.already ? `${row.name} is already on the newsletter list` : `${row.name} added to Wednesday's newsletter list`)
+    },
+    offOutreach: async (row) => {
+      const result = await removeBusinessFromOutreach(row.id)
+      if (result.error || result.backupId === undefined) {
+        toast.error(result.error ?? 'Not taken off outreach')
+        return
+      }
+      const stage = row.outreach_stage
+      patch(row.id, { outreach_stage: null })
+      const backupId = result.backupId
+      toast.undo(`${row.name} taken off outreach`, async () => {
+        const undo = await undoRemoveFromOutreach(backupId)
+        if (undo.error) toast.error(undo.error)
+        else {
+          patch(row.id, { outreach_stage: stage })
+          toast.success('Put back')
+        }
+      })
+    },
+    notABusiness: async (row) => {
+      const result = await markNotABusiness(row.id)
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      hide(row.id, true)
+      toast.undo(`${row.name} hidden as not a business`, async () => {
+        const undo = await undoBusinessChange(row.id)
+        if (undo.error) toast.error(undo.error)
+        else {
+          hide(row.id, false)
+          toast.success('Put back')
+        }
+      })
+    },
+  }
+
+  const download = (format: 'csv' | 'xlsx') => {
+    const sheet = rowsAsSheet(shown, settings.columns, today, membershipLabels)
+    const name = viewDef(settings.view).label
+    downloadSheet({ name, ...sheet }, `Businesses - ${name} - ${today}`, format)
+    toast.success(`Downloaded ${shown.length} ${shown.length === 1 ? 'business' : 'businesses'}`)
   }
 
   const sortBy = (key: SortKey) => {
@@ -321,25 +479,44 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
     settings.view === 'leads' ? 'leads' : settings.view === 'club_card' ? 'club_card' : board && BOARD_VIEWS.includes(settings.view) ? 'board' : 'table'
 
   return (
-    <div>
-      {/* Views */}
-      <div className="flex flex-wrap gap-2 mb-2" role="group" aria-label="Views">
-        {VIEWS.map((v) => (
-          <button
-            key={v.key}
-            type="button"
-            onClick={() => chooseView(v.key)}
-            aria-pressed={settings.view === v.key}
-            className={`px-3 py-1.5 text-sm border rounded-sm transition-colors duration-200 ease-out ${
-              settings.view === v.key
-                ? 'bg-brand-navy text-white border-brand-navy'
-                : 'bg-white text-gray-800 border-black/10 hover:border-brand-navy'
-            }`}
-          >
-            {v.label} <span className={settings.view === v.key ? 'text-white/80' : 'text-gray-500'}>{counts[v.key]}</span>
-          </button>
-        ))}
-      </div>
+    <FullScreenPanel
+      title={view.label}
+      headingId="business-table-heading"
+      card={false}
+      controls={
+        mode === 'table' ? (
+          <>
+            <ColumnChooser
+              columns={settings.columns}
+              onChange={setColumns}
+              widthsChanged={Object.keys(widths).length > 0}
+              onResetWidths={() => {
+                setWidths({})
+                writeJson(WIDTHS_KEY, null)
+              }}
+            />
+            <ActionMenu
+              label="Download"
+              accessibleLabel={`Download ${shown.length} businesses in this view`}
+              className="text-brand-navy"
+              entries={[
+                { label: 'Excel (.xlsx)', hint: 'The rows and columns shown, all of them', onSelect: () => download('xlsx') },
+                { label: 'CSV', hint: 'Opens in Excel, Numbers or Google Sheets', onSelect: () => download('csv') },
+              ]}
+            />
+          </>
+        ) : null
+      }
+    >
+      {(full) => (<>
+      {/* Views: the 14a filter chips */}
+      <FilterChips
+        label="Views"
+        className="mb-2"
+        value={settings.view}
+        onChange={chooseView}
+        chips={VIEWS.map((v) => ({ key: v.key, label: v.label, count: counts[v.key] }))}
+      />
       {saved.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-2 text-sm">
           <span className="text-gray-500">Your views:</span>
@@ -349,7 +526,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
                 type="button"
                 onClick={() => {
                   setLimit(PAGE_SIZE)
-                  setSettings({ view: v.view, q: v.q, deal: v.deal, status: v.status, type: v.type, sort: v.sort, dir: v.dir })
+                  setSettings({ view: v.view, q: v.q, deal: v.deal, status: v.status, type: v.type, sort: v.sort, dir: v.dir, columns: cleanColumns(v.columns) ?? DEFAULT_COLUMNS })
                 }}
                 className="px-2.5 py-1 hover:text-brand-navy"
               >
@@ -518,7 +695,16 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
         dir={settings.dir}
         onSort={sortBy}
         emptyText={`No businesses match.${settings.q || filtersSet ? ' Try clearing the search or filters.' : ''}`}
+        columns={settings.columns}
+        widths={widths}
+        onWidth={setWidth}
+        actions={actions}
+        full={full}
       />
+      <p className="mt-2 text-xs text-gray-600">
+        Row colours: <span className="px-1 bg-ms-red/45">red</span> needs attention and overdue, <span className="px-1 bg-ms-orange/45">orange</span> needs attention,{' '}
+        <span className="px-1 bg-ms-muted/70">grey</span> unreviewed. Outreach status, action date and notes can be changed in the cell.
+      </p>
       {shown.length > limit && (
         <button
           type="button"
@@ -529,6 +715,8 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
         </button>
       )}
       </>)}
-    </div>
+      <RowDialogs dialog={dialog} onClose={() => setDialog(null)} onSaveNotes={(row, notes) => actions.edit(row, { notes })} />
+      </>)}
+    </FullScreenPanel>
   )
 }
