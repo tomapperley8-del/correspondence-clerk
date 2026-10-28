@@ -176,6 +176,13 @@ export function Navigation() {
       badgeTone: '',
     },
     {
+      href: '/outreach',
+      label: 'Outreach',
+      active: pathname === '/outreach',
+      badge: null,
+      badgeTone: '',
+    },
+    {
       href: '/businesses',
       label: 'Businesses',
       active: (!!pathname?.startsWith('/businesses') && !onClubCard) || pathname === '/dashboard',

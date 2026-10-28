@@ -422,7 +422,7 @@ function OtherThings({
   return (
     <div className="text-xs text-gray-700">
       <p className="flex flex-wrap items-center gap-x-4 gap-y-0">
-        <Link href="/businesses?view=leads" className={linkBtn}>{plural(data.newLeads, 'new lead')}</Link>
+        <Link href="/outreach" className={linkBtn}>{plural(data.newLeads, 'new lead')}</Link>
         {data.clubCardToMatch > 0 && <Link href="/businesses/club-card-pages" className={linkBtn}>{plural(data.clubCardToMatch, 'card page')} to match</Link>}
         <a href={OUTLOOK_DRAFTS} target="_blank" rel="noopener noreferrer" className={linkBtn}>
           {plural(data.draftsReady, 'draft')} ready in Outlook<span className="sr-only"> (opens in a new tab)</span>
