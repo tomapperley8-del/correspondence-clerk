@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 export default async function TodosRedirect({ searchParams }: { searchParams: Promise<{ view?: string; tab?: string }> }) {
   const { view, tab } = await searchParams
   const which = view ?? tab
-  if (which === 'contracts' || which === 'renewals') redirect('/businesses?view=renewals&board=1')
+  if (which === 'contracts' || which === 'renewals') redirect('/advertising?board=1')
   if (which === 'outreach') redirect('/outreach?board=1')
   redirect('/today')
 }
