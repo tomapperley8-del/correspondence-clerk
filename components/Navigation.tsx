@@ -13,6 +13,9 @@ type Organization = {
   name: string
 }
 
+/** The places kept in the phone's bottom bar. */
+const BOTTOM_BAR = ['/today', '/businesses', '/inbox']
+
 export function Navigation() {
   const [user, setUser] = useState<User | null>(null)
   const [organization, setOrganization] = useState<Organization | null>(null)
@@ -172,6 +175,13 @@ export function Navigation() {
       href: '/club-card',
       label: 'Club Card',
       active: onClubCard,
+      badge: null,
+      badgeTone: '',
+    },
+    {
+      href: '/advertising',
+      label: 'Advertising',
+      active: pathname === '/advertising',
       badge: null,
       badgeTone: '',
     },
@@ -431,9 +441,11 @@ export function Navigation() {
         </>
       )}
 
-      {/* Mobile bottom bar: the three places and the menu */}
+      {/* Mobile bottom bar: the everyday places and the menu. Every tab is also in
+          the scrolling strip under the header and in the menu (Stage 16d: seven
+          tabs no longer fit here). */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-brand-dark border-t border-white/20 flex">
-        {places.map((p) => (
+        {places.filter((p) => BOTTOM_BAR.includes(p.href)).map((p) => (
           <Link
             key={p.href}
             href={p.href}

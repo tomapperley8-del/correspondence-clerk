@@ -3,8 +3,8 @@ import { redirect } from 'next/navigation'
 import { BusinessTable } from './_components/BusinessTable'
 
 // The business table (UI overhaul Stage 5), one of the three places in the nav
-// (Stage 7). The advertisers' renewals board is a view here; leads and the
-// outreach pipeline are on the Outreach tab (Stage 16c).
+// (Stage 7). Leads and the outreach pipeline are on the Outreach tab (Stage
+// 16c), the advertisers' Renewals board on the Advertising tab (Stage 16d).
 
 export const metadata = {
   title: 'Businesses — Correspondence Clerk',
@@ -17,6 +17,8 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
   // Leads and the Outreach view and board moved to the Outreach tab (Stage 16c).
   if (params.view === 'leads') redirect('/outreach')
   if (params.view === 'outreach') redirect(params.board === '1' ? '/outreach?board=1' : '/outreach')
+  // The advertisers' Renewals board moved to the Advertising tab (Stage 16d).
+  if (params.view === 'renewals' && params.board === '1') redirect('/advertising?board=1')
   const result = await getBusinessTable()
 
   return (
@@ -40,7 +42,6 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
           data={result.data}
           initialView={params.view}
           initialQuery={params.q}
-          initialBoard={params.board === '1'}
         />
       )}
     </div>

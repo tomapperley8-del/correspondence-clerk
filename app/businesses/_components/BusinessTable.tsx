@@ -13,7 +13,6 @@ import { updateBusiness, removeBusinessFromOutreach, undoRemoveFromOutreach, add
 import { markNotABusiness, undoBusinessChange } from '@/app/actions/business-review'
 import { addForNewsletter } from '@/app/actions/calendar'
 import { toast } from '@/lib/toast'
-import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 
 // The business table (UI overhaul Stage 5): Mastersheet-style, one row per
 // business, with built-in views from the plan's Decisions plus views Tom saves
@@ -22,7 +21,8 @@ import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 // To-dos Contracts and Outreach tabs. The Club Card view (Stage 6b) moved to
 // the Club Card tab in Stage 16b, with the Club Card half of the Renewals board.
 // Leads, the Outreach view and the Outreach board moved to the Outreach tab in
-// Stage 16c; the Outreach stage column stays.
+// Stage 16c; the Outreach stage column stays. The advertisers' Renewals board
+// moved to the Advertising tab in Stage 16d.
 // Stage 13: full screen, download, chosen columns (saved with a view), edits in
 // the cell and row actions; the views are the 14a filter chips.
 
@@ -62,7 +62,7 @@ const VIEWS: { key: ViewKey; label: string; hint: string; sort: SortKey; dir: 'a
   {
     key: 'renewals',
     label: 'Renewals',
-    hint: 'Club Card and advertising deals ending in the next 45 days or ended in the last 60, whatever their renewal stage. The board here shows advertisers; Club Card renewals have their own board on the Club Card tab.',
+    hint: 'Club Card and advertising deals ending in the next 45 days or ended in the last 60, whatever their renewal stage. Each has its own Renewals board: Club Card on the Club Card tab, advertisers on the Advertising tab.',
     sort: 'deal',
     dir: 'asc',
     match: (r) => r.in_renewal_window && r.is_commercial,
@@ -237,13 +237,10 @@ function hasBlank(r: TableRow, sort: SortKey): boolean {
   }
 }
 
-const BOARD_VIEWS: ViewKey[] = ['renewals']
-
-export function BusinessTable({ data, initialView, initialQuery, initialBoard }: {
+export function BusinessTable({ data, initialView, initialQuery }: {
   data: TableData
   initialView?: string
   initialQuery?: string
-  initialBoard?: boolean
 }) {
   const { today } = data
 
@@ -255,7 +252,6 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard }:
   const [limit, setLimit] = useState(PAGE_SIZE)
   const [naming, setNaming] = useState(false)
   const [newName, setNewName] = useState('')
-  const [board, setBoard] = useState(!!initialBoard)
   const [widths, setWidths] = useState<Partial<Record<ColumnKey | 'name', number>>>({})
   // Edits made here, shown at once without reloading the whole table.
   const [patches, setPatches] = useState<Record<string, Partial<TableRow>>>({})
@@ -282,10 +278,9 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard }:
     const params = new URLSearchParams()
     if (settings.view !== 'active') params.set('view', settings.view)
     if (settings.q) params.set('q', settings.q)
-    if (board && BOARD_VIEWS.includes(settings.view)) params.set('board', '1')
     const qs = params.toString()
     window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname)
-  }, [settings.view, settings.q, board])
+  }, [settings.view, settings.q])
 
   const membershipLabels = useMemo(() => new Map(data.membershipTypes.map((t) => [t.value, t.label])), [data.membershipTypes])
   const statuses = useMemo(() => [...new Set(rows.map((r) => r.status).filter((s): s is string => !!s))].sort(), [rows])
@@ -295,7 +290,6 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard }:
     for (const v of VIEWS) c[v.key] = rows.filter(v.match).length
     return c
   }, [rows])
-  const allBusinessNames = useMemo(() => rows.map((r) => ({ id: r.id, name: r.name })), [rows])
 
   const shown = useMemo(() => {
     const view = viewDef(settings.view)
@@ -483,7 +477,6 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard }:
 
   const filtersSet = settings.deal !== 'any' || !!settings.status || !!settings.type
   const view = viewDef(settings.view)
-  const mode: 'table' | 'board' = board && BOARD_VIEWS.includes(settings.view) ? 'board' : 'table'
 
   return (
     <FullScreenPanel
@@ -491,7 +484,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard }:
       headingId="business-table-heading"
       card={false}
       controls={
-        mode === 'table' ? (
+        (
           <>
             <ColumnChooser
               columns={settings.columns}
@@ -512,7 +505,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard }:
               ]}
             />
           </>
-        ) : null
+        )
       }
     >
       {(full) => (<>
@@ -553,27 +546,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard }:
       )}
       <p className="text-xs text-gray-500 mb-4">{view.hint}</p>
 
-      {BOARD_VIEWS.includes(settings.view) && (
-        <div className="inline-flex mb-4 border border-black/10 rounded-sm overflow-hidden" role="group" aria-label="Show as">
-          {([['table', 'Table'], ['board', 'Board']] as const).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={(key === 'board') === board}
-              onClick={() => setBoard(key === 'board')}
-              className={`px-3 py-1.5 text-sm transition-colors duration-200 ease-out ${
-                (key === 'board') === board ? 'bg-brand-navy text-white' : 'bg-white text-gray-800 hover:bg-brand-warm'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {mode === 'board' && <PipelineBoard kind="renewals" only="advertiser" allBusinessNames={allBusinessNames} />}
-
-      {mode === 'table' && (<>
+      <>
 
       {/* Search and filters */}
       <div className="flex flex-wrap items-end gap-3 mb-3">
@@ -694,7 +667,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard }:
       />
       <p className="mt-2 text-xs text-gray-600">
         Row colours: <span className="px-1 bg-ms-red/35">red</span> needs attention and overdue, <span className="px-1 bg-ms-orange/25">orange</span> needs attention,{' '}
-        <span className="px-1 bg-ms-muted/70">grey</span> unreviewed. Changes in the cells go everywhere: outreach stage moves the Outreach tab&apos;s pipeline, renewal stage the Renewals board, and Next to-do is a to-do on Today and the calendar.
+        <span className="px-1 bg-ms-muted/70">grey</span> unreviewed. Changes in the cells go everywhere: outreach stage moves the Outreach tab&apos;s pipeline, renewal stage the Renewals boards, and Next to-do is a to-do on Today and the calendar.
       </p>
       {shown.length > limit && (
         <button
@@ -705,7 +678,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard }:
           Show {Math.min(PAGE_SIZE, shown.length - limit)} more ({shown.length - limit} not shown)
         </button>
       )}
-      </>)}
+      </>
       <RowDialogs
         dialog={dialog}
         onClose={() => setDialog(null)}
