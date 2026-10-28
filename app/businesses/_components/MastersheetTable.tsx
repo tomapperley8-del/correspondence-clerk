@@ -50,9 +50,9 @@ export const RENEWAL_STAGE_LABEL: Record<string, string> = {
   not_renewing: 'Not renewing',
 }
 
-type Tone = 'clubcard' | 'both' | 'advertiser' | 'prospect' | 'former' | 'muted' | 'blue' | 'green' | 'orange' | 'red' | 'yellow'
+export type Tone = 'clubcard' | 'both' | 'advertiser' | 'prospect' | 'former' | 'muted' | 'blue' | 'green' | 'orange' | 'red' | 'yellow'
 
-const PILL: Record<Tone, string> = {
+export const PILL: Record<Tone, string> = {
   clubcard: 'bg-ms-clubcard text-white',
   both: 'bg-white text-ms-both-text border border-ms-clubcard',
   advertiser: 'bg-ms-advertiser text-ms-advertiser-text',

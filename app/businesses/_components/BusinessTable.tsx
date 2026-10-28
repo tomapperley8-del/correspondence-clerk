@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { BusinessTable as TableData, TableRow } from '@/app/actions/business-table'
-import type { ProspectLead } from '@/app/actions/leads'
-import { ProspectBoard } from '@/components/pipeline/ProspectBoard'
 import { MastersheetTable, COLUMN_DEFS, DEFAULT_COLUMNS, rowsAsSheet, type ColumnKey, type RowActions, type SortKey } from './MastersheetTable'
 import { ColumnChooser } from './ColumnChooser'
 import { RowDialogs, type RowDialog } from './RowDialogs'
@@ -23,10 +21,12 @@ import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 // routine) and Outreach, and a board for Renewals and Outreach, replacing the
 // To-dos Contracts and Outreach tabs. The Club Card view (Stage 6b) moved to
 // the Club Card tab in Stage 16b, with the Club Card half of the Renewals board.
+// Leads, the Outreach view and the Outreach board moved to the Outreach tab in
+// Stage 16c; the Outreach stage column stays.
 // Stage 13: full screen, download, chosen columns (saved with a view), edits in
 // the cell and row actions; the views are the 14a filter chips.
 
-type ViewKey = 'active' | 'attention' | 'renewals' | 'outreach' | 'leads' | 'unreviewed' | 'prospects' | 'former' | 'internal' | 'everything'
+type ViewKey = 'active' | 'attention' | 'renewals' | 'unreviewed' | 'prospects' | 'former' | 'internal' | 'everything'
 type DealFilter = 'any' | 'club_card' | 'advertiser' | 'other' | 'none'
 
 type Settings = {
@@ -66,22 +66,6 @@ const VIEWS: { key: ViewKey; label: string; hint: string; sort: SortKey; dir: 'a
     sort: 'deal',
     dir: 'asc',
     match: (r) => r.in_renewal_window && r.is_commercial,
-  },
-  {
-    key: 'outreach',
-    label: 'Outreach',
-    hint: 'Businesses in the outreach pipeline, at any stage. Switch to the board to move them between stages.',
-    sort: 'last',
-    dir: 'desc',
-    match: (r) => !!r.outreach_stage,
-  },
-  {
-    key: 'leads',
-    label: 'Leads',
-    hint: 'Possible new business found by the prospecting routine. Not yet businesses on file: move each one along or reject it.',
-    sort: 'name',
-    dir: 'asc',
-    match: () => false,
   },
   {
     key: 'unreviewed',
@@ -253,15 +237,13 @@ function hasBlank(r: TableRow, sort: SortKey): boolean {
   }
 }
 
-const BOARD_VIEWS: ViewKey[] = ['renewals', 'outreach']
+const BOARD_VIEWS: ViewKey[] = ['renewals']
 
-export function BusinessTable({ data, initialView, initialQuery, initialBoard, leads, leadsError }: {
+export function BusinessTable({ data, initialView, initialQuery, initialBoard }: {
   data: TableData
   initialView?: string
   initialQuery?: string
   initialBoard?: boolean
-  leads: ProspectLead[]
-  leadsError?: string
 }) {
   const { today } = data
 
@@ -311,9 +293,8 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
   const counts = useMemo(() => {
     const c = {} as Record<ViewKey, number>
     for (const v of VIEWS) c[v.key] = rows.filter(v.match).length
-    c.leads = leads.filter((l) => l.status === 'new' || l.status === 'reviewing').length
     return c
-  }, [rows, leads])
+  }, [rows])
   const allBusinessNames = useMemo(() => rows.map((r) => ({ id: r.id, name: r.name })), [rows])
 
   const shown = useMemo(() => {
@@ -502,8 +483,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
 
   const filtersSet = settings.deal !== 'any' || !!settings.status || !!settings.type
   const view = viewDef(settings.view)
-  const mode: 'table' | 'board' | 'leads' =
-    settings.view === 'leads' ? 'leads' : board && BOARD_VIEWS.includes(settings.view) ? 'board' : 'table'
+  const mode: 'table' | 'board' = board && BOARD_VIEWS.includes(settings.view) ? 'board' : 'table'
 
   return (
     <FullScreenPanel
@@ -553,7 +533,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
                 type="button"
                 onClick={() => {
                   setLimit(PAGE_SIZE)
-                  setSettings({ view: v.view, q: v.q, deal: v.deal, status: v.status, type: v.type, sort: v.sort, dir: v.dir, columns: cleanColumns(v.columns) ?? DEFAULT_COLUMNS })
+                  setSettings({ view: VIEWS.some((d) => d.key === v.view) ? v.view : 'everything', q: v.q, deal: v.deal, status: v.status, type: v.type, sort: v.sort, dir: v.dir, columns: cleanColumns(v.columns) ?? DEFAULT_COLUMNS })
                 }}
                 className="px-2.5 py-1 hover:text-brand-navy"
               >
@@ -591,17 +571,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
         </div>
       )}
 
-      {mode === 'leads' && (
-        leadsError ? (
-          <p className="text-sm text-red-700">Could not load the leads: {leadsError}</p>
-        ) : leads.length === 0 ? (
-          <p className="text-sm text-gray-500">No leads yet. The prospecting routine adds them here when it finds something.</p>
-        ) : (
-          <ProspectBoard initialLeads={leads} />
-        )
-      )}
-
-      {mode === 'board' && <PipelineBoard kind={settings.view === 'outreach' ? 'outreach' : 'renewals'} only={settings.view === 'renewals' ? 'advertiser' : undefined} allBusinessNames={allBusinessNames} />}
+      {mode === 'board' && <PipelineBoard kind="renewals" only="advertiser" allBusinessNames={allBusinessNames} />}
 
       {mode === 'table' && (<>
 
@@ -724,7 +694,7 @@ export function BusinessTable({ data, initialView, initialQuery, initialBoard, l
       />
       <p className="mt-2 text-xs text-gray-600">
         Row colours: <span className="px-1 bg-ms-red/35">red</span> needs attention and overdue, <span className="px-1 bg-ms-orange/25">orange</span> needs attention,{' '}
-        <span className="px-1 bg-ms-muted/70">grey</span> unreviewed. Changes in the cells go everywhere: outreach stage moves the Outreach board, renewal stage the Renewals board, and Next to-do is a to-do on Today and the calendar.
+        <span className="px-1 bg-ms-muted/70">grey</span> unreviewed. Changes in the cells go everywhere: outreach stage moves the Outreach tab&apos;s pipeline, renewal stage the Renewals board, and Next to-do is a to-do on Today and the calendar.
       </p>
       {shown.length > limit && (
         <button

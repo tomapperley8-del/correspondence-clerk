@@ -8,6 +8,6 @@ export default async function TodosRedirect({ searchParams }: { searchParams: Pr
   const { view, tab } = await searchParams
   const which = view ?? tab
   if (which === 'contracts' || which === 'renewals') redirect('/businesses?view=renewals&board=1')
-  if (which === 'outreach') redirect('/businesses?view=outreach&board=1')
+  if (which === 'outreach') redirect('/outreach?board=1')
   redirect('/today')
 }

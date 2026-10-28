@@ -1,10 +1,10 @@
 import { getBusinessTable } from '@/app/actions/business-table'
-import { getProspectLeads } from '@/app/actions/leads'
 import { redirect } from 'next/navigation'
 import { BusinessTable } from './_components/BusinessTable'
 
 // The business table (UI overhaul Stage 5), one of the three places in the nav
-// (Stage 7). Leads and the renewals and outreach boards are views here.
+// (Stage 7). The advertisers' renewals board is a view here; leads and the
+// outreach pipeline are on the Outreach tab (Stage 16c).
 
 export const metadata = {
   title: 'Businesses — Correspondence Clerk',
@@ -14,10 +14,10 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
   const params = await searchParams
   // The Club Card view moved to its own tab (Stage 16b); old links follow it.
   if (params.view === 'club_card') redirect('/club-card')
-  const [result, leadsResult] = await Promise.all([
-    getBusinessTable(),
-    getProspectLeads().catch(() => ({ data: [], error: 'Could not load prospect leads' })),
-  ])
+  // Leads and the Outreach view and board moved to the Outreach tab (Stage 16c).
+  if (params.view === 'leads') redirect('/outreach')
+  if (params.view === 'outreach') redirect(params.board === '1' ? '/outreach?board=1' : '/outreach')
+  const result = await getBusinessTable()
 
   return (
     <div className="mx-auto px-4 py-8 max-w-[1400px]">
@@ -41,8 +41,6 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
           initialView={params.view}
           initialQuery={params.q}
           initialBoard={params.board === '1'}
-          leads={leadsResult.data ?? []}
-          leadsError={leadsResult.error}
         />
       )}
     </div>
