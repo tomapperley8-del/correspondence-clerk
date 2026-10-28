@@ -34,7 +34,7 @@ const REASON_LABEL: Record<AttentionReason, string> = {
   club_card: 'Club Card page',
 }
 
-const RENEWAL_STAGE_LABEL: Record<string, string> = {
+export const RENEWAL_STAGE_LABEL: Record<string, string> = {
   not_started: 'To contact',
   contacted: 'Contacted',
   in_discussion: 'In discussion',
