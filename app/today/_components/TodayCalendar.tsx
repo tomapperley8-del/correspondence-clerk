@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { toast } from '@/lib/toast'
 import { formatDateGB } from '@/lib/utils'
 import { updateTask } from '@/app/actions/tasks'
-import { deleteTodayTask, getBusinessNames, undoDeleteTodayTask } from '@/app/actions/today'
-import { addCalendarItem, getCalendarItems, moveCalendarItem, type CalendarItem } from '@/app/actions/calendar'
+import { getBusinessNames } from '@/app/actions/today'
+import {
+  addCalendarItem, getCalendarItems, moveCalendarItem, changeTaskKind, deleteNewsletterItem, undoDeleteNewsletterItem, type CalendarItem,
+} from '@/app/actions/calendar'
 import { addDays } from '@/lib/today'
 import { FullScreenPanel, panelButtonClass } from '@/components/ui/full-screen-panel'
 import { CALENDAR_KINDS, addMonths, isWednesday, monthGrid, monthStart, weekStart, type CalendarKind } from '@/lib/calendar'
@@ -139,6 +141,19 @@ export function TodayCalendar({
     changed()
   }
 
+  async function changeKind(item: CalendarItem, to: CalendarKind) {
+    if (!item.task_id) return
+    const result = await changeTaskKind(item.task_id, to)
+    if (result.error) {
+      toast.error(result.error)
+      return
+    }
+    toast.success(`Changed to ${CALENDAR_KINDS.find((k) => k.value === to)?.label.toLowerCase() ?? to}`)
+    setOpenKey(null)
+    load()
+    changed()
+  }
+
   async function done(item: CalendarItem) {
     if (!item.task_id) return
     const result = await updateTask(item.task_id, { status: 'done' })
@@ -151,22 +166,23 @@ export function TodayCalendar({
     changed()
   }
 
-  // Hand-written items only: the engine would make its own again overnight.
+  // Hand-written items, and "promote my event" items (closed, which marks the
+  // email as dealt with); other engine tasks would come back overnight.
   async function remove(item: CalendarItem) {
-    if (!item.task_id || item.engine) return
+    if (!item.task_id || (item.engine && !item.editorial)) return
     const before = items
     setItems((prev) => prev.filter((i) => i.key !== item.key))
     setOpenKey(null)
-    const result = await deleteTodayTask(item.task_id)
-    if (result.error || !result.backupId) {
+    const result = await deleteNewsletterItem(item.editorial ? 'editorial' : 'task', item.task_id)
+    if (result.error || !result.undo) {
       setItems(before)
       toast.error(result.error ?? 'Not deleted')
       return
     }
-    const backupId = result.backupId
+    const token = result.undo
     changed()
     toast.undo(`Deleted: ${item.title}`, async () => {
-      const undo = await undoDeleteTodayTask(backupId)
+      const undo = await undoDeleteNewsletterItem(token)
       if (undo.error) toast.error(undo.error)
       else {
         toast.success('Put back')
@@ -333,7 +349,7 @@ export function TodayCalendar({
 
           {addingOn && <AddForm date={addingOn} onClose={() => setAddingOn(null)} onAdded={() => { setAddingOn(null); load(); changed() }} />}
           {open && (
-            <ItemPanel key={open.key} item={open} today={today} onClose={() => setOpenKey(null)} onMove={(d, t) => move(open, d, t)} onDone={() => done(open)} onDelete={open.engine ? undefined : () => remove(open)} />
+            <ItemPanel key={open.key} item={open} today={today} onClose={() => setOpenKey(null)} onMove={(d, t) => move(open, d, t)} onDone={() => done(open)} onChangeKind={(to) => changeKind(open, to)} onDelete={open.engine && !open.editorial ? undefined : () => remove(open)} />
           )}
 
           <p className="text-xs text-gray-600">
@@ -427,6 +443,7 @@ function ItemPanel({
   onClose,
   onMove,
   onDone,
+  onChangeKind,
   onDelete,
 }: {
   item: CalendarItem
@@ -434,10 +451,13 @@ function ItemPanel({
   onClose: () => void
   onMove: (date: string, time: string | null) => void
   onDone: () => void
+  onChangeKind: (to: CalendarKind) => void
   onDelete?: () => void
 }) {
   const [date, setDate] = useState(item.date)
   const [time, setTime] = useState(item.time ?? '')
+  const current = CALENDAR_KINDS.find((k) => k.category === item.category)?.value ?? (item.engine ? '' : 'todo')
+  const [kindTo, setKindTo] = useState<string>(current)
   return (
     <div className="border border-black/[0.06] rounded-sm bg-brand-warm p-3 space-y-2">
       <div className="flex flex-wrap items-start gap-2">
@@ -471,6 +491,18 @@ function ItemPanel({
           <button type="submit" disabled={!date || (date === item.date && (time || null) === item.time)} className={btn}>Save date</button>
           <button type="button" onClick={onDone} className={btn}>Done</button>
           {onDelete && <button type="button" onClick={onDelete} className={`${btn} text-red-700`}>Delete</button>}
+        </form>
+      )}
+      {!item.done && (
+        <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); if (kindTo && kindTo !== current) onChangeKind(kindTo as CalendarKind) }}>
+          <label className="block">
+            <span className="block text-xs font-semibold text-gray-600 mb-1">Change to</span>
+            <select value={kindTo} onChange={(e) => setKindTo(e.target.value)} className={input}>
+              {!current && <option value="">Choose a kind</option>}
+              {CALENDAR_KINDS.map((k) => <option key={k.value} value={k.value}>{k.value === 'newsletter' ? 'Newsletter item' : k.label}</option>)}
+            </select>
+          </label>
+          <button type="submit" disabled={!kindTo || kindTo === current} className={btn}>Change</button>
         </form>
       )}
       {item.done && onDelete && (
