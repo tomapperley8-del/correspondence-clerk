@@ -12,7 +12,7 @@ export const metadata = {
 
 const HINTS: Record<string, string> = {
   club_card_no_card: 'The business still shows as a Club Card member, but its card has ended. Open the business and mark the old deal not current, or record the renewal.',
-  deal_no_quickbooks: 'A deal in force or in its 60-day grace with no QuickBooks customer linked, so money owed can’t be seen. Link the customer on the business page.',
+  deal_no_quickbooks: 'A deal in force or in its 60-day grace, with an amount and not marked paid, but no QuickBooks customer linked, so money owed can’t be seen. Link the customer on the business page, or mark the deal paid.',
   active_no_named_contact: 'An Active member or advertiser with no named, active contact. Add the person on the business page.',
   stored_out_of_step: 'The status or last-in-touch date stored on the business differs from the one worked out from its deals and emails. Hidden records are left out.',
 }
