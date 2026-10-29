@@ -70,7 +70,7 @@ export interface FoundMention {
   unclearReason: string | null
 }
 
-const KIND_ORDER: Record<MatchKind, number> = { club_card_page: 0, website: 1, name: 2 }
+export const KIND_ORDER: Record<MatchKind, number> = { club_card_page: 0, website: 1, name: 2 }
 
 /** Sites that are not any one business's own (ours, Mailchimp, ticketing, social media, links). */
 const SHARED_HOSTS = new Set([

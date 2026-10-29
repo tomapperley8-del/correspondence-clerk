@@ -22,7 +22,11 @@ export interface GmailTokenRow {
 export interface GmailListed {
   messageId: string
   sentOn: string // YYYY-MM-DD, London
+  sentMs: number
 }
+
+/** An issue's subject, or a re-send of one ("- correction"); not Mailchimp's "Update Profile" mail. */
+export const isIssueSubject = (s: string) => new RegExp(`^${NEWSLETTER_SUBJECT}( [-–] correction)?$`, 'i').test(s.trim())
 
 export function gmailClient(t: GmailTokenRow, onRefresh: (access: string, expiry: Date | null) => Promise<void>) {
   const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_REDIRECT_URI)
@@ -41,7 +45,7 @@ type Gmail = ReturnType<typeof gmailClient>
 
 const londonDay = (ms: number) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 
-/** Every newsletter email in the mailbox, oldest first (ids and dates only). */
+/** Every newsletter issue in the mailbox, oldest first, one per day: the last sent that day (a correction replaces the first send). */
 export async function listGmailIssues(gmail: Gmail): Promise<GmailListed[]> {
   const ids: string[] = []
   let pageToken: string | undefined
@@ -52,12 +56,20 @@ export async function listGmailIssues(gmail: Gmail): Promise<GmailListed[]> {
   } while (pageToken)
 
   const out: GmailListed[] = []
-  for (let i = 0; i < ids.length; i += 20) {
-    const batch = await Promise.all(ids.slice(i, i + 20).map((id) =>
-      gmail.users.messages.get({ userId: 'me', id, format: 'minimal' }).then((r) => r.data)))
-    for (const m of batch) if (m.id && m.internalDate) out.push({ messageId: m.id, sentOn: londonDay(Number(m.internalDate)) })
+  // Batches of 10 stay inside Gmail's per-minute quota
+  for (let i = 0; i < ids.length; i += 10) {
+    const batch = await Promise.all(ids.slice(i, i + 10).map((id) =>
+      gmail.users.messages.get({ userId: 'me', id, format: 'metadata', metadataHeaders: ['Subject'] }).then((r) => r.data)))
+    for (const m of batch) {
+      const subject = m.payload?.headers?.find((h) => h.name?.toLowerCase() === 'subject')?.value ?? ''
+      if (m.id && m.internalDate && isIssueSubject(subject)) {
+        out.push({ messageId: m.id, sentOn: londonDay(Number(m.internalDate)), sentMs: Number(m.internalDate) })
+      }
+    }
   }
-  return out.sort((a, b) => a.sentOn.localeCompare(b.sentOn))
+  const lastPerDay = new Map<string, GmailListed>()
+  for (const l of out) if ((lastPerDay.get(l.sentOn)?.sentMs ?? -1) < l.sentMs) lastPerDay.set(l.sentOn, l)
+  return [...lastPerDay.values()].sort((a, b) => a.sentOn.localeCompare(b.sentOn))
 }
 
 interface Part { mimeType?: string | null; body?: { data?: string | null } | null; parts?: Part[] | null }

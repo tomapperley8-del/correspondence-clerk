@@ -15,7 +15,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ error?: string; detail?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  if (!user) redirect('/login')
 
   const { error: errorCode, detail } = await searchParams
   const errorMessage = errorCode ? (ERROR_MESSAGES[errorCode] ?? `Unknown error: ${errorCode}`) : null
