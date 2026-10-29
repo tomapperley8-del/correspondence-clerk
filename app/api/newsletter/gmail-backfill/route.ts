@@ -5,6 +5,7 @@ import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { makeGmailTokenRefreshHandler } from '@/lib/email-import/token-helpers'
 import { fetchGmailIssue, gmailClient, listGmailIssues } from '@/lib/newsletter/gmail'
 import { rematchOrg } from '@/lib/newsletter/read'
+import { refreshItems } from '@/lib/newsletter/items-store'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -71,6 +72,7 @@ export async function GET() {
     }
 
     const mentionsNew = added ? (await rematchOrg(supabase, orgId)).mentions_new : 0
+    if (added) await refreshItems(supabase, orgId)
     result = { ok: true, listed: listed.length, added, remaining: todo.length - done, via_email: viaEmail, mentions_new: mentionsNew }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
