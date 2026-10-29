@@ -548,7 +548,9 @@ function Promises({ ctx }: { ctx: Ctx }) {
               <li key={p.id} className={cn(card, 'px-3.5 py-3 flex flex-col gap-1.5 min-w-0')}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <BizLink id={p.business_id} name={p.business_name} />
-                  <span className={cn(pill, tone)}>{p.delivered} of {p.due_so_far} in{owed > 0 ? `, ${owed} owed` : ''}{p.term_over ? ', term over' : ''}</span>
+                  <span className={cn(pill, tone)}>
+                    {owed > 0 ? `${p.delivered} of ${p.due_so_far} in, ${owed} owed` : `${p.delivered} in, ${p.due_so_far} due so far`}{p.term_over ? ', term over' : ''}
+                  </span>
                 </div>
                 <p className="text-sm">{promiseText(p)} · {dateGB(p.contract_start)} to {p.contract_end ? dateGB(p.contract_end) : 'no end date'}</p>
                 {p.notes && <p className="text-xs text-gray-600">{p.notes}</p>}
