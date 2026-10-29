@@ -14,9 +14,10 @@ const STORE = 'cc.fold.'
 
 /**
  * Open state for a folded section, remembered in this browser. `narrowOpen`
- * is the default below 1024px wide, where the page is one column.
+ * is the default below 1024px wide, where the page is one column. With
+ * `anchorId`, a link to `#anchorId` (a summary tile) opens the section.
  */
-export function useFold(storageKey: string, defaultOpen = false, narrowOpen?: boolean) {
+export function useFold(storageKey: string, defaultOpen = false, narrowOpen?: boolean, anchorId?: string) {
   const [open, setOpen] = useState(defaultOpen)
   useEffect(() => {
     try {
@@ -28,6 +29,16 @@ export function useFold(storageKey: string, defaultOpen = false, narrowOpen?: bo
       // storage blocked: keep the default
     }
   }, [storageKey, narrowOpen])
+  useEffect(() => {
+    if (!anchorId) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the page was opened at this section
+    if (window.location.hash === `#${anchorId}`) setOpen(true)
+    const onClick = (e: MouseEvent) => {
+      if ((e.target as HTMLElement | null)?.closest(`a[href="#${anchorId}"]`)) setOpen(true)
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [anchorId])
   const toggle = () =>
     setOpen((o) => {
       try {
@@ -37,7 +48,7 @@ export function useFold(storageKey: string, defaultOpen = false, narrowOpen?: bo
       }
       return !o
     })
-  return [open, toggle] as const
+  return [open, toggle, setOpen] as const
 }
 
 export function FoldSection({
@@ -83,7 +94,7 @@ export function FoldSection({
   bodyClassName?: string
   children: React.ReactNode
 }) {
-  const [open, toggle] = useFold(storageKey, defaultOpen, narrowOpen)
+  const [open, toggle] = useFold(storageKey, defaultOpen, narrowOpen, id)
   const bodyId = useId()
   const H = heading
   return (
