@@ -26,8 +26,8 @@ export default async function InboxPage() {
   const deadLetters = deadLettersResult.data ?? []
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
-      <div className="mb-8 flex items-start justify-between">
+    <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 max-w-[1600px]">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h1
             className="text-3xl font-bold mb-1"

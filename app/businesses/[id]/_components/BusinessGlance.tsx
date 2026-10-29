@@ -12,7 +12,7 @@ import { CopyButton } from '@/components/CopyButton'
 import { formatDateGB } from '@/lib/utils'
 
 // The top of the business page (UI overhaul Stage 6): the deal, the main
-// contact, what needs attention and when they were last in touch, in one row.
+// contact, what needs attention and when they were last in touch, in one band.
 
 const REASON_LABEL: Record<AttentionReason, string> = {
   money_owed: 'Money owed',
@@ -60,9 +60,9 @@ export function money(amount: number | null, currency: string | null = 'GBP'): s
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-black/[0.06] rounded-sm p-4 min-w-0" style={{ boxShadow: 'var(--shadow-sm)' }}>
-      <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2">{title}</h2>
-      <div className="text-sm text-gray-900 space-y-1">{children}</div>
+    <div className="bg-white px-4 py-3 min-w-0">
+      <h2 className="!text-[11px] !leading-4 font-bold uppercase tracking-wide text-gray-600 mb-1">{title}</h2>
+      <div className="text-sm text-gray-900 space-y-0.5">{children}</div>
     </div>
   )
 }
@@ -73,7 +73,7 @@ function DealTerms({ text }: { text: string }) {
   const long = text.length > 160 || text.split('\n').length > 4
   return (
     <div>
-      <p className={`text-gray-600 whitespace-pre-wrap ${long && !open ? 'line-clamp-4' : ''}`}>{text}</p>
+      <p className={`text-gray-600 whitespace-pre-wrap ${long && !open ? 'line-clamp-2' : ''}`}>{text}</p>
       {long && (
         <button type="button" onClick={() => setOpen(!open)} className="text-xs text-brand-navy hover:underline">
           {open ? 'Show less' : 'Show full terms'}
@@ -173,7 +173,8 @@ export function BusinessGlance({ business, contacts, glance, correspondence, mem
   const attention = glance?.attention ?? null
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+    // One band (Stage 14b): the four cells share a card, split by hairlines.
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-px bg-black/[0.06] border border-black/[0.06] rounded-sm overflow-hidden shadow-[var(--shadow-sm)] mb-3">
       <Card title="Deal">
         {!glance ? (
           <p className="text-gray-500">Loading…</p>
@@ -243,8 +244,8 @@ export function BusinessGlance({ business, contacts, glance, correspondence, mem
                 Also: {attention.reasons.filter((r) => r !== attention.reason).map((r) => REASON_LABEL[r]).join(', ')}
               </p>
             )}
-            <Link href="/attention" className="text-xs text-brand-navy hover:underline inline-block pt-1">
-              Open Needs attention
+            <Link href="/today" className="text-xs text-brand-navy hover:underline inline-block pt-1">
+              Open Today
             </Link>
           </>
         ) : (
