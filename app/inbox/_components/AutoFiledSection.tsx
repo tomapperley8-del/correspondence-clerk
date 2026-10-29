@@ -14,7 +14,7 @@ function formatDateGB(iso: string): string {
 }
 
 export default function AutoFiledSection({ items }: Props) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
 
   if (items.length === 0) return null
 

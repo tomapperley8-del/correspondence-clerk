@@ -56,7 +56,9 @@ export function ActionMenu({
     if (focusButton) button.current?.focus()
   }
 
-  // Open above the button when there is no room below, and keep it inside the window sideways.
+  // Placed against the window (position: fixed), so a list that scrolls inside
+  // its own box (Stage 14b) never clips it. Opens above the button when there
+  // is no room below, and stays inside the window sideways.
   useLayoutEffect(() => {
     if (!open || !menu.current || !wrap.current) return
     const b = wrap.current.getBoundingClientRect()
@@ -65,10 +67,8 @@ export function ActionMenu({
     const up = b.bottom + h + 8 > window.innerHeight && b.top - h - 8 > 0
     const right = b.right - w >= 8 || b.left + w > window.innerWidth - 8
     Object.assign(menu.current.style, {
-      top: up ? 'auto' : 'calc(100% + 4px)',
-      bottom: up ? 'calc(100% + 4px)' : 'auto',
-      right: right ? '0' : 'auto',
-      left: right ? 'auto' : '0',
+      top: `${up ? b.top - h - 4 : b.bottom + 4}px`,
+      left: `${Math.max(8, right ? b.right - w : b.left)}px`,
     })
     const list = items()
     ;(startAt.current === 'last' ? list[list.length - 1] : list[0])?.focus()
@@ -79,8 +79,16 @@ export function ActionMenu({
     const outside = (e: PointerEvent) => {
       if (!wrap.current?.contains(e.target as Node)) setOpen(false)
     }
+    // A fixed menu would float away from its button: scrolling the page or a list closes it.
+    const scrolled = (e: Event) => {
+      if (!menu.current?.contains(e.target as Node)) setOpen(false)
+    }
     document.addEventListener('pointerdown', outside)
-    return () => document.removeEventListener('pointerdown', outside)
+    window.addEventListener('scroll', scrolled, true)
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      window.removeEventListener('scroll', scrolled, true)
+    }
   }, [open])
 
   function onMenuKey(e: React.KeyboardEvent) {
@@ -172,7 +180,7 @@ export function ActionMenu({
           aria-labelledby={`${id}-button`}
           onKeyDown={onMenuKey}
           className={cn(
-            'absolute top-full right-0 mt-1 z-[75] min-w-[13rem] max-w-[calc(100vw-2rem)] py-1 bg-white border border-black/[0.12] rounded-sm shadow-[var(--shadow-lg)]',
+            'fixed z-[75] min-w-[13rem] max-w-[calc(100vw-2rem)] py-1 bg-white border border-black/[0.12] rounded-sm shadow-[var(--shadow-lg)]',
           )}
         >
           {entries.map((entry, k) =>

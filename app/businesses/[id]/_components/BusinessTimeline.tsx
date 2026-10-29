@@ -513,7 +513,7 @@ export function BusinessTimeline(props: Props) {
     )
   }
 
-  const list = () => (
+  const list = (full: boolean) => (
     <div className="bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] min-w-0">
       <div className="p-3 space-y-2 border-b border-black/[0.06]">
         <FilterChips chips={chips} value={filter} onChange={(k) => { setFilter(k); setSelected(null) }} label="Show in history" />
@@ -532,8 +532,8 @@ export function BusinessTimeline(props: Props) {
           </p>
         )}
       </div>
-      {/* The list scrolls with the page (a scroll box of its own would clip the More menus); the reader stays in view. */}
-      <div ref={listRef} onKeyDown={onListKey}>
+      {/* Long histories scroll inside the list, so the page's other sections stay on the first screen (Decision 29 Oct). */}
+      <div ref={listRef} onKeyDown={onListKey} className={cn('overflow-y-auto overscroll-contain', full ? 'max-h-[calc(100vh-12rem)]' : 'max-h-[60vh] lg:max-h-[max(16rem,calc(100vh-34rem))]')}>
         {loading ? (
           <div className="animate-pulse space-y-2 p-3">
             {[1, 2, 3, 4].map((i) => <div key={i} className="h-9 bg-gray-100 rounded-sm" />)}
@@ -591,13 +591,19 @@ export function BusinessTimeline(props: Props) {
   )
 
   const reader = (full: boolean) => (
-    // The whole column stays in view while the list scrolls with the page.
-    <div className="space-y-3 min-w-0 lg:sticky lg:top-2 lg:max-h-[calc(100vh-1rem)] lg:overflow-y-auto">
+    // The dropdowns sit above the reader and a long entry scrolls inside it, so
+    // every section stays on the first screen (Decision 29 Oct). On a phone the
+    // reader is hidden (entries open under their rows) and the dropdowns follow the list.
+    <div className="space-y-3 min-w-0">
+      {!full && aside}
       <section
         id="history-reader"
         tabIndex={-1}
         aria-label="The chosen entry"
-        className="hidden lg:block bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] p-3 focus:outline-none"
+        className={cn(
+          'hidden lg:block bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] p-3 overflow-y-auto overscroll-contain focus:outline-none',
+          full ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[max(16rem,calc(100vh-39rem))]',
+        )}
         onKeyDown={(e) => {
           if (e.key === 'Escape' && !e.defaultPrevented && (e.target as HTMLElement).closest('[role="menu"]') === null) {
             listRef.current?.querySelector<HTMLElement>('button[data-row][tabindex="0"]')?.focus()
@@ -606,14 +612,13 @@ export function BusinessTimeline(props: Props) {
       >
         {current ? renderItem(current, true) : <p className="text-sm text-gray-700">Choose a row to read it here.</p>}
       </section>
-      {!full && aside}
     </div>
   )
 
   return (
     <FullScreenPanel title="History" headingId="history-h" card={false} controls={controls}>
       {(full) => (
-        <ResizableSplit storageKey="cc.business.split" defaultPercent={56} label="Resize the history and the reader" first={list()} second={reader(full)} />
+        <ResizableSplit storageKey="cc.business.split" defaultPercent={56} label="Resize the history and the reader" first={list(full)} second={reader(full)} />
       )}
     </FullScreenPanel>
   )

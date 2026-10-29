@@ -127,7 +127,7 @@ export default function InboxListClient({ items, businesses }: Props) {
     <InboxCard key={item.id} item={item} businesses={businesses} skipAutoMatch matchedBusinessId={matches.get(item.id) ?? null} />
   )
 
-  // The list scrolls with the page (a scroll box of its own would clip the More menus); the filing pane stays in view.
+  // A long queue scrolls inside the list, so Auto-filed, Discarded and Failed stay on the first screen (Decision 29 Oct).
   const list = () => (
     <div className="bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] min-w-0">
       <div className="flex flex-wrap items-center gap-3 px-3 py-2 border-b border-black/[0.06] min-h-12">
@@ -148,7 +148,7 @@ export default function InboxListClient({ items, businesses }: Props) {
           </button>
         )}
       </div>
-      <ul ref={listRef} onKeyDown={onListKey} aria-label="Emails to file">
+      <ul ref={listRef} onKeyDown={onListKey} aria-label="Emails to file" className="overflow-y-auto overscroll-contain max-h-[60vh] lg:max-h-[max(14rem,calc(100vh-24rem))]">
         {shown.map((item) => {
           const on = item.id === chosen?.id
           const who = item.direction === 'sent'

@@ -816,7 +816,7 @@ export function BusinessDetailClient({
       { key: 'contacts', label: `Contacts (${contacts.length})`, body: <ContactsList contacts={contacts} business={business} onDeleteContact={handleDeleteContact} /> },
       {
         key: 'details',
-        label: 'Deal and details',
+        label: `Deal and details (${glance?.contracts.length ?? 0} ${glance?.contracts.length === 1 ? 'deal' : 'deals'})`,
         body: (
           <>
             {businessDetailsBox}
