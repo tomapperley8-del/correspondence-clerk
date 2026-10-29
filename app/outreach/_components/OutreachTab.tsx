@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/lib/toast'
@@ -19,14 +19,17 @@ import type { OutreachNextRow, OutreachSuggestion } from '@/app/actions/outreach
 import { WorkOnNext } from './WorkOnNext'
 import { OutreachSuggestions } from './OutreachSuggestions'
 
-// The Outreach tab (UI overhaul Stage 16c, layout A, Tom's pick on 28 Oct):
-// one page top to bottom. A summary; leads to accept and the outreach
-// routine's drafts side by side; the pipeline as stage boxes that list their
-// businesses (or the board); results by month. Stage moves use the Outreach
+// The Outreach tab (UI overhaul Stage 16c; laid out again in 16c3, layout A,
+// Tom's pick on 29 Oct): a workspace. The title with a summary strip whose
+// numbers jump to their part; Work on next as the main column; a side rail with
+// the outreach routine's drafts, leads to accept, suggestions and results by
+// month; the pipeline as one strip of stages that opens a stage's list (or the
+// board). Stage moves use the Outreach
 // board's own actions, so the spreadsheet column, the leads mirror and the
 // outreach routine see them. Nothing is sent from here.
 
 const OUTLOOK_DRAFTS = 'https://outlook.office.com/mail/drafts'
+const LEADS_FIRST = 4
 
 /** The six boxes. Invoice paid is counted with Won. */
 const BOXES = OUTREACH_STAGES.filter((s) => s.key !== 'invoice_paid')
@@ -67,18 +70,6 @@ function todoTone(r: OutreachTabRow, today: string) {
   return ''
 }
 
-function SectionHead({ title, count, hint }: { title: string; count?: string; hint: string }) {
-  return (
-    <>
-      <h2 className="text-xl font-bold flex flex-wrap items-baseline gap-2 mb-0.5" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
-        {title}
-        {count !== undefined && <span className="text-xs font-semibold text-gray-600" style={{ fontFamily: 'var(--font-sans)' }}>{count}</span>}
-      </h2>
-      <p className="text-xs text-gray-600 mb-2">{hint}</p>
-    </>
-  )
-}
-
 export function OutreachTab({ data, next, nextError, initialStage, initialBoard, initialQuery }: {
   data: OutreachTabData
   next: { rows: OutreachNextRow[]; suggestions: OutreachSuggestion[] } | null
@@ -96,6 +87,9 @@ export function OutreachTab({ data, next, nextError, initialStage, initialBoard,
   const [stage, setStage] = useState(() => (BOXES.some((b) => b.key === initialStage) ? initialStage! : 'in_discussion'))
   const [board, setBoard] = useState(!!initialBoard)
   const [q, setQ] = useState(initialQuery ?? '')
+  // A stage's list opens when one is chosen (or the address names one), so the page stays short.
+  const [listOpen, setListOpen] = useState(!!initialStage || !!initialQuery)
+  const [leadsShown, setLeadsShown] = useState(LEADS_FIRST)
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- take the fresh list after router.refresh()
   useEffect(() => setLeads(data.leads), [data.leads])
@@ -104,11 +98,11 @@ export function OutreachTab({ data, next, nextError, initialStage, initialBoard,
   useEffect(() => {
     const params = new URLSearchParams()
     if (board) params.set('board', '1')
-    else if (stage !== 'in_discussion') params.set('stage', stage)
-    if (q && !board) params.set('q', q)
+    else if (listOpen) params.set('stage', stage)
+    if (q && !board && listOpen) params.set('q', q)
     const s = params.toString()
     window.history.replaceState(null, '', s ? `/outreach?${s}` : '/outreach')
-  }, [stage, board, q])
+  }, [stage, board, q, listOpen])
 
   const rows = useMemo(
     () => data.rows
@@ -208,161 +202,165 @@ export function OutreachTab({ data, next, nextError, initialStage, initialBoard,
     )
   }
 
-  const tiles: { label: string; value: number; sub?: string; onClick?: () => void; target?: string }[] = [
-    { label: 'On outreach', value: summary.onOutreach, sub: 'businesses at any stage', onClick: () => setBoard(true), target: 'the board' },
-    { label: `Contacted in ${summary.thisMonthLabel}`, value: summary.contactedThisMonth, sub: 'first approaches this month' },
-    { label: 'In discussion', value: counts.in_discussion ?? 0, sub: 'talking now', onClick: () => { setBoard(false); setStage('in_discussion') }, target: 'this stage' },
-    { label: `Won in ${summary.year}`, value: summary.wonThisYear, sub: 'a deal recorded this year' },
-    { label: 'Leads to look at', value: leads.length, sub: 'from the prospecting routine', target: 'the leads' },
+  const openStage = (key: string) => {
+    setBoard(false)
+    setStage(key)
+    setListOpen(true)
+  }
+  // In-page links, so the browser does the scrolling; In discussion also opens that stage's list.
+  const tiles: { label: string; value: number; href: string; go?: () => void; target: string }[] = [
+    { label: 'On outreach', value: summary.onOutreach, href: '#pipeline', target: 'the pipeline' },
+    { label: `Contacted in ${summary.thisMonthLabel}`, value: summary.contactedThisMonth, href: '#results', target: 'results by month' },
+    { label: 'In discussion', value: counts.in_discussion ?? 0, href: '#pipeline', go: () => openStage('in_discussion'), target: 'the businesses in discussion' },
+    { label: `Won in ${summary.year}`, value: summary.wonThisYear, href: '#results', target: 'results by month' },
+    { label: 'Leads to look at', value: leads.length, href: '#leads', target: 'the leads' },
   ]
 
   return (
-    <div>
-      {/* Summary across the top */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2 mb-6">
-        {tiles.map((t) => {
-          const body = (
-            <>
-              <span className="block text-2xl font-bold tabular-nums text-brand-dark">{t.value}</span>
-              <span className="block text-xs font-semibold text-gray-700">{t.label}</span>
-              {t.sub && <span className="block text-xs text-gray-600">{t.sub}</span>}
-            </>
-          )
-          const cls = `text-left px-3 py-2 ${card}`
-          if (t.target === 'the leads') {
-            return (
-              <a key={t.label} href="#leads" className={cn(cls, 'hover:border-black/[0.16] transition-colors duration-200 ease-out')}>
-                {body}
-                <span className="sr-only">, go to the leads</span>
-              </a>
-            )
-          }
-          return t.onClick ? (
-            <button
+    <div className="space-y-5">
+      {/* Title and the summary strip; each number jumps to its part of the page */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold mb-0.5" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
+            Outreach
+          </h1>
+          <p className="text-sm text-gray-600">New business: who to approach, who you are talking to, and how it is going.</p>
+        </div>
+        <div className={cn(card, 'grid grid-cols-3 sm:flex sm:flex-wrap divide-x divide-black/[0.06] w-full sm:w-auto')}>
+          {tiles.map((t) => (
+            <a
               key={t.label}
-              type="button"
-              onClick={() => { t.onClick!(); document.getElementById('pipeline')?.scrollIntoView({ behavior: 'smooth' }) }}
-              className={cn(cls, 'hover:border-black/[0.16] transition-colors duration-200 ease-out')}
+              href={t.href}
+              onClick={t.go}
+              className="block text-left px-3 py-1.5 hover:bg-brand-warm transition-colors duration-200 ease-out min-w-0"
             >
-              {body}
-              <span className="sr-only">, show {t.target}</span>
-            </button>
-          ) : (
-            <div key={t.label} className={cls}>{body}</div>
-          )
-        })}
+              <span className="block text-xl font-bold tabular-nums text-brand-dark">{t.value}</span>
+              <span className="block text-xs font-semibold text-gray-700">{t.label}</span>
+              <span className="sr-only">, go to {t.target}</span>
+            </a>
+          ))}
+        </div>
       </div>
 
-      {next ? (
-        <WorkOnNext rows={next.rows} contacts={contacts} />
-      ) : (
-        <p className="text-sm text-red-700 mb-6">Could not load Work on next: {nextError ?? 'no data'}</p>
-      )}
+      <div className="flex flex-wrap gap-5 items-start">
+        {/* Main column: what to do */}
+        <div className="flex-[999_1_620px] min-w-0">
+          {next ? (
+            <WorkOnNext rows={next.rows} contacts={contacts} />
+          ) : (
+            <p className="text-sm text-red-700">Could not load Work on next: {nextError ?? 'no data'}</p>
+          )}
+        </div>
 
-      {/* Leads and drafts side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-        <section id="leads" aria-labelledby="leads-heading" className="min-w-0 scroll-mt-4">
-          <div id="leads-heading">
-            <SectionHead
-              title="Leads to accept"
-              count={String(leads.length)}
-              hint="Found by the prospecting routine. Accept puts the business on outreach as Identified (or links it to the business already on file); Delete removes the lead, with Undo."
-            />
-          </div>
-          <ul className={cn(card, 'divide-y divide-black/[0.06]')}>
-            {leads.length === 0 && <li className="px-3 py-3 text-sm text-gray-600">No leads waiting. The prospecting routine adds them here when it finds something.</li>}
-            {summary.leadsAccepted > 0 && (
-              <li className="px-3 py-2 text-xs text-gray-600">
-                {summary.leadsAccepted} accepted {summary.leadsAccepted === 1 ? 'lead is' : 'leads are'} already on the pipeline as businesses.
-              </li>
-            )}
-            {leads.map((l) => {
-              const meta = MATCH_TYPE_META[l.match_type]
-              return (
-                <li key={l.id} className="px-3 py-2.5 flex flex-wrap gap-x-3 gap-y-2 items-start">
-                  <div className="flex-1 min-w-[200px]">
-                    <p className="font-semibold text-brand-dark">
-                      {l.business_name}
-                      {meta && <span className={cn('ml-2 text-[11px] font-semibold px-1.5 py-0.5 rounded-full align-middle', meta.badge)}>{meta.label}</span>}
+        {/* Side rail: what to send, what to bring in, how it is going */}
+        <aside aria-label="Drafts, leads, suggestions and results" className="flex-[1_1_400px] min-w-0 space-y-4">
+          <section aria-labelledby="drafts-heading" className={card}>
+            <RailHead id="drafts-heading" title="Drafts ready to send" count={drafts.length}>
+              {drafts.length > 0 && (
+                <a href={OUTLOOK_DRAFTS} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand-navy hover:underline">
+                  Open Outlook drafts<span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              )}
+            </RailHead>
+            <p className="px-3 pb-1.5 text-xs text-gray-600">Written by the outreach routine in the last 30 days, waiting in your Outlook drafts. Nothing is sent from here.</p>
+            <ul className="divide-y divide-black/[0.06] border-t border-black/[0.06]">
+              {drafts.length === 0 && <li className="px-3 py-2.5 text-sm text-gray-600">No outreach drafts waiting.</li>}
+              {drafts.map((d) => (
+                <li key={d.id} className="px-3 py-2 flex gap-2 items-start justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-brand-dark break-words">{d.business?.name ?? d.recipient ?? 'No business'}</p>
+                    <p className="text-xs text-gray-600 break-words line-clamp-2" title={d.subject ?? undefined}>
+                      {[`written ${dateGB(d.created_at)}`, d.recipient && d.business ? `to ${d.recipient}` : null, d.subject].filter(Boolean).join(' · ')}
                     </p>
-                    <p className="text-xs text-gray-600">
-                      {[l.business_category, l.address, `found ${dateGB(l.found_at)}`].filter(Boolean).join(' · ')}
-                      {l.source_url && (
-                        <>
-                          {' · '}
-                          <a href={l.source_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-navy hover:underline">
-                            {l.source_name || 'Source'}<span className="sr-only"> (opens in a new tab)</span>
-                          </a>
-                        </>
-                      )}
-                    </p>
-                    {(l.opportunity_notes || l.snippet) && <p className="text-xs text-gray-700 mt-0.5 line-clamp-2">{l.opportunity_notes || l.snippet}</p>}
-                    {l.matched_business && (
-                      <p className="text-xs mt-0.5">
-                        On file:{' '}
-                        <Link href={`/businesses/${l.matched_business.id}`} className="font-semibold text-brand-navy hover:underline">{l.matched_business.name}</Link>
-                      </p>
-                    )}
+                    {d.reason && <p className="text-xs text-gray-700 mt-0.5 line-clamp-1" title={d.reason}>{d.reason}</p>}
                   </div>
-                  <div className="flex gap-2">
-                    <button type="button" className={mainBtn} disabled={busyLead === l.id} onClick={() => accept(l)}>
-                      Accept<span className="sr-only"> {l.business_name}</span>
-                    </button>
-                    <button type="button" className={softBtn} disabled={busyLead === l.id} onClick={() => remove(l)}>
-                      Delete<span className="sr-only"> lead {l.business_name}</span>
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-
-        <section aria-labelledby="drafts-heading" className="min-w-0">
-          <div id="drafts-heading">
-            <SectionHead
-              title="Drafts ready to send"
-              count={String(drafts.length)}
-              hint="Written by the outreach routine in the last 30 days and waiting in your Outlook drafts. Nothing is sent from here; a sent one leaves this list when it files itself back."
-            />
-          </div>
-          <ul className={cn(card, 'divide-y divide-black/[0.06]')}>
-            {drafts.length === 0 && <li className="px-3 py-3 text-sm text-gray-600">No outreach drafts waiting.</li>}
-            {drafts.map((d) => (
-              <li key={d.id} className="px-3 py-2.5 flex flex-wrap gap-x-3 gap-y-2 items-start">
-                <div className="flex-1 min-w-[200px]">
-                  <p className="font-semibold text-brand-dark">{d.business?.name ?? d.recipient ?? 'No business'}</p>
-                  <p className="text-xs text-gray-600">
-                    {[d.subject, d.recipient && d.business ? `to ${d.recipient}` : null, `written ${dateGB(d.created_at)}`].filter(Boolean).join(' · ')}
-                  </p>
-                  {d.reason && <p className="text-xs text-gray-700 mt-0.5 line-clamp-2">{d.reason}</p>}
-                </div>
-                <div className="flex gap-2">
-                  <a href={OUTLOOK_DRAFTS} target="_blank" rel="noopener noreferrer" className={mainBtn}>
-                    Open Outlook drafts<span className="sr-only"> (opens in a new tab)</span>
-                  </a>
                   {d.business && (
                     <Link href={`/businesses/${d.business.id}`} className={softBtn}>
                       Business<span className="sr-only"> page for {d.business.name}</span>
                     </Link>
                   )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section id="leads" aria-labelledby="leads-heading" className={cn(card, 'scroll-mt-4')}>
+            <RailHead id="leads-heading" title="Leads to accept" count={leads.length} />
+            <p className="px-3 pb-1.5 text-xs text-gray-600">Found by the prospecting routine. Accept puts the business on outreach as Identified (or links it to the one on file); Delete removes the lead, with Undo.</p>
+            <ul className="divide-y divide-black/[0.06] border-t border-black/[0.06]">
+              {leads.length === 0 && <li className="px-3 py-2.5 text-sm text-gray-600">No leads waiting. The prospecting routine adds them here when it finds something.</li>}
+              {leads.slice(0, leadsShown).map((l) => {
+                const meta = MATCH_TYPE_META[l.match_type]
+                return (
+                  <li key={l.id} className="px-3 py-2 space-y-1.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-brand-dark break-words">
+                        {l.business_name}
+                        {meta && <span className={cn('ml-2 text-[11px] font-semibold px-1.5 py-0.5 rounded-full align-middle', meta.badge)}>{meta.label}</span>}
+                      </p>
+                      <p className="text-xs text-gray-600 break-words">
+                        {[l.business_category, l.address, `found ${dateGB(l.found_at)}`].filter(Boolean).join(' · ')}
+                        {l.source_url && (
+                          <>
+                            {' · '}
+                            <a href={l.source_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-navy hover:underline">
+                              {l.source_name || 'Source'}<span className="sr-only"> (opens in a new tab)</span>
+                            </a>
+                          </>
+                        )}
+                      </p>
+                      {(l.opportunity_notes || l.snippet) && <p className="text-xs text-gray-700 mt-0.5 line-clamp-2">{l.opportunity_notes || l.snippet}</p>}
+                      {l.matched_business && (
+                        <p className="text-xs mt-0.5">
+                          On file:{' '}
+                          <Link href={`/businesses/${l.matched_business.id}`} className="font-semibold text-brand-navy hover:underline">{l.matched_business.name}</Link>
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button type="button" className={mainBtn} disabled={busyLead === l.id} onClick={() => accept(l)}>
+                        Accept<span className="sr-only"> {l.business_name}</span>
+                      </button>
+                      <button type="button" className={softBtn} disabled={busyLead === l.id} onClick={() => remove(l)}>
+                        Delete<span className="sr-only"> lead {l.business_name}</span>
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+              {leads.length > leadsShown && (
+                <li className="px-3 py-1.5">
+                  <button type="button" className="text-sm font-semibold text-brand-navy hover:underline min-h-10 md:min-h-0" onClick={() => setLeadsShown(leads.length)}>
+                    Show all {leads.length} leads
+                  </button>
+                </li>
+              )}
+              {summary.leadsAccepted > 0 && (
+                <li className="px-3 py-2 text-xs text-gray-600">
+                  {summary.leadsAccepted} accepted {summary.leadsAccepted === 1 ? 'lead is' : 'leads are'} already on the pipeline as businesses.
+                </li>
+              )}
+            </ul>
+          </section>
+
+          {next && <OutreachSuggestions suggestions={next.suggestions} />}
+
+          <section id="results" aria-labelledby="results-heading" className={cn(card, 'scroll-mt-4')}>
+            <RailHead id="results-heading" title="Results by month" />
+            <p className="px-3 text-xs text-gray-600">Contacted = the first approach that month. Replied = they emailed back within 30 days of it. Won = a deal recorded that month.</p>
+            <ResultsChart months={months} />
+          </section>
+        </aside>
       </div>
 
-      {/* Pipeline */}
-      {next && <OutreachSuggestions suggestions={next.suggestions} />}
-
-      <section id="pipeline" aria-labelledby="outreach-pipeline-heading" className="mb-8 scroll-mt-4">
+      {/* Pipeline: one strip of stages; a stage opens its list, or use the board */}
+      <section id="pipeline" aria-labelledby="outreach-pipeline-heading" className="scroll-mt-4">
         <FullScreenPanel
           title="Pipeline"
           headingId="outreach-pipeline-heading"
           card={false}
           controls={
-            board ? null : (
+            board || !listOpen ? null : (
               <ActionMenu
                 label="Download"
                 accessibleLabel={`Download ${shown.length} businesses at this stage`}
@@ -377,9 +375,9 @@ export function OutreachTab({ data, next, nextError, initialStage, initialBoard,
         >
           {(full) => (
             <>
-              <div className="flex flex-wrap items-center gap-3 mb-3">
+              <div className="flex flex-wrap items-center gap-3 mb-2">
                 <p className="text-xs text-gray-600 flex-1 min-w-[220px]">
-                  Each business&apos;s outreach stage, the same one as the Outreach stage column in Businesses. Choose a stage to list it, or use the board to drag.
+                  Each business&apos;s outreach stage, the same one as the Outreach stage column in Businesses. Choose a stage to list its businesses, or use the board to drag.
                 </p>
                 <div className="inline-flex border border-black/10 rounded-sm overflow-hidden" role="group" aria-label="Show as">
                   {([['list', 'Stages'], ['board', 'Board']] as const).map(([key, label]) => (
@@ -406,116 +404,124 @@ export function OutreachTab({ data, next, nextError, initialStage, initialBoard,
                 <PipelineBoard kind="outreach" allBusinessNames={allBusinessNames} />
               ) : (
                 <>
-                  <div role="group" aria-label="Outreach stages" className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 mb-3">
+                  <div role="group" aria-label="Outreach stages" className={cn(card, 'grid grid-cols-3 sm:grid-cols-6 divide-x divide-black/[0.06] mb-3 overflow-hidden')}>
                     {BOXES.map((b) => {
                       const n = counts[b.key] ?? 0
-                      const on = b.key === stage
+                      const on = listOpen && b.key === stage
                       return (
                         <button
                           key={b.key}
                           type="button"
                           aria-pressed={on}
-                          onClick={() => setStage(b.key)}
+                          onClick={() => (on ? setListOpen(false) : openStage(b.key))}
                           className={cn(
-                            'text-left bg-white border rounded-sm px-3 py-2 transition-colors duration-200 ease-out',
-                            on ? 'border-ms-band ring-2 ring-ms-band' : 'border-black/[0.08] hover:border-black/[0.2]',
+                            'text-left px-3 py-2 transition-colors duration-200 ease-out border-b-[3px]',
+                            on ? 'border-b-ms-band bg-brand-warm' : 'border-b-transparent hover:bg-brand-warm',
                           )}
                         >
                           <span className={cn('inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-full', PILL[b.tone])}>{b.label}</span>
-                          <span className="block text-2xl font-bold tabular-nums text-brand-dark mt-1">{n}</span>
-                          <span className="block h-1.5 rounded-sm bg-ms-muted overflow-hidden mt-1" aria-hidden="true">
+                          <span className="block text-xl font-bold tabular-nums text-brand-dark mt-0.5">{n}</span>
+                          <span className="block h-1 rounded-sm bg-ms-muted overflow-hidden mt-1" aria-hidden="true">
                             <span className="block h-full bg-ms-band" style={{ width: `${Math.max(2, (n / biggest) * 100)}%` }} />
                           </span>
-                          {on && <span className="sr-only"> (listed below)</span>}
+                          {on && <span className="sr-only"> (listed below; choose again to hide)</span>}
                         </button>
                       )
                     })}
                   </div>
 
-                  <label className="block mb-2 max-w-sm">
-                    <span className="sr-only">Search this stage</span>
-                    <input
-                      type="search"
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      placeholder="Search names and contacts"
-                      className="w-full text-sm border border-black/[0.12] rounded-sm px-2 min-h-10 md:min-h-8 bg-white"
-                    />
-                  </label>
+                  {listOpen && (
+                    <>
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <label className="block flex-1 max-w-sm">
+                          <span className="sr-only">Search this stage</span>
+                          <input
+                            type="search"
+                            value={q}
+                            onChange={(e) => setQ(e.target.value)}
+                            placeholder="Search names and contacts"
+                            className="w-full text-sm border border-black/[0.12] rounded-sm px-2 min-h-10 md:min-h-8 bg-white"
+                          />
+                        </label>
+                        <button type="button" className={softBtn} onClick={() => setListOpen(false)}>Hide the list</button>
+                      </div>
 
-                  {shown.length === 0 ? (
-                    <p className="text-sm text-gray-600 py-4">Nobody at this stage{q ? ' matches the search' : ''}.</p>
-                  ) : (
-                    <div className={cn('overflow-auto border border-ms-grid rounded-sm bg-white', full ? 'max-h-[calc(100vh-16rem)]' : 'max-h-[70vh]')}>
-                      <table className="w-full min-w-[720px] text-[13px] border-collapse">
-                        <caption className="sr-only">Businesses at the stage {stageDef(stage)?.label}, most recently in touch first.</caption>
-                        <thead>
-                          <tr>
-                            {['Business', 'Stage', 'Since', 'Last in touch', 'Main contact', 'Next to-do'].map((h, i) => (
-                              <th
-                                key={h}
-                                scope="col"
-                                className={cn('sticky top-0 bg-ms-header text-white text-left font-semibold px-2 py-1.5 whitespace-nowrap', i === 0 ? 'left-0 z-20' : 'z-10')}
-                              >
-                                {h}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {shown.map((r) => (
-                            <tr key={r.id} className="border-t border-ms-grid align-top hover:bg-brand-warm">
-                              <th scope="row" className="sticky left-0 z-[5] bg-white text-left font-semibold px-2 py-1.5 max-w-[240px]">
-                                <Link href={`/businesses/${r.id}`} className="text-brand-dark hover:underline">{r.name}</Link>
-                              </th>
-                              <td className="px-2 py-1">
-                                <label>
-                                  <span className="sr-only">Outreach stage for {r.name}</span>
-                                  <select
-                                    value={r.stage}
-                                    onChange={(e) => changeStage(r, e.target.value)}
-                                    className="text-xs border border-black/[0.12] rounded-sm bg-white px-1 min-h-10 md:min-h-7"
+                      {shown.length === 0 ? (
+                        <p className="text-sm text-gray-600 py-4">Nobody at this stage{q ? ' matches the search' : ''}.</p>
+                      ) : (
+                        <div className={cn('overflow-auto border border-ms-grid rounded-sm bg-white', full ? 'max-h-[calc(100vh-16rem)]' : 'max-h-[60vh]')}>
+                          <table className="w-full min-w-[720px] text-[13px] border-collapse">
+                            <caption className="sr-only">Businesses at the stage {stageDef(stage)?.label}, most recently in touch first.</caption>
+                            <thead>
+                              <tr>
+                                {['Business', 'Stage', 'Since', 'Last in touch', 'Main contact', 'Next to-do'].map((h, i) => (
+                                  <th
+                                    key={h}
+                                    scope="col"
+                                    className={cn('sticky top-0 bg-ms-header text-white text-left font-semibold px-2 py-1.5 whitespace-nowrap', i === 0 ? 'left-0 z-20' : 'z-10')}
                                   >
-                                    {OUTREACH_STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-                                    <option value="">Take off outreach</option>
-                                  </select>
-                                </label>
-                              </td>
-                              <td className="px-2 py-1.5 whitespace-nowrap tabular-nums">{dateGB(r.since)}</td>
-                              <td className="px-2 py-1.5 whitespace-nowrap tabular-nums">{dateGB(r.table?.last_in_touch)}</td>
-                              <td className="px-2 py-1.5">
-                                {contactName(r)}
-                                {r.table?.contact?.email && !r.table.contact.is_placeholder && (
-                                  <a href={`mailto:${r.table.contact.email}`} className="block text-xs text-brand-navy hover:underline break-all">{r.table.contact.email}</a>
-                                )}
-                              </td>
-                              <td className={cn('px-2 py-1.5', todoTone(r, today))}>{todoText(r)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                    {h}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {shown.map((r) => (
+                                <tr key={r.id} className="border-t border-ms-grid align-top hover:bg-brand-warm">
+                                  <th scope="row" className="sticky left-0 z-[5] bg-white text-left font-semibold px-2 py-1.5 max-w-[240px]">
+                                    <Link href={`/businesses/${r.id}`} className="text-brand-dark hover:underline">{r.name}</Link>
+                                  </th>
+                                  <td className="px-2 py-1">
+                                    <label>
+                                      <span className="sr-only">Outreach stage for {r.name}</span>
+                                      <select
+                                        value={r.stage}
+                                        onChange={(e) => changeStage(r, e.target.value)}
+                                        className="text-xs border border-black/[0.12] rounded-sm bg-white px-1 min-h-10 md:min-h-7"
+                                      >
+                                        {OUTREACH_STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                                        <option value="">Take off outreach</option>
+                                      </select>
+                                    </label>
+                                  </td>
+                                  <td className="px-2 py-1.5 whitespace-nowrap tabular-nums">{dateGB(r.since)}</td>
+                                  <td className="px-2 py-1.5 whitespace-nowrap tabular-nums">{dateGB(r.table?.last_in_touch)}</td>
+                                  <td className="px-2 py-1.5">
+                                    {contactName(r)}
+                                    {r.table?.contact?.email && !r.table.contact.is_placeholder && (
+                                      <a href={`mailto:${r.table.contact.email}`} className="block text-xs text-brand-navy hover:underline break-all">{r.table.contact.email}</a>
+                                    )}
+                                  </td>
+                                  <td className={cn('px-2 py-1.5', todoTone(r, today))}>{todoText(r)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-600 mt-2">
+                        {shown.length} {shown.length === 1 ? 'business' : 'businesses'}. To-do dates in <span className="text-ms-red-text font-semibold">red</span> have passed; <span className="text-ms-orange-text font-semibold">orange</span> are due within a week. A name opens the business page.
+                      </p>
+                    </>
                   )}
-                  <p className="text-xs text-gray-600 mt-2">
-                    {shown.length} {shown.length === 1 ? 'business' : 'businesses'}. To-do dates in <span className="text-ms-red-text font-semibold">red</span> have passed; <span className="text-ms-orange-text font-semibold">orange</span> are due within a week. A name opens the business page.
-                  </p>
                 </>
               )}
             </>
           )}
         </FullScreenPanel>
       </section>
+    </div>
+  )
+}
 
-      {/* Results by month */}
-      <section aria-labelledby="results-heading">
-        <div id="results-heading">
-          <SectionHead
-            title="Results by month"
-            hint="Contacted = the first approach that month. Replied = they emailed back within 30 days of it. Won = a deal recorded that month."
-          />
-        </div>
-        <ResultsChart months={months} />
-      </section>
+function RailHead({ id, title, count, children }: { id: string; title: string; count?: number; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2 px-3 pt-2.5 pb-0.5">
+      <h2 id={id} className="text-lg font-bold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
+        {title}
+        {count !== undefined && <span className="ml-1.5 text-xs font-semibold text-gray-600 tabular-nums" style={{ fontFamily: 'var(--font-sans)' }}>{count}</span>}
+      </h2>
+      {children}
     </div>
   )
 }
