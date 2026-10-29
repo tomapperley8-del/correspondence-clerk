@@ -186,6 +186,13 @@ export function Navigation() {
       badgeTone: '',
     },
     {
+      href: '/newsletter',
+      label: 'Newsletter',
+      active: pathname === '/newsletter',
+      badge: null,
+      badgeTone: '',
+    },
+    {
       href: '/outreach',
       label: 'Outreach',
       active: pathname === '/outreach',
