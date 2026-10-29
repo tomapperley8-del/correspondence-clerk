@@ -16,6 +16,7 @@ import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 import { OUTREACH_STAGES, PILL } from '@/app/businesses/_components/MastersheetTable'
 import { downloadSheet } from '@/lib/spreadsheet-export'
 import type { OutreachNextRow, OutreachSuggestion } from '@/app/actions/outreach-next'
+import type { OutreachWinbacks } from '@/app/actions/outreach-winbacks'
 import { WorkOnNext } from './WorkOnNext'
 import { OutreachSuggestions } from './OutreachSuggestions'
 
@@ -70,8 +71,9 @@ function todoTone(r: OutreachTabRow, today: string) {
   return ''
 }
 
-export function OutreachTab({ data, next, nextError, initialStage, initialBoard, initialQuery }: {
+export function OutreachTab({ data, next, nextError, winbacks, initialStage, initialBoard, initialQuery }: {
   data: OutreachTabData
+  winbacks?: OutreachWinbacks | null
   next: { rows: OutreachNextRow[]; suggestions: OutreachSuggestion[] } | null
   nextError?: string
   initialStage?: string
@@ -246,7 +248,7 @@ export function OutreachTab({ data, next, nextError, initialStage, initialBoard,
         {/* Main column: what to do */}
         <div className="flex-[999_1_620px] min-w-0">
           {next ? (
-            <WorkOnNext rows={next.rows} contacts={contacts} />
+            <WorkOnNext rows={next.rows} contacts={contacts} extra={winbacks} />
           ) : (
             <p className="text-sm text-red-700">Could not load Work on next: {nextError ?? 'no data'}</p>
           )}

@@ -6,6 +6,7 @@
 // short. Every row says why it is there and has three ways off the list, each with Undo:
 // Not now (hidden for a while, outreach_snoozes), Not interested (closed, with a backup) and
 // Take off outreach (the pipeline's own removal).
+// Stage 11c (layout C) adds a switch on the card: The pipeline, Win back, Fill a category.
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -20,6 +21,8 @@ import {
 import { removeBusinessFromOutreach, undoRemoveFromOutreach, updateOutreachStage } from '@/app/actions/businesses'
 import { ActionMenu, type MenuEntry } from '@/components/ui/action-menu'
 import { OUTREACH_STAGES, PILL, type Tone } from '@/app/businesses/_components/MastersheetTable'
+import type { OutreachWinbacks } from '@/app/actions/outreach-winbacks'
+import { WinBacks } from './WinBacks'
 
 const btnBase =
   'inline-flex items-center justify-center text-sm font-semibold px-3 min-h-10 md:min-h-9 pointer-coarse:min-h-10 rounded-sm transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
@@ -129,7 +132,10 @@ export function PointChips({ points, score }: { points: FitPoints; score: number
   )
 }
 
-export function WorkOnNext({ rows, contacts }: { rows: OutreachNextRow[]; contacts: Map<string, TableContact | null> }) {
+type Mode = 'pipeline' | 'winback' | 'gaps'
+
+export function WorkOnNext({ rows, contacts, extra }: { rows: OutreachNextRow[]; contacts: Map<string, TableContact | null>; extra?: OutreachWinbacks | null }) {
+  const [mode, setMode] = useState<Mode>('pipeline')
   const router = useRouter()
   // Rows taken off here, as "business:group", so a row that moves to another group (Not now) shows there.
   const [hidden, setHidden] = useState<Set<string>>(new Set())
@@ -377,10 +383,36 @@ export function WorkOnNext({ rows, contacts }: { rows: OutreachNextRow[]; contac
         <h2 id="work-on-next-heading" className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
           Work on next
         </h2>
-        <button type="button" className={linkBtn} aria-expanded={howOpen} onClick={() => setHowOpen((o) => !o)}>
-          {howOpen ? 'Hide how this is ordered' : 'How this is ordered'}
-        </button>
+        {extra && (
+          <div role="group" aria-label="Show" className="inline-flex border border-black/10 rounded-sm overflow-hidden ml-auto">
+            {([
+              ['pipeline', 'The pipeline', null],
+              ['winback', 'Win back', extra.winbacks.filter((w) => !w.snoozed_until).length],
+              ['gaps', 'Fill a category', extra.gaps.filter((g) => g.is_thin).length],
+            ] as const).map(([key, label, n]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={mode === key}
+                onClick={() => setMode(key)}
+                className={cn(
+                  'px-3 min-h-10 md:min-h-8 text-sm transition-colors duration-200 ease-out',
+                  mode === key ? 'bg-brand-navy text-white' : 'bg-white text-gray-800 hover:bg-brand-warm',
+                )}
+              >
+                {label}
+                {n != null && <span className="tabular-nums">{key === 'gaps' ? ` (${n} thin)` : ` (${n})`}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+        {mode === 'pipeline' && (
+          <button type="button" className={linkBtn} aria-expanded={howOpen} onClick={() => setHowOpen((o) => !o)}>
+            {howOpen ? 'Hide how this is ordered' : 'How this is ordered'}
+          </button>
+        )}
       </div>
+      {mode !== 'pipeline' && extra ? <div className="mt-2"><WinBacks key={mode} data={extra} mode={mode} /></div> : (<>
       {howOpen && (
         <div className="mx-3 mt-2 p-3 bg-brand-warm rounded-sm text-sm text-gray-700 space-y-1">
           <p>Plain rules on the latest email each way, worked out fresh every time (the outreach routine reads the same list). Replies first, then chases, follow-ups, ones to close, then new businesses by fit score.</p>
@@ -413,6 +445,7 @@ export function WorkOnNext({ rows, contacts }: { rows: OutreachNextRow[]; contac
       {current.groups.every((g) => count(g.key) === 0) && current.groups.length > 1 && (
         <p className="px-3 py-3 text-sm text-gray-600">Nothing to tidy up.</p>
       )}
+      </>)}
     </section>
   )
 }

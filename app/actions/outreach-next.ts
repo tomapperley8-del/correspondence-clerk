@@ -148,8 +148,9 @@ const OUTREACH_FIELDS = [
  * Mark one or many businesses Not interested (Close? and the Tidy up groups). Each row's
  * stage and dates are copied to cc_phase0_backup first under one batch reason, so Undo
  * puts them all back exactly. The lead mirror follows the stage as it does for a board move.
+ * offOutreachToo also closes a business with no stage (a win-back, Stage 11c).
  */
-export async function closeOutreachBusinesses(ids: string[]): Promise<{ batch?: string; closed?: number; error?: string }> {
+export async function closeOutreachBusinesses(ids: string[], opts?: { offOutreachToo?: boolean }): Promise<{ batch?: string; closed?: number; error?: string }> {
   const a = await auth()
   if ('error' in a) return { error: a.error }
   const { supabase, user, orgId } = a
@@ -162,7 +163,7 @@ export async function closeOutreachBusinesses(ids: string[]): Promise<{ batch?: 
     .eq('organization_id', orgId)
     .in('id', unique)
   if (readError) return { error: readError.message }
-  const open = ((before ?? []) as unknown as Raw[]).filter((b) => b.outreach_stage && b.outreach_stage !== 'not_interested')
+  const open = ((before ?? []) as unknown as Raw[]).filter((b) => (b.outreach_stage || opts?.offOutreachToo) && b.outreach_stage !== 'not_interested')
   if (open.length === 0) return { closed: 0 }
 
   const batch = `outreach_close ${user.id} ${new Date().toISOString()}`
