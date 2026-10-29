@@ -1,7 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ForNewsletterButton } from '@/components/ForNewsletterButton'
+import { ActionMenu, type MenuItem } from '@/components/ui/action-menu'
+import { FilterChips, type Chip } from '@/components/ui/filter-chips'
+import { FullScreenPanel } from '@/components/ui/full-screen-panel'
+import { ResizableSplit } from '@/components/ui/resizable-split'
+import { rowButtonClass, rowQuietButtonClass } from '@/components/ui/item-row'
+import { cn } from '@/lib/utils'
 import { type Correspondence } from '@/app/actions/correspondence'
 import { type Contact } from '@/app/actions/contacts'
 import { type ConversationThread } from '@/app/actions/threads'
@@ -17,6 +23,9 @@ import { DRAFT_KIND_LABEL, draftStatus } from './BusinessDrafts'
 // starts and ends, and QuickBooks invoices, newest first. Correspondence uses
 // the same entry card as the classic page, so every entry action still works.
 // Stage 7: drafts the routines wrote sit just above the email they answer.
+// Stage 14b: one line per item (date, kind, who and subject, the likely action
+// and More), with the chosen item in full in a reader beside the list; on a
+// phone it opens under its row. Full screen and a remembered divider.
 
 type Kind = 'correspondence' | 'task' | 'deal' | 'invoice' | 'draft'
 
@@ -67,6 +76,12 @@ function entryMatches(e: Correspondence, q: string): boolean {
   return !!(e.subject?.toLowerCase().includes(q) || e.contact?.name.toLowerCase().includes(q) || text.toLowerCase().includes(q))
 }
 
+const taskLabel = (t: GlanceTask) =>
+  t.source !== 'manual' ? 'Task'
+    : t.task_category?.name === 'For Newsletter' ? 'Newsletter'
+    : ['Call', 'Meeting', 'Event', 'Deadline'].includes(t.task_category?.name ?? '') ? t.task_category!.name
+    : 'To-do'
+
 const dayAt = (isoDate: string) => Date.parse(`${isoDate.slice(0, 10)}T12:00:00Z`)
 
 interface Props {
@@ -109,6 +124,10 @@ interface Props {
   onCreateThread: (entryId: string, name: string) => Promise<void>
   setActionError: (v: string | null) => void
   onCreateTodo?: (entry: Correspondence) => Promise<void>
+  /** Shown under the reader (the page's other sections as dropdowns); left out in full screen. */
+  aside?: React.ReactNode
+  /** Extra buttons beside Full screen (+ Entry, + Task ...). */
+  controls?: React.ReactNode
 }
 
 function Row({ label, tone, date, children }: { label: string; tone: string; date: string; children: React.ReactNode }) {
@@ -125,10 +144,14 @@ export function BusinessTimeline(props: Props) {
   const {
     correspondence, glance, drafts, membershipTypes, loading, remainingInDB, isLoadingMore, loadMore,
     searchQuery, setSearchQuery, filteredOut, onClearFilters, onTaskDone, busyTaskId,
-    isExpandedEntry, ...entryProps
+    isExpandedEntry, aside, controls, ...entryProps
   } = props
   const [filter, setFilter] = useState<Kind | 'all'>('all')
   const [openNotes, setOpenNotes] = useState<Set<string>>(new Set())
+  // The row shown in the reader, and (on a phone) the row opened under itself.
+  const [selected, setSelected] = useState<string | null>(null)
+  const [opened, setOpened] = useState<string | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const today = glance?.today ?? new Date().toISOString().slice(0, 10)
 
   const allItems = useMemo<Item[]>(() => {
@@ -204,11 +227,12 @@ export function BusinessTimeline(props: Props) {
     })
   }, [allItems, filter, searchQuery, remainingInDB, correspondence, membershipTypes])
 
-  const renderEntry = (entry: Correspondence, key: string) => (
+  // In the reader an email shows in full.
+  const renderEntry = (entry: Correspondence, key: string, full = false) => (
     <CorrespondenceEntry
       key={key}
       entry={entry}
-      isExpanded={isExpandedEntry(entry.id)}
+      isExpanded={full || isExpandedEntry(entry.id)}
       showPrevButton={false}
       showNextButton={false}
       searchQuery={searchQuery}
@@ -224,16 +248,80 @@ export function BusinessTimeline(props: Props) {
     return next
   })
 
-  const renderItem = (item: Item) => {
+  /** One line in the list. */
+  function rowFor(item: Item): RowView {
+    const date = formatAt(item.at)
+    switch (item.kind) {
+      case 'correspondence': {
+        const e = item.entry
+        const call = e.type === 'Call'
+        const kind = e.direction === 'received' ? (call ? 'Call from' : 'From')
+          : e.direction === 'sent' ? (call ? 'Called' : 'To')
+          : (e.type ?? 'Entry')
+        const who = e.contact?.name ?? (e.type === 'Note' ? 'Note' : 'No contact')
+        const text = e.formatted_text_current || e.formatted_text_original || e.raw_text_original
+        return {
+          date, kind,
+          kindTone: e.direction === 'received' ? 'text-ms-blue-text' : e.direction === 'sent' ? 'text-ms-green-text' : 'text-gray-600',
+          title: who,
+          detail: e.subject || firstLine(text),
+          status: e.action_needed !== 'none' ? e.action_needed.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : e.is_pinned ? 'Pinned' : undefined,
+          strong: e.direction === 'received',
+        }
+      }
+      case 'task': {
+        const t = item.task
+        const done = t.status === 'done'
+        const overdue = !done && !!t.due_date && t.due_date < today
+        return {
+          date, kind: taskLabel(t), kindTone: 'text-brand-dark', title: t.title, strong: !done, struck: done,
+          status: done ? 'Done' : t.due_date ? `Due ${relativeDays(t.due_date, today)}` : undefined,
+          late: overdue,
+        }
+      }
+      case 'deal': {
+        const c = item.contract
+        const amount = money(c.contract_amount, c.contract_currency)
+        return {
+          date, kind: 'Deal', kindTone: 'text-brand-navy',
+          title: `${membershipLabel(c.membership_type, membershipTypes)} ${item.event === 'start' ? 'started' : 'ended'}`,
+          detail: item.event === 'start' && amount ? `${amount}${c.billing_frequency === 'monthly' ? ' a month' : ''}` : undefined,
+        }
+      }
+      case 'invoice': {
+        const i = item.invoice
+        const voided = i.private_memo === 'Voided'
+        const outstanding = !voided && (i.balance ?? 0) > 0
+        return {
+          date, kind: 'Invoice', kindTone: 'text-gray-600',
+          title: `Invoice ${i.doc_number ?? i.qbo_invoice_id}`,
+          detail: [money(i.total_amount), i.line_description].filter(Boolean).join(' · ') || undefined,
+          status: voided ? 'Voided' : outstanding ? `${money(i.balance)} owed` : 'Paid',
+          late: outstanding && !!i.due_date && i.due_date < today,
+        }
+      }
+      case 'draft': {
+        const d = item.draft
+        return {
+          date, kind: 'Draft', kindTone: 'text-brand-olive',
+          title: `${DRAFT_KIND_LABEL[d.kind] ?? d.kind} draft`,
+          detail: d.subject ?? undefined,
+          status: d.sent_at ? undefined : 'Waiting to send',
+        }
+      }
+    }
+  }
+
+  const renderItem = (item: Item, full = false) => {
     switch (item.kind) {
       case 'correspondence':
-        return renderEntry(item.entry, item.key)
+        return renderEntry(item.entry, item.key, full)
       case 'task': {
         const t = item.task
         const done = t.status === 'done'
         const overdue = !done && t.due_date && t.due_date < today
         return (
-          <Row key={item.key} label={t.source !== 'manual' ? 'Task' : t.task_category?.name === 'For Newsletter' ? 'Newsletter' : ['Call', 'Meeting', 'Event', 'Deadline'].includes(t.task_category?.name ?? '') ? t.task_category!.name : 'To-do'} tone="bg-brand-olive/15 text-brand-dark" date={formatAt(item.at)}>
+          <Row key={item.key} label={taskLabel(t)} tone="bg-brand-olive/15 text-brand-dark" date={formatAt(item.at)}>
             <p className={done ? 'line-through text-gray-500' : 'font-medium'}>{t.title}</p>
             {t.notes && <p className="text-gray-600 whitespace-pre-wrap mt-0.5">{t.notes}</p>}
             <div className="flex flex-wrap items-center gap-3 mt-1 text-xs">
@@ -352,68 +440,188 @@ export function BusinessTimeline(props: Props) {
     }
   }
 
-  return (
-    <div className="bg-white border border-black/[0.06] rounded-sm p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 className="text-xl font-semibold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>History</h2>
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Show in history">
-          {FILTERS.map(({ kind, label }) => (
-            <button
-              key={kind}
-              type="button"
-              aria-pressed={filter === kind}
-              onClick={() => setFilter(kind)}
-              className={`text-xs px-2.5 py-1 border rounded-sm transition-colors ${
-                filter === kind ? 'bg-brand-navy text-white border-brand-navy' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {label} ({counts[kind]}{kind === 'correspondence' && remainingInDB > 0 ? '+' : ''})
-            </button>
-          ))}
-        </div>
+  const chips: Chip<Kind | 'all'>[] = FILTERS
+    .map(({ kind, label }) => ({ key: kind, label: `${label}${kind === 'correspondence' && remainingInDB > 0 ? ' (more to load)' : ''}`, count: counts[kind] }))
+    .filter((c) => c.key === 'all' || c.count > 0)
+
+  const current = visible.find((i) => i.key === selected) ?? visible[0] ?? null
+
+  // Up and Down move through the rows (one Tab stop for the list), as on Today.
+  function onListKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return
+    const buttons = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>('button[data-row]') ?? [])
+    const at = buttons.findIndex((b) => b === document.activeElement)
+    if (at < 0) return
+    e.preventDefault()
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : Math.min(buttons.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))
+    buttons[next].focus()
+    setSelected(buttons[next].dataset.row ?? null)
+  }
+
+  /** Choose a row: the reader shows it; on a phone it opens under the row. */
+  function open(key: string, focusReader = false) {
+    setSelected(key)
+    if (!window.matchMedia('(min-width: 1024px)').matches) setOpened((o) => (focusReader ? key : o === key ? null : key))
+    else if (focusReader) window.setTimeout(() => document.getElementById('history-reader')?.focus(), 50)
+  }
+
+  /** The likely action as a button, the rest in More. Everything else is in the reader. */
+  function rowActions(item: Item) {
+    if (item.kind === 'task' && item.task.status !== 'done') {
+      return (
+        <button type="button" className={rowButtonClass} disabled={busyTaskId === item.task.id} onClick={() => onTaskDone(item.task.id)}>
+          {busyTaskId === item.task.id ? 'Saving…' : 'Mark done'}
+        </button>
+      )
+    }
+    if (item.kind === 'draft' && !item.draft.sent_at) {
+      return <a href="https://outlook.office.com/mail/drafts" target="_blank" rel="noopener noreferrer" className={rowButtonClass}>Open drafts</a>
+    }
+    if (item.kind !== 'correspondence') return null
+    const e = item.entry
+    const followUp = () => {
+      const d = new Date()
+      d.setDate(d.getDate() + 7)
+      entryProps.onAction(e.id, 'follow_up', d.toISOString().split('T')[0])
+    }
+    const flagged = e.action_needed !== 'none'
+    const all: (MenuItem & { key: string })[] = [
+      ...(flagged
+        ? [{ key: 'done', label: 'Mark done', hint: `Clears "${e.action_needed.replace(/_/g, ' ')}"`, onSelect: () => entryProps.onAction(e.id, 'none') }]
+        : [
+            { key: 'follow', label: 'Follow-up', hint: 'Flag it for 7 days from now', onSelect: followUp },
+            { key: 'waiting', label: 'Waiting on them', onSelect: () => entryProps.onAction(e.id, 'waiting_on_them') },
+          ]),
+      ...(entryProps.onCreateTodo ? [{ key: 'todo', label: 'Create to-do', onSelect: () => entryProps.onCreateTodo!(e) }] : []),
+      { key: 'edit', label: 'Edit', onSelect: () => { open(item.key); entryProps.onStartEdit(e) } },
+      { key: 'pin', label: e.is_pinned ? 'Unpin' : 'Pin to the top', onSelect: () => entryProps.onPin(e.id, e.is_pinned ?? false) },
+      { key: 'delete', label: 'Delete', hint: 'You can undo it', onSelect: () => entryProps.onDelete(e.id, e.subject || '') },
+    ]
+    const mainKey = flagged ? 'done' : e.direction === 'received' ? 'follow' : e.direction === 'sent' ? 'waiting' : 'edit'
+    const main = all.find((a) => a.key === mainKey)!
+    return (
+      <>
+        <button type="button" className={rowButtonClass} onClick={main.onSelect}>{main.label}</button>
+        <ActionMenu
+          accessibleLabel={`More for ${e.subject || 'this entry'}`}
+          entries={[
+            ...all.filter((a) => a.key !== mainKey),
+            { label: 'All actions', hint: 'Newsletter, thread, move, copy, link', onSelect: () => open(item.key, true) },
+          ]}
+        />
+      </>
+    )
+  }
+
+  const list = () => (
+    <div className="bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] min-w-0">
+      <div className="p-3 space-y-2 border-b border-black/[0.06]">
+        <FilterChips chips={chips} value={filter} onChange={(k) => { setFilter(k); setSelected(null) }} label="Show in history" />
+        <input
+          type="search"
+          placeholder="Search this history"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          aria-label="Search this history"
+          className="w-full px-3 min-h-10 md:min-h-8 text-sm border border-gray-300 rounded-sm focus:border-brand-navy focus:outline-none"
+        />
+        {filteredOut && (
+          <p className="text-xs text-gray-700">
+            Showing only {filteredOut} (a filter set on the classic page).{' '}
+            <button type="button" onClick={onClearFilters} className="text-brand-navy hover:underline">Show all correspondence</button>
+          </p>
+        )}
       </div>
-
-      <input
-        type="text"
-        placeholder="Search this history..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        aria-label="Search this history"
-        className="w-full px-3 py-2 mb-4 text-sm border border-gray-300 rounded-sm focus:border-brand-navy focus:outline-none"
-      />
-
-      {filteredOut && (
-        <p className="text-xs text-gray-600 mb-4">
-          Showing only {filteredOut} (a filter set on the classic page).{' '}
-          <button type="button" onClick={onClearFilters} className="text-brand-navy hover:underline">Show all correspondence</button>
-        </p>
-      )}
-
-      {loading ? (
-        <div className="animate-pulse space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-gray-100 rounded-sm" />)}
-        </div>
-      ) : visible.length === 0 ? (
-        <p className="text-sm text-gray-600 py-8 text-center">{searchQuery ? 'Nothing matches that search.' : 'Nothing here yet.'}</p>
-      ) : (
-        <div className="space-y-3">{visible.map(renderItem)}</div>
-      )}
-
-      {!loading && remainingInDB > 0 && (filter === 'all' || filter === 'correspondence') && (
-        <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={loadMore}
-            disabled={isLoadingMore}
-            className="px-4 py-2 text-sm border border-gray-300 bg-white text-gray-700 hover:border-brand-navy rounded-sm disabled:opacity-50"
-          >
-            {isLoadingMore ? 'Loading…' : `Show older history (${remainingInDB} more ${remainingInDB === 1 ? 'entry' : 'entries'})`}
-          </button>
-        </div>
-      )}
+      {/* The list scrolls with the page (a scroll box of its own would clip the More menus); the reader stays in view. */}
+      <div ref={listRef} onKeyDown={onListKey}>
+        {loading ? (
+          <div className="animate-pulse space-y-2 p-3">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="h-9 bg-gray-100 rounded-sm" />)}
+          </div>
+        ) : visible.length === 0 ? (
+          <p className="text-sm text-gray-700 py-8 text-center">{searchQuery ? 'Nothing matches that search.' : 'Nothing here yet.'}</p>
+        ) : (
+          <ul aria-label="History">
+            {visible.map((item) => {
+              const r = rowFor(item)
+              const on = item.key === current?.key
+              return (
+                <li key={item.key} className="border-b border-black/[0.05] last:border-b-0">
+                  <div className={cn('flex items-center gap-1 pr-2 border-l-[3px] transition-colors duration-200 ease-out', on ? 'bg-brand-navy/[0.06] border-brand-navy' : 'border-transparent hover:bg-brand-warm')}>
+                    <button
+                      type="button"
+                      data-row={item.key}
+                      tabIndex={on ? 0 : -1}
+                      aria-current={on ? 'true' : undefined}
+                      aria-expanded={opened === item.key}
+                      aria-label={[r.date, r.kind, r.title, r.detail, r.status].filter(Boolean).join('. ')}
+                      onClick={() => open(item.key)}
+                      className="min-w-0 flex-1 text-left grid grid-cols-[4.75rem_minmax(0,1fr)] sm:grid-cols-[5.25rem_4.75rem_minmax(0,1fr)] gap-x-2 items-baseline pl-2 py-2 min-h-10 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy"
+                    >
+                      <span className="text-xs text-gray-600 tabular-nums whitespace-nowrap">{r.date}</span>
+                      <span className={cn('hidden sm:block text-[11px] font-semibold uppercase tracking-wide truncate', r.kindTone)}>{r.kind}</span>
+                      <span className="min-w-0 line-clamp-2 break-words sm:line-clamp-none sm:block sm:truncate" title={[r.title, r.detail, r.status].filter(Boolean).join(' · ')}>
+                        <span className={cn('sm:hidden text-[11px] font-semibold uppercase tracking-wide mr-1.5', r.kindTone)}>{r.kind}</span>
+                        <span className={cn(r.strong && 'font-semibold', r.struck ? 'line-through text-gray-600' : 'text-brand-dark')}>{r.title}</span>
+                        {r.detail && <span className="text-gray-600"> · {r.detail}</span>}
+                        {r.status && (
+                          <span className={cn('ml-2 text-xs font-semibold px-1.5 py-0.5 rounded-sm whitespace-nowrap', r.late ? 'bg-ms-red text-ms-red-text' : 'bg-brand-warm text-gray-700')}>
+                            {r.status}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                    <div className="flex items-center gap-1 shrink-0">{rowActions(item)}</div>
+                  </div>
+                  {opened === item.key && <div className="lg:hidden px-2 pb-3 pt-1 bg-brand-warm">{renderItem(item, true)}</div>}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {!loading && remainingInDB > 0 && (filter === 'all' || filter === 'correspondence') && (
+          <div className="p-3 text-center border-t border-black/[0.05]">
+            <button type="button" onClick={loadMore} disabled={isLoadingMore} className={rowQuietButtonClass}>
+              {isLoadingMore ? 'Loading…' : `Show older history (${remainingInDB} more ${remainingInDB === 1 ? 'entry' : 'entries'})`}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
+
+  const reader = (full: boolean) => (
+    // The whole column stays in view while the list scrolls with the page.
+    <div className="space-y-3 min-w-0 lg:sticky lg:top-2 lg:max-h-[calc(100vh-1rem)] lg:overflow-y-auto">
+      <section
+        id="history-reader"
+        tabIndex={-1}
+        aria-label="The chosen entry"
+        className="hidden lg:block bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] p-3 focus:outline-none"
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && !e.defaultPrevented && (e.target as HTMLElement).closest('[role="menu"]') === null) {
+            listRef.current?.querySelector<HTMLElement>('button[data-row][tabindex="0"]')?.focus()
+          }
+        }}
+      >
+        {current ? renderItem(current, true) : <p className="text-sm text-gray-700">Choose a row to read it here.</p>}
+      </section>
+      {!full && aside}
+    </div>
+  )
+
+  return (
+    <FullScreenPanel title="History" headingId="history-h" card={false} controls={controls}>
+      {(full) => (
+        <ResizableSplit storageKey="cc.business.split" defaultPercent={56} label="Resize the history and the reader" first={list()} second={reader(full)} />
+      )}
+    </FullScreenPanel>
+  )
 }
+
+type RowView = { date: string; kind: string; kindTone: string; title: string; detail?: string; status?: string; late?: boolean; strong?: boolean; struck?: boolean }
+
+const firstLine = (text: string | null | undefined) => (text ?? '').split('\n').map((l) => l.trim()).find(Boolean)?.slice(0, 140) ?? ''
 
 function formatAt(at: number): string {
   return dateOnlyGB(new Date(at).toISOString())

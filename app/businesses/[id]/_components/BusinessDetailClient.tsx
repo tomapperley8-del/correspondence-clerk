@@ -46,6 +46,7 @@ import { BusinessReviewBar } from './BusinessReviewBar'
 import { BusinessGlance } from './BusinessGlance'
 import { ForNewsletterButton } from '@/components/ForNewsletterButton'
 import { BusinessTimeline } from './BusinessTimeline'
+import { ActionMenu } from '@/components/ui/action-menu'
 
 function formatRelativeTime(isoString: string): string {
   const diffMs = Date.now() - new Date(isoString).getTime()
@@ -117,9 +118,17 @@ export function BusinessDetailClient({
   // At-a-glance layout (UI overhaul Stage 6). The classic page stays one click
   // away until Stage 7; the choice is remembered per browser.
   const [layout, setLayout] = useState<'glance' | 'classic'>('glance')
-  const [glanceTab, setGlanceTab] = useState<'history' | 'contacts' | 'details' | 'files'>(
+  const [glanceTab] = useState<'history' | 'contacts' | 'details' | 'files'>(
     initialTab === 'contacts' || initialTab === 'details' || initialTab === 'files' ? initialTab : 'history'
   )
+  // Stage 14b: Contacts, Deal and details, Files and news are dropdowns; ?tab= opens one.
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(glanceTab === 'history' ? [] : [glanceTab]))
+  const toggleSection = (key: string) => setOpenSections((prev) => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  })
   const [glance, setGlance] = useState<GlanceData | null>(initialGlance)
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null)
   useEffect(() => { setGlance(initialGlance) }, [initialGlance])
@@ -632,7 +641,7 @@ export function BusinessDetailClient({
   )
 
   const quickActionsBar = (
-    <div className="sticky top-0 z-10 bg-white border border-gray-200 px-4 py-2.5 mb-6 flex items-center gap-3">
+    <div className="bg-white border border-black/[0.06] rounded-sm px-3 py-2 mb-3 flex flex-wrap items-center gap-2">
       <Link
         href={`/new-entry?businessId=${businessId}`}
         className="text-xs font-semibold px-3 py-1.5 bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors"
@@ -787,10 +796,11 @@ export function BusinessDetailClient({
     </>
   )
 
-  const tabsRef = useRef<HTMLDivElement>(null)
+  const sectionsRef = useRef<HTMLDivElement>(null)
   const showTab = (tab: typeof glanceTab) => {
-    setGlanceTab(tab)
-    setTimeout(() => tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+    if (tab === 'history') return
+    setOpenSections((prev) => new Set(prev).add(tab))
+    setTimeout(() => document.getElementById(`section-${tab}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
   }
   const filterContactName = contactFilter !== 'all' ? (contacts.find(c => c.id === contactFilter)?.name ?? 'one contact') : null
   const filteredOut = contactFilter !== 'all' || directionFilter !== 'all'
@@ -801,14 +811,64 @@ export function BusinessDetailClient({
     : null
 
   if (layout === 'glance') {
-    const TABS: { key: typeof glanceTab; label: string }[] = [
-      { key: 'history', label: 'History' },
-      { key: 'contacts', label: `Contacts (${contacts.length})` },
-      { key: 'details', label: 'Deal and details' },
-      { key: 'files', label: 'Files and news' },
+    // Stage 14b: the page's other parts as dropdowns under the reader (after the list on a phone).
+    const SECTIONS: { key: Exclude<typeof glanceTab, 'history'>; label: string; body: React.ReactNode }[] = [
+      { key: 'contacts', label: `Contacts (${contacts.length})`, body: <ContactsList contacts={contacts} business={business} onDeleteContact={handleDeleteContact} /> },
+      {
+        key: 'details',
+        label: 'Deal and details',
+        body: (
+          <>
+            {businessDetailsBox}
+            <PipelineStatusCard business={business} />
+            <div className="mb-6">
+              <ContractDetailsCard business={business} onUpdate={handleContractUpdate} membershipTypes={membershipTypes} />
+            </div>
+            <BusinessClubCard businessId={business.id} />
+            <BusinessOneOffs sales={oneOffSales} />
+            <BusinessDrafts drafts={routineDrafts} />
+          </>
+        ),
+      },
+      {
+        key: 'files',
+        label: 'Files and news',
+        body: (
+          <>
+            <BusinessFiles businessId={business.id} />
+            <BusinessArticles businessId={business.id} />
+            <BusinessFreebies businessId={business.id} />
+          </>
+        ),
+      },
     ]
+    const sections = (
+      <div ref={sectionsRef} className="bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] divide-y divide-black/[0.06]">
+        {SECTIONS.map(({ key, label, body }) => {
+          const isOpen = openSections.has(key)
+          return (
+            <section key={key} id={`section-${key}`} className="scroll-mt-4">
+              <h2 className="!text-sm !leading-5">
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-controls={`section-${key}-body`}
+                  onClick={() => toggleSection(key)}
+                  className="w-full flex items-center gap-2 px-3 min-h-11 text-left font-semibold text-brand-dark hover:bg-brand-warm transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy"
+                >
+                  <span aria-hidden="true" className={`inline-block w-3 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}>▸</span>
+                  {label}
+                  <span className="ml-auto text-xs font-semibold text-brand-navy">{isOpen ? 'Hide' : 'Show'}</span>
+                </button>
+              </h2>
+              {isOpen && <div id={`section-${key}-body`} className="px-3 pb-3 pt-1 min-w-0">{body}</div>}
+            </section>
+          )
+        })}
+      </div>
+    )
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <Breadcrumbs items={[
           fromTodos
             ? { label: 'Today', href: '/today' }
@@ -818,27 +878,25 @@ export function BusinessDetailClient({
 
         {topBanners}
 
-        <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
-          <div className="min-w-0">
+        <div className="flex flex-wrap justify-between items-center gap-x-3 gap-y-2 mb-3">
+          <div className="min-w-0 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h1 className="text-3xl font-semibold text-brand-dark break-words" style={{ fontFamily: 'var(--font-serif)' }}>{business.name}</h1>
             {(business.category || business.status || membershipLabelText) && (
-              <div className="flex flex-wrap gap-2 mt-1">
-                {business.category && <span className="text-xs bg-gray-100 px-2 py-0.5 text-gray-700 rounded-sm">{business.category}</span>}
-                {business.status && <span className="text-xs bg-gray-100 px-2 py-0.5 text-gray-700 rounded-sm">{business.status}</span>}
-                {membershipLabelText && <span className="text-xs bg-gray-100 px-2 py-0.5 text-gray-700 rounded-sm">{membershipLabelText}</span>}
+              <div className="flex flex-wrap gap-1.5">
+                {membershipLabelText && <span className="text-xs font-semibold bg-ms-green text-ms-green-text px-2 py-0.5 rounded-sm">{membershipLabelText}</span>}
+                {business.category && <span className="text-xs bg-brand-warm border border-black/[0.06] px-2 py-0.5 text-gray-700 rounded-sm">{business.category}</span>}
+                {business.status && <span className="text-xs bg-brand-warm border border-black/[0.06] px-2 py-0.5 text-gray-700 rounded-sm">{business.status}</span>}
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <EditBusinessButton business={business} />
-            <button
-              type="button"
-              onClick={() => chooseLayout('classic')}
-              className="text-xs px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-sm transition-colors"
-              title="The old layout, kept while the new one settles in"
-            >
-              Classic page
-            </button>
+            <ActionMenu
+              accessibleLabel="More for this business"
+              entries={[
+                { label: 'Classic page', hint: 'The old layout, kept while the new one settles in', onSelect: () => chooseLayout('classic') },
+              ]}
+            />
           </div>
         </div>
 
@@ -856,67 +914,24 @@ export function BusinessDetailClient({
 
         {quickActionsBar}
 
-        <div ref={tabsRef} className="flex flex-wrap gap-1 mb-4 border-b border-black/[0.06] scroll-mt-16" role="tablist" aria-label="Business page sections">
-          {TABS.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={glanceTab === key}
-              onClick={() => setGlanceTab(key)}
-              className={`text-sm px-3 py-2 -mb-px border-b-2 transition-colors ${
-                glanceTab === key ? 'border-brand-navy text-brand-navy font-semibold' : 'border-transparent text-gray-600 hover:text-brand-dark'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {glanceTab === 'history' && (
-          <BusinessTimeline
-            correspondence={correspondence}
-            glance={glance}
-            drafts={routineDrafts}
-            membershipTypes={membershipTypes}
-            loading={correspondenceLoading}
-            remainingInDB={remainingInDB}
-            isLoadingMore={isLoadingMore}
-            loadMore={loadMore}
-            filteredOut={filteredOut}
-            onClearFilters={() => { setContactFilter('all'); setDirectionFilter('all') }}
-            onTaskDone={handleTaskDone}
-            busyTaskId={busyTaskId}
-            threads={threads}
-            {...entryPassthroughProps}
-            setSearchQuery={setSearchQuery}
-          />
-        )}
-
-        {glanceTab === 'contacts' && (
-          <ContactsList contacts={contacts} business={business} onDeleteContact={handleDeleteContact} />
-        )}
-
-        {glanceTab === 'details' && (
-          <>
-            {businessDetailsBox}
-            <PipelineStatusCard business={business} />
-            <div className="mb-6">
-              <ContractDetailsCard business={business} onUpdate={handleContractUpdate} membershipTypes={membershipTypes} />
-            </div>
-            <BusinessClubCard businessId={business.id} />
-            <BusinessOneOffs sales={oneOffSales} />
-            <BusinessDrafts drafts={routineDrafts} />
-          </>
-        )}
-
-        {glanceTab === 'files' && (
-          <>
-            <BusinessFiles businessId={business.id} />
-            <BusinessArticles businessId={business.id} />
-            <BusinessFreebies businessId={business.id} />
-          </>
-        )}
+        <BusinessTimeline
+          correspondence={correspondence}
+          glance={glance}
+          drafts={routineDrafts}
+          membershipTypes={membershipTypes}
+          loading={correspondenceLoading}
+          remainingInDB={remainingInDB}
+          isLoadingMore={isLoadingMore}
+          loadMore={loadMore}
+          filteredOut={filteredOut}
+          onClearFilters={() => { setContactFilter('all'); setDirectionFilter('all') }}
+          onTaskDone={handleTaskDone}
+          busyTaskId={busyTaskId}
+          threads={threads}
+          {...entryPassthroughProps}
+          setSearchQuery={setSearchQuery}
+          aside={sections}
+        />
 
         {confirmDialogs}
       </div>

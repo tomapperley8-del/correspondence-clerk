@@ -19,6 +19,9 @@ interface Props {
   businesses: Business[]
   isSelected?: boolean
   onToggleSelect?: () => void
+  /** Stage 14b: the list has already looked the address up (and auto-filed definite matches); this is its business match. */
+  matchedBusinessId?: string | null
+  skipAutoMatch?: boolean
 }
 
 // Derive a human-readable business name from an email address domain.
@@ -57,7 +60,7 @@ function cleanPreview(text: string): string {
     .trim()
 }
 
-export default function InboxCard({ item, businesses: initialBusinesses, isSelected, onToggleSelect }: Props) {
+export default function InboxCard({ item, businesses: initialBusinesses, isSelected, onToggleSelect, matchedBusinessId, skipAutoMatch }: Props) {
   const router = useRouter()
   const [businesses, setBusinesses] = useState<Business[]>(initialBusinesses)
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
@@ -81,6 +84,7 @@ export default function InboxCard({ item, businesses: initialBusinesses, isSelec
   // - Definite contact match (contactId non-null) → auto-file immediately, no user action needed.
   // - Business-only match → pre-select the business so user just hits "File it".
   useEffect(() => {
+    if (skipAutoMatch) return
     const emailToLookup = isSent ? (item.to_emails?.[0]?.email ?? '') : item.from_email
     if (!emailToLookup) return
 
@@ -102,6 +106,12 @@ export default function InboxCard({ item, businesses: initialBusinesses, isSelec
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // The list's match can arrive after this card is shown: pre-select it unless a business is already chosen.
+  useEffect(() => {
+    if (skipAutoMatch && matchedBusinessId && !selectedBusinessId) handleSelectBusiness(matchedBusinessId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedBusinessId])
 
   if (!visible) return null
 
@@ -232,7 +242,7 @@ export default function InboxCard({ item, businesses: initialBusinesses, isSelec
             />
           </div>
         )}
-        <div className="flex-1 p-5">
+        <div className="flex-1 min-w-0 p-4 sm:p-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="min-w-0 flex-1">
