@@ -10,7 +10,8 @@ import { loadMatchInputs, pagedSelect, ServiceClient } from './load'
  * is matched by its website). An item takes a business only when the issue's mention of that business
  * is confirmed (by the rules or by Tom), so Yes and No on the tab carry through. Of several, the
  * strongest kind wins, then the one named first.
- * Contributor: a contributor's name or alias as whole words, the first one named.
+ * Contributor: a contributor's name or alias (a person, or a series such as "Volunteer stories") as
+ * whole words, capitals ignored, the first one named.
  *
  * Rows are keyed on (issue_id, position) and only written when something changed. Where Tom edited an
  * item (edited_at), its kind, business and contributor stay as he left them.
@@ -27,7 +28,8 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 function contributorMatchers(cs: Contributor[]) {
   return cs.flatMap((c) =>
     [c.name, ...(c.aliases ?? [])].map((s) => s.trim()).filter((s) => s.length >= 3)
-      .map((s) => ({ id: c.id, len: s.length, re: new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(s)}(?![\\p{L}\\p{N}])`, 'u') })))
+      // Capitals ignored: series are often written in lower case ("Chiswick Calendar volunteer stories")
+      .map((s) => ({ id: c.id, len: s.length, re: new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(s)}(?![\\p{L}\\p{N}])`, 'iu') })))
 }
 
 function firstContributor(text: string, ms: ReturnType<typeof contributorMatchers>): string | null {
