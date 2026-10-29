@@ -15,6 +15,9 @@ import { FullScreenPanel } from '@/components/ui/full-screen-panel'
 import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 import { OUTREACH_STAGES, PILL } from '@/app/businesses/_components/MastersheetTable'
 import { downloadSheet } from '@/lib/spreadsheet-export'
+import type { OutreachNextRow, OutreachSuggestion } from '@/app/actions/outreach-next'
+import { WorkOnNext } from './WorkOnNext'
+import { OutreachSuggestions } from './OutreachSuggestions'
 
 // The Outreach tab (UI overhaul Stage 16c, layout A, Tom's pick on 28 Oct):
 // one page top to bottom. A summary; leads to accept and the outreach
@@ -76,8 +79,10 @@ function SectionHead({ title, count, hint }: { title: string; count?: string; hi
   )
 }
 
-export function OutreachTab({ data, initialStage, initialBoard, initialQuery }: {
+export function OutreachTab({ data, next, nextError, initialStage, initialBoard, initialQuery }: {
   data: OutreachTabData
+  next: { rows: OutreachNextRow[]; suggestions: OutreachSuggestion[] } | null
+  nextError?: string
   initialStage?: string
   initialBoard?: boolean
   initialQuery?: string
@@ -123,6 +128,7 @@ export function OutreachTab({ data, initialStage, initialBoard, initialQuery }: 
       .filter((r) => boxOf(r.stage) === stage && (!needle || r.name.toLowerCase().includes(needle) || contactName(r).toLowerCase().includes(needle)))
       .sort((a, b) => (b.table?.last_in_touch ?? '').localeCompare(a.table?.last_in_touch ?? '') || a.name.localeCompare(b.name, 'en-GB'))
   }, [rows, stage, q])
+  const contacts = useMemo(() => new Map(data.rows.map((r) => [r.id, r.table?.contact ?? null])), [data.rows])
   const allBusinessNames = useMemo(() => data.rows.map((r) => ({ id: r.id, name: r.name })), [data.rows])
 
   async function accept(lead: ProspectLead) {
@@ -247,6 +253,12 @@ export function OutreachTab({ data, initialStage, initialBoard, initialQuery }: 
         })}
       </div>
 
+      {next ? (
+        <WorkOnNext rows={next.rows} contacts={contacts} />
+      ) : (
+        <p className="text-sm text-red-700 mb-6">Could not load Work on next: {nextError ?? 'no data'}</p>
+      )}
+
       {/* Leads and drafts side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         <section id="leads" aria-labelledby="leads-heading" className="min-w-0 scroll-mt-4">
@@ -342,6 +354,8 @@ export function OutreachTab({ data, initialStage, initialBoard, initialQuery }: 
       </div>
 
       {/* Pipeline */}
+      {next && <OutreachSuggestions suggestions={next.suggestions} />}
+
       <section id="pipeline" aria-labelledby="outreach-pipeline-heading" className="mb-8 scroll-mt-4">
         <FullScreenPanel
           title="Pipeline"
