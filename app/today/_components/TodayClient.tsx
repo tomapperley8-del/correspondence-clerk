@@ -23,7 +23,7 @@ import { TodayQuickAdd } from './TodayQuickAdd'
 import { TodayCalendar, CALENDAR_CHANGED } from './TodayCalendar'
 import { addToNewsletter } from '@/components/ForNewsletterButton'
 import { ActionMenu, type MenuItem } from '@/components/ui/action-menu'
-import { FilterChips, type Chip } from '@/components/ui/filter-chips'
+import { FoldSection } from '@/components/ui/fold-section'
 import { FullScreenPanel, useFullScreen } from '@/components/ui/full-screen-panel'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 
@@ -37,18 +37,18 @@ import { ResizableSplit } from '@/components/ui/resizable-split'
 // detail opens under its row and the calendar follows the list. Colours are
 // the Mastersheet palette of the Businesses table. Nothing is ticked here but
 // to-dos and newsletter items: a line goes when its cause goes.
+//
+// Stage 14c ("nothing out of sight", Tom 29 Oct): your to-dos have their own
+// box at the top, overdue first, with + Add to-do inside; every other kind is a
+// folded section with its count (the chips went: the headings carry the same
+// counts), so every heading is on the first screen. Open sections, the detail
+// panel and the calendar scroll inside themselves.
 
 const OUTLOOK_DRAFTS = 'https://outlook.office.com/mail/drafts'
-const FILTER_STORE = 'cc.today.filter'
-/** Which dropdown sections are open under All, remembered in this browser. */
-const OPEN_STORE = 'cc.today.open'
 const OVERDUE_HINT =
   'The nav badge counts these: money more than 30 days overdue, a renewal ended in the last 30 days or ending within a week, an email waiting a week or more, a to-do past its date.'
-/** A list or section shows this many rows, then "Show all" (full screen shows all). */
-const LIST_LIMIT = 10
 
 type Kind = TodayReason | 'newsletter' | 'snoozed'
-type FilterKey = 'all' | 'overdue' | Kind
 
 type Row = {
   key: string
@@ -74,7 +74,7 @@ const TONE: Record<Tone, string> = {
   muted: 'bg-ms-muted text-ms-muted-text',
 }
 
-const CHIPS: { key: Kind; label: string; hint: string }[] = [
+const SECTIONS: { key: Kind; label: string; hint: string }[] = [
   { key: 'money_owed', label: 'Money', hint: 'QuickBooks invoices past due, with no chaser in the last 7 days.' },
   { key: 'renewal', label: 'Renewals', hint: 'Ending in the next 45 days or ended in the last 60, with no outcome recorded.' },
   { key: 'club_card_lapsed', label: 'Lapsed cards', hint: 'The card ended more than 60 days ago (or is not renewing) but the website page is still up.' },
@@ -322,43 +322,59 @@ export function TodayClient({
 
   const actions: PanelActions = { run, remove, removeNewsletter, busy, today, changed, wednesday: newsletter.wednesday }
 
-  const list = (
-    <FullScreenPanel
-      title="Needs attention"
-      headingId="attention-h"
+  const todoRows = rows.filter((r) => r.kind === 'todo')
+  const current = rows.find((r) => r.key === selected) ?? rows.find((r) => r.kind !== 'snoozed') ?? null
+  const listProps = { selected: current?.key ?? null, opened, choose, renderInline: (row: Row) => <DetailPanel row={row} detail={row.business_id ? details.get(row.business_id) : undefined} actions={actions} inline /> }
+
+  const todos = (
+    <FoldSection
+      storageKey="today.todos"
+      title="Your to-dos"
+      big
+      defaultOpen
+      count={todoRows.length}
+      badge={todoRows.some((r) => r.overdue) ? <span className="shrink-0 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded-full bg-ms-red text-ms-red-text" style={{ fontFamily: 'var(--font-sans)' }}>{todoRows.filter((r) => r.overdue).length} overdue</span> : undefined}
+      scroll="max-h-[12vh] sm:max-h-[16vh] lg:max-h-[24vh]"
       controls={
         <button type="button" className={`${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`} aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
-          + Add
+          + Add to-do
         </button>
       }
+      className="shadow-[var(--shadow-sm)]"
     >
-      <div className="space-y-3">
-        {adding && (
-          <div className="bg-ms-green/40 border border-ms-green rounded-sm p-3">
-            <TodayQuickAdd
-              today={today}
-              wednesday={newsletter.wednesday}
-              onCancel={() => setAdding(false)}
-              onAdded={() => {
-                setAdding(false)
-                changed()
-              }}
-            />
-          </div>
-        )}
-        <OtherThings data={data} quiet={quiet} showQuiet={showQuiet} setShowQuiet={setShowQuiet} busy={busy} run={run} />
-        <AttentionList
-          rows={rows}
-          selected={selected}
-          opened={opened}
-          choose={choose}
-          renderInline={(row) => <DetailPanel row={row} detail={row.business_id ? details.get(row.business_id) : undefined} actions={actions} inline />}
-        />
+      {adding && (
+        <div className="bg-ms-green/40 border-b border-ms-green p-3">
+          <TodayQuickAdd
+            today={today}
+            wednesday={newsletter.wednesday}
+            onCancel={() => setAdding(false)}
+            onAdded={() => {
+              setAdding(false)
+              changed()
+            }}
+          />
+        </div>
+      )}
+      {todoRows.length === 0 ? (
+        <p className="text-sm text-gray-700 px-3 py-2">No to-dos. Use + Add to-do for anything you have said you will do.</p>
+      ) : (
+        <RowList rows={todoRows} label="Your to-dos" {...listProps} />
+      )}
+    </FoldSection>
+  )
+
+  // Under the list on a computer; under the calendar on a phone, so the calendar's heading stays on the first screen.
+  const other = <OtherThings data={data} quiet={quiet} showQuiet={showQuiet} setShowQuiet={setShowQuiet} busy={busy} run={run} />
+
+  const list = (
+    <FullScreenPanel title="Needs attention" headingId="attention-h" className="!p-2.5 sm:!p-4">
+      <div className="space-y-2">
+        <AttentionList rows={rows.filter((r) => r.kind !== 'todo')} {...listProps} />
+        <div className="hidden lg:block">{other}</div>
       </div>
     </FullScreenPanel>
   )
 
-  const current = rows.find((r) => r.key === selected) ?? rows.find((r) => r.kind !== 'snoozed') ?? null
   // The panel follows the first row until one is chosen.
   useEffect(() => {
     if (!selected && current?.business_id) loadDetail(current.business_id)
@@ -366,11 +382,11 @@ export function TodayClient({
   }, [current?.key, selected])
 
   const side = (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <section
         id="today-detail"
         aria-label="Detail"
-        className={cn(CARD, 'hidden lg:block p-4 sm:p-5')}
+        className={cn(CARD, 'hidden lg:block p-4 max-h-[42vh] overflow-y-auto overscroll-contain')}
         onKeyDown={(e) => {
           if (e.key === 'Escape' && !e.defaultPrevented && (e.target as HTMLElement).closest('[role="menu"]') === null) {
             document.querySelector<HTMLElement>('button[data-row][aria-current="true"], button[data-row][tabindex="0"]')?.focus()
@@ -384,20 +400,21 @@ export function TodayClient({
         )}
       </section>
       <TodayCalendar today={today} initialItems={calendar} onChanged={() => { refreshNav(); router.refresh() }} />
+      <div className="lg:hidden">{other}</div>
     </div>
   )
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-4xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>Today</h1>
-        <p className="text-sm text-gray-700 mt-1">
+    <div className="space-y-3">
+      <header className="flex flex-wrap items-baseline gap-x-4">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-brand-dark" style={{ fontFamily: 'var(--font-serif)' }}>Today</h1>
+        <p className="text-sm text-gray-700">
           <strong className="text-ms-red-text">{overdueCount} overdue.</strong>{' '}
-          {rows.filter((r) => r.kind !== 'snoozed').length} in the list, nothing hidden.
+          {rows.filter((r) => r.kind !== 'snoozed').length} in the list<span className="hidden sm:inline">, nothing hidden</span>.
           {data.owed > 0 && <> £{data.owed.toLocaleString('en-GB', { maximumFractionDigits: 2 })} owed.</>}
         </p>
       </header>
-      <ResizableSplit storageKey="cc.today.split.v2" defaultPercent={55} label="Resize the list and the detail panel" first={list} second={side} />
+      <ResizableSplit storageKey="cc.today.split.v2" defaultPercent={55} label="Resize the list and the detail panel" first={<div className="space-y-3">{todos}{list}</div>} second={side} />
     </div>
   )
 }
@@ -450,87 +467,23 @@ function OtherThings({
   )
 }
 
-/**
- * The chips and the rows. Under "All" the rows sit in dropdown sections:
- * Overdue first (open unless closed), then one per kind holding the rest; which
- * sections are open is remembered in this browser. A chip shows one plain list.
- * Up and Down move the choice through the open sections; Enter opens it (on a
- * phone, under the row).
- */
-function AttentionList({
-  rows,
-  selected,
-  opened,
-  choose,
-  renderInline,
-}: {
-  rows: Row[]
+type ListProps = {
   selected: string | null
   opened: string | null
   choose: (row: Row, open: boolean) => void
   renderInline: (row: Row) => React.ReactNode
-}) {
-  const full = useFullScreen()
-  const [filter, setFilter] = useState<FilterKey>('all')
-  const [showAll, setShowAll] = useState<Set<string>>(new Set())
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(['overdue']))
-  const listRef = useRef<HTMLDivElement>(null)
+}
 
-  useEffect(() => {
-    try {
-      const fromUrl = new URLSearchParams(window.location.search).get('show') as FilterKey | null
-      const saved = fromUrl ?? (window.localStorage.getItem(FILTER_STORE) as FilterKey | null)
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of a saved preference on mount
-      if (saved) setFilter(saved)
-      const groups = window.localStorage.getItem(OPEN_STORE)
-      if (groups !== null) setOpenGroups(new Set(groups.split(',').filter(Boolean)))
-    } catch {
-      // storage blocked: start on All, Overdue open
-    }
-  }, [])
-  const pick = (k: FilterKey) => {
-    setFilter(k)
-    setShowAll(new Set())
-    try {
-      if (k === 'all') window.localStorage.removeItem(FILTER_STORE)
-      else window.localStorage.setItem(FILTER_STORE, k)
-    } catch {
-      // storage blocked
-    }
-  }
-  const toggleGroup = (key: string) => {
-    setOpenGroups((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      try {
-        window.localStorage.setItem(OPEN_STORE, [...next].join(','))
-      } catch {
-        // storage blocked
-      }
-      return next
-    })
-  }
+/**
+ * One list of rows. Up and Down (and Home, End) move the choice through the
+ * list; Enter opens it (on a phone, under the row). The chosen row, or else
+ * the first, is the list's one Tab stop.
+ */
+function RowList({ rows, label, selected, opened, choose, renderInline }: ListProps & { rows: Row[]; label: string }) {
+  const listRef = useRef<HTMLUListElement>(null)
+  const focusKey = rows.some((r) => r.key === selected) ? selected : rows[0]?.key
 
-  const live = rows.filter((r) => r.kind !== 'snoozed')
-  const chips: Chip<FilterKey>[] = [
-    { key: 'all', label: 'All', count: live.length },
-    { key: 'overdue', label: 'Overdue', count: live.filter((r) => r.overdue).length },
-    ...CHIPS.map((c) => ({ key: c.key as FilterKey, label: c.label, count: rows.filter((r) => r.kind === c.key).length })).filter((c) => c.count > 0),
-  ]
-  const active: FilterKey = chips.some((c) => c.key === filter) ? filter : 'all'
-  const shown = active === 'all' ? live : active === 'overdue' ? live.filter((r) => r.overdue) : rows.filter((r) => r.kind === active)
-  const hint = active === 'overdue' ? OVERDUE_HINT : active === 'all' ? undefined : CHIPS.find((c) => c.key === active)?.hint
-
-  // Under All: Overdue, then each kind with what is left.
-  const groups: { key: string; label: string; rows: Row[] }[] = active === 'all'
-    ? [
-        { key: 'overdue', label: 'Overdue', rows: live.filter((r) => r.overdue) },
-        ...CHIPS.filter((c) => c.key !== 'snoozed').map((c) => ({ key: c.key as string, label: c.label, rows: live.filter((r) => r.kind === c.key && !r.overdue) })),
-      ].filter((g) => g.rows.length > 0)
-    : []
-
-  function onKey(e: React.KeyboardEvent<HTMLDivElement>) {
+  function onKey(e: React.KeyboardEvent<HTMLUListElement>) {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return
     const buttons = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>('button[data-row]') ?? [])
     const at = buttons.findIndex((b) => b === document.activeElement)
@@ -538,109 +491,89 @@ function AttentionList({
     e.preventDefault()
     const next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : Math.min(buttons.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))
     buttons[next].focus()
-    const row = shown.find((r) => r.key === buttons[next].dataset.row)
+    buttons[next].scrollIntoView({ block: 'nearest' })
+    const row = rows.find((r) => r.key === buttons[next].dataset.row)
     if (row) choose(row, false)
   }
 
-  const visible = active === 'all' ? groups.filter((g) => openGroups.has(g.key)).flatMap((g) => g.rows) : shown
-  const current = selected ?? visible[0]?.key ?? null
-
-  function rowItem(r: Row) {
-    const on = r.key === current
-    return (
-      <li key={r.key} className="border-b border-ms-grid">
-        <button
-          type="button"
-          data-row={r.key}
-          aria-label={`${r.title}. ${KIND_LABEL[r.kind]}: ${r.detail}. ${r.pill.text}${r.overdue ? ', overdue' : ''}`}
-          aria-current={on ? 'true' : undefined}
-          aria-expanded={opened === r.key}
-          tabIndex={on ? 0 : -1}
-          onClick={(e) => {
-            choose(r, true)
-            // Enter on a computer: on to the detail panel's main action (Escape comes back).
-            if (e.detail === 0 && window.matchMedia('(min-width: 1024px)').matches) {
-              window.setTimeout(() => document.querySelector<HTMLElement>('#today-detail [data-main]')?.focus(), 50)
-            }
-          }}
-          className={cn(
-            'w-full text-left flex items-start gap-3 px-3 py-2.5 border-l-[3px] transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy',
-            on ? 'bg-ms-green/50 border-ms-band' : 'bg-white border-transparent hover:bg-brand-warm',
-          )}
-        >
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold text-brand-dark truncate" title={r.title}>{r.title}</span>
-            <span className="block text-xs text-gray-600 truncate" title={r.detail}>
-              <span className="sr-only">{KIND_LABEL[r.kind]}: </span>{r.detail}
-            </span>
-          </span>
-          <span className={cn('shrink-0 mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', TONE[r.pill.tone])}>{r.pill.text}</span>
-        </button>
-        {opened === r.key && <div className="lg:hidden px-3 pb-3 pt-1 bg-ms-green/20">{renderInline(r)}</div>}
-      </li>
-    )
-  }
-
-  /** Rows with a "Show all" past the limit (full screen shows all). */
-  function rowList(key: string, list: Row[], label: string) {
-    const limit = full || showAll.has(key) ? Infinity : LIST_LIMIT
-    return (
-      <>
-        <ul aria-label={label} className="border-t border-ms-grid">{list.slice(0, limit).map(rowItem)}</ul>
-        {list.length > limit && (
-          <button type="button" className={cn(softBtn, 'mt-2')} onClick={() => setShowAll((prev) => new Set(prev).add(key))}>
-            Show all {list.length}
-          </button>
-        )}
-      </>
-    )
-  }
-
   return (
-    <div className="space-y-2">
-      <FilterChips chips={chips} value={active} onChange={pick} label="Show" />
-      {hint && <p className="text-xs text-gray-700">{hint}</p>}
-      <div ref={listRef} onKeyDown={onKey}>
-        {shown.length === 0 ? (
-          <p className="text-sm text-gray-700 py-3">Nothing here.</p>
-        ) : active !== 'all' ? (
-          rowList(active, shown, 'Needs attention')
-        ) : (
-          <div className="space-y-2">
-            {groups.map((g) => {
-              const isOpen = openGroups.has(g.key)
-              const id = `today-group-${g.key}`
-              return (
-                <section key={g.key} className="border border-ms-grid rounded-sm bg-white">
-                  <h3>
-                    <button
-                      type="button"
-                      aria-expanded={isOpen}
-                      aria-controls={id}
-                      onClick={() => toggleGroup(g.key)}
-                      className={cn(
-                        'w-full flex items-center gap-2 px-3 min-h-11 text-left text-sm font-semibold transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy',
-                        g.key === 'overdue' ? 'bg-ms-red/40 text-ms-red-text hover:bg-ms-red/60' : 'bg-brand-warm text-brand-dark hover:bg-ms-green/40',
-                      )}
-                    >
-                      <span aria-hidden="true" className={cn('inline-block w-3 transition-transform duration-200', isOpen && 'rotate-90')}>▸</span>
-                      <span>{g.label}</span>
-                      <span className="tabular-nums font-normal">{g.rows.length}</span>
-                      <span className="ml-auto text-xs font-semibold text-brand-navy">{isOpen ? 'Hide' : 'Show'}</span>
-                    </button>
-                  </h3>
-                  {isOpen && (
-                    <div id={id} className="px-2 pb-2">
-                      {g.key === 'overdue' && <p className="text-xs text-gray-700 px-1 py-1.5">{OVERDUE_HINT}</p>}
-                      {rowList(g.key, g.rows, g.label)}
-                    </div>
-                  )}
-                </section>
-              )
-            })}
-          </div>
-        )}
-      </div>
+    <ul ref={listRef} aria-label={label} onKeyDown={onKey}>
+      {rows.map((r) => {
+        const on = r.key === selected
+        return (
+          <li key={r.key} className="border-b border-ms-grid last:border-b-0">
+            <button
+              type="button"
+              data-row={r.key}
+              aria-label={`${r.title}. ${KIND_LABEL[r.kind]}: ${r.detail}. ${r.pill.text}${r.overdue ? ', overdue' : ''}`}
+              aria-current={on ? 'true' : undefined}
+              aria-expanded={opened === r.key}
+              tabIndex={r.key === focusKey ? 0 : -1}
+              onClick={(e) => {
+                choose(r, true)
+                // Enter on a computer: on to the detail panel's main action (Escape comes back).
+                if (e.detail === 0 && window.matchMedia('(min-width: 1024px)').matches) {
+                  window.setTimeout(() => document.querySelector<HTMLElement>('#today-detail [data-main]')?.focus(), 50)
+                }
+              }}
+              className={cn(
+                'w-full text-left flex items-start gap-3 px-3 py-2 border-l-[3px] transition-colors duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-navy',
+                on ? 'bg-ms-green/50 border-ms-band' : 'bg-white border-transparent hover:bg-brand-warm',
+              )}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-brand-dark truncate" title={r.title}>{r.title}</span>
+                <span className="block text-xs text-gray-600 truncate" title={r.detail}>
+                  <span className="sr-only">{KIND_LABEL[r.kind]}: </span>{r.detail}
+                </span>
+              </span>
+              <span className={cn('shrink-0 mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', TONE[r.pill.tone])}>{r.pill.text}</span>
+            </button>
+            {opened === r.key && <div className="lg:hidden px-3 pb-3 pt-1 bg-ms-green/20">{renderInline(r)}</div>}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/**
+ * Everything but your to-dos, as folded sections with counts: Overdue first,
+ * then one per kind holding the rest, then Snoozed. Which are open is
+ * remembered in this browser; an open one scrolls inside itself (full screen
+ * shows them at full height).
+ */
+function AttentionList({ rows, ...listProps }: ListProps & { rows: Row[] }) {
+  const full = useFullScreen()
+  const live = rows.filter((r) => r.kind !== 'snoozed')
+  const groups: { key: string; label: string; hint?: string; rows: Row[] }[] = [
+    { key: 'overdue', label: 'Overdue', hint: OVERDUE_HINT, rows: live.filter((r) => r.overdue) },
+    ...SECTIONS.filter((c) => c.key !== 'todo').map((c) => ({
+      key: c.key as string,
+      label: c.label,
+      hint: c.hint,
+      rows: c.key === 'snoozed' ? rows.filter((r) => r.kind === 'snoozed') : live.filter((r) => r.kind === c.key && !r.overdue),
+    })),
+  ].filter((g) => g.rows.length > 0)
+
+  if (groups.length === 0) return <p className="text-sm text-gray-700 py-3">Nothing needs attention.</p>
+  return (
+    <div className="space-y-1.5">
+      {groups.map((g) => (
+        <FoldSection
+          key={g.key}
+          storageKey={`today.group.${g.key}`}
+          heading="h3"
+          title={g.label}
+          count={g.rows.length}
+          tone={g.key === 'overdue' ? 'alert' : 'plain'}
+          hint={g.hint}
+          scroll={full ? '' : 'max-h-[40vh]'}
+          className="border-ms-grid"
+        >
+          <RowList rows={g.rows} label={g.label} {...listProps} />
+        </FoldSection>
+      ))}
     </div>
   )
 }
