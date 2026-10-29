@@ -59,6 +59,7 @@ export function FoldSection({
   tone = 'plain',
   defaultOpen = false,
   narrowOpen,
+  openOnMount = false,
   controls,
   hint,
   scroll = 'max-h-[45vh]',
@@ -80,6 +81,8 @@ export function FoldSection({
   defaultOpen?: boolean
   /** The default below 1024px wide, if different. */
   narrowOpen?: boolean
+  /** Open whatever was saved, because a link asked for this section (?board=1). */
+  openOnMount?: boolean
   /** Buttons beside the heading (Add, Download, Full screen), outside the toggle. */
   controls?: React.ReactNode
   /** One line under the heading while open. */
@@ -94,7 +97,11 @@ export function FoldSection({
   bodyClassName?: string
   children: React.ReactNode
 }) {
-  const [open, toggle] = useFold(storageKey, defaultOpen, narrowOpen, id)
+  const [open, toggle, setOpen] = useFold(storageKey, defaultOpen, narrowOpen, id)
+  useEffect(() => {
+    if (openOnMount) setOpen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on mount
+  }, [])
   const bodyId = useId()
   const H = heading
   return (

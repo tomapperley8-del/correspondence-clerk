@@ -6,6 +6,7 @@ import { cn, formatDateGB } from '@/lib/utils'
 import type { AdvertisingRow, AdvertisingSummary } from '@/app/actions/advertising-tab'
 import { ActionMenu } from '@/components/ui/action-menu'
 import { FilterChips } from '@/components/ui/filter-chips'
+import { FoldSection } from '@/components/ui/fold-section'
 import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 import { RENEWAL_STAGE_LABEL } from '@/app/businesses/_components/MastersheetTable'
 import { downloadSheet } from '@/lib/spreadsheet-export'
@@ -147,10 +148,7 @@ export function AdvertisingTab({ data, initialShow, initialView }: {
       </p>
 
       {/* Renewals coming up, by stage */}
-      <section aria-labelledby="adv-renewals" className="mb-6">
-        <h2 id="adv-renewals" className="text-xl font-bold mb-0.5" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
-          Renewals coming up
-        </h2>
+      <FoldSection storageKey="advertising.renewals" big title="Renewals coming up" count={renewing.length} className="mb-2 shadow-[var(--shadow-sm)]" bodyClassName="p-2">
         <p className="text-xs text-gray-600 mb-2">
           Deals ending in the next 45 days or ended in the last 60. Move them along on the Renewals board.
           {notRenewing.length > 0 && ` Not renewing: ${notRenewing.map((r) => r.name).join(', ')}.`}
@@ -179,14 +177,11 @@ export function AdvertisingTab({ data, initialShow, initialView }: {
             )
           })}
         </div>
-      </section>
+      </FoldSection>
 
       {/* Advertisers */}
-      <section aria-labelledby="adv-list">
+      <FoldSection storageKey="advertising.list" big title="Advertisers" count={shown.length} defaultOpen openOnMount={initialView === 'board'} scroll="" className="shadow-[var(--shadow-sm)]" bodyClassName="p-2">
         <div className="flex flex-wrap items-center gap-2 mb-2">
-          <h2 id="adv-list" className="text-xl font-bold mr-2" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
-            Advertisers
-          </h2>
           <FilterChips label="Show" value={view === 'board' ? ('' as Show) : show} onChange={(s) => { setShow(s); if (view === 'board') setView('cards') }} chips={SHOWS.map((s) => ({ key: s.key, label: s.label, count: counts[s.key] }))} />
           <span className="flex-1" />
           <div className="inline-flex border border-black/10 rounded-sm overflow-hidden" role="group" aria-label="Show as">
@@ -232,12 +227,12 @@ export function AdvertisingTab({ data, initialShow, initialView }: {
             <p className="text-xs text-gray-600 mb-2">
               Ending soonest first. The bar shows how far through its term each deal is. Performance stats (impressions, clicks, reports) are not connected yet, so none are shown.
             </p>
-            <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[max(16rem,calc(100vh-25rem))] overflow-y-auto overscroll-contain">
               {shown.map((r) => <AdvertiserCard key={r.business_id} row={r} today={today} />)}
             </ul>
           </>
         )}
-      </section>
+      </FoldSection>
     </div>
   )
 }
@@ -287,7 +282,7 @@ function AdvertiserCard({ row: r, today }: { row: AdvertisingRow; today: string 
 
 function AdvertisersTable({ rows, today }: { rows: AdvertisingRow[]; today: string }) {
   return (
-    <div className="overflow-auto border border-ms-grid rounded-sm bg-white max-h-[75vh]">
+    <div className="overflow-auto border border-ms-grid rounded-sm bg-white max-h-[max(16rem,calc(100vh-25rem))]">
       <table className="w-full min-w-[900px] text-[13px] border-collapse">
         <caption className="sr-only">Advertisers, ending soonest first.</caption>
         <thead>
