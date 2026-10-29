@@ -1,4 +1,4 @@
--- Undo 20261029_001_newsletter_items (Stage 16a Newsletter tab). Drops the items, contributors,
+-- Undo 20261029_002_newsletter_items (Stage 16a Newsletter tab). Drops the items, contributors,
 -- promises and ticks and their views. Issues, mentions and rules are untouched.
 DROP VIEW IF EXISTS public.v_newsletter_promises;
 DROP VIEW IF EXISTS public.v_newsletter_contributors;

@@ -8,7 +8,7 @@
 --
 -- Readers: the Newsletter tab, the business page (freebies), and views the desk email and routines can
 -- read (v_newsletter_items, v_newsletter_contributors, v_newsletter_promises). Nothing else changes.
--- Rollback: supabase/migrations/rollback/20261029_001_newsletter_items_down.sql
+-- Rollback: supabase/migrations/rollback/20261029_002_newsletter_items_down.sql
 
 CREATE TABLE IF NOT EXISTS public.newsletter_contributors (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
