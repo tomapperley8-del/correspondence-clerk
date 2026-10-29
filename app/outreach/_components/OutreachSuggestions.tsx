@@ -3,7 +3,7 @@
 // "Could be on outreach" (UI overhaul Stage 16c2, intake option A): businesses not on outreach
 // that our own records say are worth a look (v_outreach_suggestions). Nothing joins outreach
 // by itself: Accept puts the business at Identified (addBusinessToOutreach, the board's own
-// action), Not now hides it, each with Undo.
+// action), Not now hides it, each with Undo. Since 16c3 it sits in the Outreach side rail.
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -13,7 +13,7 @@ import { cn, formatDateGB } from '@/lib/utils'
 import type { OutreachSuggestion } from '@/app/actions/outreach-next'
 import { acceptOutreachSuggestion, dismissOutreachSuggestion, undoDismissOutreachSuggestion } from '@/app/actions/outreach-next'
 import { undoRemoveFromOutreach } from '@/app/actions/businesses'
-import { PointChips } from './WorkOnNext'
+
 
 const btnBase =
   'inline-flex items-center justify-center text-sm font-semibold px-3 min-h-10 md:min-h-9 pointer-coarse:min-h-10 rounded-sm transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
@@ -29,7 +29,7 @@ const CHIPS: { key: Chip; label: string; test: (s: OutreachSuggestion) => boolea
   { key: 'newsletter', label: 'In the newsletter', test: (s) => s.in_newsletter },
   { key: 'news', label: 'In the news', test: (s) => s.in_recent_news },
 ]
-const FIRST = 6
+const FIRST = 4
 
 const dateGB = (d: string | null | undefined) => (d ? formatDateGB(`${d.slice(0, 10)}T12:00:00Z`) : '')
 
@@ -105,15 +105,17 @@ export function OutreachSuggestions({ suggestions }: { suggestions: OutreachSugg
   }
 
   return (
-    <section id="suggestions" aria-labelledby="suggestions-heading" className="mb-8 scroll-mt-4">
-      <h2 id="suggestions-heading" className="text-xl font-bold flex flex-wrap items-baseline gap-2 mb-0.5" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
-        Could be on outreach
-        <span className="text-xs font-semibold text-gray-600" style={{ fontFamily: 'var(--font-sans)' }}>{live.length}</span>
-      </h2>
-      <p className="text-xs text-gray-600 mb-2">
-        Businesses not on outreach that our own records point to. Former members came back more often than anyone else: leads for lapsed members converted 4 times in 5. Accept puts the business on outreach as Identified; Not now hides it. Nothing is added by itself.
+    <section id="suggestions" aria-labelledby="suggestions-heading" className={cn(card, 'scroll-mt-4')}>
+      <div className="px-3 pt-2.5 pb-0.5">
+        <h2 id="suggestions-heading" className="text-lg font-bold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
+          Could be on outreach
+          <span className="ml-1.5 text-xs font-semibold text-gray-600 tabular-nums" style={{ fontFamily: 'var(--font-sans)' }}>{live.length}</span>
+        </h2>
+      </div>
+      <p className="px-3 pb-1.5 text-xs text-gray-600">
+        Not on outreach, but our own records point to them. Leads for lapsed members converted 4 times in 5. Accept puts the business on outreach as Identified; Not now hides it. Nothing is added by itself.
       </p>
-      <div className="flex flex-wrap gap-1.5 mb-2" role="group" aria-label="Show">
+      <div className="flex flex-wrap gap-1 px-3 pb-2" role="group" aria-label="Show">
         {CHIPS.map((c) => {
           const n = live.filter(c.test).length
           return (
@@ -122,7 +124,10 @@ export function OutreachSuggestions({ suggestions }: { suggestions: OutreachSugg
               type="button"
               aria-pressed={chip === c.key}
               onClick={() => { setChip(c.key); setLimit(FIRST) }}
-              className={cn(btnBase, chip === c.key ? 'bg-brand-navy text-white' : 'bg-white border border-black/[0.12] text-brand-dark hover:bg-brand-warm')}
+              className={cn(
+                'inline-flex items-center text-xs font-semibold px-2 min-h-10 md:min-h-7 rounded-sm transition-colors duration-200 ease-out',
+                chip === c.key ? 'bg-brand-navy text-white' : 'bg-white border border-black/[0.12] text-brand-dark hover:bg-brand-warm',
+              )}
             >
               {c.label} <span className="ml-1 tabular-nums opacity-80">{n}</span>
             </button>
@@ -130,29 +135,34 @@ export function OutreachSuggestions({ suggestions }: { suggestions: OutreachSugg
         })}
       </div>
       {list.length === 0 ? (
-        <p className={cn(card, 'px-3 py-3 text-sm text-gray-600')}>Nothing to suggest here right now.</p>
+        <p className="px-3 py-2.5 text-sm text-gray-600 border-t border-black/[0.06]">Nothing to suggest here right now.</p>
       ) : (
-        <ul className={cn(card, 'divide-y divide-black/[0.06]')}>
+        <ul className="divide-y divide-black/[0.06] border-t border-black/[0.06]">
           {list.slice(0, limit).map((s) => (
-            <li key={s.business_id} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-start px-3 py-2.5">
+            <li key={s.business_id} className="px-3 py-2 space-y-1.5">
               <div className="min-w-0">
-                <Link href={`/businesses/${s.business_id}`} className="font-semibold text-brand-dark hover:underline break-words">{s.name}</Link>
+                <Link href={`/businesses/${s.business_id}`} className="text-sm font-semibold text-brand-dark hover:underline break-words">{s.name}</Link>
                 <span className="text-xs text-gray-600"> {s.category ?? 'No category'} · fit {s.fit_score}{s.has_email ? '' : ' · no email on file'}</span>
-                <p className="text-xs text-gray-600">{reasons(s)}</p>
-                <PointChips points={s.points} score={s.fit_score} />
+                <p className="text-xs text-gray-600 line-clamp-2">{reasons(s)}</p>
               </div>
-              <div className="flex flex-wrap gap-1.5 sm:justify-end">
-                <button type="button" className={mainBtn} disabled={busy === s.business_id} onClick={() => accept(s)}>Accept</button>
-                <button type="button" className={softBtn} disabled={busy === s.business_id} onClick={() => notNow(s)}>Not now</button>
+              <div className="flex gap-1.5">
+                <button type="button" className={mainBtn} disabled={busy === s.business_id} onClick={() => accept(s)}>
+                  Accept<span className="sr-only"> {s.name}</span>
+                </button>
+                <button type="button" className={softBtn} disabled={busy === s.business_id} onClick={() => notNow(s)}>
+                  Not now<span className="sr-only"> for {s.name}</span>
+                </button>
               </div>
             </li>
           ))}
         </ul>
       )}
       {list.length > limit && (
-        <button type="button" className="mt-1 text-sm font-semibold text-brand-navy hover:underline min-h-10 md:min-h-0" onClick={() => setLimit((l) => l + FIRST * 2)}>
-          Show {Math.min(list.length - limit, FIRST * 2)} more of {list.length - limit}
-        </button>
+        <div className="px-3 py-1.5 border-t border-black/[0.06]">
+          <button type="button" className="text-sm font-semibold text-brand-navy hover:underline min-h-10 md:min-h-0" onClick={() => setLimit((l) => l + FIRST * 3)}>
+            Show {Math.min(list.length - limit, FIRST * 3)} more of {list.length - limit}
+          </button>
+        </div>
       )}
     </section>
   )

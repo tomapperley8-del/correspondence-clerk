@@ -4,6 +4,8 @@
 // in the database (v_outreach_next, v_outreach_suggestions; migration 20261029_001) so the
 // outreach routine can read the same list. Rules and points are in that migration and in
 // supabase/.local/16c2/findings.md. Nothing here writes wording: only stages and "Not now".
+// Stage 16c3 adds "Not now" on any Work on next row (outreach_snoozes, migration 20261029_003):
+// the view gives a snoozed row the bucket 'snoozed' until the date, or until they email.
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
@@ -12,7 +14,7 @@ import { addBusinessToOutreach } from '@/app/actions/businesses'
 
 export type OutreachBucket =
   | 'reply' | 'chase' | 'follow_up' | 'close' | 'new' | 'find_contact'
-  | 'tidy_wrote' | 'tidy_discussion' | 'tidy_contacted' | 'waiting'
+  | 'tidy_wrote' | 'tidy_discussion' | 'tidy_contacted' | 'snoozed' | 'waiting'
 
 export type FitPoints = {
   named_contact: number
@@ -37,6 +39,8 @@ export type OutreachNextRow = {
   newsletter_mentions_12m: number
   fit_score: number
   points: FitPoints
+  /** Set while a "Not now" is in force (bucket 'snoozed'). */
+  snoozed_until: string | null
 }
 
 export type OutreachSuggestion = {
@@ -83,7 +87,7 @@ export async function getOutreachNext(): Promise<{ data?: { rows: OutreachNextRo
   const [nextRes, sugRes] = await Promise.all([
     supabase
       .from('v_outreach_next')
-      .select('business_id, name, category, outreach_stage, bucket, next_order, days_quiet, last_direction, last_email_on, has_email, draft_ready, newsletter_mentions_12m, fit_score, pts_named_contact, pts_wrote_before, pts_in_news, pts_had_deal, pts_category')
+      .select('business_id, name, category, outreach_stage, bucket, next_order, days_quiet, last_direction, last_email_on, has_email, draft_ready, newsletter_mentions_12m, fit_score, pts_named_contact, pts_wrote_before, pts_in_news, pts_had_deal, pts_category, snoozed_until')
       .eq('organization_id', orgId)
       .neq('bucket', 'waiting')
       .order('next_order', { ascending: true })
@@ -114,6 +118,7 @@ export async function getOutreachNext(): Promise<{ data?: { rows: OutreachNextRo
     newsletter_mentions_12m: Number(r.newsletter_mentions_12m ?? 0),
     fit_score: Number(r.fit_score ?? 0),
     points: points(r),
+    snoozed_until: (r.snoozed_until as string | null) ?? null,
   }))
   const suggestions = ((sugRes.data ?? []) as Raw[]).map((r) => ({
     business_id: r.business_id as string,
@@ -261,4 +266,82 @@ export async function undoDismissOutreachSuggestion(businessId: string): Promise
   if (error) return { error: error.message }
   revalidatePath('/outreach')
   return {}
+}
+
+export type OutreachSnooze = { snoozed_until: string; snoozed_at: string } | null
+
+function addDaysISO(days: number) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date())
+  const d = new Date(`${today}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * "Not now" on a Work on next row: hidden for `days` (the stage is not touched), back sooner if
+ * they email. Returns the snooze it replaced, so Undo can put that back.
+ */
+export async function snoozeOutreachBusiness(businessId: string, days: number): Promise<{ until?: string; previous?: OutreachSnooze; error?: string }> {
+  const a = await auth()
+  if ('error' in a) return { error: a.error }
+  const { supabase, user, orgId } = a
+  if (!Number.isInteger(days) || days < 1 || days > 366) return { error: 'Choose how long' }
+  const { data: before, error: readError } = await supabase
+    .from('outreach_snoozes')
+    .select('snoozed_until, snoozed_at')
+    .eq('business_id', businessId)
+    .eq('organization_id', orgId)
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  const until = addDaysISO(days)
+  const { error } = await supabase
+    .from('outreach_snoozes')
+    .upsert({ business_id: businessId, organization_id: orgId, snoozed_until: until, snoozed_at: new Date().toISOString(), snoozed_by: user.id })
+  if (error) return { error: error.message }
+  revalidatePath('/outreach')
+  return { until, previous: (before as OutreachSnooze) ?? null }
+}
+
+/**
+ * Put a snooze back as it was before (Undo of "Not now" or of "Bring back"): `previous` null
+ * means there was none, so the row is simply on the list again.
+ */
+export async function restoreOutreachSnooze(businessId: string, previous: OutreachSnooze): Promise<{ error?: string }> {
+  const a = await auth()
+  if ('error' in a) return { error: a.error }
+  const { supabase, user, orgId } = a
+  const { error } = previous
+    ? await supabase
+      .from('outreach_snoozes')
+      .upsert({ business_id: businessId, organization_id: orgId, snoozed_until: previous.snoozed_until, snoozed_at: previous.snoozed_at, snoozed_by: user.id })
+    : await supabase
+      .from('outreach_snoozes')
+      .delete()
+      .eq('business_id', businessId)
+      .eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  revalidatePath('/outreach')
+  return {}
+}
+
+/** "Bring back" a snoozed row early. Returns the snooze it ended, for Undo. */
+export async function endOutreachSnooze(businessId: string): Promise<{ previous?: OutreachSnooze; error?: string }> {
+  const a = await auth()
+  if ('error' in a) return { error: a.error }
+  const { supabase, orgId } = a
+  const { data: before, error: readError } = await supabase
+    .from('outreach_snoozes')
+    .select('snoozed_until, snoozed_at')
+    .eq('business_id', businessId)
+    .eq('organization_id', orgId)
+    .maybeSingle()
+  if (readError) return { error: readError.message }
+  const { error } = await supabase
+    .from('outreach_snoozes')
+    .delete()
+    .eq('business_id', businessId)
+    .eq('organization_id', orgId)
+  if (error) return { error: error.message }
+  revalidatePath('/outreach')
+  return { previous: (before as OutreachSnooze) ?? null }
 }
