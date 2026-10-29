@@ -8,7 +8,7 @@ export const ISSUE_LABEL: Record<ClubCardIssue, string> = {
   page_lapsed: 'Card ended, page still live',
   page_no_member: 'Page but no Club Card on file',
   no_page: 'No page on the website',
-  offer_old: 'Offer not checked for a year',
+  offer_old: 'Offer looks out of date',
   offer_ending: 'Offer ending',
   not_in_az: 'Not in the A-Z',
   az_twice: 'Listed twice in the A-Z',
