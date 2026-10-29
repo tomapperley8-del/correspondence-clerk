@@ -131,9 +131,9 @@ Done: 0-7, 6b, 9, 11a (next-day check 24 Oct), 12 (next-day check 24 Oct), the B
 3. **15** Quick fixes (spec "Quick fixes (Stage 15)").
 4. **13** Businesses spreadsheet upgrades, including the Stage 14 interface pass for that table (reuse 14a's row, menu, full-screen and resize patterns). Full screen and download at any time.
 5. **16** Full tabs (spec "Full tabs (Stage 16)"): 16a Newsletter, 16b Club Card, 16c Outreach, 16d Advertising (stats later).
-6. **17a** after 14c: business dossier + skill rewrite (spec "One place for Claude (Stage 17)").
-6b. **17b** the new sources, one at a time, QuickBooks history first.
-6c. **14c** Nothing out of sight (Decision 29 Oct): the to-dos box on Today, and folded dropdowns with counts, all on the first screen, on Today, Club Card, Advertising, Newsletter, Outreach, Businesses and Data health. One session, after 11c and 14b have merged.
+6. **14c** Nothing out of sight (Decision 29 Oct): the to-dos box on Today, and folded dropdowns with counts, all on the first screen, on Today, Club Card, Advertising, Newsletter, Outreach, Businesses and Data health. One session, after 11c and 14b have merged.
+6b. **17a** after 14c: business dossier + skill rewrite (spec "One place for Claude (Stage 17)").
+6c. **17b** the new sources, one at a time, QuickBooks history first.
 7. **11c** trimmed (Decision 29 Oct): Data health, plus win-backs and category gaps in the Outreach tab; no Insights tab.
 7. **14b** business page and Inbox, after 11b and 16 have added what they add there, so it is laid out once.
 8. **10** finish.
