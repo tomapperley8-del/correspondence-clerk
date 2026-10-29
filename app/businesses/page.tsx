@@ -1,5 +1,7 @@
 import { getBusinessTable } from '@/app/actions/business-table'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { getDataHealthCount } from '@/app/actions/data-health'
 import { BusinessTable } from './_components/BusinessTable'
 
 // The business table (UI overhaul Stage 5), one of the three places in the nav
@@ -19,7 +21,7 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
   if (params.view === 'outreach') redirect(params.board === '1' ? '/outreach?board=1' : '/outreach')
   // The advertisers' Renewals board moved to the Advertising tab (Stage 16d).
   if (params.view === 'renewals' && params.board === '1') redirect('/advertising?board=1')
-  const result = await getBusinessTable()
+  const [result, healthCount] = await Promise.all([getBusinessTable(), getDataHealthCount()])
 
   return (
     <div className="mx-auto px-4 py-8 max-w-[1400px]">
@@ -32,6 +34,10 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
         </h1>
         <p className="text-sm" style={{ color: 'rgba(0,0,0,0.5)' }}>
           One line per business: main contact, deal, last time in touch and anything needing attention. Click a name to open the business.
+          {' '}
+          <Link href="/data-health" className="font-semibold text-brand-navy hover:underline whitespace-nowrap">
+            Data health{healthCount > 0 ? ` (${healthCount} to fix)` : ''}
+          </Link>
         </p>
       </div>
 

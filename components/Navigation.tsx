@@ -219,6 +219,7 @@ export function Navigation() {
   const menuItems: { href: string; label: string }[] = [
     { href: '/resources', label: 'Resources' },
     { href: '/search', label: 'Search page' },
+    { href: '/data-health', label: 'Data health' },
     { href: '/dashboard', label: 'Old business list' },
     { href: '/import/gmail', label: 'Import emails' },
     { href: '/help', label: 'Help' },

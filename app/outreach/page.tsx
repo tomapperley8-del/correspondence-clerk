@@ -1,5 +1,6 @@
 import { getOutreachTab } from '@/app/actions/outreach-tab'
 import { getOutreachNext } from '@/app/actions/outreach-next'
+import { getOutreachWinbacks } from '@/app/actions/outreach-winbacks'
 import { OutreachTab } from './_components/OutreachTab'
 
 // The Outreach tab (UI overhaul Stage 16c, laid out as a workspace in 16c3): Work on next,
@@ -11,7 +12,7 @@ export const metadata = {
 }
 
 export default async function OutreachPage({ searchParams }: { searchParams: Promise<{ stage?: string; board?: string; q?: string }> }) {
-  const [result, next, params] = await Promise.all([getOutreachTab(), getOutreachNext(), searchParams])
+  const [result, next, winbacks, params] = await Promise.all([getOutreachTab(), getOutreachNext(), getOutreachWinbacks(), searchParams])
 
   return (
     <div className="mx-auto px-4 py-6 max-w-[1400px]">
@@ -23,7 +24,7 @@ export default async function OutreachPage({ searchParams }: { searchParams: Pro
           <p className="text-sm text-red-700">Could not load the Outreach tab: {result.error ?? 'no data'}</p>
         </>
       ) : (
-        <OutreachTab data={result.data} next={next.data ?? null} nextError={next.error} initialStage={params.stage} initialBoard={params.board === '1'} initialQuery={params.q} />
+        <OutreachTab data={result.data} next={next.data ?? null} nextError={next.error} winbacks={winbacks.data ?? null} initialStage={params.stage} initialBoard={params.board === '1'} initialQuery={params.q} />
       )}
     </div>
   )

@@ -21,10 +21,9 @@ const mainBtn = `${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`
 const softBtn = `${btnBase} bg-white border border-black/[0.12] text-brand-dark hover:bg-brand-warm`
 const card = 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)]'
 
-type Chip = 'all' | 'former' | 'unreviewed' | 'newsletter' | 'news'
+type Chip = 'all' | 'unreviewed' | 'newsletter' | 'news'
 const CHIPS: { key: Chip; label: string; test: (s: OutreachSuggestion) => boolean }[] = [
   { key: 'all', label: 'All', test: () => true },
-  { key: 'former', label: 'Former members', test: (s) => s.is_former },
   { key: 'unreviewed', label: 'Emailed in, not reviewed', test: (s) => s.is_unreviewed },
   { key: 'newsletter', label: 'In the newsletter', test: (s) => s.in_newsletter },
   { key: 'news', label: 'In the news', test: (s) => s.in_recent_news },
@@ -50,7 +49,8 @@ export function OutreachSuggestions({ suggestions }: { suggestions: OutreachSugg
   const [busy, setBusy] = useState<string | null>(null)
   const [limit, setLimit] = useState(FIRST)
 
-  const live = useMemo(() => suggestions.filter((s) => !gone.has(s.business_id)), [suggestions, gone])
+  // Former members are listed in Work on next, Win back (Stage 11c), so they leave this card.
+  const live = useMemo(() => suggestions.filter((s) => !s.is_former && !gone.has(s.business_id)), [suggestions, gone])
   const list = useMemo(() => live.filter(CHIPS.find((c) => c.key === chip)!.test), [live, chip])
   const setOne = (id: string, on: boolean) =>
     setGone((prev) => {
