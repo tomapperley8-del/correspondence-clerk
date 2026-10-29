@@ -1,7 +1,7 @@
 'use server'
 
 // Outreach "Work on next" and suggestions (UI overhaul Stage 16c2). The order is worked out
-// in the database (v_outreach_next, v_outreach_suggestions; migration 20261029_002) so the
+// in the database (v_outreach_next, v_outreach_suggestions; migration 20261029_001) so the
 // outreach routine can read the same list. Rules and points are in that migration and in
 // supabase/.local/16c2/findings.md. Nothing here writes wording: only stages and "Not now".
 
