@@ -262,3 +262,16 @@ export async function setPromiseTick(promiseId: string, issueId: string, on: boo
   revalidatePath('/newsletter')
   return {}
 }
+
+export type BusinessFreebie = { id: string; date: string; kind: 'freebie' | 'competition'; headline: string | null; link_url: string | null; closes_on: string | null; issue_url: string | null }
+
+/** Freebies and competitions the newsletter ran for one business (the business page). */
+export async function getBusinessFreebies(businessId: string): Promise<BusinessFreebie[]> {
+  const ctx = await context()
+  if ('error' in ctx) return []
+  const { data } = await ctx.supabase.from('v_newsletter_items')
+    .select('id, issue_date, kind, headline, link_url, closes_on, issue_url')
+    .eq('organization_id', ctx.orgId).eq('business_id', businessId).in('kind', ['freebie', 'competition'])
+    .order('issue_date', { ascending: false }).limit(50)
+  return (data ?? []).map((r) => ({ id: r.id, date: r.issue_date, kind: r.kind, headline: r.headline, link_url: r.link_url, closes_on: r.closes_on, issue_url: r.issue_url }))
+}

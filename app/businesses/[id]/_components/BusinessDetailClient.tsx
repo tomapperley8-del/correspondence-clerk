@@ -40,6 +40,7 @@ import { type EditFields } from './CorrespondenceEditForm'
 import { useCorrespondence } from './useCorrespondence'
 import { PipelineStatusCard } from './PipelineStatusCard'
 import { BusinessArticles } from './BusinessArticles'
+import { BusinessFreebies } from './BusinessFreebies'
 import { BusinessClubCard } from './BusinessClubCard'
 import { BusinessReviewBar } from './BusinessReviewBar'
 import { BusinessGlance } from './BusinessGlance'
@@ -913,6 +914,7 @@ export function BusinessDetailClient({
           <>
             <BusinessFiles businessId={business.id} />
             <BusinessArticles businessId={business.id} />
+            <BusinessFreebies businessId={business.id} />
           </>
         )}
 
@@ -1075,6 +1077,7 @@ export function BusinessDetailClient({
 
       {/* News Coverage */}
       <BusinessArticles businessId={business.id} />
+      <BusinessFreebies businessId={business.id} />
 
       {/* Letter File / Correspondence */}
       <div className="bg-white border-2 border-gray-300 p-6">
