@@ -8,6 +8,7 @@ import { toast } from '@/lib/toast'
 import { FilterChips } from '@/components/ui/filter-chips'
 import { addToNewsletter } from '@/components/ForNewsletterButton'
 import type { ItemKind } from '@/lib/newsletter/items'
+import { nthWednesday, weekWords } from '@/lib/newsletter/rhythm'
 import {
   addPromise, decideMention, deleteContributor, deletePromise, saveContributor, setPromiseTick, updateNewsletterItem,
   type ContributorInput, type NewsletterTabData, type NlContributor, type NlItem, type NlPromise,
@@ -194,9 +195,25 @@ function NextIssue({ ctx, next }: { ctx: Ctx; next: { wednesday: string; items: 
   const router = useRouter()
   const [moving, setMoving] = useState<string | null>(null)
   const nextWed = next.wednesday
+  // Due: a monthly regular with a usual week when this is that week and they haven't been in this
+  // month; anyone else when their next piece falls by this issue
+  const nth = nthWednesday(nextWed)
   const dueContributors = data.contributors
-    .filter((c) => c.active && c.next_expected && c.next_expected <= addDaysISO(nextWed, 3))
-    .sort((a, b) => (a.next_expected ?? '').localeCompare(b.next_expected ?? ''))
+    .map((c) => {
+      if (!c.active) return null
+      const byGap = !!c.next_expected && c.next_expected <= addDaysISO(nextWed, 3)
+      const monthly = !c.expected_every_days || c.expected_every_days >= 21
+      const byWeek = monthly && !!c.usual?.weeks.includes(nth) && (c.last_in ?? '').slice(0, 7) !== nextWed.slice(0, 7)
+      // A monthly regular with a clear usual week is due in that week, not merely when the gap is up
+      if (!(monthly && c.usual ? byWeek : byGap)) return null
+      const why = [
+        c.usual ? `usually the ${weekWords(c.usual.weeks)} (${c.usual.hits} of last ${c.usual.of})` : c.expected_every_days ? `every ${c.expected_every_days} days` : null,
+        c.last_in ? `last ${shortGB(c.last_in)}` : 'not in yet',
+      ].filter(Boolean).join(', ')
+      return { c, why, late: byGap && c.next_expected! < data.today }
+    })
+    .filter((x): x is { c: NlContributor; why: string; late: boolean } => !!x)
+    .sort((a, b) => (a.c.last_in ?? '').localeCompare(b.c.last_in ?? ''))
   const onList = new Set(next.items.map((i) => i.business_id).filter(Boolean))
   const due = data.queue.filter((q) => !onList.has(q.business_id)).slice(0, 6)
   const lastFreebie = data.items.find((i) => i.kind === 'freebie')
@@ -244,14 +261,12 @@ function NextIssue({ ctx, next }: { ctx: Ctx; next: { wednesday: string; items: 
         )}
       </Section>
 
-      <Section id="nl-due" title="Due this week" hint="From the patterns: contributors whose next piece is due, then members and advertisers longest without a mention.">
+      <Section id="nl-due" title="Due this week" hint={`From the patterns: regulars whose piece is due (this is the ${weekWords([nth])} of the month), then members and advertisers longest without a mention.`}>
         <ul className="divide-y divide-black/[0.06] text-sm">
-          {dueContributors.map((c) => (
+          {dueContributors.map(({ c, why, late }) => (
             <li key={c.id} className="py-2">
               <span className="font-semibold text-brand-dark">{c.name}</span>{c.column_name && <>, {c.column_name}</>}{' '}
-              <span className={cn(pill, c.next_expected! < data.today ? 'bg-ms-orange text-ms-orange-text' : 'bg-ms-muted text-ms-muted-text')}>
-                every {c.expected_every_days} days, last {shortGB(c.last_in!)}
-              </span>
+              <span className={cn(pill, late ? 'bg-ms-orange text-ms-orange-text' : 'bg-ms-muted text-ms-muted-text')}>{why}</span>
             </li>
           ))}
           {due.map((q) => (
@@ -386,13 +401,13 @@ function Contributors({ ctx }: { ctx: Ctx }) {
   const rows = [...data.contributors].sort((a, b) => Number(b.active) - Number(a.active) || b.issues_total - a.issues_total)
   return (
     <Section id="nl-contributors" title="Contributors"
-      hint={`Regular writers, found by name (or another name you give) in each item. Dots: the last ${recent.length} issues, oldest first. "Every" is how often you expect them; leave it blank for no fixed rhythm.`}>
+      hint={`Regular writers and series, found by name or phrase (capitals ignored) in each item. Usual week: which Wednesday of the month, from their last 12 appearances. Dots: the last ${recent.length} issues, oldest first. "Every" is how often you expect them; leave it blank for no fixed rhythm.`}>
       <div className="mb-2"><button type="button" className={btn} onClick={() => setEditing('new')}>Add a contributor</button></div>
       {editing === 'new' && <ContributorEditor ctx={ctx} onDone={() => setEditing(null)} />}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] text-[13px] border-collapse">
+        <table className="w-full min-w-[1000px] text-[13px] border-collapse">
           <caption className="sr-only">Contributors, most issues first.</caption>
-          <thead><tr>{['Who', 'Column', 'Business', 'Every', 'Last 26 issues', 'Last 12 months', 'Last in', 'Next expected', ''].map((h) => (
+          <thead><tr>{['Who', 'Column', 'Business', 'Every', 'Usual week', 'Last 26 issues', 'Last 12 months', 'Last in', 'Next expected', ''].map((h) => (
             <th key={h} scope="col" className="text-left text-[11px] uppercase tracking-wide text-gray-600 font-semibold px-2 py-1.5 border-b border-black/[0.08] whitespace-nowrap">{h}</th>
           ))}</tr></thead>
           <tbody>
@@ -405,6 +420,7 @@ function Contributors({ ctx }: { ctx: Ctx }) {
                   <td className="px-2 py-1.5">{c.column_name}</td>
                   <td className="px-2 py-1.5"><BizLink id={c.business_id} name={c.business_name} /></td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{c.expected_every_days ? `${c.expected_every_days} days` : ''}</td>
+                  <td className="px-2 py-1.5 whitespace-nowrap">{c.usual ? <>{weekWords(c.usual.weeks)} <span className="text-gray-600">({c.usual.hits} of {c.usual.of})</span></> : <span className="text-gray-600">any week</span>}</td>
                   <td className="px-2 py-1.5 font-mono tracking-[2px] whitespace-nowrap" aria-label={`In ${recent.filter((i) => seen.has(i.id)).length} of the last ${recent.length} issues`}>
                     {recent.map((i) => (seen.has(i.id) ? '●' : '·')).join('')}
                   </td>

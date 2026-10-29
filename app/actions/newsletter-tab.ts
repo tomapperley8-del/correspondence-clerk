@@ -14,6 +14,7 @@ import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { getBusinessTable } from '@/app/actions/business-table'
 import { refreshItems } from '@/lib/newsletter/items-store'
 import type { ItemKind } from '@/lib/newsletter/items'
+import { usualWeek, type UsualWeek } from '@/lib/newsletter/rhythm'
 
 export type NlIssue = { id: string; date: string; url: string | null; items: number; businesses: number }
 export type NlItem = {
@@ -25,6 +26,8 @@ export type NlContributor = {
   id: string; name: string; column_name: string | null; business_id: string | null; business_name: string | null
   aliases: string[]; expected_every_days: number | null; active: boolean; notes: string | null
   issues_total: number; issues_last_12_months: number; last_in: string | null; next_expected: string | null
+  /** Which Wednesday of the month they usually appear, from their last 12 appearances */
+  usual: UsualWeek | null
 }
 export type NlPromise = {
   id: string; contract_id: string; business_id: string; business_name: string; kind: 'blog' | 'editorial' | 'banner' | 'ad' | 'mention'
@@ -112,6 +115,8 @@ export async function getNewsletterTab(): Promise<{ data?: NewsletterTabData; er
       if (it.business_id) s.biz.add(it.business_id)
       perIssue.set(it.issue_id, s)
     }
+    const datesBy = new Map<string, string[]>()
+    for (const it of itemRows) if (it.contributor_id) datesBy.set(it.contributor_id, [...(datesBy.get(it.contributor_id) ?? []), it.issue_date])
     const ticks = new Map<string, string[]>()
     for (const t of tickRows) ticks.set(t.promise_id, [...(ticks.get(t.promise_id) ?? []), t.issue_id])
 
@@ -140,7 +145,7 @@ export async function getNewsletterTab(): Promise<{ data?: NewsletterTabData; er
           headline: it.headline, blurb: it.blurb ? it.blurb.slice(0, 220) : null, link_url: it.link_url, closes_on: it.closes_on,
           business_id: it.business_id, business_name: it.business_name, contributor_id: it.contributor_id, edited: it.edited_by_hand,
         })),
-        contributors: contributorRows.map((c) => ({ ...c, aliases: extra.get(c.id)?.aliases ?? [], notes: extra.get(c.id)?.notes ?? null })),
+        contributors: contributorRows.map((c) => ({ ...c, aliases: extra.get(c.id)?.aliases ?? [], notes: extra.get(c.id)?.notes ?? null, usual: usualWeek(datesBy.get(c.id) ?? []) })),
         promises: promiseRows.map((p) => ({ ...p, ticks: ticks.get(p.id) ?? [] })),
         contracts: contractRows
           .filter((c) => !c.contract_end || c.contract_end >= today)
