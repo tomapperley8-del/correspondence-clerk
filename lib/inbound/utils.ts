@@ -176,6 +176,58 @@ export function extractContactFormSender(rawBody: string): { email: string; name
 }
 
 /**
+ * Every sender named in a forwarded or quoted chain, in the order they appear
+ * (Stage 18). Looks at "From:" header lines, "On ..., Name <email> wrote:"
+ * attributions and contact-form "Email:" fields. Outlook's
+ * "info@x.co.uk<mailto:info@x.co.uk>" doubling is read as one address.
+ */
+export function chainSenders(rawBody: string): { email: string; name: string }[] {
+  const out: { at: number; email: string; name: string }[] = []
+  const addr = /([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/
+  const push = (at: number, line: string, nameHint?: string) => {
+    const m = addr.exec(line)
+    if (!m) return
+    const email = m[1].toLowerCase().replace(/\.+$/, '')
+    const before = line.slice(0, m.index).replace(/[<"'\[(]+\s*$/, '').trim()
+    out.push({ at, email, name: (nameHint ?? before) || email.split('@')[0] })
+  }
+  for (const m of rawBody.matchAll(/^>*\s*\*?From:\*?\s+(.{1,200})$/gim)) push(m.index ?? 0, m[1])
+  // "On Mon, 26 Oct 2026 at 15:39, Name <email> wrote:" (may wrap onto two lines)
+  for (const m of rawBody.matchAll(/^>*\s*On\s[^\n]{0,120}?(?:\n[^\n]{0,120}?)?\bwrote:/gim)) {
+    const text = m[0].replace(/\s+/g, ' ')
+    const e = addr.exec(text)
+    if (!e) continue
+    // The name sits between the date and the address: after the last comma, and after any time
+    const name = text.slice(0, e.index).split(',').at(-1)!
+      .replace(/^.*\d{1,2}:\d{2}(?:\s*[ap]m)?/i, '').replace(/[<"'\s]+$/, '').trim()
+    push(m.index ?? 0, text.slice(e.index), name || undefined)
+  }
+  for (const m of rawBody.matchAll(/^\s*(?:E[-\s]?Mail|Email|Sender\s+Email)\s*:\s*([^\s]+@[^\s]+)\s*$/gim)) {
+    const name = /^\s*Name\s*:\s*(.{1,100})$/im.exec(rawBody.slice(Math.max(0, (m.index ?? 0) - 600), (m.index ?? 0) + 600))
+    push(m.index ?? 0, m[1], name?.[1]?.trim())
+  }
+  return out.sort((a, b) => a.at - b.at).map(({ email, name }) => ({ email, name }))
+}
+
+/**
+ * The original sender of an email a team member (or Tom) forwarded: the first
+ * sender in the chain who is not one of us. `isUs` says whether an address is
+ * Tom's own or a team member's. Returns null when the chain names nobody else.
+ */
+export function originalSenderOfForward(
+  rawBody: string,
+  isUs: (email: string) => boolean,
+): { email: string; name: string } | null {
+  return chainSenders(rawBody).find((s) => !isUs(s.email)) ?? null
+}
+
+/** A forward, judged from the subject or a forwarding marker in the body. */
+export function looksForwarded(subject: string, rawBody: string): boolean {
+  return /^\s*(?:(?:re|aw)\s*:\s*)*(?:fw|fwd)\s*:/i.test(subject) ||
+    /^(?:-{3,}\s*Forwarded message\s*-{3,}|Begin forwarded message:|_{10,}\s*$)/im.test(rawBody)
+}
+
+/**
  * Strip quoted content from email body text.
  * Postmark's StrippedTextReply already does most of this; we apply
  * an extra pass to catch remaining patterns.

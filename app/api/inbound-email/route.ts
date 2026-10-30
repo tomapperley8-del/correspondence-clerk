@@ -31,6 +31,8 @@ import {
   stripQuotedContent,
   extractForwardedSender,
   extractContactFormSender,
+  originalSenderOfForward,
+  looksForwarded,
   getOwnDomains,
   domainBusinessNameScore,
   plainEmailBody,
@@ -768,6 +770,32 @@ async function createBusinessAndContact(
 // ---------------------------------------------------------------------------
 // Structured logger
 // ---------------------------------------------------------------------------
+/**
+ * Tom's team: every email address on a contact of an Internal business (business type
+ * 'internal', not commercial), less notification services filed there (QuickBooks, Mailchimp).
+ */
+async function getTeamEmails(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  orgId: string
+): Promise<Set<string>> {
+  const out = new Set<string>()
+  const { data: biz } = await supabase
+    .from('businesses').select('id').eq('organization_id', orgId).eq('business_type', 'internal').is('merged_into', null)
+  const ids = (biz ?? []).map(b => b.id as string)
+  if (ids.length === 0) return out
+  const { data: contacts } = await supabase.from('contacts').select('emails').in('business_id', ids)
+  for (const c of contacts ?? []) {
+    for (const e of Array.isArray(c.emails) ? c.emails : []) {
+      if (typeof e !== 'string' || !e.includes('@')) continue
+      const email = e.trim().toLowerCase()
+      const domain = email.split('@')[1]
+      if (newBusinessRefusal(domain) === 'notification service' || /(?:^|\.)(?:intuit|quickbooks|mailchimp)\.com$/.test(domain)) continue
+      out.add(email)
+    }
+  }
+  return out
+}
+
 function log(event: string, data: Record<string, unknown> = {}) {
   console.log(JSON.stringify({ t: new Date().toISOString(), event, ...data }))
 }
@@ -880,7 +908,22 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
   let effectiveFromEmail = fromEmail
   let effectiveFromName = fromName
 
-  if (fromSelf) {
+  // Stage 18: Tom's team (contacts on Internal businesses, e.g. Cleo for the events
+  // listings, Bridget the editor) forward emails in too. Those belong to the business
+  // that first wrote, not to the team member, so read the original sender from the chain.
+  const teamEmails = await getTeamEmails(supabase, orgId)
+  const isUs = (e: string) =>
+    ownEmails.includes(e) || ownDomains.has(e.split('@')[1] ?? '') || teamEmails.has(e)
+  const teamForward = !fromSelf && teamEmails.has(fromEmail) && looksForwarded(payload.subject ?? '', payload.text ?? '')
+
+  if (teamForward) {
+    const original = originalSenderOfForward(payload.text ?? '', isUs)
+    if (original) {
+      effectiveFromEmail = original.email
+      effectiveFromName = original.name
+      log('[inbound-email] team_forward_sender_extracted', { original: fromEmail, extracted: effectiveFromEmail })
+    }
+  } else if (fromSelf) {
     const rawBody = payload.text ?? ''
     const contactFormSender = extractContactFormSender(rawBody)
     if (contactFormSender) {
@@ -893,6 +936,15 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
         effectiveFromEmail = forwardedSender.email
         effectiveFromName = forwardedSender.name
         log('[inbound-email] forwarded_sender_extracted', { original: fromEmail, extracted: effectiveFromEmail })
+      }
+    }
+    // Tom forwarding a team member's forward: look past the team member too
+    if (teamEmails.has(effectiveFromEmail)) {
+      const original = originalSenderOfForward(rawBody, isUs)
+      if (original) {
+        effectiveFromEmail = original.email
+        effectiveFromName = original.name
+        log('[inbound-email] team_forward_sender_extracted', { original: fromEmail, extracted: effectiveFromEmail })
       }
     }
   }
@@ -1185,6 +1237,21 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
       if (autoFiledBusinessId) {
         log('[inbound-email] auto_filed_received_fuzzy_match', { businessId: autoFiledBusinessId, domain: effectiveDomain })
       }
+    }
+  }
+
+  // Stage 18: a team forward whose original sender matches nothing, and from whom no
+  // business can be made (a personal address or a service), stays with the team
+  // member as before, rather than being dropped.
+  if (teamForward && effectiveFromEmail !== fromEmail && !autoFiledBusinessId && !skipAutoFile &&
+      (!effectiveDomain || isPersonalDomain(effectiveDomain) || newBusinessRefusal(effectiveDomain))) {
+    const back = await matchBusinessFromEmail(supabase, orgId, fromEmail, payload.subject ?? '')
+    if (back && !back.routeToInbox) {
+      autoFiledBusinessId = back.businessId
+      autoFiledContactId = back.contactId
+      effectiveFromEmail = fromEmail
+      effectiveFromName = fromName
+      log('[inbound-email] team_forward_kept_with_team', { from: fromEmail })
     }
   }
 
