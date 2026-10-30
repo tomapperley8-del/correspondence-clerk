@@ -2,12 +2,15 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { bandClass, bandStyle, type KindColour } from '@/components/ui/kind'
 
 // A panel with a labelled "Full screen" button (UI overhaul Stage 14). Full
 // screen fills the window over the page; "Exit full screen" or Escape returns,
 // with focus back on the button. While it is open, Tab stays inside it.
 // Children read useFullScreen() to use the room (taller calendar days, all rows).
 // Reused by the Businesses table (Stage 13), the business page and Inbox (14b).
+// With `band` (Stage 14d house style) the heading sits on a solid band in the
+// box's colour, and buttons in it turn white.
 
 const FullScreenContext = createContext(false)
 
@@ -29,6 +32,8 @@ export function FullScreenPanel({
   className,
   id,
   card = true,
+  band,
+  bodyClassName,
 }: {
   title: React.ReactNode
   headingId: string
@@ -40,6 +45,10 @@ export function FullScreenPanel({
   id?: string
   /** Drawn as a white card on the page (default); full screen fills the window instead. */
   card?: boolean
+  /** A coloured header band (house style); the body gets its own padding. */
+  band?: KindColour
+  /** Padding for the body under a band (default p-2.5 sm:p-3 on a card). */
+  bodyClassName?: string
 }) {
   const [full, setFull] = useState(false)
   const panel = useRef<HTMLElement>(null)
@@ -94,26 +103,45 @@ export function FullScreenPanel({
         className={cn(
           full
             ? 'fixed inset-0 m-0 z-[70] overflow-y-auto bg-brand-paper px-4 py-4 sm:px-8 sm:py-6'
-            : cn('min-w-0', card && 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] p-4 sm:p-5'),
+            : cn(
+                'min-w-0',
+                card && 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)]',
+                card && !band && 'p-4 sm:p-5',
+              ),
           className,
         )}
       >
-        <div className={cn('flex flex-wrap items-center gap-2 mb-2', full && 'mx-auto max-w-[1800px]')}>
-          <h2 id={headingId} className="text-[1.6rem] leading-tight font-semibold text-brand-dark mr-auto" style={{ fontFamily: 'var(--font-serif)' }}>
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-2',
+            band ? cn(bandClass(band), 'px-3 py-1 rounded-sm', !full && card && 'rounded-b-none') : 'mb-2',
+            full && 'mx-auto max-w-[1800px]',
+          )}
+          style={band ? bandStyle(band) : undefined}
+        >
+          <h2
+            id={headingId}
+            className={cn('leading-tight font-semibold mr-auto', band ? 'text-[1.35rem] text-white' : 'text-[1.6rem] text-brand-dark')}
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
             {title}
           </h2>
-          {controls}
-          {full ? (
-            <button ref={exit} type="button" className={panelButtonClass} onClick={() => setFull(false)}>
-              Exit full screen
-            </button>
-          ) : (
-            <button ref={enter} type="button" className={panelButtonClass} onClick={() => setFull(true)}>
-              Full screen
-            </button>
-          )}
+          <div className={cn('contents', band && 'cc-band-controls')}>
+            {controls}
+            {full ? (
+              <button ref={exit} type="button" className={panelButtonClass} onClick={() => setFull(false)}>
+                Exit full screen
+              </button>
+            ) : (
+              <button ref={enter} type="button" className={panelButtonClass} onClick={() => setFull(true)}>
+                Full screen
+              </button>
+            )}
+          </div>
         </div>
-        <div className={cn(full && 'mx-auto max-w-[1800px]')}>{typeof children === 'function' ? children(full) : children}</div>
+        <div className={cn(full && 'mx-auto max-w-[1800px]', band && (bodyClassName ?? (card && !full ? 'p-2.5 sm:p-3' : 'pt-2')))}>
+          {typeof children === 'function' ? children(full) : children}
+        </div>
       </section>
     </FullScreenContext.Provider>
   )
