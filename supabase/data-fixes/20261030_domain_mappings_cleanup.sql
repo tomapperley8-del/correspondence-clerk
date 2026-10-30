@@ -1,8 +1,7 @@
 -- 30 Oct 2026: remove domain mappings that file one organisation's mail under another.
 -- Learned by the old fuzzy match, which rated a domain containing a place word ("london",
 -- "chiswick") 0.9 for any business named with it. Audit: supabase/.local/dm/audit.md and the
--- shared note domain-mappings-audit.md. Group A as proposed; NOT YET AGREED BY TOM, change the
--- list to his choice before running on live.
+-- shared note domain-mappings-audit.md. Group A, agreed by Tom on 30 Oct ("Yes, remove group A").
 -- Each row is checked by id, domain and business, so a mapping changed since the audit is left alone.
 -- Contacts and emails are not touched. Before-images: cc_phase0_backup reason
 -- 'domain mappings 2026-10-30'. Undo: 20261030_domain_mappings_cleanup_undo.sql.
