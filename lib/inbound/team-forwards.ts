@@ -89,8 +89,8 @@ export async function findTeamForwards(supabase: SupabaseClient, orgId: string, 
     // Letters only, in order: operahollandpark.com fits "Opera Holland Park"
     const base = letters(registrableDomain(domain).split('.')[0] ?? '')
     const plain = letters(name)
-    if (base.length >= 4 && plain.length >= 4 && (plain.includes(base) || base.includes(plain))) return true
-    return domainBusinessNameScore(domain, name) >= 0.6
+    if (base.length >= 3 && plain.length >= 3 && (plain.includes(base) || base.includes(plain))) return true
+    return domainBusinessNameScore(domain, name) >= 0.9
   }
 
   const moves: TeamForwardMove[] = []
