@@ -8,6 +8,9 @@
 -- search_correspondence(p_text, p_business, p_limit)
 --                                 full-text search over emails and notes (the app's own
 --                                 search_vector), optionally inside one business.
+-- search_everything(p_text, p_from, p_to, p_limit)
+--                                 across all businesses: emails, notes, to-dos, newsletter items,
+--                                 routine drafts; snippets and counts per kind.
 --
 -- Read by the correspondence-clerk-db skill (claude.ai) and Claude Code. Read-only: STABLE,
 -- SECURITY INVOKER, so RLS (own organisation) applies to signed-in users; the service role and
@@ -410,6 +413,59 @@ BEGIN
       LIMIT greatest(1, least(coalesce(p_limit, 20), 50))) s), '[]'::jsonb));
 END $$;
 
+-- Search everything Tom has written or filed, across all businesses: emails, calls, meetings and
+-- notes (the app's search_vector index), business and contact notes, to-dos, newsletter items and
+-- the routines' drafts. Optional date range. Newest first, with a snippet around the match, and a
+-- count of all matches per kind (so "how many" questions don't depend on the limit).
+CREATE OR REPLACE FUNCTION public.search_everything(p_text text, p_from date DEFAULT NULL, p_to date DEFAULT NULL, p_limit int DEFAULT 25)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path = public, extensions AS $$
+  WITH q AS (SELECT websearch_to_tsquery('english', coalesce(p_text, '')) AS tsq),
+  hits AS (
+    SELECT CASE WHEN c.type::text = 'Note' THEN 'note' ELSE lower(c.type::text) END AS kind, c.id::text AS ref,
+           c.business_id, c.entry_date::date AS d, c.direction, c.contact_id, c.subject AS title,
+           coalesce(c.formatted_text_current, c.formatted_text_original, c.raw_text_original, '') AS body
+    FROM correspondence c, q WHERE c.search_vector @@ q.tsq
+    UNION ALL
+    SELECT 'business_note', b.id::text, b.id, b.updated_at::date, NULL, NULL, b.name, b.notes
+    FROM businesses b, q WHERE b.merged_into IS NULL AND coalesce(b.notes, '') <> ''
+      AND to_tsvector('english', b.notes) @@ q.tsq
+    UNION ALL
+    SELECT 'contact_note', k.id::text, k.business_id, k.updated_at::date, NULL, k.id, k.name, k.notes
+    FROM contacts k, q WHERE coalesce(k.notes, '') <> '' AND to_tsvector('english', k.notes) @@ q.tsq
+    UNION ALL
+    SELECT 'todo', t.id::text, t.business_id, coalesce(t.due_date, t.created_at::date), t.status, NULL, t.title, coalesce(t.notes, '')
+    FROM tasks t, q WHERE to_tsvector('english', t.title || ' ' || coalesce(t.notes, '')) @@ q.tsq
+    UNION ALL
+    SELECT 'newsletter_item', n.id::text, n.business_id, i.sent_at::date, NULL, NULL, n.headline, coalesce(n.blurb, '')
+    FROM newsletter_items n JOIN newsletter_issues i ON i.id = n.issue_id, q
+    WHERE to_tsvector('english', coalesce(n.headline, '') || ' ' || coalesce(n.blurb, '')) @@ q.tsq
+    UNION ALL
+    SELECT 'routine_draft', r.id::text, r.business_id, r.created_at::date, r.outcome, NULL, r.subject, coalesce(r.reason, '')
+    FROM routine_drafts r, q WHERE to_tsvector('english', coalesce(r.subject, '') || ' ' || coalesce(r.reason, '')) @@ q.tsq
+  ),
+  inrange AS (
+    SELECT * FROM hits WHERE (p_from IS NULL OR d >= p_from) AND (p_to IS NULL OR d <= p_to)
+  ),
+  top AS (
+    SELECT * FROM inrange ORDER BY d DESC NULLS LAST LIMIT greatest(1, least(coalesce(p_limit, 25), 100))
+  )
+  SELECT jsonb_build_object(
+    'query', p_text, 'from', p_from, 'to', p_to,
+    'total', (SELECT count(*) FROM inrange),
+    'by_kind', (SELECT jsonb_object_agg(kind, n) FROM (SELECT kind, count(*) n FROM inrange GROUP BY kind) k),
+    'businesses_matched', (SELECT count(DISTINCT business_id) FROM inrange),
+    'note', 'Not searched (not in the database yet): Freebie and Eventbrite entries, sent email nobody BCCd, Drive documents, ad stats, full QuickBooks history.',
+    'results', coalesce((SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+        'kind', t.kind, 'id', t.ref, 'date', t.d, 'business', b.name, 'business_id', t.business_id,
+        'direction_or_status', t.direction, 'contact', k.name, 'title', t.title,
+        'snippet', ts_headline('english', left(t.body, 20000), q.tsq,
+                     'MaxWords=40, MinWords=15, MaxFragments=2, FragmentDelimiter=" ... ", StartSel=**, StopSel=**')))
+        ORDER BY t.d DESC NULLS LAST)
+      FROM top t CROSS JOIN q
+      LEFT JOIN businesses b ON b.id = t.business_id
+      LEFT JOIN contacts k ON k.id = t.contact_id), '[]'::jsonb));
+$$;
+
 REVOKE ALL ON FUNCTION public.cc_name_key(text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.cc_business_survivor(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.cc_business_candidates(text, int) FROM PUBLIC, anon;
@@ -422,3 +478,5 @@ GRANT EXECUTE ON FUNCTION public.cc_business_candidates(text, int) TO authentica
 GRANT EXECUTE ON FUNCTION public.business_dossier(text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.find_businesses(jsonb) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.search_correspondence(text, text, int) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.search_everything(text, date, date, int) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_everything(text, date, date, int) TO authenticated, service_role;
