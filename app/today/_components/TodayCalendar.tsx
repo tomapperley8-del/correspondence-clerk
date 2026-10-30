@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { toast } from '@/lib/toast'
-import { formatDateGB } from '@/lib/utils'
+import { cn, formatDateGB } from '@/lib/utils'
 import { updateTask } from '@/app/actions/tasks'
 import { getBusinessNames } from '@/app/actions/today'
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/app/actions/calendar'
 import { addDays } from '@/lib/today'
 import { FullScreenPanel, panelButtonClass } from '@/components/ui/full-screen-panel'
+import { useFold } from '@/components/ui/fold-section'
 import { CALENDAR_KINDS, addMonths, isWednesday, monthGrid, monthStart, weekStart, type CalendarKind } from '@/lib/calendar'
 
 // The work calendar on Today (UI overhaul Stage 12). Week view by default,
@@ -80,6 +81,8 @@ export function TodayCalendar({
   onChanged: () => void
 }) {
   const [view, setView] = useState<'week' | 'month'>('week')
+  // Stage 14c: folded by default on a phone, so it never sits out of sight.
+  const [shown, toggleShown] = useFold('today.calendar', true, false)
   const [anchor, setAnchor] = useState(today)
   const [items, setItems] = useState<CalendarItem[]>(initialItems)
   const [loading, setLoading] = useState(false)
@@ -313,6 +316,9 @@ export function TodayCalendar({
 
   const controls = (
     <>
+      <button type="button" className={panelButtonClass} aria-expanded={shown} aria-controls="calendar-body" onClick={toggleShown}>
+        {shown ? 'Hide' : 'Show'}<span className="sr-only"> the calendar</span>
+      </button>
       <div className="flex gap-1" role="group" aria-label="Calendar view">
         <button type="button" className={view === 'week' ? btnOn : btn} aria-pressed={view === 'week'} onClick={() => setView('week')}>Week</button>
         <button type="button" className={view === 'month' ? btnOn : btn} aria-pressed={view === 'month'} onClick={() => setView('month')}>Month</button>
@@ -321,9 +327,9 @@ export function TodayCalendar({
   )
 
   return (
-    <FullScreenPanel title="Calendar" headingId="calendar-h" controls={controls}>
+    <FullScreenPanel title="Calendar" headingId="calendar-h" controls={controls} className="!p-2.5 sm:!p-4">
       {(full) => (
-        <div className="space-y-2">
+        <div id="calendar-body" hidden={!shown && !full} className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm text-brand-dark font-semibold mr-auto" aria-live="polite">
               {title}
@@ -336,7 +342,7 @@ export function TodayCalendar({
             </div>
           </div>
 
-          <div className="@container border-y border-black/[0.05] -mx-1">
+          <div className={cn('@container border-y border-black/[0.05] -mx-1', !full && 'max-h-[30vh] overflow-y-auto overscroll-contain')}>
             {view === 'month' && (
               <div className="grid grid-cols-7 border-b border-black/[0.05]">
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((n) => (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/lib/toast'
@@ -11,7 +11,8 @@ import { acceptProspectLead, deleteProspectLead, undoDeleteProspectLead } from '
 import { removeBusinessFromOutreach, undoRemoveFromOutreach, updateOutreachStage } from '@/app/actions/businesses'
 import { MATCH_TYPE_META } from '@/lib/lead-meta'
 import { ActionMenu } from '@/components/ui/action-menu'
-import { FullScreenPanel } from '@/components/ui/full-screen-panel'
+import { FullScreenPanel, panelButtonClass } from '@/components/ui/full-screen-panel'
+import { FoldSection, useFold } from '@/components/ui/fold-section'
 import { PipelineBoard } from '@/components/pipeline/PipelineBoards'
 import { OUTREACH_STAGES, PILL } from '@/app/businesses/_components/MastersheetTable'
 import { downloadSheet } from '@/lib/spreadsheet-export'
@@ -42,6 +43,8 @@ const btnBase =
 const mainBtn = `${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`
 const softBtn = `${btnBase} bg-white border border-black/[0.12] text-brand-dark hover:bg-brand-warm`
 const card = 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)]'
+/** Stage 14c: the rail's folded sections. */
+const RAIL = 'shadow-[var(--shadow-sm)] scroll-mt-4'
 
 const dateGB = (d: string | null | undefined) => (d ? formatDateGB(`${d.slice(0, 10)}T12:00:00Z`) : '')
 
@@ -92,6 +95,13 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
   // A stage's list opens when one is chosen (or the address names one), so the page stays short.
   const [listOpen, setListOpen] = useState(!!initialStage || !!initialQuery)
   const [leadsShown, setLeadsShown] = useState(LEADS_FIRST)
+  // Stage 14c: folded unless a stage or search was asked for, or a tile links here.
+  const [pipelineShown, togglePipeline, setPipelineShown] = useFold('outreach.pipeline', false, undefined, 'pipeline')
+  useEffect(() => {
+    // A link asked for a stage, a search or the board.
+    if (initialStage || initialQuery || initialBoard) setPipelineShown(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, after the saved state is read
+  }, [])
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- take the fresh list after router.refresh()
   useEffect(() => setLeads(data.leads), [data.leads])
@@ -219,7 +229,7 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* Title and the summary strip; each number jumps to its part of the page */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -244,7 +254,7 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-5 items-start">
+      <div className="flex flex-wrap gap-3 items-start">
         {/* Main column: what to do */}
         <div className="flex-[999_1_620px] min-w-0">
           {next ? (
@@ -255,16 +265,23 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
         </div>
 
         {/* Side rail: what to send, what to bring in, how it is going */}
-        <aside aria-label="Drafts, leads, suggestions and results" className="flex-[1_1_400px] min-w-0 space-y-4">
-          <section aria-labelledby="drafts-heading" className={card}>
-            <RailHead id="drafts-heading" title="Drafts ready to send" count={drafts.length}>
-              {drafts.length > 0 && (
-                <a href={OUTLOOK_DRAFTS} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand-navy hover:underline">
+        <aside aria-label="Drafts, leads, suggestions and results" className="flex-[1_1_400px] min-w-0 space-y-1.5">
+          <FoldSection
+            storageKey="outreach.drafts"
+            id="drafts"
+            big
+            title="Drafts ready to send"
+            count={drafts.length}
+            className={RAIL}
+            controls={
+              drafts.length > 0 && (
+                <a href={OUTLOOK_DRAFTS} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-brand-navy hover:underline px-2 inline-flex items-center min-h-10 md:min-h-8">
                   Open Outlook drafts<span className="sr-only"> (opens in a new tab)</span>
                 </a>
-              )}
-            </RailHead>
-            <p className="px-3 pb-1.5 text-xs text-gray-600">Written by the outreach routine in the last 30 days, waiting in your Outlook drafts. Nothing is sent from here.</p>
+              )
+            }
+          >
+            <p className="px-3 py-1.5 text-xs text-gray-600">Written by the outreach routine in the last 30 days, waiting in your Outlook drafts. Nothing is sent from here.</p>
             <ul className="divide-y divide-black/[0.06] border-t border-black/[0.06]">
               {drafts.length === 0 && <li className="px-3 py-2.5 text-sm text-gray-600">No outreach drafts waiting.</li>}
               {drafts.map((d) => (
@@ -284,11 +301,10 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
                 </li>
               ))}
             </ul>
-          </section>
+          </FoldSection>
 
-          <section id="leads" aria-labelledby="leads-heading" className={cn(card, 'scroll-mt-4')}>
-            <RailHead id="leads-heading" title="Leads to accept" count={leads.length} />
-            <p className="px-3 pb-1.5 text-xs text-gray-600">Found by the prospecting routine. Accept puts the business on outreach as Identified (or links it to the one on file); Delete removes the lead, with Undo.</p>
+          <FoldSection storageKey="outreach.leads" id="leads" big title="Leads to accept" count={leads.length} className={RAIL}>
+            <p className="px-3 py-1.5 text-xs text-gray-600">Found by the prospecting routine. Accept puts the business on outreach as Identified (or links it to the one on file); Delete removes the lead, with Undo.</p>
             <ul className="divide-y divide-black/[0.06] border-t border-black/[0.06]">
               {leads.length === 0 && <li className="px-3 py-2.5 text-sm text-gray-600">No leads waiting. The prospecting routine adds them here when it finds something.</li>}
               {leads.slice(0, leadsShown).map((l) => {
@@ -343,26 +359,29 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
                 </li>
               )}
             </ul>
-          </section>
+          </FoldSection>
 
           {next && <OutreachSuggestions suggestions={next.suggestions} />}
 
-          <section id="results" aria-labelledby="results-heading" className={cn(card, 'scroll-mt-4')}>
-            <RailHead id="results-heading" title="Results by month" />
-            <p className="px-3 text-xs text-gray-600">Contacted = the first approach that month. Replied = they emailed back within 30 days of it. Won = a deal recorded that month.</p>
+          <FoldSection storageKey="outreach.results" id="results" big title="Results by month" className={RAIL}>
+            <p className="px-3 pt-1.5 text-xs text-gray-600">Contacted = the first approach that month. Replied = they emailed back within 30 days of it. Won = a deal recorded that month.</p>
             <ResultsChart months={months} />
-          </section>
+          </FoldSection>
         </aside>
       </div>
 
       {/* Pipeline: one strip of stages; a stage opens its list, or use the board */}
       <section id="pipeline" aria-labelledby="outreach-pipeline-heading" className="scroll-mt-4">
         <FullScreenPanel
-          title="Pipeline"
+          title={<>Pipeline <span className="text-sm font-normal tabular-nums" style={{ fontFamily: 'var(--font-sans)' }}>{summary.onOutreach}</span></>}
           headingId="outreach-pipeline-heading"
           card={false}
           controls={
-            board || !listOpen ? null : (
+            <>
+            <button type="button" className={panelButtonClass} aria-expanded={pipelineShown} aria-controls="pipeline-body" onClick={togglePipeline}>
+              {pipelineShown ? 'Hide' : 'Show'}<span className="sr-only"> the pipeline</span>
+            </button>
+            {board || !listOpen || !pipelineShown ? null : (
               <ActionMenu
                 label="Download"
                 accessibleLabel={`Download ${shown.length} businesses at this stage`}
@@ -372,11 +391,12 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
                   { label: 'CSV', hint: 'Opens in Excel, Numbers or Google Sheets', onSelect: () => download('csv') },
                 ]}
               />
-            )
+            )}
+            </>
           }
         >
           {(full) => (
-            <>
+            <div id="pipeline-body" hidden={!pipelineShown && !full}>
               <div className="flex flex-wrap items-center gap-3 mb-2">
                 <p className="text-xs text-gray-600 flex-1 min-w-[220px]">
                   Each business&apos;s outreach stage, the same one as the Outreach stage column in Businesses. Choose a stage to list its businesses, or use the board to drag.
@@ -508,22 +528,10 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
                   )}
                 </>
               )}
-            </>
+            </div>
           )}
         </FullScreenPanel>
       </section>
-    </div>
-  )
-}
-
-function RailHead({ id, title, count, children }: { id: string; title: string; count?: number; children?: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-baseline justify-between gap-2 px-3 pt-2.5 pb-0.5">
-      <h2 id={id} className="text-lg font-bold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
-        {title}
-        {count !== undefined && <span className="ml-1.5 text-xs font-semibold text-gray-600 tabular-nums" style={{ fontFamily: 'var(--font-sans)' }}>{count}</span>}
-      </h2>
-      {children}
     </div>
   )
 }

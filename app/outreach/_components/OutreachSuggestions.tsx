@@ -13,13 +13,13 @@ import { cn, formatDateGB } from '@/lib/utils'
 import type { OutreachSuggestion } from '@/app/actions/outreach-next'
 import { acceptOutreachSuggestion, dismissOutreachSuggestion, undoDismissOutreachSuggestion } from '@/app/actions/outreach-next'
 import { undoRemoveFromOutreach } from '@/app/actions/businesses'
+import { FoldSection } from '@/components/ui/fold-section'
 
 
 const btnBase =
   'inline-flex items-center justify-center text-sm font-semibold px-3 min-h-10 md:min-h-9 pointer-coarse:min-h-10 rounded-sm transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
 const mainBtn = `${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`
 const softBtn = `${btnBase} bg-white border border-black/[0.12] text-brand-dark hover:bg-brand-warm`
-const card = 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)]'
 
 type Chip = 'all' | 'unreviewed' | 'newsletter' | 'news'
 const CHIPS: { key: Chip; label: string; test: (s: OutreachSuggestion) => boolean }[] = [
@@ -105,14 +105,8 @@ export function OutreachSuggestions({ suggestions }: { suggestions: OutreachSugg
   }
 
   return (
-    <section id="suggestions" aria-labelledby="suggestions-heading" className={cn(card, 'scroll-mt-4')}>
-      <div className="px-3 pt-2.5 pb-0.5">
-        <h2 id="suggestions-heading" className="text-lg font-bold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
-          Could be on outreach
-          <span className="ml-1.5 text-xs font-semibold text-gray-600 tabular-nums" style={{ fontFamily: 'var(--font-sans)' }}>{live.length}</span>
-        </h2>
-      </div>
-      <p className="px-3 pb-1.5 text-xs text-gray-600">
+    <FoldSection storageKey="outreach.suggestions" id="suggestions" big title="Could be on outreach" count={live.length} className="shadow-[var(--shadow-sm)] scroll-mt-4">
+      <p className="px-3 py-1.5 text-xs text-gray-600">
         Not on outreach, but our own records point to them. Leads for lapsed members converted 4 times in 5. Accept puts the business on outreach as Identified; Not now hides it. Nothing is added by itself.
       </p>
       <div className="flex flex-wrap gap-1 px-3 pb-2" role="group" aria-label="Show">
@@ -164,6 +158,6 @@ export function OutreachSuggestions({ suggestions }: { suggestions: OutreachSugg
           </button>
         </div>
       )}
-    </section>
+    </FoldSection>
   )
 }

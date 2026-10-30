@@ -75,7 +75,7 @@ export function ResizableSplit({
       )}
       <div
         ref={box}
-        className={cn('flex flex-col gap-8 lg:grid lg:gap-0 lg:[grid-template-columns:var(--split-a)_1.5rem_minmax(0,1fr)]', dragging && 'select-none')}
+        className={cn('flex flex-col gap-3 lg:grid lg:gap-0 lg:[grid-template-columns:var(--split-a)_1.5rem_minmax(0,1fr)]', dragging && 'select-none')}
         style={{ '--split-a': `minmax(0, ${pct}%)` } as React.CSSProperties}
       >
         <div className="min-w-0">{first}</div>

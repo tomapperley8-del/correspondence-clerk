@@ -328,7 +328,7 @@ export function MastersheetTable({
   return (
     // Scrolls both ways inside its own box, so the header row and the name column stay put like frozen panes.
     <div
-      className={`${full ? 'max-h-[calc(100vh-12rem)]' : 'max-h-[75vh]'} overflow-auto border border-ms-grid bg-white`}
+      className={`${full ? 'max-h-[calc(100vh-12rem)]' : 'max-h-[max(16rem,calc(100vh-26rem))]'} relative overflow-auto border border-ms-grid bg-white`}
       style={{ boxShadow: 'var(--shadow-sm)' }}
     >
       <table className="table-fixed border-separate border-spacing-0 text-[13px] leading-5" style={{ width: total }}>

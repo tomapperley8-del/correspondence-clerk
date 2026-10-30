@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getDataHealth, type DataHealthRow } from '@/app/actions/data-health'
 import { cn, formatDateGB } from '@/lib/utils'
+import { FoldSection } from '@/components/ui/fold-section'
 
 // Data health (UI overhaul Stage 11c, Decision 29 Oct): things that have drifted, each with a
 // count and a list to fix, quiet when nothing has. Reached from Businesses and the user menu.
@@ -69,7 +70,7 @@ export default async function DataHealthPage() {
   const fine = here.filter((c) => c.n === 0)
 
   return (
-    <div className="mx-auto px-4 py-8 max-w-[1100px] space-y-4">
+    <div className="mx-auto px-4 py-6 max-w-[1100px] space-y-2">
       {header}
 
       {todo.length === 0 ? (
@@ -84,13 +85,15 @@ export default async function DataHealthPage() {
       {todo.map((c) => {
         const list = rows.filter((r) => r.check_key === c.check_key)
         return (
-          <details key={c.check_key} className={card} open={todo.length <= 2 || c === todo[0]}>
-            <summary className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 cursor-pointer min-h-10">
-              <span className="text-xs font-bold px-2 py-0.5 rounded-sm tabular-nums bg-ms-orange text-ms-orange-text">{c.n}</span>
-              <span className="font-semibold text-brand-dark">{c.title}</span>
-              <span className="text-xs text-gray-600 basis-full sm:basis-auto sm:flex-1">{HINTS[c.check_key]}</span>
-            </summary>
-            <div className="overflow-x-auto border-t border-black/[0.06]">
+          <FoldSection
+            key={c.check_key}
+            storageKey={`datahealth.${c.check_key}`}
+            title={c.title}
+            badge={<span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-sm tabular-nums bg-ms-orange text-ms-orange-text">{c.n}</span>}
+            hint={HINTS[c.check_key]}
+            className="shadow-[var(--shadow-sm)]"
+          >
+            <div className="overflow-x-auto mt-1.5 border-t border-black/[0.06]">
               <table className="w-full text-sm border-collapse">
                 <caption className="sr-only">{c.title}</caption>
                 <thead>
@@ -117,7 +120,7 @@ export default async function DataHealthPage() {
                 </tbody>
               </table>
             </div>
-          </details>
+          </FoldSection>
         )
       })}
 

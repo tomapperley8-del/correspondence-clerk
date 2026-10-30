@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { cn, formatDateGB } from '@/lib/utils'
 import { toast } from '@/lib/toast'
 import { FilterChips } from '@/components/ui/filter-chips'
+import { FoldSection } from '@/components/ui/fold-section'
 import { addToNewsletter } from '@/components/ForNewsletterButton'
 import type { ItemKind } from '@/lib/newsletter/items'
 import { nthWednesday, weekWords } from '@/lib/newsletter/rhythm'
@@ -53,8 +54,6 @@ const PROMISE_WORD: Record<NlPromise['kind'], [string, string]> = {
 }
 
 const card = 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)]'
-const h2 = 'text-xl font-bold mb-0.5'
-const serif = { fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }
 const btn = 'inline-flex items-center px-2.5 min-h-10 md:min-h-8 text-sm rounded-sm border border-black/10 bg-white hover:bg-brand-warm transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
 const mainBtn = 'inline-flex items-center px-2.5 min-h-10 md:min-h-8 text-sm rounded-sm bg-brand-navy text-white hover:bg-brand-navy-hover transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
 const input = 'border border-black/15 rounded-sm px-2 min-h-10 md:min-h-8 text-sm bg-white min-w-0'
@@ -173,13 +172,25 @@ function IssueButton({ on, dashed, onClick, title, sub }: { on: boolean; dashed?
   )
 }
 
+// Stage 14c: each section is a folded section (open on a computer, folded on a
+// phone, remembered per browser) whose body scrolls inside, so the page ends at
+// the first screen.
 function Section({ id, title, hint, children, className }: { id: string; title: string; hint?: string; children: React.ReactNode; className?: string }) {
   return (
-    <section aria-labelledby={id} className={cn(card, 'px-3.5 py-3 min-w-0', className)}>
-      <h2 id={id} className={h2} style={serif}>{title}</h2>
-      {hint && <p className="text-xs text-gray-600 mb-2">{hint}</p>}
+    <FoldSection
+      storageKey={`newsletter.${id}`}
+      id={id}
+      big
+      title={title}
+      defaultOpen
+      narrowOpen={false}
+      hint={hint}
+      scroll="max-h-[40vh] lg:max-h-[max(14rem,calc(100vh-26rem))]"
+      className={cn('shadow-[var(--shadow-sm)]', className)}
+      bodyClassName="relative px-3.5 pb-3 [&>p:first-child]:px-0 [&>p:first-child]:pb-2"
+    >
       {children}
-    </section>
+    </FoldSection>
   )
 }
 

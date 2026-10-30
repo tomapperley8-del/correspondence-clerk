@@ -14,7 +14,7 @@ export default async function NewsletterPage({ searchParams }: { searchParams: P
   const [result, next, params] = await Promise.all([getNewsletterTab(), getNewsletterList(), searchParams])
 
   return (
-    <div className="mx-auto px-4 py-8 max-w-[1400px]">
+    <div className="mx-auto px-4 py-4 max-w-[1400px]">
       <div className="mb-4">
         <h1 className="text-3xl font-bold mb-1" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
           Newsletter

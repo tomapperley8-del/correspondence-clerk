@@ -23,6 +23,10 @@ import { ActionMenu, type MenuEntry } from '@/components/ui/action-menu'
 import { OUTREACH_STAGES, PILL, type Tone } from '@/app/businesses/_components/MastersheetTable'
 import type { OutreachWinbacks } from '@/app/actions/outreach-winbacks'
 import { WinBacks } from './WinBacks'
+import { useFold } from '@/components/ui/fold-section'
+
+/** Stage 14c: long lists scroll inside the box, so the page ends at the screen. */
+const SCROLL = 'max-h-[45vh] overflow-y-auto overscroll-contain'
 
 const btnBase =
   'inline-flex items-center justify-center text-sm font-semibold px-3 min-h-10 md:min-h-9 pointer-coarse:min-h-10 rounded-sm transition-colors duration-200 ease-out disabled:opacity-50 whitespace-nowrap'
@@ -143,6 +147,8 @@ export function WorkOnNext({ rows, contacts, extra }: { rows: OutreachNextRow[];
   const [shown, setShown] = useState<Record<string, number>>({})
   const [confirmBulk, setConfirmBulk] = useState<OutreachBucket | null>(null)
   const [howOpen, setHowOpen] = useState(false)
+  // Stage 14c: open on a computer, folded on a phone; the rows scroll inside.
+  const [open, toggle] = useFold('outreach.next', true, false)
   const [picked, setPicked] = useState<TabKey | null>(null)
 
   const byBucket = useMemo(() => {
@@ -383,7 +389,10 @@ export function WorkOnNext({ rows, contacts, extra }: { rows: OutreachNextRow[];
         <h2 id="work-on-next-heading" className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
           Work on next
         </h2>
-        {extra && (
+        <button type="button" className={linkBtn} aria-expanded={open} aria-controls="work-on-next-body" onClick={toggle}>
+          {open ? 'Hide' : 'Show'}<span className="sr-only"> work on next</span>
+        </button>
+        {open && extra && (
           <div role="group" aria-label="Show" className="inline-flex border border-black/10 rounded-sm overflow-hidden ml-auto">
             {([
               ['pipeline', 'The pipeline', null],
@@ -406,13 +415,14 @@ export function WorkOnNext({ rows, contacts, extra }: { rows: OutreachNextRow[];
             ))}
           </div>
         )}
-        {mode === 'pipeline' && (
+        {open && mode === 'pipeline' && (
           <button type="button" className={linkBtn} aria-expanded={howOpen} onClick={() => setHowOpen((o) => !o)}>
             {howOpen ? 'Hide how this is ordered' : 'How this is ordered'}
           </button>
         )}
       </div>
-      {mode !== 'pipeline' && extra ? <div className="mt-2"><WinBacks key={mode} data={extra} mode={mode} /></div> : (<>
+      <div id="work-on-next-body" hidden={!open} className="pb-1">
+      {mode !== 'pipeline' && extra ? <div className={cn('mt-2', SCROLL)}><WinBacks key={mode} data={extra} mode={mode} /></div> : (<>
       {howOpen && (
         <div className="mx-3 mt-2 p-3 bg-brand-warm rounded-sm text-sm text-gray-700 space-y-1">
           <p>Plain rules on the latest email each way, worked out fresh every time (the outreach routine reads the same list). Replies first, then chases, follow-ups, ones to close, then new businesses by fit score.</p>
@@ -441,11 +451,14 @@ export function WorkOnNext({ rows, contacts, extra }: { rows: OutreachNextRow[];
           )
         })}
       </div>
+      <div className={SCROLL}>
       {current.groups.length === 1 ? renderGroup(current.groups[0], false) : current.groups.map((g) => renderGroup(g, true))}
       {current.groups.every((g) => count(g.key) === 0) && current.groups.length > 1 && (
         <p className="px-3 py-3 text-sm text-gray-600">Nothing to tidy up.</p>
       )}
+      </div>
       </>)}
+      </div>
     </section>
   )
 }
