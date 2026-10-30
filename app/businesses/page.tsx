@@ -24,8 +24,8 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
   const [result, healthCount] = await Promise.all([getBusinessTable(), getDataHealthCount()])
 
   return (
-    <div className="mx-auto px-4 py-8 max-w-[1400px]">
-      <div className="mb-5">
+    <div className="mx-auto px-4 py-4 max-w-[1400px]">
+      <div className="mb-3">
         <h1
           className="text-3xl font-bold mb-1"
           style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}
