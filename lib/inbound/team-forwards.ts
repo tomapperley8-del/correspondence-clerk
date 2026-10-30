@@ -5,10 +5,12 @@
 // services. Read-only.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { looksForwarded, originalSenderOfForward, newBusinessRefusal, isPersonalDomain, registrableDomain, domainBusinessNameScore } from '@/lib/inbound/utils'
+import { looksForwarded, originalSenderOfForward, newBusinessRefusal, isPersonalDomain, registrableDomain } from '@/lib/inbound/utils'
 
 /** Dawn's (Dwmultimedia) ad emails are Stage 17b's. */
 const LEAVE_TO_17B = new Set(['Dwmultimedia'])
+/** Too general to tie a domain to one business. */
+const PLACE_WORDS = new Set(['chiswick', 'london', 'hammersmith', 'ealing', 'hounslow', 'brentford', 'kew'])
 const OWN_DOMAINS = ['thechiswickcalendar.co.uk', 'chiswickcalendar.co.uk']
 
 export type TeamForwardMove = {
@@ -86,11 +88,14 @@ export async function findTeamForwards(supabase: SupabaseClient, orgId: string, 
     const domain = email.split('@')[1] ?? ''
     if (isPersonalDomain(domain)) return true
     const name = byId.get(businessId)?.name ?? ''
-    // Letters only, in order: operahollandpark.com fits "Opera Holland Park"
+    // Letters only, in order: operahollandpark.com fits "Opera Holland Park", tabard.org.uk fits
+    // "Theatre at the Tabard"; chiswickchamberorchestra.org doesn't fit "B&Q Chiswick". (The
+    // inbound scorer, domainBusinessNameScore, rates that 0.9, so it isn't used here.)
     const base = letters(registrableDomain(domain).split('.')[0] ?? '')
     const plain = letters(name)
-    if (base.length >= 3 && plain.length >= 3 && (plain.includes(base) || base.includes(plain))) return true
-    return domainBusinessNameScore(domain, name) >= 0.9
+    if (base === plain && base.length >= 2) return true
+    if (PLACE_WORDS.has(base) || PLACE_WORDS.has(plain)) return false
+    return (base.length >= 5 && plain.includes(base)) || (plain.length >= 5 && base.includes(plain))
   }
 
   const moves: TeamForwardMove[] = []
