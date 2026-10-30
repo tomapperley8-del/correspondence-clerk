@@ -171,17 +171,37 @@ export async function updateNewsletterItem(id: string, change: { kind?: ItemKind
   return {}
 }
 
-/** Yes or No on an unclear mention. The next read keeps the choice. */
-export async function decideMention(id: string, yes: boolean): Promise<{ error?: string }> {
+/**
+ * Yes or No on unclear mentions, one or many at once (Stage 19). The next read keeps the
+ * choice (decided_at set). Returns the ids so the choice can be undone.
+ */
+export async function decideMentions(ids: string[], yes: boolean): Promise<{ ids?: string[]; error?: string }> {
   const ctx = await context()
   if ('error' in ctx) return ctx
   const { supabase, orgId, userId } = ctx
+  if (ids.length === 0) return { ids: [] }
   const now = new Date().toISOString()
   const { data, error } = await supabase.from('newsletter_mentions')
     .update({ status: yes ? 'confirmed' : 'rejected', decided_by: userId, decided_at: now, updated_at: now })
-    .eq('id', id).eq('organization_id', orgId).select('issue_id').single()
+    .in('id', ids).eq('organization_id', orgId).eq('status', 'unclear').select('id, issue_id')
   if (error) return { error: error.message }
-  try { await relink(orgId, [data.issue_id]) } catch (e) { return { error: e instanceof Error ? e.message : String(e) } }
+  try { await relink(orgId, [...new Set((data ?? []).map((m) => m.issue_id))]) } catch (e) { return { error: e instanceof Error ? e.message : String(e) } }
+  revalidatePath('/newsletter')
+  revalidatePath('/businesses')
+  return { ids: (data ?? []).map((m) => m.id) }
+}
+
+/** Undo: the mentions go back to unclear, undecided, so the next read may judge them again. */
+export async function undoMentionDecisions(ids: string[]): Promise<{ error?: string }> {
+  const ctx = await context()
+  if ('error' in ctx) return ctx
+  const { supabase, orgId } = ctx
+  if (ids.length === 0) return {}
+  const { data, error } = await supabase.from('newsletter_mentions')
+    .update({ status: 'unclear', decided_by: null, decided_at: null, updated_at: new Date().toISOString() })
+    .in('id', ids).eq('organization_id', orgId).select('issue_id')
+  if (error) return { error: error.message }
+  try { await relink(orgId, [...new Set((data ?? []).map((m) => m.issue_id))]) } catch (e) { return { error: e instanceof Error ? e.message : String(e) } }
   revalidatePath('/newsletter')
   revalidatePath('/businesses')
   return {}

@@ -71,6 +71,7 @@ async function getToday(supabase: SupabaseServer): Promise<string> {
 
 function refresh(businessId?: string | null) {
   revalidatePath('/today')
+  revalidatePath('/newsletter')
   if (businessId) revalidatePath(`/businesses/${businessId}`)
 }
 

@@ -179,7 +179,7 @@ function newsletterRow(n: NewsletterItem, asTodo: TodayItem | undefined, today: 
     business_name: n.business_name,
     title: n.business_name ?? n.title,
     detail: n.business_name ? `${NL_LABEL[n.kind]}: ${n.title}` : NL_LABEL[n.kind],
-    pill: late ? { text: ageWords(asTodo!, today), tone: 'red' } : { text: n.date ? `newsletter ${dateGB(n.date).slice(0, 5)}` : 'newsletter', tone: 'green' },
+    pill: late ? { text: ageWords(asTodo!, today), tone: 'red' } : { text: n.date ? `newsletter ${dateGB(n.date)}` : 'newsletter', tone: 'green' },
     overdue: late,
     nl: n,
   }

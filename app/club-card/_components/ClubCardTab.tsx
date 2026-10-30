@@ -38,7 +38,7 @@ const SHOWS: { key: Show; label: string; hint: string }[] = [
   { key: 'all', label: 'Everything', hint: 'Members, former members and every business with a member page.' },
 ]
 
-type Col = 'card' | 'ends' | 'amount' | 'offer' | 'page' | 'contact' | 'last' | 'newsletter' | 'news' | 'renewal' | 'terms' | 'problems'
+type Col = 'card' | 'ends' | 'amount' | 'offer' | 'page' | 'contact' | 'last' | 'newsletter' | 'freebie' | 'news' | 'renewal' | 'terms' | 'problems'
 const COLS: { key: Col; label: string }[] = [
   { key: 'card', label: 'Card' },
   { key: 'ends', label: 'Ends' },
@@ -48,6 +48,7 @@ const COLS: { key: Col; label: string }[] = [
   { key: 'contact', label: 'Main contact' },
   { key: 'last', label: 'Last in touch' },
   { key: 'newsletter', label: 'Last in newsletter' },
+  { key: 'freebie', label: 'Last Freebie' },
   { key: 'news', label: 'News articles' },
   { key: 'renewal', label: 'Renewal stage' },
   { key: 'terms', label: 'Terms' },
@@ -108,6 +109,7 @@ function cellText(r: ClubCardTabRow, col: Col): string {
     case 'contact': return contactName(r)
     case 'last': return dateGB(r.table?.last_in_touch)
     case 'newsletter': return dateGB(r.table?.newsletter?.date)
+    case 'freebie': return r.freebies.map((f) => dateGB(f.date)).join(', ')
     case 'news': return m && 'articles' in m ? String((m as { articles: number }).articles) : ''
     case 'renewal': return r.table?.in_renewal_window && r.table.renewal_stage ? RENEWAL_STAGE_LABEL[r.table.renewal_stage] ?? r.table.renewal_stage : ''
     case 'terms': return String(r.terms)
@@ -462,6 +464,10 @@ function cell(r: ClubCardTabRow, c: Col, today: string): React.ReactNode {
           </a>
         ) : <span className="whitespace-nowrap tabular-nums">{dateGB(r.table.newsletter.date)}</span>
       ) : <span className="text-gray-500">Never</span>
+    case 'freebie':
+      return r.freebies.length > 0
+        ? <span className="whitespace-nowrap tabular-nums" title={r.freebies.map((f) => dateGB(f.date)).join(', ')}>{dateGB(r.freebies[0].date)}{r.freebies.length > 1 && <span className="text-gray-600"> ({r.freebies.length})</span>}</span>
+        : <span className="text-gray-500">Never</span>
     case 'problems':
       return (m?.issues.length ?? 0) > 0 ? (
         <span className="flex flex-wrap gap-1">
@@ -671,6 +677,12 @@ function MemberPanel({ row, today, due, inline = false }: { row: ClubCardTabRow;
               : dateGB(row.table.newsletter.date)
           ) : 'never'}
           {due && <span className="ml-2 text-[11px] font-semibold px-1.5 py-0.5 rounded-sm bg-ms-yellow text-ms-yellow-text">Due a mention</span>}
+        </p>
+        <p>
+          Freebies:{' '}
+          {row.freebies.length > 0
+            ? row.freebies.map((f) => `${dateGB(f.date)}${f.closes_on ? ` (closes ${dateGB(f.closes_on)})` : ''}`).join(', ')
+            : 'never had one'}
         </p>
         {articles === null ? (
           <p className="text-gray-600">Loading news articles…</p>

@@ -31,6 +31,8 @@ export type ClubCardTabRow = {
   contract: ClubCardContract | null
   /** How many Club Card terms this business has had. */
   terms: number
+  /** Freebies the newsletter ran for them (newsletter_items, kind freebie), newest first (Stage 19). */
+  freebies: { date: string; closes_on: string | null }[]
 }
 
 export type ClubCardSummary = {
@@ -86,7 +88,7 @@ export async function getClubCardTab(): Promise<{
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
 
-  const [membersRes, tableRes, contractsRes] = await Promise.all([
+  const [membersRes, tableRes, contractsRes, freebiesRes] = await Promise.all([
     getClubCardMembers(),
     getBusinessTable(),
     supabase
@@ -95,6 +97,14 @@ export async function getClubCardTab(): Promise<{
       .eq('organization_id', orgId)
       .in('membership_type', ['club_card', 'former_club_card'])
       .order('contract_start', { ascending: false, nullsFirst: false }),
+    supabase
+      .from('v_newsletter_items')
+      .select('business_id, issue_date, closes_on')
+      .eq('organization_id', orgId)
+      .eq('kind', 'freebie')
+      .not('business_id', 'is', null)
+      .order('issue_date', { ascending: false })
+      .limit(1000),
   ])
   if (membersRes.error || !membersRes.data) return { error: membersRes.error ?? 'Could not load the Club Card members' }
   if (tableRes.error || !tableRes.data) return { error: tableRes.error ?? 'Could not load the businesses' }
@@ -102,6 +112,11 @@ export async function getClubCardTab(): Promise<{
 
   const today = tableRes.data.today ?? londonToday()
   const tableById = new Map(tableRes.data.rows.map((r) => [r.id, r]))
+  const freebiesBy = new Map<string, ClubCardTabRow['freebies']>()
+  for (const f of freebiesRes.data ?? []) {
+    if (!f.business_id) continue
+    freebiesBy.set(f.business_id, [...(freebiesBy.get(f.business_id) ?? []), { date: f.issue_date, closes_on: f.closes_on }])
+  }
 
   // Contracts per business, newest first; the current club_card one wins.
   const byBusiness = new Map<string, NonNullable<typeof contractsRes.data>>()
@@ -125,6 +140,7 @@ export async function getClubCardTab(): Promise<{
     table: tableById.get(m.business_id) ?? null,
     contract: pick(m.business_id),
     terms: byBusiness.get(m.business_id)?.length ?? 0,
+    freebies: freebiesBy.get(m.business_id) ?? [],
   }))
 
   // Former members: had a Club Card, and are no longer in the member list
@@ -136,7 +152,7 @@ export async function getClubCardTab(): Promise<{
     const t = tableById.get(id)
     if (!t) continue
     if (list.some((c) => c.is_current && c.membership_type === 'club_card' && (c.contract_end ?? '9999') >= today)) continue
-    rows.push({ business_id: id, name: t.name, card_state: 'former', member: null, table: t, contract: pick(id), terms: list.length })
+    rows.push({ business_id: id, name: t.name, card_state: 'former', member: null, table: t, contract: pick(id), terms: list.length, freebies: freebiesBy.get(id) ?? [] })
   }
   rows.sort((a, b) => a.name.localeCompare(b.name, 'en-GB'))
 

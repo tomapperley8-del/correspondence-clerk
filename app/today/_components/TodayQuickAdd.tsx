@@ -130,7 +130,7 @@ export function TodayQuickAdd({
           />
         </label>
       ) : (
-        <p className="text-xs text-gray-700 self-center">For {new Date(`${wednesday}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}</p>
+        <p className="text-xs text-gray-700 self-center">For {new Date(`${wednesday}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })} {new Date(`${wednesday}T12:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC' })}</p>
       )}
       <button
         type="submit"

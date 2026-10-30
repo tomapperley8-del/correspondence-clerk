@@ -12,12 +12,13 @@ import { addToNewsletter } from '@/components/ForNewsletterButton'
 import type { ItemKind } from '@/lib/newsletter/items'
 import { nthWednesday, weekWords } from '@/lib/newsletter/rhythm'
 import {
-  addPromise, decideMention, deleteContributor, deletePromise, saveContributor, setPromiseTick, updateNewsletterItem,
+  addPromise, decideMentions, deleteContributor, deletePromise, saveContributor, setPromiseTick, undoMentionDecisions, updateNewsletterItem,
   type ContributorInput, type NewsletterTabData, type NlContributor, type NlItem, type NlPromise,
 } from '@/app/actions/newsletter-tab'
 import {
-  deleteNewsletterItem, markNewsletterUsed, moveNewsletterItem, undoDeleteNewsletterItem, type NewsletterItem,
+  addCalendarItem, changeNewsletterKind, deleteNewsletterItem, markNewsletterUsed, moveNewsletterItem, undoDeleteNewsletterItem, type NewsletterItem,
 } from '@/app/actions/calendar'
+import { CALENDAR_KINDS, type CalendarKind } from '@/lib/calendar'
 
 // The Newsletter tab (UI overhaul Stage 16a, layout B, Tom's pick on 29 Oct):
 // a strip of Wednesdays (the next issue first), then views. The next issue's
@@ -61,13 +62,13 @@ const input = 'border border-black/15 rounded-sm px-2 min-h-10 md:min-h-8 text-s
 const pill = 'text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap'
 
 const dateGB = (d: string | null | undefined) => (d ? formatDateGB(`${d.slice(0, 10)}T12:00:00Z`) : '')
-const shortGB = (d: string) => dateGB(d).slice(0, 5)
 function addDaysISO(iso: string, days: number) {
   const d = new Date(`${iso}T12:00:00Z`)
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().slice(0, 10)
 }
-const weekdayGB = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+// Stage 19: every newsletter date carries its year (DD/MM/YYYY)
+const weekdayGB = (d: string) => `${new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })} ${dateGB(d)}`
 
 export function NewsletterTab({ data, next, initialView, initialIssue }: {
   data: NewsletterTabData
@@ -127,7 +128,7 @@ export function NewsletterTab({ data, next, initialView, initialIssue }: {
           title={`Next · ${weekdayGB(next.wednesday)}`} sub={`${next.items.length} on the list`} />
         {data.issues.map((i) => (
           <IssueButton key={i.id} on={issueId === i.id} onClick={() => { setIssueId(i.id); setView('issue') }}
-            title={shortGB(i.date)} sub={`${i.items} items · ${i.businesses} businesses`} />
+            title={dateGB(i.date)} sub={`${i.items} items · ${i.businesses} businesses`} />
         ))}
       </div>
 
@@ -210,6 +211,7 @@ function NextIssue({ ctx, next }: { ctx: Ctx; next: { wednesday: string; items: 
   const { data, run, pending } = ctx
   const router = useRouter()
   const [moving, setMoving] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
   const nextWed = next.wednesday
   // Due: a monthly regular with a usual week when this is that week and they haven't been in this
   // month; anyone else when their next piece falls by this issue
@@ -224,7 +226,7 @@ function NextIssue({ ctx, next }: { ctx: Ctx; next: { wednesday: string; items: 
       if (!(monthly && c.usual ? byWeek : byGap)) return null
       const why = [
         c.usual ? `usually the ${weekWords(c.usual.weeks)} (${c.usual.hits} of last ${c.usual.of})` : c.expected_every_days ? `every ${c.expected_every_days} days` : null,
-        c.last_in ? `last ${shortGB(c.last_in)}` : 'not in yet',
+        c.last_in ? `last ${dateGB(c.last_in)}` : 'not in yet',
       ].filter(Boolean).join(', ')
       return { c, why, late: byGap && c.next_expected! < data.today }
     })
@@ -252,6 +254,10 @@ function NextIssue({ ctx, next }: { ctx: Ctx; next: { wednesday: string; items: 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-3">
       <Section id="nl-next" band="newsletter" title={`Next issue, ${weekdayGB(nextWed)}`} hint="The same list as Today. Mark each one once it has gone in.">
+        <div className="mb-2">
+          <button type="button" className={btn} aria-expanded={adding} onClick={() => setAdding((a) => !a)}>{adding ? 'Close' : '+ Add item'}</button>
+        </div>
+        {adding && <AddItem ctx={ctx} wednesday={nextWed} onDone={() => setAdding(false)} />}
         {next.items.length === 0 ? <p className="text-sm text-gray-600">Nothing on the list yet. Add from a business page, an email or the suggestions here.</p> : (
           <ul className="divide-y divide-black/[0.06]">
             {next.items.map((n) => (
@@ -270,6 +276,15 @@ function NextIssue({ ctx, next }: { ctx: Ctx; next: { wednesday: string; items: 
                 ) : (
                   <button type="button" className={btn} disabled={pending} onClick={() => setMoving(n.key)}>Move</button>
                 )}
+                <select className={input} aria-label={`Change ${n.title} to another kind`} value="" disabled={pending}
+                  onChange={(e) => {
+                    const to = e.target.value as CalendarKind
+                    const k = CALENDAR_KINDS.find((c) => c.value === to)
+                    if (k) run(() => changeNewsletterKind(n.kind, n.ref_id, to), `Changed to a ${k.label.toLowerCase()}`)
+                  }}>
+                  <option value="">Change to…</option>
+                  {CALENDAR_KINDS.filter((k) => k.value !== 'newsletter').map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                </select>
                 <button type="button" className={btn} disabled={pending} onClick={() => remove(n)}>Delete</button>
               </li>
             ))}
@@ -304,6 +319,35 @@ function NextIssue({ ctx, next }: { ctx: Ctx; next: { wednesday: string; items: 
         </ul>
       </Section>
     </div>
+  )
+}
+
+/** "+ Add item" (Stage 19): the same For Newsletter to-do as Today's add, so it shows on Today and the calendar's Wednesday too. */
+function AddItem({ ctx, wednesday, onDone }: { ctx: Ctx; wednesday: string; onDone: () => void }) {
+  const [title, setTitle] = useState('')
+  const [biz, setBiz] = useState<string | null>(null)
+  const [date, setDate] = useState(wednesday)
+  return (
+    <form className="mb-2 p-2 bg-brand-warm rounded-sm flex flex-wrap items-end gap-2"
+      onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onDone() } }}
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (!title.trim() || !date) return
+        if (document.getElementById('nl-add-biz')?.getAttribute('aria-invalid') === 'true') { toast.error('Pick the business from the list, or leave it empty'); return }
+        ctx.run(() => addCalendarItem({ kind: 'newsletter', title, date, business_id: biz }), `Added to the newsletter for ${dateGB(date)}`)
+        onDone()
+      }}>
+      <datalist id="nl-businesses">{ctx.data.businesses.map((b) => <option key={b.id} value={b.name} />)}</datalist>
+      <label className="flex flex-col text-xs text-gray-700 gap-0.5 flex-[2_1_240px]">What goes in
+        <input className={input} required autoFocus value={title} placeholder="their autumn menu launch" onChange={(e) => setTitle(e.target.value)} />
+      </label>
+      <div className="flex-[1_1_200px]"><BusinessInput ctx={ctx} id="nl-add-biz" value={biz} onChange={setBiz} label="For a business (optional)" /></div>
+      <label className="flex flex-col text-xs text-gray-700 gap-0.5">Issue date
+        <input type="date" className={input} required value={date} onChange={(e) => setDate(e.target.value)} />
+      </label>
+      <button type="submit" className={mainBtn} disabled={ctx.pending || !title.trim()}>Add item</button>
+      <button type="button" className={btn} onClick={onDone}>Cancel</button>
+    </form>
   )
 }
 
@@ -499,7 +543,18 @@ function ContributorEditor({ ctx, contributor: c, onDone }: { ctx: Ctx; contribu
 function Freebies({ ctx }: { ctx: Ctx }) {
   const { data } = ctx
   const items = data.items.filter((i) => i.kind === 'freebie' || i.kind === 'competition')
-  const hadOne = new Set(data.items.filter((i) => i.kind === 'freebie' && i.business_id).map((i) => i.business_id))
+  // Who has had a Freebie and when (Stage 19), newest first; items come newest first
+  const had = useMemo(() => {
+    const m = new Map<string, { id: string; name: string; dates: { date: string; closes_on: string | null }[] }>()
+    for (const i of data.items) {
+      if (i.kind !== 'freebie' || !i.business_id) continue
+      const h = m.get(i.business_id) ?? { id: i.business_id, name: i.business_name ?? '', dates: [] }
+      h.dates.push({ date: i.date, closes_on: i.closes_on })
+      m.set(i.business_id, h)
+    }
+    return [...m.values()]
+  }, [data.items])
+  const hadOne = new Set(had.map((h) => h.id))
   const never = data.queue.filter((q) => !hadOne.has(q.business_id))
   const open = items.filter((i) => i.closes_on && i.closes_on >= data.today)
   return (
@@ -508,11 +563,25 @@ function Freebies({ ctx }: { ctx: Ctx }) {
         hint={`${items.filter((i) => i.kind === 'freebie').length} freebies and ${items.filter((i) => i.kind === 'competition').length} competitions, newest first.${open.length ? ` Open now: ${open.length}.` : ''} Reader entries go to the info@ mailbox, so they are not counted here.`}>
         <ul className="divide-y divide-black/[0.06]">{items.map((it) => <ItemRow key={it.id} ctx={ctx} item={it} showDate />)}</ul>
       </Section>
-      <Section id="nl-never-freebie" title="Never had a freebie" hint="Club Card members and advertisers with a deal in force and no freebie found.">
-        <ul className="text-sm columns-1 sm:columns-2 lg:columns-1 xl:columns-2">
-          {never.map((q) => <li key={q.business_id} className="py-0.5 break-inside-avoid"><BizLink id={q.business_id} name={q.name} /></li>)}
-        </ul>
-      </Section>
+      <div className="flex flex-col gap-3 min-w-0">
+        <Section id="nl-had-freebie" title="Had a Freebie" hint={`${had.length} businesses, most recent first, with each Freebie's issue date and closing date.`}>
+          <ul className="divide-y divide-black/[0.06] text-sm">
+            {had.map((h) => (
+              <li key={h.id} className="py-1.5">
+                <BizLink id={h.id} name={h.name} />
+                <span className="block text-xs text-gray-600 tabular-nums">
+                  {h.dates.map((d) => `${dateGB(d.date)}${d.closes_on ? ` (closes ${dateGB(d.closes_on)})` : ''}`).join(' · ')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+        <Section id="nl-never-freebie" title="Never had a Freebie" hint="Club Card members and advertisers with a deal in force and no Freebie found.">
+          <ul className="text-sm columns-1 sm:columns-2 lg:columns-1 xl:columns-2">
+            {never.map((q) => <li key={q.business_id} className="py-0.5 break-inside-avoid"><BizLink id={q.business_id} name={q.name} /></li>)}
+          </ul>
+        </Section>
+      </div>
     </div>
   )
 }
@@ -592,8 +661,8 @@ function Promises({ ctx }: { ctx: Ctx }) {
                     {inTerm.slice().reverse().map((i) => (
                       <label key={i.id} className={cn('inline-flex items-center gap-1 text-xs px-1.5 min-h-10 md:min-h-7 border rounded-sm', ticked.has(i.id) ? 'border-brand-navy bg-brand-warm' : 'border-black/10')}>
                         <input type="checkbox" checked={ticked.has(i.id)} disabled={pending}
-                          onChange={(e) => run(() => setPromiseTick(p.id, i.id, e.target.checked), e.target.checked ? `Ticked ${shortGB(i.date)}` : `Unticked ${shortGB(i.date)}`)} />
-                        {shortGB(i.date)}
+                          onChange={(e) => run(() => setPromiseTick(p.id, i.id, e.target.checked), e.target.checked ? `Ticked ${dateGB(i.date)}` : `Unticked ${dateGB(i.date)}`)} />
+                        {dateGB(i.date)}
                       </label>
                     ))}
                   </fieldset>
@@ -676,7 +745,7 @@ function Markets({ ctx }: { ctx: Ctx }) {
                 {g.id ? <BizLink id={g.id} name={g.name} /> : <span className="font-semibold">{g.name}</span>}
                 <span className="text-xs text-gray-600"> · {g.dates.length} issues, last {dateGB(g.dates[0])}{gap !== null && gap >= 5 ? `, ${gap} weeks ago` : ''}</span>
               </p>
-              <p className="text-xs text-gray-600 tabular-nums">{g.dates.slice(0, 24).map(shortGB).join(' · ')}{g.dates.length > 24 ? ' …' : ''}</p>
+              <p className="text-xs text-gray-600 tabular-nums">{g.dates.slice(0, 24).map(dateGB).join(' · ')}{g.dates.length > 24 ? ' …' : ''}</p>
             </li>
           )
         })}
@@ -718,26 +787,74 @@ function EveryItem({ ctx }: { ctx: Ctx }) {
 
 /* ---------- To check ---------- */
 
+// Stage 19: tick boxes and Select all, then Yes or No on the lot, with Undo. Rows
+// leave the list at once; the write and the re-link run behind.
 function ToCheck({ ctx }: { ctx: Ctx }) {
-  const { data, run, pending } = ctx
+  const { data } = ctx
+  const router = useRouter()
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [gone, setGone] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState(false)
+  const rows = data.toCheck.filter((m) => !gone.has(m.id))
+  const allOn = rows.length > 0 && rows.every((m) => picked.has(m.id))
+  const toggle = (id: string, on: boolean) => setPicked((p) => { const n = new Set(p); if (on) n.add(id); else n.delete(id); return n })
+
+  async function decide(ids: string[], yes: boolean) {
+    if (ids.length === 0) return
+    const names = ids.length === 1 ? data.toCheck.find((m) => m.id === ids[0])?.business_name ?? '' : null
+    setGone((g) => new Set([...g, ...ids]))
+    setPicked((p) => { const n = new Set(p); ids.forEach((id) => n.delete(id)); return n })
+    setBusy(true)
+    const r = await decideMentions(ids, yes)
+    setBusy(false)
+    if (r.error) {
+      toast.error(r.error)
+      setGone((g) => { const n = new Set(g); ids.forEach((id) => n.delete(id)); return n })
+      return
+    }
+    const done = r.ids ?? []
+    const what = names !== null ? `${yes ? 'Counted' : 'Dropped'} for ${names}` : `${done.length} mentions ${yes ? 'counted' : 'dropped'}`
+    toast.undo(what, async () => {
+      const back = await undoMentionDecisions(done)
+      if (back.error) { toast.error(back.error); return }
+      setGone((g) => { const n = new Set(g); done.forEach((id) => n.delete(id)); return n })
+      toast.success(done.length === 1 ? 'Back on the list to check' : `${done.length} back on the list to check`)
+      router.refresh()
+    })
+    router.refresh()
+  }
+
+  const chosen = rows.filter((m) => picked.has(m.id)).map((m) => m.id)
   return (
     <Section id="nl-check" title="Mentions to check"
-      hint="The read wasn't sure these are about the business named. Yes counts it (and links the item); No drops it. The weekly read keeps your answer.">
-      {data.toCheck.length === 0 ? <p className="text-sm text-gray-600">Nothing to check.</p> : (
-        <ul className="divide-y divide-black/[0.06]">
-          {data.toCheck.map((m) => (
-            <li key={m.id} className="py-2 flex flex-wrap items-start gap-2">
-              <span className="flex-[1_1_280px] min-w-0">
-                <span className="block text-sm"><BizLink id={m.business_id} name={m.business_name} /><span className="text-xs text-gray-600"> · {dateGB(m.date)} · matched &ldquo;{m.matched_text}&rdquo;{m.reason ? `, ${m.reason}` : ''}</span></span>
-                {m.context && <span className="block text-xs text-gray-700 line-clamp-2">{m.context}</span>}
-              </span>
-              <span className="flex gap-2" role="group" aria-label={`Is this about ${m.business_name}?`}>
-                <button type="button" className={mainBtn} disabled={pending} onClick={() => run(() => decideMention(m.id, true), `Counted for ${m.business_name}`)}>Yes</button>
-                <button type="button" className={btn} disabled={pending} onClick={() => run(() => decideMention(m.id, false), `Dropped for ${m.business_name}`)}>No</button>
-              </span>
-            </li>
-          ))}
-        </ul>
+      hint="The read wasn't sure these are about the business named. Yes counts it (and links the item); No drops it. Tick several to answer them in one go. The weekly read keeps your answer.">
+      {rows.length === 0 ? <p className="text-sm text-gray-600">Nothing to check.</p> : (
+        <>
+          <div className="sticky top-0 z-10 bg-white flex flex-wrap items-center gap-2 py-2 border-b border-black/[0.06]">
+            <label className="inline-flex items-center gap-2 text-sm min-h-10 md:min-h-8 pr-2">
+              <input type="checkbox" checked={allOn} onChange={(e) => setPicked(e.target.checked ? new Set(rows.map((m) => m.id)) : new Set())} />
+              Select all ({rows.length})
+            </label>
+            <span className="text-sm text-gray-600" aria-live="polite">{chosen.length} ticked</span>
+            <button type="button" className={mainBtn} disabled={busy || chosen.length === 0} onClick={() => decide(chosen, true)}>Yes, count {chosen.length || ''}</button>
+            <button type="button" className={btn} disabled={busy || chosen.length === 0} onClick={() => decide(chosen, false)}>No, drop {chosen.length || ''}</button>
+          </div>
+          <ul className="divide-y divide-black/[0.06]">
+            {rows.map((m) => (
+              <li key={m.id} className="py-2 flex flex-wrap items-start gap-2">
+                <input type="checkbox" className="mt-1.5" aria-label={`Tick ${m.business_name}, ${dateGB(m.date)}`} checked={picked.has(m.id)} onChange={(e) => toggle(m.id, e.target.checked)} />
+                <span className="flex-[1_1_260px] min-w-0">
+                  <span className="block text-sm"><BizLink id={m.business_id} name={m.business_name} /><span className="text-xs text-gray-600"> · {dateGB(m.date)} · matched &ldquo;{m.matched_text}&rdquo;{m.reason ? `, ${m.reason}` : ''}</span></span>
+                  {m.context && <span className="block text-xs text-gray-700 line-clamp-2">{m.context}</span>}
+                </span>
+                <span className="flex gap-2" role="group" aria-label={`Is this about ${m.business_name}?`}>
+                  <button type="button" className={mainBtn} onClick={() => decide([m.id], true)}>Yes</button>
+                  <button type="button" className={btn} onClick={() => decide([m.id], false)}>No</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </Section>
   )

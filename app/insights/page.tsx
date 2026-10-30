@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function InsightsPage() {
   const ai = isAiEnabled()
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 88px)' }}>
       <OpenThreadsPanel />
       {ai ? (
         <InsightsPanel inline={true} />

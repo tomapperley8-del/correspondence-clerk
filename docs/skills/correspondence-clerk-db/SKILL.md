@@ -44,7 +44,7 @@ Merged records resolve to the surviving business. Returns one JSON document:
 | `todos` | open to-dos (hand-written ones first) and the last 5 done |
 | `calendar` | to-dos, deal ends and invoice due dates from a week ago to 90 days ahead |
 | `club_card` | card state (member, grace, lapsed, none), the website page, offer and its end date, page checks |
-| `newsletter` | last featured, mentions in the last 12 months, recent mentions with the issue link |
+| `newsletter` | last featured, mentions in the last 12 months, recent mentions with the issue link, and `freebies`: every Freebie the newsletter ran for them (issue date, closing date, headline, link) |
 | `news_articles` | count and the 10 most recent articles about them |
 | `outreach` | stage, the Work on next bucket and fit score, the routines' drafts, prospect leads |
 | `data_health` | anything on the Data health page for this business |
@@ -134,9 +134,10 @@ These arrive one by one in Stage 17b. Until then, if a question depends on them,
 in Correspondence Clerk yet, and offer what is there (for example emails that mention it) clearly
 labelled as that, not as the answer:
 
-- **Freebie entries and Eventbrite** ticket sales or attendees (so "how many businesses have done
-  Freebie entries" can't be counted; `search_everything('freebie')` only finds emails and notes
-  that mention the word).
+- **Freebie reader entries and Eventbrite** ticket sales or attendees (entries go to the info@
+  mailbox). Which businesses have *had* a Freebie, and when, is known: the dossier's
+  `newsletter.freebies`, or the query below. Freebies before the newsletter archive (May 2024),
+  or not linked to a business, aren't counted.
 - **Sent email that wasn't BCC'd or forwarded** in, and email nobody forwarded.
 - **Google Drive documents** (contracts, media packs, proposals).
 - **Ad stats** (Google Analytics figures from Dawn or James) as data: only the emails they sent, if forwarded.
@@ -210,6 +211,14 @@ WHERE m.status = 'confirmed' AND i.sent_at >= '2026-09-01' AND i.sent_at < '2026
 GROUP BY b.name ORDER BY mentions DESC;
 ```
 
+**Who has had a Freebie, and when** (from the newsletter's items; `closes_on` is the closing date):
+
+```sql
+SELECT b.name, i.issue_date, i.closes_on, i.headline
+FROM v_newsletter_items i JOIN v_businesses b ON b.id = i.business_id
+WHERE i.kind = 'freebie' ORDER BY i.issue_date DESC;
+```
+
 **Outreach** stage counts and the Work on next buckets (as on the Outreach tab):
 
 ```sql
@@ -254,6 +263,7 @@ Current objects worth knowing (all in `public`):
 | `qbo_invoices` + `qbo_links` | invoices and which business they belong to (`voided_at`, `private_memo = 'Voided'`) |
 | `v_club_card_members`, `club_card_pages` | Club Card state, page and offer |
 | `v_business_newsletter`, `newsletter_mentions`, `newsletter_issues` | newsletter appearances |
+| `v_newsletter_items` | each issue split into items (`kind`: freebie, competition, column, ...; `issue_date`, `closes_on`, `business_id`) |
 | `business_articles` | news articles about a business (`status` confirmed/rejected) |
 | `v_outreach_next` | Outreach Work on next buckets |
 | `routine_drafts` | drafts written by the Claude routines |

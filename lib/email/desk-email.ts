@@ -107,8 +107,9 @@ export const WORK_ON_NEXT_BUCKETS: { bucket: string; label: string }[] = [
   { bucket: 'new', label: 'New' },
 ]
 
+// A newsletter issue date: weekday and DD/MM/YYYY (Stage 19: newsletter dates carry the year)
 const dayMonth = (iso: string) =>
-  new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${iso}T12:00:00Z`))
+  `${new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short' }).format(new Date(`${iso}T12:00:00Z`))} ${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`
 
 /** Stage 18 sections from the tabs: Work on next, due a mention, offers to check. */
 export function tabSections(tabs: DeskTabs, limit = 6): Section[] {

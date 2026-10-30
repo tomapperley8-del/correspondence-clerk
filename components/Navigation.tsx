@@ -143,12 +143,11 @@ export function Navigation() {
     return (
       <nav className="bg-brand-dark border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <span className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-serif)' }}>Correspondence Clerk</span>
-            </div>
+          <div className="flex items-center h-12">
+            <span className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-serif)' }}>Correspondence Clerk</span>
           </div>
         </div>
+        <div className="h-10 border-t border-white/10" />
       </nav>
     )
   }
@@ -252,35 +251,36 @@ export function Navigation() {
     </Link>
   ))
 
+  // Two slim rows (Stage 19, Tom 30 Oct: the tabs looked cramped in one row).
+  // Top: logo, search box, + New entry, user menu. Second: the tabs, scrolling
+  // sideways on narrow screens.
   return (
     <>
     <nav aria-label="Main navigation" className="bg-brand-dark border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center space-x-6">
-            <Link
-              href="/today"
-              className="text-xl font-bold text-white flex items-center gap-2"
-              style={{ fontFamily: 'var(--font-serif)' }}
-            >
-              <span className="hidden lg:inline">Correspondence Clerk</span>
-              <span className="lg:hidden">Clerk</span>
-            </Link>
+        <div className="flex items-center justify-between gap-3 h-12">
+          <Link
+            href="/today"
+            className="shrink-0 text-lg font-bold text-white"
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
+            <span className="hidden sm:inline">Correspondence Clerk</span>
+            <span className="sm:hidden">Clerk</span>
+          </Link>
 
-            <div className="hidden xl:flex h-16">{tabLinks('h-16 px-4')}</div>
-          </div>
-
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               type="button"
               onClick={openSearch}
-              className="hidden md:inline-flex items-center gap-2 text-sm text-white/90 border border-white/30 rounded-sm px-3 py-1.5 hover:bg-white/10 transition-colors"
+              aria-label="Search (Ctrl K)"
+              className="flex items-center justify-between gap-3 min-w-0 w-28 sm:w-56 lg:w-72 h-8 text-left text-sm text-white/70 bg-white/10 border border-white/20 rounded-sm px-3 hover:bg-white/15 hover:text-white transition-colors"
             >
-              Search <span className="text-xs text-white/60">Ctrl K</span>
+              <span className="truncate">Search</span>
+              <span className="hidden sm:inline shrink-0 text-xs text-white/50">Ctrl K</span>
             </button>
             <Link
               href="/new-entry"
-              className={`hidden md:inline-flex text-sm font-semibold text-white rounded-sm px-3 py-1.5 transition-colors ${
+              className={`hidden md:inline-flex items-center h-8 shrink-0 text-sm font-semibold text-white rounded-sm px-3 transition-colors ${
                 pathname === '/new-entry' ? 'bg-brand-olive ring-1 ring-white/60' : 'bg-brand-olive hover:bg-brand-olive/80'
               }`}
             >
@@ -292,12 +292,12 @@ export function Navigation() {
                 onClick={() => setMenuOpen((o) => !o)}
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
-                className="text-left max-w-[180px] px-2 py-1 rounded-sm hover:bg-white/10 transition-colors"
+                className="text-left max-w-[180px] px-2 py-0.5 rounded-sm hover:bg-white/10 transition-colors"
               >
-                <span className="block text-sm text-white truncate">
+                <span className="block text-sm leading-tight text-white truncate">
                   {displayName || user.email?.split('@')[0] || user.email} <span aria-hidden="true">▾</span>
                 </span>
-                {organization && <span className="block text-xs text-gray-400 truncate">{organization.name}</span>}
+                {organization && <span className="block text-xs leading-tight text-gray-400 truncate">{organization.name}</span>}
               </button>
               {menuOpen && (
                 <div role="menu" className="absolute right-0 top-full mt-2 z-50 w-56 bg-white border border-black/[0.08] rounded-sm shadow-lg py-1">
@@ -346,16 +346,18 @@ export function Navigation() {
             <button
               onClick={() => setMobileOpen((o) => !o)}
               aria-label="Open menu"
-              className="md:hidden text-sm font-medium text-white border border-white/30 rounded-sm px-3 py-1.5"
+              className="md:hidden shrink-0 h-8 text-sm font-medium text-white border border-white/30 rounded-sm px-3"
             >
               Menu
             </button>
           </div>
         </div>
       </div>
-      {/* Narrower screens, phones too: the tabs in their own strip, scrolling sideways */}
-      <div className="xl:hidden border-t border-white/10 overflow-x-auto">
-        <div className="flex min-w-max px-2 sm:px-4">{tabLinks('h-11 px-3')}</div>
+      {/* Second row: the tabs */}
+      <div className="border-t border-white/10 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4">
+          <div className="flex min-w-max">{tabLinks('h-10 px-4 first:border-l')}</div>
+        </div>
       </div>
 
     </nav>
