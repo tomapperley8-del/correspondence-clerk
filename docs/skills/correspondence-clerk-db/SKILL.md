@@ -55,6 +55,9 @@ If the name matches several businesses equally well you get `"ambiguous": true` 
 clear, otherwise ask him which, then call again with the id. `"found": false` with no candidates
 means nothing matched: try a shorter part of the name, or `find_businesses('{"q": "..."}')`.
 
+If a business shows no emails, check `search_everything('"business name"')`: their emails may be
+filed under the person who wrote them.
+
 To keep a reply short, pull only the parts needed:
 
 ```sql
