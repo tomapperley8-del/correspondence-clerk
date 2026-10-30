@@ -85,11 +85,12 @@ export function newBusinessRefusal(domain: string): string | null {
  * Strips TLDs, common suffixes (ltd, limited, inc, llc, the), punctuation,
  * and lowercases. Returns sorted unique tokens.
  */
+const STOP_WORDS = new Set([
+  'ltd', 'limited', 'inc', 'llc', 'plc', 'co', 'uk', 'com', 'org', 'net',
+  'the', 'and', 'of', 'for', 'www',
+])
+
 function normaliseForComparison(input: string): string[] {
-  const STOP_WORDS = new Set([
-    'ltd', 'limited', 'inc', 'llc', 'plc', 'co', 'uk', 'com', 'org', 'net',
-    'the', 'and', 'of', 'for', 'www',
-  ])
   return input
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
@@ -99,28 +100,57 @@ function normaliseForComparison(input: string): string[] {
 }
 
 /**
+ * Place words: too general to tie a domain to one business. Many local
+ * organisations' domains contain them (chiswickchamberorchestra.org,
+ * london-fire.gov.uk), so sharing one says nothing.
+ */
+export const PLACE_WORDS = new Set([
+  'chiswick', 'london', 'w4', 'hammersmith', 'ealing', 'hounslow', 'brentford', 'kew',
+  'acton', 'gunnersbury', 'turnham', 'grove', 'strand', 'richmond', 'fulham', 'putney',
+  'west', 'east', 'north', 'south', 'uk', 'england', 'british',
+])
+
+const withoutPlaces = (s: string) =>
+  [...PLACE_WORDS].sort((a, b) => b.length - a.length).reduce((x, p) => x.split(p).join(''), s)
+
+/**
  * Score how well a domain name matches a business name.
  * Returns a value between 0 and 1. A score >= 0.6 is a good match.
+ *
+ * A match must rest on more than a place word. Until 30 Oct 2026 "chiswick"
+ * alone made chiswickchamberorchestra.org and chiswickcalendar.co.uk score 0.9
+ * for "B&Q CHISWICK", and "london" gave S&V LONDON eleven unrelated domains.
  */
 export function domainBusinessNameScore(domain: string, businessName: string): number {
   // The company part: "stripe" for email.stripe.com, not "email", which once
   // matched a business called "Mail" and filed Stripe's mail there.
   const domainBase = registrableDomain(domain).split('.')[0] ?? ''
+  const letters = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const domainLetters = letters(domainBase)
+  // The whole name, letters only: svlondon.com is S&V LONDON, bqchiswick.co.uk is B&Q CHISWICK
+  if (domainLetters.length >= 2 && domainLetters === letters(businessName)) return 1
+
   const domainTokens = normaliseForComparison(domainBase)
   const bizTokens = normaliseForComparison(businessName)
   if (domainTokens.length === 0 || bizTokens.length === 0) return 0
 
-  // Check if domain is a concatenated form of business tokens
-  // e.g. "smithplumbing" matches "Smith Plumbing"
+  // In the name's own order, so "smithplumbing" is found in "Smith Plumbing"
+  const inOrder = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(t => t.length > 1 && !STOP_WORDS.has(t))
   const domainJoined = domainTokens.join('')
-  const bizJoined = bizTokens.join('')
-  if (domainJoined === bizJoined) return 1
-  if (domainJoined.includes(bizJoined) || bizJoined.includes(domainJoined)) return 0.9
+  const bizJoined = inOrder(businessName).join('')
+  // What's left of the name without place words: "" for B&Q CHISWICK, "pier trust" for Chiswick Pier Trust
+  const bizOwn = inOrder(businessName).filter(t => !PLACE_WORDS.has(t)).join('')
+  if (bizOwn.length >= 4 && domainJoined.includes(bizOwn)) return 0.9
+  // A short domain inside the name (tabard.org.uk, "Theatre at the Tabard") needs a word of its own
+  if (withoutPlaces(domainJoined).length >= 4 && bizJoined.includes(domainJoined)) return 0.9
 
-  // Token overlap
-  const matched = domainTokens.filter(t => bizTokens.some(b => b.includes(t) || t.includes(b)))
-  const overlapRatio = matched.length / Math.max(domainTokens.length, bizTokens.length)
-  return overlapRatio
+  // Token overlap, place words left out on both sides
+  const domainOwn = domainTokens.filter(t => !PLACE_WORDS.has(t))
+  const bizOwnTokens = bizTokens.filter(t => !PLACE_WORDS.has(t))
+  if (domainOwn.length === 0 || bizOwnTokens.length === 0) return 0
+  const matched = domainOwn.filter(t => bizOwnTokens.some(b => b === t || (Math.min(b.length, t.length) >= 4 && (b.includes(t) || t.includes(b)))))
+  return matched.length / Math.max(domainTokens.length, bizTokens.length)
 }
 
 /**
@@ -133,7 +163,8 @@ export function getOwnDomains(emails: (string | null | undefined)[]): Set<string
   const domains = new Set<string>()
   for (const e of emails) {
     const d = (e ?? '').split('@')[1]?.toLowerCase()
-    if (d) domains.add(d)
+    // A login on gmail.com doesn't make every Gmail sender us
+    if (d && !isPersonalDomain(d)) domains.add(d)
   }
   return domains
 }

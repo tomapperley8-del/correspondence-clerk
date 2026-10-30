@@ -533,10 +533,12 @@ async function matchBusinessFromRecipients(
 async function matchBusinessByDomainName(
   supabase: ReturnType<typeof createServiceRoleClient>,
   orgId: string,
-  domain: string
+  domain: string,
+  ownDomains: Set<string>
 ): Promise<string | null> {
-  // A service's mail (Stripe, PayPal) is never a business's, whatever its name
-  if (!domain || newBusinessRefusal(domain) === 'notification service') return null
+  // A service's mail (Stripe, PayPal) is never a business's, whatever its name,
+  // and our own domains are never learned
+  if (!domain || ownDomains.has(domain) || newBusinessRefusal(domain) === 'notification service') return null
   const { data: businesses } = await supabase
     .from('businesses')
     .select('id, name')
@@ -893,7 +895,17 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     authEmail,
     ...(profile.own_email_addresses ?? []).map((e: string) => e.toLowerCase()),
   ].filter(Boolean)
-  const ownDomains = getOwnDomains(ownEmails)
+  // Own domains come from every profile in the org, not just the one this mail came in on:
+  // the info@ profile listed only tom@thechiswickcalendar.co.uk, so a site email from
+  // chiswickcalendar.co.uk (16 Jul 2026) was fuzzy-matched to B&Q CHISWICK and learned.
+  const { data: orgProfiles } = await supabase
+    .from('user_profiles')
+    .select('own_email_addresses')
+    .eq('organization_id', orgId)
+  const ownDomains = getOwnDomains([
+    ...ownEmails,
+    ...(orgProfiles ?? []).flatMap((p) => (p.own_email_addresses ?? []) as string[]),
+  ])
   const fromDomain = fromEmail.split('@')[1]?.toLowerCase() ?? ''
   // fromSelf = sender is one of the user's own addresses OR on one of their
   // own domains. Domain-level match catches contact-form submissions sent
@@ -1097,7 +1109,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
     for (const email of recipientEmails) {
       const domain = email.split('@')[1]?.toLowerCase() ?? ''
       if (!domain || isPersonalDomain(domain) || ownDomains.has(domain)) continue
-      const fuzzyBizId = await matchBusinessByDomainName(supabase, orgId, domain)
+      const fuzzyBizId = await matchBusinessByDomainName(supabase, orgId, domain, ownDomains)
       if (fuzzyBizId) {
         log('[inbound-email] auto_filed_sent_fuzzy_match', { businessId: fuzzyBizId, domain })
         const fuzzyEntry = toEmails.find(r => r.email === email)
@@ -1233,7 +1245,7 @@ async function handleInbound(request: NextRequest): Promise<NextResponse> {
 
     // 3. Fuzzy match: compare domain name against business names
     if (!skipAutoFile && !autoFiledBusinessId && effectiveDomain && !isPersonalDomain(effectiveDomain) && !ownDomains.has(effectiveDomain)) {
-      autoFiledBusinessId = await matchBusinessByDomainName(supabase, orgId, effectiveDomain)
+      autoFiledBusinessId = await matchBusinessByDomainName(supabase, orgId, effectiveDomain, ownDomains)
       if (autoFiledBusinessId) {
         log('[inbound-email] auto_filed_received_fuzzy_match', { businessId: autoFiledBusinessId, domain: effectiveDomain })
       }

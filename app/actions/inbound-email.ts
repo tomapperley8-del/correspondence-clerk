@@ -233,14 +233,14 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
   // (info@chiswickcalendar.co.uk) to a business, we must NOT learn that domain —
   // every subsequent contact-form submission from that address would then
   // auto-file to the same business regardless of who the real sender was.
-  const { data: fileProfile } = await supabase
+  // Every profile in the org: one profile's list can miss a domain another lists.
+  const { data: orgProfiles } = await supabase
     .from('user_profiles')
     .select('own_email_addresses')
-    .eq('id', user.id)
-    .maybeSingle()
+    .eq('organization_id', orgId)
   const ownDomains = getOwnDomains([
     user.email ?? '',
-    ...((fileProfile?.own_email_addresses ?? []) as string[]),
+    ...(orgProfiles ?? []).flatMap((p) => (p.own_email_addresses ?? []) as string[]),
   ])
 
   const domainSource = itemDirection === 'sent'
