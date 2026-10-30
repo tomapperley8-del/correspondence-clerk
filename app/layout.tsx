@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next'
+import { Suspense } from 'react'
 import './globals.css'
 import { Navigation } from '@/components/Navigation'
+import { NavProgress } from '@/components/NavProgress'
 import { InsightsProvider } from '@/components/InsightsContext'
 import { ToastContainer } from '@/components/Toast'
 import { DynamicPanels } from '@/components/DynamicPanels'
@@ -53,6 +55,7 @@ export default function RootLayout({
           </a>
           <PwaNavBar />
           <Navigation />
+          <Suspense fallback={null}><NavProgress /></Suspense>
           <DynamicPanels />
           <ToastContainer />
           <main id="main-content" className="pb-16 md:pb-0">{children}</main>

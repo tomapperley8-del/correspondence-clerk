@@ -10,7 +10,7 @@
 // into it), so none are shown.
 
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { getCurrentUser, getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { getBusinessTable, type TableRow } from '@/app/actions/business-table'
 
 export type AdvertisingContract = {
@@ -67,7 +67,7 @@ export async function getAdvertisingTab(): Promise<{
   error?: string
 }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getCurrentUser()
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }

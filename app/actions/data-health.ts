@@ -5,7 +5,7 @@
 // 20261029_004) so the desk email or a routine can read the same numbers. Read only.
 
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { getCurrentUser, getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 export type DataHealthCheck = { check_key: string; title: string; fixed_on: string; n: number }
 export type DataHealthRow = {
@@ -19,7 +19,7 @@ export type DataHealthRow = {
 
 export async function getDataHealth(): Promise<{ data?: { checks: DataHealthCheck[]; rows: DataHealthRow[] }; error?: string }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getCurrentUser()
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }

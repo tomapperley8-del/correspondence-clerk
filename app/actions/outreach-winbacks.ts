@@ -7,7 +7,7 @@
 // (closeOutreachBusinesses), Take off outreach, and "Not a win-back" (the suggestion dismissal).
 
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { getCurrentUser, getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 export type WinBackContact = { name: string; role: string | null; email: string | null; is_placeholder: boolean } | null
 
@@ -52,7 +52,7 @@ type Raw = Record<string, unknown>
 
 export async function getOutreachWinbacks(): Promise<{ data?: OutreachWinbacks; error?: string }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getCurrentUser()
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }

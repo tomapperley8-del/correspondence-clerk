@@ -9,7 +9,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { getCurrentUser, getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { addBusinessToOutreach } from '@/app/actions/businesses'
 
 export type OutreachBucket =
@@ -72,7 +72,7 @@ const points = (r: Raw): FitPoints => ({
 
 async function auth() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getCurrentUser()
   if (!user) return { error: 'Unauthorized' as const }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' as const }

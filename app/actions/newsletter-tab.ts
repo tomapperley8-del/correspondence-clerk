@@ -10,7 +10,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { getCurrentUser, getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { getBusinessTable } from '@/app/actions/business-table'
 import { refreshItems } from '@/lib/newsletter/items-store'
 import { mentionQueue } from '@/lib/newsletter/due'
@@ -55,7 +55,7 @@ const londonDay = (ts: string) => new Date(ts).toLocaleDateString('en-CA', { tim
 
 async function context() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getCurrentUser()
   if (!user) return { error: 'Unauthorized' as const }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' as const }

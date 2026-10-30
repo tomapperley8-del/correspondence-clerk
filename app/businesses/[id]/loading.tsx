@@ -1,8 +1,13 @@
+import { SlowNotice } from '@/components/ui/page-skeleton'
+
 export default function BusinessDetailLoading() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div aria-busy="true" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Breadcrumb skeleton */}
-      <div className="h-4 w-48 bg-gray-200 animate-pulse mb-4" />
+      <div className="flex items-center justify-between mb-4">
+        <div className="h-4 w-48 bg-gray-200 animate-pulse" />
+        <SlowNotice label="the business" />
+      </div>
 
       {/* Business header skeleton */}
       <div className="flex justify-between items-start mb-6">
