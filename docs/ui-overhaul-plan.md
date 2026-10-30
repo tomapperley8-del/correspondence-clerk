@@ -125,7 +125,6 @@ Agreed 22 Oct 2026. Tom finds the site confusing and uses none of Briefing; Brie
 
 ## Order of the remaining work (agreed 22 Oct, updated 23 Oct)
 
-Done: 0-7, 6b, 9, 11a (next-day check 24 Oct), 12 (next-day check 24 Oct), the Businesses filter fix. 14a's first version is live (23 Oct) but Tom asked for a rethink (v2 below). Dropped: 8 (Decision 23 Oct).
 
 Done and live by 30 Oct: 0-7, 6b, 9, 11a, 11b, 11c (trimmed), 12, 13, 13b, 14a (v2), 14b, 14c, 15, 16a-16d (with 16c2, 16c3, the Newsletter tab), the newsletter-items fix, the business-picker fix. Dropped: 8.
 
