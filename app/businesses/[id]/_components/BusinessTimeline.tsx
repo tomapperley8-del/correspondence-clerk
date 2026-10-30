@@ -616,7 +616,7 @@ export function BusinessTimeline(props: Props) {
   )
 
   return (
-    <FullScreenPanel title="History" headingId="history-h" card={false} controls={controls}>
+    <FullScreenPanel title="History" headingId="history-h" card={false} band="attention" controls={controls}>
       {(full) => (
         <ResizableSplit storageKey="cc.business.split" defaultPercent={56} label="Resize the history and the reader" first={list(full)} second={reader(full)} />
       )}

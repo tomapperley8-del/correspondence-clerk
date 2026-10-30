@@ -48,3 +48,13 @@ export function KindTag({ kind, children, className }: { kind: KindColour; child
     </span>
   )
 }
+
+/** The colour of each Needs attention reason (v_business_attention). */
+export const REASON_KIND: Record<'money_owed' | 'renewal' | 'club_card_lapsed' | 'waiting_on_you' | 'todo' | 'club_card', KindColour> = {
+  money_owed: 'money',
+  renewal: 'renewal',
+  club_card_lapsed: 'card',
+  waiting_on_you: 'waiting',
+  todo: 'todo',
+  club_card: 'card',
+}

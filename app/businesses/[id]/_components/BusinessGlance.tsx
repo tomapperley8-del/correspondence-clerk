@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { KIND, REASON_KIND } from '@/components/ui/kind'
 import Link from 'next/link'
 import { type Business } from '@/app/actions/businesses'
 import { type Contact } from '@/app/actions/contacts'
@@ -219,7 +220,7 @@ export function BusinessGlance({ business, contacts, glance, correspondence, mem
           <p className="text-gray-500">Loading…</p>
         ) : attention ? (
           <>
-            <p className="font-semibold">
+            <p className={`font-semibold ${KIND[REASON_KIND[attention.reason]].text}`}>
               {REASON_LABEL[attention.reason]}
               {attention.is_snoozed && attention.attention_snoozed_until && (
                 <span className="font-normal text-gray-500"> · snoozed until {dateOnlyGB(attention.attention_snoozed_until)}</span>

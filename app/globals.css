@@ -292,7 +292,8 @@ h4 {
 
 /* Stage 14d header bands: buttons in a band's controls are white with the
    band's colour as text (unlayered, so it wins over utility classes). Menus
-   that open from them keep their own look. */
+   that open from them keep their own look. Focus keeps the site's paper and
+   olive double ring, which shows on every band. */
 .cc-band-controls :is(button, a, select):not([role="menu"] *) {
   background-color: #fff;
   color: var(--band);
@@ -300,10 +301,6 @@ h4 {
 }
 .cc-band-controls :is(button, a, select):not([role="menu"] *):hover {
   background-color: var(--band-soft);
-}
-.cc-band :focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 1px;
 }
 
 @layer base {

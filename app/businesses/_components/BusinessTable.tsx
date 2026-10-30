@@ -483,6 +483,7 @@ export function BusinessTable({ data, initialView, initialQuery }: {
       title={view.label}
       headingId="business-table-heading"
       card={false}
+      band="attention"
       controls={
         (
           <>
