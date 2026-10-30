@@ -334,7 +334,7 @@ export function TodayClient({
       defaultOpen
       count={todoRows.length}
       badge={todoRows.some((r) => r.overdue) ? <span className="shrink-0 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded-full bg-ms-red text-ms-red-text" style={{ fontFamily: 'var(--font-sans)' }}>{todoRows.filter((r) => r.overdue).length} overdue</span> : undefined}
-      scroll="max-h-[12vh] sm:max-h-[16vh] lg:max-h-[24vh]"
+      scroll="max-h-[10vh] sm:max-h-[16vh] lg:max-h-[24vh]"
       controls={
         <button type="button" className={`${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`} aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
           + Add to-do
@@ -414,7 +414,7 @@ export function TodayClient({
           {data.owed > 0 && <> £{data.owed.toLocaleString('en-GB', { maximumFractionDigits: 2 })} owed.</>}
         </p>
       </header>
-      <ResizableSplit storageKey="cc.today.split.v2" defaultPercent={55} label="Resize the list and the detail panel" first={<div className="space-y-3">{todos}{list}</div>} second={side} />
+      <ResizableSplit storageKey="cc.today.split.v2" defaultPercent={55} label="Resize the list and the detail panel" first={<div className="space-y-2 sm:space-y-3">{todos}{list}</div>} second={side} />
     </div>
   )
 }
@@ -558,7 +558,7 @@ function AttentionList({ rows, ...listProps }: ListProps & { rows: Row[] }) {
 
   if (groups.length === 0) return <p className="text-sm text-gray-700 py-3">Nothing needs attention.</p>
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1 sm:space-y-1.5">
       {groups.map((g) => (
         <FoldSection
           key={g.key}
