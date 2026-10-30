@@ -13,6 +13,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { getBusinessTable } from '@/app/actions/business-table'
 import { refreshItems } from '@/lib/newsletter/items-store'
+import { mentionQueue } from '@/lib/newsletter/due'
 import type { ItemKind } from '@/lib/newsletter/items'
 import { usualWeek, type UsualWeek } from '@/lib/newsletter/rhythm'
 
@@ -51,7 +52,6 @@ export type NewsletterTabData = {
 }
 
 const londonDay = (ts: string) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
-const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000)
 
 async function context() {
   const supabase = await createClient()
@@ -120,21 +120,11 @@ export async function getNewsletterTab(): Promise<{ data?: NewsletterTabData; er
     const ticks = new Map<string, string[]>()
     for (const t of tickRows) ticks.set(t.promise_id, [...(ticks.get(t.promise_id) ?? []), t.issue_id])
 
-    // Due a mention: deals in force, never in since joining first, then longest since last in
-    const queue: NlQueueRow[] = []
-    for (const r of tableRes.data.rows) {
-      const types = r.deal_types_in_force ?? []
-      if (!types.includes('club_card') && !types.includes('advertiser')) continue
-      const joined = r.deal?.contract_start ?? null
-      const last = r.newsletter?.date ?? null
-      const sinceJoin = last && joined && last < joined ? null : last
-      queue.push({
-        business_id: r.id, name: r.name, deal: types.includes('advertiser') ? 'advertiser' : 'club_card', joined,
-        last_in: sinceJoin, days: sinceJoin ? daysBetween(sinceJoin, today) : null,
-      })
-    }
-    queue.sort((a, b) => (a.last_in === null) !== (b.last_in === null) ? (a.last_in === null ? -1 : 1)
-      : a.last_in === null ? (a.joined ?? '').localeCompare(b.joined ?? '') : a.last_in.localeCompare(b.last_in!))
+    // Due a mention: the shared rule (lib/newsletter/due.ts), also read by the desk email
+    const queue: NlQueueRow[] = mentionQueue(tableRes.data.rows.map((r) => ({
+      business_id: r.id, name: r.name, deal_types_in_force: r.deal_types_in_force ?? [],
+      joined: r.deal?.contract_start ?? null, last_in: r.newsletter?.date ?? null,
+    })), today)
 
     return {
       data: {

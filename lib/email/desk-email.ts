@@ -14,6 +14,8 @@
  */
 
 import { ageWords, REASON_LABEL, overdueItems, type TodayItem, type TodayReason } from '@/lib/today'
+import type { SystemMiss } from '@/lib/today-source'
+import type { MentionRow } from '@/lib/newsletter/due'
 
 export interface DeskLine {
   section: number
@@ -69,7 +71,8 @@ export interface DeskEmailInput {
   brief: DeskBrief | null
   health: DeskHealth | null
   closed: ClosedItem[]
-  missedRoutines: string[]
+  /** Stage 18: jobs and routines that missed (system_alarm()); the email opens with them. */
+  system?: SystemMiss[]
   pipeline: Record<string, unknown> | null
   drafts?: DraftItem[]
   skippedCount?: number
@@ -77,6 +80,63 @@ export interface DeskEmailInput {
   gaps?: CareGap[]
   /** Today's items (lib/today-source.ts) and the London date they were judged on. */
   today: { date: string; items: TodayItem[] }
+  /** Stage 18: the tabs' own lists, read from the same sources as the tabs. */
+  tabs?: DeskTabs
+}
+
+export interface OutreachNextLine { name: string; bucket: string; days_quiet: number | null; draft_ready: boolean }
+
+export interface DeskTabs {
+  /** v_outreach_next, Work on next order, the action buckets only (Outreach tab). */
+  workOnNext: OutreachNextLine[]
+  workOnNextCounts: Record<string, number>
+  /** Due a mention before the coming Wednesday (lib/newsletter/due.ts, Newsletter tab). */
+  dueMention: { wednesday: string; rows: MentionRow[] }
+  /** Club Card members whose offer looks out of date (v_club_card_members 'offer_old', Club Card tab). */
+  offersToCheck: { name: string; offer: string | null }[]
+  /** Things to fix on Data health (v_data_health_counts, the same count as its links). */
+  dataHealth: number
+}
+
+/** Outreach buckets in Work on next order, as the Outreach tab names them. */
+export const WORK_ON_NEXT_BUCKETS: { bucket: string; label: string }[] = [
+  { bucket: 'reply', label: 'Reply' },
+  { bucket: 'chase', label: 'Chase' },
+  { bucket: 'follow_up', label: 'Follow up once' },
+  { bucket: 'close', label: 'Close?' },
+  { bucket: 'new', label: 'New' },
+]
+
+const dayMonth = (iso: string) =>
+  new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${iso}T12:00:00Z`))
+
+/** Stage 18 sections from the tabs: Work on next, due a mention, offers to check. */
+export function tabSections(tabs: DeskTabs, limit = 6): Section[] {
+  const out: Section[] = []
+  const label = new Map(WORK_ON_NEXT_BUCKETS.map((b) => [b.bucket, b.label]))
+  if (tabs.workOnNext.length > 0) {
+    const counts = WORK_ON_NEXT_BUCKETS.filter((b) => tabs.workOnNextCounts[b.bucket])
+      .map((b) => `${tabs.workOnNextCounts[b.bucket]} ${b.label.toLowerCase().replace('?', '')}`)
+    out.push({
+      heading: `Work on next (${counts.join(', ')})`,
+      items: tabs.workOnNext.slice(0, limit).map((r) =>
+        `${label.get(r.bucket) ?? r.bucket}: ${r.name}${r.days_quiet !== null ? ` (quiet ${r.days_quiet} days)` : ''}${r.draft_ready ? ', draft ready' : ''}`),
+    })
+  }
+  if (tabs.dueMention.rows.length > 0) {
+    const rows = tabs.dueMention.rows
+    const items = rows.slice(0, limit).map((r) =>
+      `${r.name} (${r.deal === 'advertiser' ? 'advertiser' : 'Club Card'}): ${r.last_in ? `last in ${r.days} days ago` : 'not in since joining'}`)
+    if (rows.length > limit) items.push(`and ${rows.length - limit} more on the Newsletter tab`)
+    out.push({ heading: `Due a newsletter mention before ${dayMonth(tabs.dueMention.wednesday)} (${rows.length})`, items })
+  }
+  if (tabs.offersToCheck.length > 0) {
+    out.push({
+      heading: `Club Card offers to check (${tabs.offersToCheck.length})`,
+      items: tabs.offersToCheck.map((o) => `${o.name}: offer looks out of date${o.offer ? ` ("${o.offer.slice(0, 80)}")` : ''}`),
+    })
+  }
+  return out
 }
 
 // Today's groups, in Today's order and with its titles (app/today/_components/TodayClient.tsx).
@@ -149,7 +209,7 @@ function pick(lines: DeskLine[], section: number, limit: number, lead?: string):
 }
 
 export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: string; text: string } {
-  const { now, lines, brief, health, closed, missedRoutines, pipeline, drafts = [], skippedCount = 0, gaps = [], today } = input
+  const { now, lines, brief, health, closed, system = [], pipeline, drafts = [], skippedCount = 0, gaps = [], today, tabs } = input
 
   const sections: Section[] = []
   const add = (s: Section | null) => { if (s) sections.push(s) }
@@ -173,6 +233,7 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
   // (your own list, you said you would, waiting on you, money, due today,
   // renewals), which were worked out separately and could disagree with Today.
   sections.push(...todaySections(today.date, today.items))
+  if (tabs) sections.push(...tabSections(tabs))
   add(pick(lines, 6, 6, '{n} arrived'))   // Editorial arrivals
   add(pick(lines, 7, 10))                 // New businesses worth approaching
   add(pick(lines, 8, 8))                  // Story leads
@@ -203,7 +264,13 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
   const overdueCount = overdueItems(today.items, today.date).length
   const opening = `${overdueCount} thing${overdueCount === 1 ? '' : 's'} overdue. ` +
     `${money(brief?.receivables_total)} is owed across ${brief?.businesses_owing ?? 0} businesses; ` +
-    `${count('waiting_on_you')} waiting on a reply from you, ${count('renewal')} renewals and ${count('todo')} to-dos.`
+    `${count('waiting_on_you')} waiting on a reply from you, ${count('renewal')} renewals and ${count('todo')} to-dos.` +
+    (tabs && tabs.dataHealth > 0 ? ` Data health has ${tabs.dataHealth} thing${tabs.dataHealth === 1 ? '' : 's'} to fix.` : '')
+
+  // Stage 18: the System line, first, and only when a job or routine missed
+  const systemLine = system.length > 0
+    ? `System: ${system.map((m) => m.line).join('; ')}. Lists that depend on it may be short until it runs.`
+    : ''
 
   // Closing line: system health in plain words
   const health_bits: string[] = []
@@ -222,12 +289,12 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
     if (hoursSince(health.engine_ran_at, now) > 48) warnings.push('the task engine has not run for two days')
     if (Number(health.quickbooks_unlinked ?? 0) > 0) warnings.push(`${health.quickbooks_unlinked} QuickBooks customer is not matched to a business`)
   }
-  for (const r of missedRoutines) warnings.push(`the ${r} routine did not finish`)
 
   const footer = health_bits.length ? health_bits.join('; ') + '.' : ''
   const warn = warnings.length ? `Needs looking at: ${warnings.join('; ')}.` : ''
 
   const html = [
+    systemLine ? `<p style="color:#9B1C1C"><strong>${esc(systemLine)}</strong></p>` : '',
     `<p>${esc(opening)}</p>`,
     ...sections.map(s =>
       `<p><strong>${esc(s.heading)}</strong></p><ul>${s.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`),
@@ -237,11 +304,12 @@ export function buildDeskEmail(input: DeskEmailInput): { subject: string; html: 
   ].join('\n')
 
   const text = [
+    ...(systemLine ? [systemLine, ''] : []),
     opening,
     ...sections.map(s => `\n${s.heading}\n${s.items.map(i => `- ${i}`).join('\n')}`),
     footer ? `\n${footer}` : '',
     warn ? `\n${warn}` : '',
   ].join('\n')
 
-  return { subject: deskSubject(now), html, text }
+  return { subject: system.length > 0 ? `${deskSubject(now)} (system: something missed)` : deskSubject(now), html, text }
 }

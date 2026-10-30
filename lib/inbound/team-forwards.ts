@@ -5,7 +5,7 @@
 // services. Read-only.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { looksForwarded, originalSenderOfForward, newBusinessRefusal } from '@/lib/inbound/utils'
+import { looksForwarded, originalSenderOfForward, newBusinessRefusal, isPersonalDomain, registrableDomain, domainBusinessNameScore } from '@/lib/inbound/utils'
 
 /** Dawn's (Dwmultimedia) ad emails are Stage 17b's. */
 const LEAVE_TO_17B = new Set(['Dwmultimedia'])
@@ -78,6 +78,21 @@ export async function findTeamForwards(supabase: SupabaseClient, orgId: string, 
     }
   }
 
+  // A match is trusted when the sender writes from a personal address, or their company domain
+  // fits the business: mapped to it, or its name (Chamber Orchestra's address sat on B&Q's contact).
+  const { data: mappings } = await supabase.from('domain_mappings').select('domain, business_id').eq('org_id', orgId)
+  const mappedTo = new Map((mappings ?? []).map((m) => [String(m.domain).toLowerCase(), m.business_id as string]))
+  const named = businesses.filter((b) => !b.merged_into && b.status !== 'Not a business' && !internalIds.has(b.id))
+  const fits = (email: string, businessId: string) => {
+    const domain = email.split('@')[1] ?? ''
+    if (isPersonalDomain(domain)) return true
+    if (domainBusinessNameScore(domain, byId.get(businessId)?.name ?? '') >= 0.5) return true
+    // The domain names another business outright (Home Instead's address on the Scouts' contact)
+    if (named.some((b) => b.id !== businessId && domainBusinessNameScore(domain, b.name) >= 0.9)) return false
+    const mapped = mappedTo.get(domain) ?? mappedTo.get(registrableDomain(domain))
+    return mapped === businessId
+  }
+
   const moves: TeamForwardMove[] = []
   const review: TeamForwardReview[] = []
   let stay = 0
@@ -95,6 +110,8 @@ export async function findTeamForwards(supabase: SupabaseClient, orgId: string, 
       const candidates = at.map((id) => ({ id, name: byId.get(id)?.name ?? '' }))
       if (hold.has(e.id)) {
         review.push({ ...base, why: 'the contact on file looks wrong', candidates })
+      } else if (at.length === 1 && !fits(s.email, at[0])) {
+        review.push({ ...base, why: `the contact on file may be wrong: ${s.email.split('@')[1]} doesn't fit ${candidates[0].name}`, candidates })
       } else if (at.length === 1) {
         moves.push({ ...base, to_business_id: at[0], to_name: candidates[0].name, contact_id: contactAt.get(`${at[0]}|${s.email}`)!,
           direction: e.direction, reply_dismissed_at: e.reply_dismissed_at })

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { buildDeskEmail, type CareGap, type ClosedItem, type DeskLine, type DraftItem } from '@/lib/email/desk-email'
-import { loadTodayCore } from '@/lib/today-source'
+import { buildDeskEmail, WORK_ON_NEXT_BUCKETS, type CareGap, type ClosedItem, type DeskLine, type DraftItem, type DeskTabs } from '@/lib/email/desk-email'
+import { loadTodayCore, loadSystemMisses } from '@/lib/today-source'
+import { loadMentionQueue } from '@/lib/newsletter/due'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
   }
 
   const since = new Date(now.getTime() - 24 * 3_600_000).toISOString()
-  const [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes, gapsRes, letGoRes] = await Promise.all([
+  const [linesRes, briefRes, healthRes, closedRes, draftsRes, gapsRes, letGoRes, system, tabs] = await Promise.all([
     supabase.from('v_morning_desk').select('section, heading, sort, line, is_priority'),
     supabase.from('v_daily_brief').select('*').maybeSingle(),
     supabase.from('v_system_health').select('*').maybeSingle(),
@@ -68,20 +69,18 @@ export async function GET(request: NextRequest) {
       .gte('observed_at', since)
       .order('observed_at', { ascending: true }),
     supabase
-      .from('tasks')
-      .select('signal_meta')
-      .neq('status', 'done')
-      .eq('signal_meta->>kind', 'routine_missed'),
-    supabase
       .from('routine_drafts')
       .select('kind, outcome, recipient, reason, sent_at, bump_count, bumped_at, business_id, businesses(name)')
       .or(`created_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()},bumped_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()}`)
       .order('created_at', { ascending: true }),
     supabase.from('v_care_gaps').select('severity, gap, detail').order('severity'),
     supabase.from('care_exclusions').select('business_id').eq('kind', 'all'),
+    // Stage 18: the system alarm, and the tabs' lists from the tabs' own sources
+    loadSystemMisses(supabase),
+    loadDeskTabs(supabase, orgId, todayCore.today),
   ])
 
-  const firstError = [linesRes, briefRes, healthRes, closedRes, missedRes, draftsRes, gapsRes].find(r => r.error)?.error
+  const firstError = [linesRes, briefRes, healthRes, closedRes, draftsRes, gapsRes].find(r => r.error)?.error
   if (firstError) {
     console.error('[desk-email] read error:', firstError.message)
     return NextResponse.json({ error: firstError.message }, { status: 500 })
@@ -92,9 +91,6 @@ export async function GET(request: NextRequest) {
     const title = Array.isArray(task) ? task[0]?.title : task?.title
     return { title: title ?? '(task)', summary: r.summary ?? '', hand_written: r.signal_key == null }
   })
-  const missedRoutines = (missedRes.data ?? [])
-    .map(r => (r.signal_meta as { routine?: string } | null)?.routine)
-    .filter((x): x is string => !!x)
 
   // Businesses Tom has told us to stop writing to drop out of the list, even if
   // an unsent draft from before the decision is still sitting in Outlook.
@@ -121,12 +117,13 @@ export async function GET(request: NextRequest) {
     brief: briefRes.data,
     health: healthRes.data,
     closed,
-    missedRoutines,
+    system,
     pipeline,
     drafts,
     skippedCount,
     gaps: (gapsRes.data ?? []) as CareGap[],
     today: { date: todayCore.today, items: todayCore.items },
+    tabs: tabs ?? undefined,
   })
 
   if (dry) {
@@ -151,4 +148,44 @@ export async function GET(request: NextRequest) {
 
   await supabase.from('routine_heartbeat').insert({ routine: 'desk_email', summary: email.subject })
   return NextResponse.json({ sent: true, subject: email.subject, pipeline })
+}
+
+/** The coming Wednesday's date (today if it is Wednesday): the next newsletter. */
+function nextWednesday(today: string): string {
+  const d = new Date(`${today}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + ((3 - d.getUTCDay() + 7) % 7))
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * Stage 18: what the Outreach, Newsletter, Club Card and Data health tabs list, read from the
+ * same views and rules as the tabs. Null if any read fails: the email still goes without them.
+ */
+async function loadDeskTabs(supabase: ReturnType<typeof createServiceRoleClient>, orgId: string, today: string): Promise<DeskTabs | null> {
+  try {
+    const buckets = WORK_ON_NEXT_BUCKETS.map((b) => b.bucket)
+    const [nextRes, offersRes, healthRes, queue] = await Promise.all([
+      supabase.from('v_outreach_next').select('name, bucket, days_quiet, draft_ready, next_order')
+        .eq('organization_id', orgId).in('bucket', buckets).order('next_order', { ascending: true }).limit(2000),
+      supabase.from('v_club_card_members').select('business_name, offer_text, issues')
+        .eq('organization_id', orgId).contains('issues', ['offer_old']).order('business_name'),
+      supabase.from('v_data_health_counts').select('n').eq('organization_id', orgId).eq('fixed_on', '/data-health'),
+      loadMentionQueue(supabase, orgId, today),
+    ])
+    const err = [nextRes, offersRes, healthRes].find((r) => r.error)?.error
+    if (err) throw new Error(err.message)
+    const next = nextRes.data ?? []
+    const counts: Record<string, number> = {}
+    for (const r of next) counts[r.bucket] = (counts[r.bucket] ?? 0) + 1
+    return {
+      workOnNext: next.slice(0, 6).map((r) => ({ name: r.name, bucket: r.bucket, days_quiet: r.days_quiet, draft_ready: !!r.draft_ready })),
+      workOnNextCounts: counts,
+      dueMention: { wednesday: nextWednesday(today), rows: queue },
+      offersToCheck: (offersRes.data ?? []).map((o) => ({ name: o.business_name, offer: o.offer_text })),
+      dataHealth: (healthRes.data ?? []).reduce((t, r) => t + Number(r.n ?? 0), 0),
+    }
+  } catch (e) {
+    console.error('[desk-email] tabs read error:', (e as Error).message)
+    return null
+  }
 }

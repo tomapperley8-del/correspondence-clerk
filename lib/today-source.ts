@@ -72,3 +72,19 @@ export function buildTodayItems(rows: AttentionRow[], tasks: ManualTask[]): Toda
   }
   return items
 }
+
+export type SystemMiss = { job_key: string; label: string; line: string }
+
+/**
+ * Scheduled jobs and routines that missed (Stage 18, system_alarm() in the database).
+ * The desk email's "System" line and Today's banner both read this, so they agree.
+ * Fails quiet: an alarm that can't be read never stops the page or the email.
+ */
+export async function loadSystemMisses(supabase: SupabaseClient): Promise<SystemMiss[]> {
+  const { data, error } = await supabase.from('v_system_alarm').select('job_key, label, line').eq('missed', true)
+  if (error) {
+    console.error('[system-alarm] read error:', error.message)
+    return []
+  }
+  return (data ?? []) as SystemMiss[]
+}
