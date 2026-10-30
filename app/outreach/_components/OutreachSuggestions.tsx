@@ -105,7 +105,7 @@ export function OutreachSuggestions({ suggestions }: { suggestions: OutreachSugg
   }
 
   return (
-    <FoldSection storageKey="outreach.suggestions" id="suggestions" big title="Could be on outreach" count={live.length} className="shadow-[var(--shadow-sm)] scroll-mt-4">
+    <FoldSection storageKey="outreach.suggestions" id="suggestions" big band="outreach" title="Could be on outreach" count={live.length} className="shadow-[var(--shadow-sm)] scroll-mt-4">
       <p className="px-3 py-1.5 text-xs text-gray-600">
         Not on outreach, but our own records point to them. Leads for lapsed members converted 4 times in 5. Accept puts the business on outreach as Identified; Not now hides it. Nothing is added by itself.
       </p>

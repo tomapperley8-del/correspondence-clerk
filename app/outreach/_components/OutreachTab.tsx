@@ -270,6 +270,7 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
             storageKey="outreach.drafts"
             id="drafts"
             big
+            band="todo"
             title="Drafts ready to send"
             count={drafts.length}
             className={RAIL}
@@ -303,7 +304,7 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
             </ul>
           </FoldSection>
 
-          <FoldSection storageKey="outreach.leads" id="leads" big title="Leads to accept" count={leads.length} className={RAIL}>
+          <FoldSection storageKey="outreach.leads" id="leads" big band="attention" title="Leads to accept" count={leads.length} className={RAIL}>
             <p className="px-3 py-1.5 text-xs text-gray-600">Found by the prospecting routine. Accept puts the business on outreach as Identified (or links it to the one on file); Delete removes the lead, with Undo.</p>
             <ul className="divide-y divide-black/[0.06] border-t border-black/[0.06]">
               {leads.length === 0 && <li className="px-3 py-2.5 text-sm text-gray-600">No leads waiting. The prospecting routine adds them here when it finds something.</li>}
@@ -363,7 +364,7 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
 
           {next && <OutreachSuggestions suggestions={next.suggestions} />}
 
-          <FoldSection storageKey="outreach.results" id="results" big title="Results by month" className={RAIL}>
+          <FoldSection storageKey="outreach.results" id="results" big band="neutral" title="Results by month" className={RAIL}>
             <p className="px-3 pt-1.5 text-xs text-gray-600">Contacted = the first approach that month. Replied = they emailed back within 30 days of it. Won = a deal recorded that month.</p>
             <ResultsChart months={months} />
           </FoldSection>
@@ -376,6 +377,7 @@ export function OutreachTab({ data, next, nextError, winbacks, initialStage, ini
           title={<>Pipeline <span className="text-sm font-normal tabular-nums" style={{ fontFamily: 'var(--font-sans)' }}>{summary.onOutreach}</span></>}
           headingId="outreach-pipeline-heading"
           card={false}
+          band="attention"
           controls={
             <>
             <button type="button" className={panelButtonClass} aria-expanded={pipelineShown} aria-controls="pipeline-body" onClick={togglePipeline}>

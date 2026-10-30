@@ -24,6 +24,7 @@ import { OUTREACH_STAGES, PILL, type Tone } from '@/app/businesses/_components/M
 import type { OutreachWinbacks } from '@/app/actions/outreach-winbacks'
 import { WinBacks } from './WinBacks'
 import { useFold } from '@/components/ui/fold-section'
+import { bandClass, bandStyle } from '@/components/ui/kind'
 
 /** Stage 14c: long lists scroll inside the box, so the page ends at the screen. */
 const SCROLL = 'max-h-[45vh] overflow-y-auto overscroll-contain'
@@ -34,6 +35,8 @@ const mainBtn = `${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`
 const softBtn = `${btnBase} bg-white border border-black/[0.12] text-brand-dark hover:bg-brand-warm`
 const card = 'bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)]'
 const linkBtn = 'text-sm font-semibold text-brand-navy hover:underline min-h-10 md:min-h-0 inline-flex items-center'
+/** A button in the header band (white, house style). */
+const bandBtn = 'text-xs font-semibold rounded-sm px-2.5 min-h-10 md:min-h-8 inline-flex items-center transition-colors duration-200 ease-out'
 
 const stageLabel = (key: string) => OUTREACH_STAGES.find((s) => s.key === key)?.label ?? key
 const dateGB = (d: string | null | undefined) => (d ? formatDateGB(`${d.slice(0, 10)}T12:00:00Z`) : '')
@@ -385,11 +388,11 @@ export function WorkOnNext({ rows, contacts, extra }: { rows: OutreachNextRow[];
 
   return (
     <section id="work-on-next" aria-labelledby="work-on-next-heading" className={cn(card, 'scroll-mt-4 min-w-0')}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2 px-3 pt-3">
-        <h2 id="work-on-next-heading" className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
+      <div className={cn('cc-band-controls flex flex-wrap items-center justify-between gap-2 px-3 py-1 rounded-t-sm', bandClass('outreach'), !open && 'rounded-b-sm')} style={bandStyle('outreach')}>
+        <h2 id="work-on-next-heading" className="text-[1.35rem] leading-tight font-semibold text-white" style={{ fontFamily: 'var(--font-serif)' }}>
           Work on next
         </h2>
-        <button type="button" className={linkBtn} aria-expanded={open} aria-controls="work-on-next-body" onClick={toggle}>
+        <button type="button" className={bandBtn} aria-expanded={open} aria-controls="work-on-next-body" onClick={toggle}>
           {open ? 'Hide' : 'Show'}<span className="sr-only"> work on next</span>
         </button>
         {open && extra && (
@@ -416,7 +419,7 @@ export function WorkOnNext({ rows, contacts, extra }: { rows: OutreachNextRow[];
           </div>
         )}
         {open && mode === 'pipeline' && (
-          <button type="button" className={linkBtn} aria-expanded={howOpen} onClick={() => setHowOpen((o) => !o)}>
+          <button type="button" className={bandBtn} aria-expanded={howOpen} onClick={() => setHowOpen((o) => !o)}>
             {howOpen ? 'Hide how this is ordered' : 'How this is ordered'}
           </button>
         )}

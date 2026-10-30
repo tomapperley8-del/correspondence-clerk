@@ -257,6 +257,7 @@ export function ClubCardTab({ data, initialShow, initialBusiness, initialQuery }
         title={board ? 'Club Card renewals' : showDef.label}
         headingId="club-card-heading"
         card={false}
+        band="card"
         controls={
           board ? null : (
             <>
