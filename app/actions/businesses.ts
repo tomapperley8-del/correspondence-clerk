@@ -102,19 +102,30 @@ export async function getBusinesses(): Promise<{ data?: BusinessListItem[]; erro
     return { error: 'Unauthorized' }
   }
 
-  const { data, error } = await supabase
-    // Stage 11a: status, deal, last in touch from the truth layer (writes still go to businesses)
-    .from('v_businesses')
-    .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, last_contacted_at')
-    // Records found not to be businesses in a review: kept for their emails, never listed
-    .or(`status.is.null,status.neq."${NOT_A_BUSINESS}"`)
-    .order('name', { ascending: true })
+  // The API returns at most 1,000 rows per request, so read in pages: with over
+  // 1,000 businesses, the end of the alphabet was missing from every picker.
+  const PAGE = 1000
+  const rows: BusinessListItem[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      // Stage 11a: status, deal, last in touch from the truth layer (writes still go to businesses)
+      .from('v_businesses')
+      .select('id, name, normalized_name, category, status, is_club_card, is_advertiser, membership_type, business_type, last_contacted_at')
+      // Records found not to be businesses in a review: kept for their emails, never listed
+      .or(`status.is.null,status.neq."${NOT_A_BUSINESS}"`)
+      .order('name', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1)
 
-  if (error) {
-    return { error: error.message }
+    if (error) {
+      return { error: error.message }
+    }
+
+    rows.push(...((data ?? []) as BusinessListItem[]))
+    if (!data || data.length < PAGE) break
   }
 
-  return { data: data as BusinessListItem[] }
+  return { data: rows }
 }
 
 export async function getBusinessById(id: string) {
