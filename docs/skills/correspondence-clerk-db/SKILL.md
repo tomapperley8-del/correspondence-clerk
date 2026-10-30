@@ -56,7 +56,9 @@ clear, otherwise ask him which, then call again with the id. `"found": false` wi
 means nothing matched: try a shorter part of the name, or `find_businesses('{"q": "..."}')`.
 
 If a business shows no emails, check `search_everything('"business name"')`: their emails may be
-filed under the person who wrote them.
+filed under the person who wrote them. Since 30 Oct 2026 an email Tom's team (Cleo, Bridget, James)
+forwards in is filed under the business that first wrote, with that sender as contact; older
+forwards Correspondence Clerk couldn't place still sit on the team member's record.
 
 To keep a reply short, pull only the parts needed:
 
@@ -253,6 +255,7 @@ Current objects worth knowing (all in `public`):
 | `routine_drafts` | drafts written by the Claude routines |
 | `tasks` | to-dos (`source = 'manual'` are Tom's; others feed the desk email) |
 | `v_data_health` | records that need tidying |
+| `v_system_alarm` | every scheduled job and routine: last good run, when due, `missed`, a plain `line` (weekday routines are never due at weekends) |
 
 Match names with `cc_name_key(name) LIKE '%' || cc_name_key('term') || '%'` (ignores punctuation),
 skip `merged_into IS NOT NULL` rows, and keep result sets small (`LIMIT`, pick columns).

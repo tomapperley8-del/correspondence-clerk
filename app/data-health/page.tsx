@@ -52,6 +52,10 @@ export default async function DataHealthPage() {
       </p>
       <h1 className="text-3xl font-bold mb-1" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>Data health</h1>
       <p className="text-sm text-gray-600">Things that have drifted, checked live. Each one clears by itself once it is fixed.</p>
+      <p className="text-sm text-gray-600 mt-1">
+        Emails the team forwarded in that are still filed under them:{' '}
+        <Link href="/review/team-forwards" className="underline" style={{ color: 'var(--link-blue)' }}>Team forwards</Link>.
+      </p>
     </div>
   )
 

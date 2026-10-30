@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { isFeatureEnabled } from '@/lib/feature-flags'
-import { loadTodayCore } from '@/lib/today-source'
+import { loadTodayCore, loadSystemMisses, type SystemMiss } from '@/lib/today-source'
 import { overdueItems, type TodayItem } from '@/lib/today'
 import { getBusinessGlance, type BusinessGlance } from '@/app/actions/business-glance'
 
@@ -50,6 +50,14 @@ export async function getOverdueCount(): Promise<number | null> {
   } catch {
     return null
   }
+}
+
+/** Stage 18: scheduled jobs and routines that missed, for Today's banner (same read as the desk email). */
+export async function getSystemMisses(): Promise<SystemMiss[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  return loadSystemMisses(supabase)
 }
 
 export async function getTodayData(): Promise<{ data?: TodayData; error?: string }> {
