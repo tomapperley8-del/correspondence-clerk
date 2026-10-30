@@ -79,18 +79,18 @@ export async function findTeamForwards(supabase: SupabaseClient, orgId: string, 
   }
 
   // A match is trusted when the sender writes from a personal address, or their company domain
-  // fits the business: mapped to it, or its name (Chamber Orchestra's address sat on B&Q's contact).
-  const { data: mappings } = await supabase.from('domain_mappings').select('domain, business_id').eq('org_id', orgId)
-  const mappedTo = new Map((mappings ?? []).map((m) => [String(m.domain).toLowerCase(), m.business_id as string]))
-  const named = businesses.filter((b) => !b.merged_into && b.status !== 'Not a business' && !internalIds.has(b.id))
+  // fits the business's name. Learned domain mappings are not enough: some were learned wrongly
+  // (Chamber Orchestra's address sat on B&Q's contact and its domain mapped there).
+  const letters = (x: string) => x.toLowerCase().replace(/^the\s+/, '').replace(/[^a-z]/g, '')
   const fits = (email: string, businessId: string) => {
     const domain = email.split('@')[1] ?? ''
     if (isPersonalDomain(domain)) return true
-    if (domainBusinessNameScore(domain, byId.get(businessId)?.name ?? '') >= 0.5) return true
-    // The domain names another business outright (Home Instead's address on the Scouts' contact)
-    if (named.some((b) => b.id !== businessId && domainBusinessNameScore(domain, b.name) >= 0.9)) return false
-    const mapped = mappedTo.get(domain) ?? mappedTo.get(registrableDomain(domain))
-    return mapped === businessId
+    const name = byId.get(businessId)?.name ?? ''
+    // Letters only, in order: operahollandpark.com fits "Opera Holland Park"
+    const base = letters(registrableDomain(domain).split('.')[0] ?? '')
+    const plain = letters(name)
+    if (base.length >= 4 && plain.length >= 4 && (plain.includes(base) || base.includes(plain))) return true
+    return domainBusinessNameScore(domain, name) >= 0.5
   }
 
   const moves: TeamForwardMove[] = []
