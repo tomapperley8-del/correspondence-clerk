@@ -59,6 +59,10 @@ If a business shows no emails, check `search_everything('"business name"')`: the
 filed under the person who wrote them. Since 30 Oct 2026 an email Tom's team (Cleo, Bridget, James)
 forwards in is filed under the business that first wrote, with that sender as contact; older
 forwards Correspondence Clerk couldn't place still sit on the team member's record.
+Before 30 Oct 2026 an email could also land on an unrelated business whose name shares a place word
+with the sender's domain: "london" put London Councils, London Fire Brigade and others on
+**S&V LONDON**, and "chiswick" put several organisations on B&Q CHISWICK (since tidied). If an
+organisation's emails seem missing, search for its domain before saying there are none.
 
 To keep a reply short, pull only the parts needed:
 
