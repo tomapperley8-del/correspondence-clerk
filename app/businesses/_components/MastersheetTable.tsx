@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { KindTag, REASON_KIND } from '@/components/ui/kind'
 import Link from 'next/link'
 import { ActionMenu, type MenuEntry } from '@/components/ui/action-menu'
 import type { TableRow } from '@/app/actions/business-table'
@@ -716,9 +717,14 @@ function Row({
                   .filter(Boolean)
                   .join('\n')}
               >
-                <Pill tone={r.attention.is_snoozed ? 'muted' : r.attention.is_overdue ? 'red' : 'orange'}>
-                  {REASON_LABEL[r.attention.reason]}
-                </Pill>
+                {r.attention.is_snoozed ? (
+                  <Pill tone="muted">{REASON_LABEL[r.attention.reason]}</Pill>
+                ) : (
+                  <KindTag kind={REASON_KIND[r.attention.reason]} className={r.attention.is_overdue ? 'ring-1 ring-kind-overdue' : undefined}>
+                    {REASON_LABEL[r.attention.reason]}
+                    {r.attention.is_overdue && <span className="sr-only">, overdue</span>}
+                  </KindTag>
+                )}
                 <span className="truncate text-gray-600">
                   {r.attention.is_snoozed ? 'snoozed' : r.attention.since ? ago(r.attention.since, today) : ''}
                   {r.attention.reasons.length > 1 ? ` +${r.attention.reasons.length - 1}` : ''}

@@ -7,6 +7,7 @@ import { cn, formatDateGB } from '@/lib/utils'
 import { toast } from '@/lib/toast'
 import { FilterChips } from '@/components/ui/filter-chips'
 import { FoldSection } from '@/components/ui/fold-section'
+import type { KindColour } from '@/components/ui/kind'
 import { addToNewsletter } from '@/components/ForNewsletterButton'
 import type { ItemKind } from '@/lib/newsletter/items'
 import { nthWednesday, weekWords } from '@/lib/newsletter/rhythm'
@@ -175,12 +176,16 @@ function IssueButton({ on, dashed, onClick, title, sub }: { on: boolean; dashed?
 // Stage 14c: each section is a folded section (open on a computer, folded on a
 // phone, remembered per browser) whose body scrolls inside, so the page ends at
 // the first screen.
-function Section({ id, title, hint, children, className }: { id: string; title: string; hint?: string; children: React.ReactNode; className?: string }) {
+// Stage 14d: each box has a header band; the issue itself is in the newsletter's
+// teal, Club Card boxes in the card plum, the rest in slate or grey so that
+// neighbouring boxes differ.
+function Section({ id, title, hint, children, className, band = 'attention' }: { id: string; title: string; hint?: string; children: React.ReactNode; className?: string; band?: KindColour }) {
   return (
     <FoldSection
       storageKey={`newsletter.${id}`}
       id={id}
       big
+      band={band}
       title={title}
       defaultOpen
       narrowOpen={false}
@@ -246,7 +251,7 @@ function NextIssue({ ctx, next }: { ctx: Ctx; next: { wednesday: string; items: 
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-3">
-      <Section id="nl-next" title={`Next issue, ${weekdayGB(nextWed)}`} hint="The same list as Today. Mark each one once it has gone in.">
+      <Section id="nl-next" band="newsletter" title={`Next issue, ${weekdayGB(nextWed)}`} hint="The same list as Today. Mark each one once it has gone in.">
         {next.items.length === 0 ? <p className="text-sm text-gray-600">Nothing on the list yet. Add from a business page, an email or the suggestions here.</p> : (
           <ul className="divide-y divide-black/[0.06]">
             {next.items.map((n) => (
@@ -314,7 +319,7 @@ function IssueItems({ ctx, items, issue }: { ctx: Ctx; items: NlItem[]; issue: N
     return out
   }, [items])
   return (
-    <Section id="nl-issue" title={`Issue of ${weekdayGB(issue.date)}`}
+    <Section id="nl-issue" band="newsletter" title={`Issue of ${weekdayGB(issue.date)}`}
       hint={`${issue.items} items, ${issue.businesses} businesses. Change any item's kind, business or contributor with Edit; the weekly read keeps your choice.`}>
       {issue.url && <p className="text-sm mb-2"><a href={issue.url} target="_blank" rel="noreferrer" className="text-brand-navy hover:underline">Open the issue in Mailchimp</a></p>}
       {sections.map((s, n) => (
@@ -499,7 +504,7 @@ function Freebies({ ctx }: { ctx: Ctx }) {
   const open = items.filter((i) => i.closes_on && i.closes_on >= data.today)
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-3">
-      <Section id="nl-freebies" title="Freebies and competitions"
+      <Section id="nl-freebies" band="neutral" title="Freebies and competitions"
         hint={`${items.filter((i) => i.kind === 'freebie').length} freebies and ${items.filter((i) => i.kind === 'competition').length} competitions, newest first.${open.length ? ` Open now: ${open.length}.` : ''} Reader entries go to the info@ mailbox, so they are not counted here.`}>
         <ul className="divide-y divide-black/[0.06]">{items.map((it) => <ItemRow key={it.id} ctx={ctx} item={it} showDate />)}</ul>
       </Section>
@@ -522,7 +527,7 @@ function ClubCard({ ctx }: { ctx: Ctx }) {
   const never = queue.filter((q) => !q.last_in).length
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-      <Section id="nl-cc-queue" title="Due a mention"
+      <Section id="nl-cc-queue" band="card" title="Due a mention"
         hint={`${queue.length} members. ${never} not in since joining (oldest joiner first), then the longest since their last mention.`}>
         <ol className="divide-y divide-black/[0.06] text-sm">
           {queue.map((q, n) => (
@@ -537,7 +542,7 @@ function ClubCard({ ctx }: { ctx: Ctx }) {
           ))}
         </ol>
       </Section>
-      <Section id="nl-cc-items" title="Club Card in the newsletter" hint="New members, offers and members' events, newest first (the last 40).">
+      <Section id="nl-cc-items" band="card" title="Club Card in the newsletter" hint="New members, offers and members' events, newest first (the last 40).">
         <ul className="divide-y divide-black/[0.06]">{spotlights.map((it) => <ItemRow key={it.id} ctx={ctx} item={it} showDate />)}</ul>
       </Section>
     </div>
@@ -661,7 +666,7 @@ function Markets({ ctx }: { ctx: Ctx }) {
   }, [data.items])
   const jazzIssues = new Set(data.items.filter((i) => i.kind === 'jazz').map((i) => i.issue_id)).size
   return (
-    <Section id="nl-markets" title="Markets and regulars" hint={`Each market and the issues it was in, newest first. Jazz at George IV was in ${jazzIssues} of ${data.issues.length} issues.`}>
+    <Section id="nl-markets" band="neutral" title="Markets and regulars" hint={`Each market and the issues it was in, newest first. Jazz at George IV was in ${jazzIssues} of ${data.issues.length} issues.`}>
       <ul className="divide-y divide-black/[0.06]">
         {groups.map((g) => {
           const gap = g.dates.length ? Math.round((Date.parse(`${data.today}T12:00:00Z`) - Date.parse(`${g.dates[0]}T12:00:00Z`)) / (7 * 86_400_000)) : null

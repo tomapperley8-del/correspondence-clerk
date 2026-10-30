@@ -216,7 +216,7 @@ export default function InboxListClient({ items, businesses }: Props) {
   )
 
   return (
-    <FullScreenPanel title={`To file (${shown.length})`} headingId="inbox-h" card={false}>
+    <FullScreenPanel title={`To file (${shown.length})`} headingId="inbox-h" card={false} band="attention">
       {() => (
         <ResizableSplit storageKey="cc.inbox.split" defaultPercent={45} min={30} label="Resize the email list and the filing pane" first={list()} second={reader()} />
       )}

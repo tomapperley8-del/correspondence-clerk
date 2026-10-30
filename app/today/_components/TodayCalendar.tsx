@@ -38,18 +38,21 @@ const dateGB = (d: string) => formatDateGB(`${d}T12:00:00Z`)
 const dayName = (d: string, opts: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { ...opts, timeZone: 'UTC' })
 
 function tone(i: CalendarItem): string {
-  // A coloured edge and plain text; the words ("invoice due", "Meeting:") say the kind.
-  if (i.kind === 'renewal') return 'border-l-2 border-amber-500 text-amber-800'
-  if (i.kind === 'invoice') return 'border-l-2 border-red-600 text-red-800'
-  if (i.done) return 'border-l-2 border-gray-300 text-gray-500 line-through'
+  // House style (Stage 14d): each kind keeps its colour everywhere, as an edge
+  // and text; the words ("invoice due", "Newsletter:") say the kind.
+  if (i.kind === 'renewal') return 'border-l-[3px] border-kind-renewal text-kind-renewal'
+  if (i.kind === 'invoice') return 'border-l-[3px] border-kind-money text-kind-money'
+  if (i.done) return 'border-l-[3px] border-gray-300 text-gray-500 line-through'
   switch (i.category) {
     case 'Call':
     case 'Meeting':
-      return 'border-l-2 border-brand-navy text-brand-dark'
+      return 'border-l-[3px] border-kind-outreach text-brand-dark'
     case 'Deadline':
-      return 'border-l-2 border-red-600 text-brand-dark'
+      return 'border-l-[3px] border-kind-overdue text-brand-dark'
+    case 'For Newsletter':
+      return 'border-l-[3px] border-kind-newsletter text-kind-newsletter'
     default:
-      return 'border-l-2 border-brand-olive text-brand-dark'
+      return 'border-l-[3px] border-kind-todo text-brand-dark'
   }
 }
 
@@ -327,7 +330,7 @@ export function TodayCalendar({
   )
 
   return (
-    <FullScreenPanel title="Calendar" headingId="calendar-h" controls={controls} className="!p-2.5 sm:!p-4">
+    <FullScreenPanel title="Calendar" headingId="calendar-h" controls={controls} band="neutral">
       {(full) => (
         <div id="calendar-body" hidden={!shown && !full} className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">

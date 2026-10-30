@@ -49,6 +49,22 @@
   --color-ms-red: #F4CCCC;         --color-ms-red-text: #990000;
   --color-ms-yellow: #FFF2CC;      --color-ms-yellow-text: #7F6000;
 
+  /* House style (Stage 14d, Decision 30 Oct 2026): one colour per kind of
+     thing, the same on Today, the calendar and every tab, always shown with
+     its name. The strong colour is a header band (white text) and text on
+     white; each passes WCAG AA both ways (all 6.9:1 or more). The soft colour
+     is a tint behind the strong one as text (all 6:1 or more). */
+  --color-kind-todo: var(--kind-todo);  --color-kind-todo-soft: var(--kind-todo-soft);
+  --color-kind-attention: var(--kind-attention);  --color-kind-attention-soft: var(--kind-attention-soft);
+  --color-kind-money: var(--kind-money);  --color-kind-money-soft: var(--kind-money-soft);
+  --color-kind-renewal: var(--kind-renewal);  --color-kind-renewal-soft: var(--kind-renewal-soft);
+  --color-kind-waiting: var(--kind-waiting);  --color-kind-waiting-soft: var(--kind-waiting-soft);
+  --color-kind-card: var(--kind-card);  --color-kind-card-soft: var(--kind-card-soft);
+  --color-kind-newsletter: var(--kind-newsletter);  --color-kind-newsletter-soft: var(--kind-newsletter-soft);
+  --color-kind-outreach: var(--kind-outreach);  --color-kind-outreach-soft: var(--kind-outreach-soft);
+  --color-kind-overdue: var(--kind-overdue);  --color-kind-overdue-soft: var(--kind-overdue-soft);
+  --color-kind-neutral: var(--kind-neutral);  --color-kind-neutral-soft: var(--kind-neutral-soft);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -250,6 +266,43 @@ h4 {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+:root {
+  /* Stage 14d kind colours (see the @theme note) */
+  --kind-todo: #2F5D3A;
+  --kind-todo-soft: #E7F0E8;
+  --kind-attention: #1E293B;
+  --kind-attention-soft: #EEF0F3;
+  --kind-money: #9B1C1C;
+  --kind-money-soft: #FBE4E4;
+  --kind-renewal: #8A4A0C;
+  --kind-renewal-soft: #FDF0DC;
+  --kind-waiting: #1F4F86;
+  --kind-waiting-soft: #E3EDF8;
+  --kind-card: #6B3A7A;
+  --kind-card-soft: #F1E7F4;
+  --kind-newsletter: #1D6464;
+  --kind-newsletter-soft: #E0F0EF;
+  --kind-outreach: #2C4A6E;
+  --kind-outreach-soft: #E6EDF5;
+  --kind-overdue: #9B1C1C;
+  --kind-overdue-soft: #FBE4E4;
+  --kind-neutral: #4B5563;
+  --kind-neutral-soft: #F1F1EE;
+}
+
+/* Stage 14d header bands: buttons in a band's controls are white with the
+   band's colour as text (unlayered, so it wins over utility classes). Menus
+   that open from them keep their own look. Focus keeps the site's paper and
+   olive double ring, which shows on every band. */
+.cc-band-controls :is(button, a, select):not([role="menu"] *) {
+  background-color: #fff;
+  color: var(--band);
+  border-color: transparent;
+}
+.cc-band-controls :is(button, a, select):not([role="menu"] *):hover {
+  background-color: var(--band-soft);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -275,4 +328,8 @@ h4 {
 }
 .border-blue-600 {
   border-color: var(--link-blue) !important;
+}
+.cc-band-controls [aria-pressed="true"]:not([role="menu"] *) {
+  background-color: var(--band-soft);
+  box-shadow: inset 0 -3px 0 var(--band);
 }

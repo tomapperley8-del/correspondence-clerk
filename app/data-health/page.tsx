@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getDataHealth, type DataHealthRow } from '@/app/actions/data-health'
 import { cn, formatDateGB } from '@/lib/utils'
 import { FoldSection } from '@/components/ui/fold-section'
+import { bandClass } from '@/components/ui/kind'
 
 // Data health (UI overhaul Stage 11c, Decision 29 Oct): things that have drifted, each with a
 // count and a list to fix, quiet when nothing has. Reached from Businesses and the user menu.
@@ -82,6 +83,11 @@ export default async function DataHealthPage() {
         </p>
       )}
 
+      {todo.length > 0 && (
+      <section aria-labelledby="dh-fix-h" className={card}>
+        <h2 id="dh-fix-h" className={cn(bandClass('attention'), 'px-3 py-1.5 rounded-t-sm text-[1.35rem] leading-tight font-semibold')} style={{ fontFamily: 'var(--font-serif)' }}>
+          To fix <span className="text-sm font-normal tabular-nums" style={{ fontFamily: 'var(--font-sans)' }}>{todo.length}</span>
+        </h2>
       {todo.map((c) => {
         const list = rows.filter((r) => r.check_key === c.check_key)
         return (
@@ -91,7 +97,7 @@ export default async function DataHealthPage() {
             title={c.title}
             badge={<span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-sm tabular-nums bg-ms-orange text-ms-orange-text">{c.n}</span>}
             hint={HINTS[c.check_key]}
-            className="shadow-[var(--shadow-sm)]"
+            heading="h3"
           >
             <div className="overflow-x-auto mt-1.5 border-t border-black/[0.06]">
               <table className="w-full text-sm border-collapse">
@@ -123,11 +129,13 @@ export default async function DataHealthPage() {
           </FoldSection>
         )
       })}
+      </section>
+      )}
 
       {elsewhere.length > 0 && (
-        <div className={cn(card, 'px-3 py-2.5')}>
-          <p className="font-semibold text-brand-dark text-sm">Fixed on their own tabs</p>
-          <p className="text-sm text-gray-700 mt-0.5">
+        <section aria-labelledby="dh-else-h" className={card}>
+          <h2 id="dh-else-h" className={cn(bandClass('neutral'), 'px-3 py-1.5 rounded-t-sm text-[1.35rem] leading-tight font-semibold')} style={{ fontFamily: 'var(--font-serif)' }}>Fixed on their own tabs</h2>
+          <p className="text-sm text-gray-700 px-3 py-2.5">
             Counted here, listed where you fix them:{' '}
             {elsewhere.map((c, i) => (
               <span key={c.check_key}>
@@ -136,7 +144,7 @@ export default async function DataHealthPage() {
               </span>
             ))}
           </p>
-        </div>
+        </section>
       )}
     </div>
   )

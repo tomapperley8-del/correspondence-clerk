@@ -148,7 +148,7 @@ export function AdvertisingTab({ data, initialShow, initialView }: {
       </p>
 
       {/* Renewals coming up, by stage */}
-      <FoldSection storageKey="advertising.renewals" big title="Renewals coming up" count={renewing.length} className="mb-2 shadow-[var(--shadow-sm)]" bodyClassName="p-2">
+      <FoldSection storageKey="advertising.renewals" big band="renewal" title="Renewals coming up" count={renewing.length} className="mb-2 shadow-[var(--shadow-sm)]" bodyClassName="p-2">
         <p className="text-xs text-gray-600 mb-2">
           Deals ending in the next 45 days or ended in the last 60. Move them along on the Renewals board.
           {notRenewing.length > 0 && ` Not renewing: ${notRenewing.map((r) => r.name).join(', ')}.`}
@@ -180,7 +180,7 @@ export function AdvertisingTab({ data, initialShow, initialView }: {
       </FoldSection>
 
       {/* Advertisers */}
-      <FoldSection storageKey="advertising.list" big title="Advertisers" count={shown.length} defaultOpen openOnMount={initialView === 'board'} scroll="" className="shadow-[var(--shadow-sm)]" bodyClassName="p-2">
+      <FoldSection storageKey="advertising.list" big band="attention" title="Advertisers" count={shown.length} defaultOpen openOnMount={initialView === 'board'} scroll="" className="shadow-[var(--shadow-sm)]" bodyClassName="p-2">
         <div className="flex flex-wrap items-center gap-2 mb-2">
           <FilterChips label="Show" value={view === 'board' ? ('' as Show) : show} onChange={(s) => { setShow(s); if (view === 'board') setView('cards') }} chips={SHOWS.map((s) => ({ key: s.key, label: s.label, count: counts[s.key] }))} />
           <span className="flex-1" />

@@ -25,6 +25,7 @@ import { addToNewsletter } from '@/components/ForNewsletterButton'
 import { ActionMenu, type MenuItem } from '@/components/ui/action-menu'
 import { FoldSection } from '@/components/ui/fold-section'
 import { FullScreenPanel, useFullScreen } from '@/components/ui/full-screen-panel'
+import { KIND, KindTag, type KindColour } from '@/components/ui/kind'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 
 // Today v2 (UI overhaul Stage 14a v2, mockup B, Tom 23 Oct). One list of
@@ -86,6 +87,18 @@ const SECTIONS: { key: Kind; label: string; hint: string }[] = [
 ]
 
 const KIND_LABEL: Record<Kind, string> = { ...REASON_LABEL, newsletter: 'Newsletter', snoozed: 'Snoozed' }
+
+/** Each kind's colour (Stage 14d house style), the same on every tab and the calendar. */
+const KIND_COLOUR: Record<Kind, KindColour> = {
+  money_owed: 'money',
+  renewal: 'renewal',
+  club_card_lapsed: 'card',
+  waiting_on_you: 'waiting',
+  todo: 'todo',
+  club_card: 'card',
+  newsletter: 'newsletter',
+  snoozed: 'neutral',
+}
 
 const NL_LABEL: Record<NewsletterItem['kind'], string> = {
   task: 'For newsletter',
@@ -331,9 +344,10 @@ export function TodayClient({
       storageKey="today.todos"
       title="Your to-dos"
       big
+      band="todo"
       defaultOpen
       count={todoRows.length}
-      badge={todoRows.some((r) => r.overdue) ? <span className="shrink-0 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded-full bg-ms-red text-ms-red-text" style={{ fontFamily: 'var(--font-sans)' }}>{todoRows.filter((r) => r.overdue).length} overdue</span> : undefined}
+      badge={todoRows.some((r) => r.overdue) ? <span className="shrink-0 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded-full bg-white text-kind-overdue" style={{ fontFamily: 'var(--font-sans)' }}>{todoRows.filter((r) => r.overdue).length} overdue</span> : undefined}
       scroll="max-h-[10vh] sm:max-h-[16vh] lg:max-h-[24vh]"
       controls={
         <button type="button" className={`${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`} aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
@@ -367,10 +381,10 @@ export function TodayClient({
   const other = <OtherThings data={data} quiet={quiet} showQuiet={showQuiet} setShowQuiet={setShowQuiet} busy={busy} run={run} />
 
   const list = (
-    <FullScreenPanel title="Needs attention" headingId="attention-h" className="!p-2.5 sm:!p-4">
-      <div className="space-y-2">
+    <FullScreenPanel title="Needs attention" headingId="attention-h" band="attention" bodyClassName="p-0">
+      <div>
         <AttentionList rows={rows.filter((r) => r.kind !== 'todo')} {...listProps} />
-        <div className="hidden lg:block">{other}</div>
+        <div className="hidden lg:block px-3 py-2 border-t border-black/[0.08]">{other}</div>
       </div>
     </FullScreenPanel>
   )
@@ -479,7 +493,7 @@ type ListProps = {
  * list; Enter opens it (on a phone, under the row). The chosen row, or else
  * the first, is the list's one Tab stop.
  */
-function RowList({ rows, label, selected, opened, choose, renderInline }: ListProps & { rows: Row[]; label: string }) {
+function RowList({ rows, label, selected, opened, choose, renderInline, showKind = false }: ListProps & { rows: Row[]; label: string; showKind?: boolean }) {
   const listRef = useRef<HTMLUListElement>(null)
   const focusKey = rows.some((r) => r.key === selected) ? selected : rows[0]?.key
 
@@ -527,6 +541,7 @@ function RowList({ rows, label, selected, opened, choose, renderInline }: ListPr
                   <span className="sr-only">{KIND_LABEL[r.kind]}: </span>{r.detail}
                 </span>
               </span>
+              {showKind && <KindTag kind={KIND_COLOUR[r.kind]} className="mt-0.5 hidden sm:inline-flex">{KIND_LABEL[r.kind]}</KindTag>}
               <span className={cn('shrink-0 mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', TONE[r.pill.tone])}>{r.pill.text}</span>
             </button>
             {opened === r.key && <div className="lg:hidden px-3 pb-3 pt-1 bg-ms-green/20">{renderInline(r)}</div>}
@@ -556,9 +571,9 @@ function AttentionList({ rows, ...listProps }: ListProps & { rows: Row[] }) {
     })),
   ].filter((g) => g.rows.length > 0)
 
-  if (groups.length === 0) return <p className="text-sm text-gray-700 py-3">Nothing needs attention.</p>
+  if (groups.length === 0) return <p className="text-sm text-gray-700 px-3 py-3">Nothing needs attention.</p>
   return (
-    <div className="space-y-1 sm:space-y-1.5">
+    <div>
       {groups.map((g) => (
         <FoldSection
           key={g.key}
@@ -567,11 +582,11 @@ function AttentionList({ rows, ...listProps }: ListProps & { rows: Row[] }) {
           title={g.label}
           count={g.rows.length}
           tone={g.key === 'overdue' ? 'alert' : 'plain'}
+          kind={g.key === 'overdue' ? undefined : KIND_COLOUR[g.key as Kind]}
           hint={g.hint}
           scroll={full ? '' : 'max-h-[40vh]'}
-          className="border-ms-grid"
         >
-          <RowList rows={g.rows} label={g.label} {...listProps} />
+          <RowList rows={g.rows} label={g.label} showKind={g.key === 'overdue'} {...listProps} />
         </FoldSection>
       ))}
     </div>
@@ -766,7 +781,7 @@ function DetailPanel({ row, detail, actions, inline = false }: { row: Row; detai
           {dealPill && <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', dealPill.cls)}>{dealPill.text}</span>}
         </div>
         <p className="text-sm text-gray-700">
-          <span className="font-semibold text-brand-dark">{KIND_LABEL[row.kind]}</span>
+          <span className={cn('font-semibold', KIND[KIND_COLOUR[row.kind]].text)}>{KIND_LABEL[row.kind]}</span>
           {' · '}
           <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', TONE[row.pill.tone])}>{row.pill.text}</span>
           {row.overdue && <span className="sr-only"> (overdue)</span>}
