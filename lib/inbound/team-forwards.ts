@@ -90,7 +90,7 @@ export async function findTeamForwards(supabase: SupabaseClient, orgId: string, 
     const base = letters(registrableDomain(domain).split('.')[0] ?? '')
     const plain = letters(name)
     if (base.length >= 4 && plain.length >= 4 && (plain.includes(base) || base.includes(plain))) return true
-    return domainBusinessNameScore(domain, name) >= 0.5
+    return domainBusinessNameScore(domain, name) >= 0.6
   }
 
   const moves: TeamForwardMove[] = []
