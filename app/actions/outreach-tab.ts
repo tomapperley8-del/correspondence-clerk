@@ -10,7 +10,7 @@
 // from the stage dates and correspondence; no other reader needs them yet.
 
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { getCurrentUser, getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { getBusinessTable, type TableRow } from '@/app/actions/business-table'
 import { getProspectLeads, getRoutineDrafts, type ProspectLead, type RoutineDraft } from '@/app/actions/leads'
 
@@ -80,7 +80,7 @@ function addDays(isoDate: string, days: number): string {
 
 export async function getOutreachTab(): Promise<{ data?: OutreachTabData; error?: string }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getCurrentUser()
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }

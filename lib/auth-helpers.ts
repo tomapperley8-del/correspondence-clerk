@@ -14,6 +14,15 @@ import { createClient } from '@/lib/supabase/server'
  * This is used by server actions to include organization_id when creating records
  * Cached per request via React cache() — multiple calls in the same request only query once
  */
+/**
+ * The signed-in user, checked with Supabase Auth once per request (React cache()),
+ * so a page whose loaders each check sign-in makes one round trip, not several.
+ */
+export const getCurrentUser = cache(async () => {
+  const supabase = await createClient()
+  return supabase.auth.getUser()
+})
+
 export const getCurrentUserOrganizationId = cache(async (): Promise<string | null> => {
   const supabase = await createClient()
 
@@ -21,7 +30,7 @@ export const getCurrentUserOrganizationId = cache(async (): Promise<string | nul
   const {
     data: { user },
     error: userError,
-  } = await supabase.auth.getUser()
+  } = await getCurrentUser()
 
   if (userError || !user) {
     return null

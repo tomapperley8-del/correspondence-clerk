@@ -1,6 +1,9 @@
+import { SlowNotice } from '@/components/ui/page-skeleton'
+
 export default function InboxLoading() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
+    <div aria-busy="true" className="container mx-auto px-4 py-8 max-w-3xl">
+      <div className="flex justify-end"><SlowNotice label="Inbox" /></div>
       {/* Header skeleton */}
       <div className="mb-8">
         <div className="h-8 w-24 bg-black/[0.08] animate-pulse mb-2" />

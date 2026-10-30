@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { getCurrentUser, getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import type { AttentionRow } from '@/app/actions/attention'
 
 // The business table (UI overhaul Stage 5): one row per business with its main
@@ -266,7 +266,7 @@ function pickDeal(contracts: ContractRow[], today: string): TableDeal | null {
 
 export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?: string }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getCurrentUser()
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organisation found' }

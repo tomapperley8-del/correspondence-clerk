@@ -8,7 +8,7 @@
 // v_business_newsletter), and amounts and former members from contracts.
 
 import { createClient } from '@/lib/supabase/server'
-import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
+import { getCurrentUser, getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { getClubCardMembers, type ClubCardRow } from '@/app/actions/club-card'
 import { getBusinessTable, type TableRow } from '@/app/actions/business-table'
 
@@ -81,7 +81,7 @@ export async function getClubCardTab(): Promise<{
   error?: string
 }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getCurrentUser()
   if (!user) return { error: 'Unauthorized' }
   const orgId = await getCurrentUserOrganizationId()
   if (!orgId) return { error: 'No organization found' }
