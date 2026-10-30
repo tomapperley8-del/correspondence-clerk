@@ -4,6 +4,7 @@
 UPDATE correspondence c SET business_id = (b.before_row->>'business_id')::uuid,
        contact_id = (b.before_row->>'contact_id')::uuid,
        reply_dismissed_at = (b.before_row->>'reply_dismissed_at')::timestamptz,
+       ai_metadata = b.before_row->'ai_metadata',
        updated_at = now()
 FROM cc_phase0_backup b
 WHERE b.reason = 'stage18 team forwards 2026-10-30' AND b.table_name = 'correspondence' AND c.id = b.row_id;
