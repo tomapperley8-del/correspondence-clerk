@@ -227,7 +227,7 @@ export function ClubCardTab({ data, initialShow, initialBusiness, initialQuery }
   return (
     <div>
       {/* Summary across the top: each box opens its list */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2 mb-2">
         {tiles.map((t) => {
           const body = (
             <>
@@ -324,14 +324,14 @@ export function ClubCardTab({ data, initialShow, initialBusiness, initialQuery }
                         label="Resize the list and the detail panel"
                         first={<MembersTable rows={shown} cols={cols} today={today} selected={current?.business_id ?? null} onSelect={setSelected} tall={full} />}
                         second={current ? (
-                          <div className="bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] p-4 lg:sticky lg:top-4">
+                          <div className={cn('bg-white border border-black/[0.06] rounded-sm shadow-[var(--shadow-sm)] p-4 lg:sticky lg:top-4 overflow-y-auto overscroll-contain', full ? 'max-h-[calc(100vh-14rem)]' : 'max-h-[max(16rem,calc(100vh-28rem))]')}>
                             <MemberPanel key={current.business_id} row={current} today={today} due={due.has(current.business_id)} />
                           </div>
                         ) : null}
                       />
                     </div>
                     {/* Phones and narrow windows: cards, the chosen one opens in place */}
-                    <ul className="lg:hidden divide-y divide-ms-grid border-y border-ms-grid bg-white">
+                    <ul className="lg:hidden relative divide-y divide-ms-grid border-y border-ms-grid bg-white max-h-[max(16rem,calc(100vh-30rem))] overflow-y-auto overscroll-contain">
                       {shown.map((r) => {
                         const open = r.business_id === current?.business_id && selected === r.business_id
                         return (
@@ -388,7 +388,7 @@ function MembersTable({ rows, cols, today, selected, onSelect, tall }: {
   tall: boolean
 }) {
   return (
-    <div className={cn('overflow-auto border border-ms-grid rounded-sm bg-white', tall ? 'max-h-[calc(100vh-14rem)]' : 'max-h-[75vh]')}>
+    <div className={cn('relative overflow-auto border border-ms-grid rounded-sm bg-white', tall ? 'max-h-[calc(100vh-14rem)]' : 'max-h-[max(16rem,calc(100vh-28rem))]')}>
       <table className="w-full text-[13px] border-collapse">
         <caption className="sr-only">Club Card list. Choose a row to see it in the panel.</caption>
         <thead>

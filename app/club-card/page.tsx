@@ -13,7 +13,7 @@ export default async function ClubCardPage({ searchParams }: { searchParams: Pro
   const [result, params] = await Promise.all([getClubCardTab(), searchParams])
 
   return (
-    <div className="mx-auto px-4 py-8 max-w-[1500px]">
+    <div className="mx-auto px-4 py-4 max-w-[1500px]">
       <div className="mb-4">
         <h1 className="text-3xl font-bold mb-1" style={{ fontFamily: 'var(--font-serif)', color: 'var(--brand-dark)' }}>
           Club Card
