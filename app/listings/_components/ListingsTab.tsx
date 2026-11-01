@@ -7,6 +7,7 @@ import { toast } from '@/lib/toast'
 import { formatDateTimeGB } from '@/lib/utils'
 import { checkListingsNow, type Listing, type ListingsData } from '@/app/actions/listings'
 import { ListingActions, WebsitePill, dateGB } from './ListingParts'
+import { LinkBusiness } from './LinkBusiness'
 
 type View = 'open' | 'cleo' | 'notsent' | 'live' | 'all' | 'hidden'
 
@@ -119,6 +120,8 @@ export function ListingsTab({ data, initialView }: { data: ListingsData; initial
                       ? <Link href={`/businesses/${l.business_id}`} className="text-brand-navy hover:underline">{l.business_name}</Link>
                       : <span className="text-gray-700">{l.requester_name ?? l.requester_email ?? 'Unknown'}</span>}
                     {l.requester_email && <div className="text-xs text-gray-500 break-words">{l.requester_email}</div>}
+                    <LinkBusiness listingId={l.id} linked={!!l.business_id} businesses={data.businesses}
+                      hint={[l.requester_email?.split('@')[1], l.requester_name, l.title].filter(Boolean).join(' ')} />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap tabular-nums">{dateGB(l.asked_at) ?? '–'}</td>
                   <td className="px-3 py-2 whitespace-nowrap tabular-nums">{dateGB(l.sent_to_cleo_at) ?? <span className="text-gray-400">–</span>}</td>

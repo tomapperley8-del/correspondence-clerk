@@ -40,7 +40,12 @@ export type Listing = {
   is_open: boolean
 }
 
-export type ListingsData = { listings: Listing[]; lastRun: { ran_at: string; ok: boolean; error: string | null } | null }
+export type ListingsData = {
+  listings: Listing[]
+  lastRun: { ran_at: string; ok: boolean; error: string | null } | null
+  /** For Link to business: every business that isn't merged or Not a business */
+  businesses: { id: string; name: string }[]
+}
 
 const COLUMNS = 'id, source, title, requester_name, requester_email, event_when, business_id, business_name, entry_ids, entry_business_id, asked_at, sent_to_cleo_at, cleo_replied_at, cleo_note, told_at, event_links, website_state, match_kind, website_url, website_title, website_published_at, event_starts_at, website_gone_at, status, is_open'
 
@@ -61,14 +66,16 @@ function refresh() {
 export async function getListings(): Promise<{ data?: ListingsData; error?: string }> {
   const ctx = await context()
   if ('error' in ctx) return { error: ctx.error }
-  const [rows, run] = await Promise.all([
+  const [rows, run, biz] = await Promise.all([
     ctx.supabase.from('v_listing_requests').select(COLUMNS).eq('organization_id', ctx.orgId)
       .order('asked_at', { ascending: false, nullsFirst: false }).limit(2000),
     ctx.supabase.from('listing_sync_runs').select('ran_at, ok, error').eq('organization_id', ctx.orgId)
       .order('ran_at', { ascending: false }).limit(1).maybeSingle(),
+    ctx.supabase.from('businesses').select('id, name').eq('organization_id', ctx.orgId)
+      .is('merged_into', null).or('status.is.null,status.neq.Not a business').order('name').limit(5000),
   ])
   if (rows.error) return { error: rows.error.message }
-  return { data: { listings: (rows.data ?? []) as Listing[], lastRun: run.data ?? null } }
+  return { data: { listings: (rows.data ?? []) as Listing[], lastRun: run.data ?? null, businesses: biz.data ?? [] } }
 }
 
 export async function getBusinessListings(businessId: string): Promise<Listing[]> {
