@@ -45,6 +45,7 @@ Merged records resolve to the surviving business. Returns one JSON document:
 | `calendar` | to-dos, deal ends and invoice due dates from a week ago to 90 days ahead |
 | `club_card` | card state (member, grace, lapsed, none), the website page, offer and its end date, page checks |
 | `newsletter` | last featured, mentions in the last 12 months, recent mentions with the issue link, and `freebies`: every Freebie the newsletter ran for them (issue date, closing date, headline, link) |
+| `whats_on_listings` | their What's On listing requests (forms and listing emails), newest first: `title`, `status` (live, possible, cleo_replied, with_cleo, not_sent), `asked`, `sent_to_cleo`, `cleo_replied`, `cleo_said` (Cleo's own words), `on_website` link, `published`, `event_date`, `page_removed` (the website deletes events about a month after they happen) |
 | `news_articles` | count and the 10 most recent articles about them |
 | `outreach` | stage, the Work on next bucket and fit score, the routines' drafts, prospect leads |
 | `data_health` | anything on the Data health page for this business |
@@ -219,6 +220,20 @@ FROM v_newsletter_items i JOIN v_businesses b ON b.id = i.business_id
 WHERE i.kind = 'freebie' ORDER BY i.issue_date DESC;
 ```
 
+**What's On listings** (as on the Listings tab; one row per Promote my Event form or listing email,
+worked out nightly from the emails and the website's events calendar). `status`: `live` (Cleo's or
+Tom's reply has the link, the website has a same-title event published after the request, or Tom
+confirmed), `possible` (a likely match Tom hasn't confirmed), `cleo_replied` (she answered, not on
+the website), `with_cleo` (forwarded to her, no reply), `not_sent` (no forward to Cleo on file, which
+can just mean the forward wasn't copied in), `hidden` (Tom said not a listing). `is_open` = not live
+and still worth chasing. Cleo is staff (events listings), never the business: the requester is.
+
+```sql
+SELECT title, coalesce(business_name, requester_email) AS who, status, asked_at::date,
+       sent_to_cleo_at::date, cleo_replied_at::date, website_url, event_starts_at::date
+FROM v_listing_requests WHERE is_open ORDER BY asked_at DESC;
+```
+
 **Outreach** stage counts and the Work on next buckets (as on the Outreach tab):
 
 ```sql
@@ -264,6 +279,7 @@ Current objects worth knowing (all in `public`):
 | `v_club_card_members`, `club_card_pages` | Club Card state, page and offer |
 | `v_business_newsletter`, `newsletter_mentions`, `newsletter_issues` | newsletter appearances |
 | `v_newsletter_items` | each issue split into items (`kind`: freebie, competition, column, ...; `issue_date`, `closes_on`, `business_id`) |
+| `v_listing_requests` | What's On listing requests: asked, sent to Cleo, her reply, live on the website (`status`, `is_open`, `website_url`) |
 | `business_articles` | news articles about a business (`status` confirmed/rejected) |
 | `v_outreach_next` | Outreach Work on next buckets |
 | `routine_drafts` | drafts written by the Claude routines |

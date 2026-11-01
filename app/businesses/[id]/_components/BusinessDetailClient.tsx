@@ -41,6 +41,7 @@ import { useCorrespondence } from './useCorrespondence'
 import { PipelineStatusCard } from './PipelineStatusCard'
 import { BusinessArticles } from './BusinessArticles'
 import { BusinessFreebies } from './BusinessFreebies'
+import { BusinessListings } from './BusinessListings'
 import { BusinessClubCard } from './BusinessClubCard'
 import { BusinessReviewBar } from './BusinessReviewBar'
 import { BusinessGlance } from './BusinessGlance'
@@ -930,7 +931,11 @@ export function BusinessDetailClient({
           threads={threads}
           {...entryPassthroughProps}
           setSearchQuery={setSearchQuery}
-          aside={sections}
+          aside={<>
+            {/* Stage 20: shown above the dropdowns, only when they have asked to be listed */}
+            <BusinessListings businessId={business.id} />
+            {sections}
+          </>}
         />
 
         {confirmDialogs}
@@ -1093,6 +1098,7 @@ export function BusinessDetailClient({
       {/* News Coverage */}
       <BusinessArticles businessId={business.id} />
       <BusinessFreebies businessId={business.id} />
+      <BusinessListings businessId={business.id} />
 
       {/* Letter File / Correspondence */}
       <div className="bg-white border-2 border-gray-300 p-6">
