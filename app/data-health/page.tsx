@@ -9,6 +9,8 @@ import { SentMailList } from './_components/SentMailList'
 import { bandClass } from '@/components/ui/kind'
 import { getCompanyOverview, getCompanyMatches } from '@/app/actions/companies-house'
 import { CompanyLookup, CompanyMatchList } from './_components/CompanyHousePanel'
+import { getAdEmailMatches } from '@/app/actions/ad-emails'
+import { AdEmailList } from './_components/AdEmailList'
 
 export const maxDuration = 60
 
@@ -88,6 +90,7 @@ export default async function DataHealthPage() {
   const sent = todo.some((c) => c.check_key === 'sent_mail_to_review') ? await getSentMailToReview() : null
   const company = todo.some((c) => c.check_key === 'company_to_match') ? await getCompanyMatches() : null
   const companyOverview = await getCompanyOverview()
+  const adEmails = await getAdEmailMatches()
   const fine = here.filter((c) => c.n === 0)
 
   return (
@@ -112,6 +115,20 @@ export default async function DataHealthPage() {
           ? <CompanyLookup overview={companyOverview.data} />
           : <p className="px-3 py-2 text-sm text-red-700">Could not load: {companyOverview.error}</p>}
       </section>
+
+      {adEmails.data && adEmails.data.length > 0 && (
+        <section className={card}>
+          <FoldSection
+            storageKey="datahealth.ad_email_to_match"
+            title="Ad emails to match to an advertiser"
+            badge={<span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-sm tabular-nums bg-ms-orange text-ms-orange-text">{adEmails.data.length}</span>}
+            hint="Emails from Dawn Wilson or James Willcocks about an ad that might be about this advertiser. Confirm and the email also shows on that business (it stays on their own record too, and Claude finds it when asked about that advertiser). Undo takes back the last change."
+            heading="h2"
+          >
+            <AdEmailList rows={adEmails.data} />
+          </FoldSection>
+        </section>
+      )}
 
       {todo.length > 0 && (
       <section aria-labelledby="dh-fix-h" className={card}>
