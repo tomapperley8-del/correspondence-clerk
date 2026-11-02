@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,26 @@ export default function SearchPage() {
   const [type, setType] = useState<'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note' | ''>('')
   const [sortBy, setSortBy] = useState<'relevance' | 'date_newest' | 'date_oldest'>('relevance')
   const [showFilters, setShowFilters] = useState(false)
+  // Opens on the latest correspondence, newest first, until a search is run (Tom, 2 Nov).
+  const [showingLatest, setShowingLatest] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const loadLatest = async () => {
+      setIsSearching(true)
+      const result = await searchAll('', { latest: true, sortBy: 'date_newest' })
+      if (cancelled) return
+      if ('error' in result) {
+        setSearchError(result.error || 'Could not load the latest correspondence')
+      } else {
+        setResults(result.data)
+      }
+      setHasSearched(true)
+      setIsSearching(false)
+    }
+    loadLatest()
+    return () => { cancelled = true }
+  }, [])
 
   const hasActiveFilters = dateFrom || dateTo || direction || type || sortBy !== 'relevance'
   const hasBrowseFilters = dateFrom || dateTo || direction || type
@@ -33,6 +53,7 @@ export default function SearchPage() {
 
     setIsSearching(true)
     setHasSearched(true)
+    setShowingLatest(false)
     setSearchError(null)
 
     const filters: SearchFilters = {
@@ -233,6 +254,7 @@ export default function SearchPage() {
           {/* Result count */}
           <p className="text-sm text-gray-600 mb-4" aria-live="polite">
             {(() => {
+              if (showingLatest) return `Latest ${results.length} entries, newest first. Search or filter to see more.`
               const label = query.trim() ? `for "${query.trim()}"` : 'matching your filters'
               if (results.length === 0) return `No results ${label}`
               return `Found ${results.length} result${results.length !== 1 ? 's' : ''} ${label}`
