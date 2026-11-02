@@ -4,6 +4,8 @@ import { cn, formatDateGB } from '@/lib/utils'
 import { FoldSection } from '@/components/ui/fold-section'
 import { getQboToMatch } from '@/app/actions/qbo-match'
 import { QboMatchList } from './_components/QboMatchList'
+import { getSentMailToReview } from '@/app/actions/sent-mail-review'
+import { SentMailList } from './_components/SentMailList'
 import { bandClass } from '@/components/ui/kind'
 
 // Data health (UI overhaul Stage 11c, Decision 29 Oct): things that have drifted, each with a
@@ -19,6 +21,7 @@ const HINTS: Record<string, string> = {
   deal_no_quickbooks: 'A deal in force or in its 60-day grace, with an amount and not marked paid, but no QuickBooks customer linked, so money owed can’t be seen. Link the customer on the business page, or mark the deal paid.',
   active_no_named_contact: 'An Active member or advertiser with no named, active contact. Add the person on the business page.',
   qbo_customer_to_match: 'QuickBooks customers (all of them since Nov 2019) that have invoices but no business in the app, so their invoices can’t be seen on a business page. Tick any, then Confirm the suggested business, Choose a business, or Make a new business. The suggestion is a guess from the name, email address or domain: check it. Undo takes back the last change.',
+  sent_mail_to_review: 'Sent email from tom@ or info@ to an address that matches no contact or business in the app (personal Gmail-type addresses are skipped). Tick any, then Choose a business to file the emails there (the person is added as a contact if Outlook gave a name, and the company domain is remembered) or Ignore them. Undo takes back the last change.',
   stored_out_of_step: 'The status or last-in-touch date stored on the business differs from the one worked out from its deals and emails. Hidden records are left out.',
 }
 
@@ -76,6 +79,7 @@ export default async function DataHealthPage() {
   const elsewhere = checks.filter((c) => c.fixed_on !== '/data-health' && c.n > 0)
   const todo = here.filter((c) => c.n > 0)
   const qbo = todo.some((c) => c.check_key === 'qbo_customer_to_match') ? await getQboToMatch() : null
+  const sent = todo.some((c) => c.check_key === 'sent_mail_to_review') ? await getSentMailToReview() : null
   const fine = here.filter((c) => c.n === 0)
 
   return (
@@ -111,6 +115,22 @@ export default async function DataHealthPage() {
               {qbo?.data
                 ? <QboMatchList rows={qbo.data.rows} businesses={qbo.data.businesses} />
                 : <p className="px-3 py-2 text-sm text-red-700">Could not load the list: {qbo?.error ?? 'no data'}</p>}
+            </FoldSection>
+          )
+        }
+        if (c.check_key === 'sent_mail_to_review') {
+          return (
+            <FoldSection
+              key={c.check_key}
+              storageKey={`datahealth.${c.check_key}`}
+              title={c.title}
+              badge={<span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-sm tabular-nums bg-ms-orange text-ms-orange-text">{c.n}</span>}
+              hint={HINTS[c.check_key]}
+              heading="h3"
+            >
+              {sent?.data
+                ? <SentMailList rows={sent.data.rows} businesses={sent.data.businesses} />
+                : <p className="px-3 py-2 text-sm text-red-700">Could not load the list: {sent?.error ?? 'no data'}</p>}
             </FoldSection>
           )
         }

@@ -17,7 +17,7 @@ const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 const dateGB = (d: string | null) => (d ? formatDateGB(`${d.slice(0, 10)}T12:00:00Z`) : '')
 const money = (n: number) => `£${Number(n).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 
-function BusinessPicker({ businesses, onPick, onCancel, label }: {
+export function BusinessPicker({ businesses, onPick, onCancel, label }: {
   businesses: { id: string; name: string }[]
   onPick: (b: { id: string; name: string }) => void
   onCancel: () => void

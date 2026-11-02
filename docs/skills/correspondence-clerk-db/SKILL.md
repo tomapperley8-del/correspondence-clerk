@@ -15,7 +15,8 @@ description: >
 # Correspondence Clerk: how to look things up
 
 Correspondence Clerk (https://correspondenceclerk.com) holds The Chiswick Calendar's businesses,
-deals, contacts, every forwarded/BCC'd/swept email, QuickBooks invoices, Club Card pages,
+deals, contacts, every forwarded/BCC'd/swept email (including Tom's sent mail from tom@ and info@),
+QuickBooks invoices, Club Card pages,
 newsletter mentions, news articles, to-dos and the routines' drafts.
 
 - **Project ID:** `ayoiibrzkllerrwbhvda` (Supabase MCP, `execute_sql`). Load the Supabase MCP tools first if they aren't loaded.
@@ -139,7 +140,14 @@ labelled as that, not as the answer:
   mailbox). Which businesses have *had* a Freebie, and when, is known: the dossier's
   `newsletter.freebies`, or the query below. Freebies before the newsletter archive (May 2024),
   or not linked to a business, aren't counted.
-- **Sent email that wasn't BCC'd or forwarded** in, and email nobody forwarded.
+- **Sent email before 4 Jun 2026**, and sent mail to personal-provider addresses (Gmail, Hotmail and so on) that
+  are not a contact on file, and sent mail to the team (Cleo, Bridget). Sent mail since 4 Jun 2026 to a known
+  contact or business is filed (`correspondence.ai_metadata->>'source' = 'sent_mail_sweep'` for the swept ones;
+  BCC copies are `webhook_bcc`). A swept sent email keeps Outlook's preview of the message (the first part, flagged
+  `ai_metadata->>'body_is_preview'`, with `web_link` to the whole message), so a long reply may be cut short.
+  Sent mail to a company we have no contact for is held on Data health (`sent_mail_to_review`,
+  view `v_sent_mail_to_review`) until Tom files or ignores it; `mail_scan` shows what the sweep did with every message.
+- **Email nobody forwarded or sent from tom@ / info@** is only seen by the daily desk routine's Inbox sweep.
 - **Google Drive documents** (contracts, media packs, proposals).
 - **Ad stats** (Google Analytics figures from Dawn or James) as data: only the emails they sent, if forwarded.
 - **Mailchimp opens and clicks**, **Companies House** details for members, and website pages beyond Club Card.
@@ -253,7 +261,7 @@ SELECT bucket, count(*) FROM v_outreach_next GROUP BY 1 ORDER BY 2 DESC;
   Unreviewed = created automatically from an email and not yet checked by Tom; "Not a business" =
   hidden (kept for its emails).
 - Money: QuickBooks in the app holds every invoice since Nov 2019 (the daily desk routine keeps it
-  current on weekdays; `v_system_alarm` has a `routine:quickbooks_copy` line if it is over 2 days old).
+  current on weekdays; `v_system_alarm` has a `routine:quickbooks_copy` line if it is over 2 days old; the sent email sweep has `routine:sent_mail_sweep` on the same rule).
   Old Club Card and advertising invoices are past contracts (`deal.history`, `is_current` false). Voided
   invoices don't count. If `do_not_chase` is set, don't suggest chasing.
 - Email text is the cleaned body (quoted chains removed). Quote Tom's and the business's words
@@ -286,6 +294,8 @@ Current objects worth knowing (all in `public`):
 | `routine_drafts` | drafts written by the Claude routines |
 | `tasks` | to-dos (`source = 'manual'` are Tom's; others feed the desk email) |
 | `v_data_health` | records that need tidying (check `qbo_customer_to_match`: QuickBooks customers with invoices and no business, one row each; the detail is the customer id) |
+| `v_sent_mail_to_review` | sent email held for review: recipient, name, number of emails, last sent, subjects (Data health check `sent_mail_to_review`) |
+| `mail_scan` | every Outlook message the daily desk routine looked at, with what it did (`disposition`: backfilled, linked, ignored_noise, unmatched, new_business) and `note`; `direction` received or sent |
 | `v_qbo_customers_to_match` | QuickBooks customers with invoices but no business yet: customer, email, invoice count, total, last invoice date, open balance, and a suggested business with why (same name, email, domain or similar name; a guess). Tom matches them on Data health. Their invoices are still found with `search_everything` kind `invoice` |
 | `contract_invoices` | which QuickBooks invoices a contract covers (a past contract can cover several monthly invoices) |
 | `v_system_alarm` | every scheduled job and routine: last good run, when due, `missed`, a plain `line` (weekday routines are never due at weekends) |
