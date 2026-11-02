@@ -368,6 +368,11 @@ export function BusinessTimeline(props: Props) {
               <p className="text-xs text-gray-600">Runs to {dateOnlyGB(c.contract_end)}</p>
             )}
             {item.event === 'start' && c.deal_terms && <p className="text-gray-600 whitespace-pre-wrap mt-0.5">{c.deal_terms}</p>}
+            {item.event === 'start' && c.invoice_docs && c.invoice_docs.length > 0 && (
+              <p className="text-xs text-gray-600 mt-0.5">
+                {c.is_current ? 'Made from' : 'Past deal, made from'} QuickBooks {c.invoice_docs.length === 1 ? 'invoice' : 'invoices'} {c.invoice_docs.join(', ')}
+              </p>
+            )}
           </Row>
         )
       }
@@ -414,6 +419,12 @@ export function BusinessTimeline(props: Props) {
               {money(i.total_amount) && <span className="font-normal text-gray-700"> · {money(i.total_amount)}</span>}
             </p>
             {i.line_description && <p className="text-gray-600 mt-0.5">{i.line_description}</p>}
+            {i.contract && (
+              <p className="text-xs text-gray-600 mt-0.5">
+                {i.contract.is_current ? 'Part of the current' : 'Part of a past'} {membershipLabel(i.contract.membership_type, membershipTypes)} deal
+                {i.contract.contract_start ? `, ${dateOnlyGB(i.contract.contract_start)}` : ''}{i.contract.contract_end ? ` to ${dateOnlyGB(i.contract.contract_end)}` : ''}
+              </p>
+            )}
             <p className={`text-xs mt-0.5 ${pastDue ? 'text-red-700' : 'text-gray-600'}`}>
               {voided
                 ? 'Voided'

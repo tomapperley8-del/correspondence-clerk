@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { getDataHealth, type DataHealthRow } from '@/app/actions/data-health'
 import { cn, formatDateGB } from '@/lib/utils'
 import { FoldSection } from '@/components/ui/fold-section'
+import { getQboToMatch } from '@/app/actions/qbo-match'
+import { QboMatchList } from './_components/QboMatchList'
 import { bandClass } from '@/components/ui/kind'
 
 // Data health (UI overhaul Stage 11c, Decision 29 Oct): things that have drifted, each with a
@@ -16,6 +18,7 @@ const HINTS: Record<string, string> = {
   club_card_no_card: 'The business still shows as a Club Card member, but its card has ended. Open the business and mark the old deal not current, or record the renewal.',
   deal_no_quickbooks: 'A deal in force or in its 60-day grace, with an amount and not marked paid, but no QuickBooks customer linked, so money owed can’t be seen. Link the customer on the business page, or mark the deal paid.',
   active_no_named_contact: 'An Active member or advertiser with no named, active contact. Add the person on the business page.',
+  qbo_customer_to_match: 'QuickBooks customers (all of them since Nov 2019) that have invoices but no business in the app, so their invoices can’t be seen on a business page. Tick any, then Confirm the suggested business, Choose a business, or Make a new business. The suggestion is a guess from the name, email address or domain: check it. Undo takes back the last change.',
   stored_out_of_step: 'The status or last-in-touch date stored on the business differs from the one worked out from its deals and emails. Hidden records are left out.',
 }
 
@@ -72,6 +75,7 @@ export default async function DataHealthPage() {
   const here = checks.filter((c) => c.fixed_on === '/data-health')
   const elsewhere = checks.filter((c) => c.fixed_on !== '/data-health' && c.n > 0)
   const todo = here.filter((c) => c.n > 0)
+  const qbo = todo.some((c) => c.check_key === 'qbo_customer_to_match') ? await getQboToMatch() : null
   const fine = here.filter((c) => c.n === 0)
 
   return (
@@ -94,6 +98,22 @@ export default async function DataHealthPage() {
         </h2>
       {todo.map((c) => {
         const list = rows.filter((r) => r.check_key === c.check_key)
+        if (c.check_key === 'qbo_customer_to_match') {
+          return (
+            <FoldSection
+              key={c.check_key}
+              storageKey={`datahealth.${c.check_key}`}
+              title={c.title}
+              badge={<span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-sm tabular-nums bg-ms-orange text-ms-orange-text">{c.n}</span>}
+              hint={HINTS[c.check_key]}
+              heading="h3"
+            >
+              {qbo?.data
+                ? <QboMatchList rows={qbo.data.rows} businesses={qbo.data.businesses} />
+                : <p className="px-3 py-2 text-sm text-red-700">Could not load the list: {qbo?.error ?? 'no data'}</p>}
+            </FoldSection>
+          )
+        }
         return (
           <FoldSection
             key={c.check_key}
