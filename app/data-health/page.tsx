@@ -30,6 +30,7 @@ const HINTS: Record<string, string> = {
   sent_mail_to_review: 'Sent email from tom@ or info@ to an address that matches no contact or business in the app (personal Gmail-type addresses are skipped). Tick any, then Choose a business to file the emails there (the person is added as a contact if Outlook gave a name, and the company domain is remembered) or Ignore them. Undo takes back the last change.',
   company_to_match: 'A Companies House company that looks like this business but was not certain enough to attach on its own (a similar name, a registered office outside W3, W4 and W5, or more than one company with the name). Open the register link, then tick and Confirm, or say it is not this company. Confirming reads its status, officers and filing dates into the business dossier.',
   company_not_trading: 'The register says this company is dissolved, in liquidation or similar, but the business is still Active or has a current deal. Check before chasing money or renewing. Clears when the business or deal is updated.',
+  void_invoice_contract: 'A current Club Card or advertising contract, not marked paid, whose invoice is void in QuickBooks. If it was their membership, open the business and end the contract (Club Card tab: End membership); if not, the contract can stay. Clears when the contract ends or is paid.',
   stored_out_of_step: 'The status or last-in-touch date stored on the business differs from the one worked out from its deals and emails. Hidden records are left out.',
 }
 
