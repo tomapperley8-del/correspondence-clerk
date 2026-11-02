@@ -18,7 +18,7 @@ export async function pagedSelect<T>(build: (from: number, to: number) => Promis
 /** Businesses (merged ones left out), Club Card pages and Tom's match rules, as matchIssues() takes them. */
 export async function loadMatchInputs(supabase: ServiceClient, orgId: string): Promise<{ businesses: MatchBusiness[]; pages: MatchCardPage[]; rules: MatchRules }> {
   const businesses = await pagedSelect<{ id: string; name: string; status: string | null; business_type: string | null; website: string | null; merged_into: string | null }>((a, b) =>
-    supabase.from('businesses').select('id, name, status, business_type, website, merged_into').eq('organization_id', orgId).order('id').range(a, b))
+    supabase.from('v_businesses').select('id, name, status, business_type, website, merged_into').eq('organization_id', orgId).order('id').range(a, b))
   const pages = await pagedSelect<{ business_id: string; link: string; page_website_host: string | null }>((a, b) =>
     supabase.from('club_card_pages').select('business_id, link, page_website_host').eq('organization_id', orgId).not('business_id', 'is', null).is('gone_at', null).order('id').range(a, b))
   const ruleRows = await pagedSelect<{ kind: string; business_id: string | null; phrase: string | null }>((a, b) =>

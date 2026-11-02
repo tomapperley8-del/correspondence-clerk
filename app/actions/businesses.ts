@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { refreshTruth } from '@/lib/refresh-truth'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { z } from 'zod'
 
@@ -211,6 +212,7 @@ export async function createBusiness(formData: {
     if (deal.error) return { error: `Business added, but its ${type === 'club_card' ? 'Club Card' : 'advertising'} contract wasn't recorded: ${deal.error}` }
   }
 
+  await refreshTruth(supabase, data.id)
   revalidatePath('/dashboard')
   return { data }
 }

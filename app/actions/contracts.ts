@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { refreshTruth } from '@/lib/refresh-truth'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 
 export type Contract = {
@@ -90,6 +91,7 @@ export async function createContract(businessId: string, fields: {
       .eq('organization_id', orgId)
   }
 
+  await refreshTruth(supabase, businessId)
   revalidatePath(`/businesses/${businessId}`)
   revalidatePath('/today')
   return { data: data as Contract }
@@ -123,6 +125,7 @@ export async function updateContract(contractId: string, businessId: string, fie
     .single()
 
   if (error) return { error: error.message }
+  await refreshTruth(supabase, businessId)
   revalidatePath(`/businesses/${businessId}`)
   return { data: data as Contract }
 }
@@ -142,6 +145,7 @@ export async function deleteContract(contractId: string, businessId: string) {
     .eq('organization_id', orgId)
 
   if (error) return { error: error.message }
+  await refreshTruth(supabase, businessId)
   revalidatePath(`/businesses/${businessId}`)
   return { success: true }
 }
