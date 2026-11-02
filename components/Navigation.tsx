@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import { getNavData } from '@/app/actions/organizations'
-import { useInsights } from '@/components/InsightsContext'
 
 type Organization = {
   id: string
@@ -24,14 +23,12 @@ export function Navigation() {
   const [overdueCount, setOverdueCount] = useState<number | null>(null)
   const [inboundCount, setInboundCount] = useState(0)
   const [dataHealthCount, setDataHealthCount] = useState(0)
-  const [aiEnabled, setAiEnabled] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const { close: closeInsights, toggle: toggleInsights } = useInsights()
   const navFetchedAt = useRef(0)
 
   async function loadNavData() {
@@ -40,7 +37,6 @@ export function Navigation() {
     setOverdueCount(nav.overdueCount)
     setInboundCount(nav.inboundCount)
     setDataHealthCount(nav.dataHealthCount)
-    setAiEnabled(nav.aiEnabled)
     if (nav.organizationId) {
       setOrganization({ id: nav.organizationId, name: nav.organizationName ?? '' })
     } else {
@@ -86,7 +82,6 @@ export function Navigation() {
       navFetchedAt.current = Date.now()
       loadNavData()
     }
-    if (pathname === '/insights') closeInsights()
     setMobileOpen(false)
     setMenuOpen(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,7 +155,7 @@ export function Navigation() {
   }
 
   // Tabs across the top (UI overhaul Stage 16, Tom's order): Today, Club Card,
-  // Advertising, Newsletter, Outreach, Businesses, Inbox, Insights. A tab is
+  // Advertising, Newsletter, Outreach, Businesses, Inbox. A tab is
   // added here when it is built (Tom, 28 Oct: hide the rest until then).
   // Everything else lives under the user menu.
   const onClubCard = !!pathname?.startsWith('/club-card') || !!pathname?.startsWith('/businesses/club-card-pages')
@@ -211,7 +206,7 @@ export function Navigation() {
     {
       href: '/businesses',
       label: 'Businesses',
-      active: (!!pathname?.startsWith('/businesses') && !onClubCard) || pathname === '/dashboard',
+      active: !!pathname?.startsWith('/businesses') && !onClubCard,
       badge: null,
       badgeTone: '',
     },
@@ -249,14 +244,10 @@ export function Navigation() {
   ]
 
   const menuItems: { href: string; label: string }[] = [
-    { href: '/dashboard', label: 'Old business list' },
     { href: '/import/gmail', label: 'Import emails' },
     { href: '/help', label: 'Help' },
     { href: '/settings', label: 'Settings' },
   ]
-
-  // The CC Mastersheet, frozen as a read-only archive in Stage 9 (22 Oct 2026)
-  const mastersheetUrl = 'https://docs.google.com/spreadsheets/d/1cwQkGrtMverl-KJ5_7VvmaNLPL9MYyNmNgBeGO-2rgA/edit'
 
   const badgeEl = (n: number, tone: string, title?: string) => (
     <span
@@ -341,25 +332,6 @@ export function Navigation() {
                       {m.label}
                     </Link>
                   ))}
-                  <a
-                    href={mastersheetUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    role="menuitem"
-                    className="block px-4 py-2 text-sm text-brand-dark hover:bg-brand-warm"
-                  >
-                    Mastersheet (archived)
-                  </a>
-                  {aiEnabled && (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => { setMenuOpen(false); toggleInsights() }}
-                      className="block w-full text-left px-4 py-2 text-sm text-brand-dark hover:bg-brand-warm"
-                    >
-                      Insights
-                    </button>
-                  )}
                   <div className="border-t border-black/[0.06] my-1" />
                   <button
                     type="button"
@@ -447,23 +419,6 @@ export function Navigation() {
                   {m.label}
                 </Link>
               ))}
-              <a
-                href={mastersheetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block px-5 py-3 text-sm text-white/80 hover:bg-brand-olive/20 transition-colors"
-              >
-                Mastersheet (archived)
-              </a>
-              {aiEnabled && (
-                <button
-                  type="button"
-                  onClick={() => { setMobileOpen(false); toggleInsights() }}
-                  className="block w-full text-left px-5 py-3 text-sm text-white/80 hover:bg-brand-olive/20"
-                >
-                  Insights
-                </button>
-              )}
             </div>
             <div className="border-t border-white/20 px-5 py-4">
               <p className="text-xs text-gray-400 truncate mb-3">

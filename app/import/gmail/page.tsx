@@ -119,7 +119,7 @@ export default function GmailImportPage() {
           </p>
           <div className="flex flex-col gap-3">
             <Link
-              href="/dashboard"
+              href="/businesses"
               className="inline-block text-center px-5 py-2.5 bg-brand-navy text-white text-sm font-medium hover:bg-brand-dark transition-colors"
             >
               Go to Businesses

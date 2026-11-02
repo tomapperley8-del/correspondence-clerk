@@ -92,7 +92,7 @@ export default function ImportGoogleDocsClient() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Link
-        href="/dashboard"
+        href="/businesses"
         className="text-brand-navy hover:text-brand-dark hover:underline text-sm mb-4 inline-block"
       >
         &larr; Back to Businesses

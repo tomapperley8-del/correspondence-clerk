@@ -3,7 +3,6 @@ import { Suspense } from 'react'
 import './globals.css'
 import { Navigation } from '@/components/Navigation'
 import { NavProgress } from '@/components/NavProgress'
-import { InsightsProvider } from '@/components/InsightsContext'
 import { ToastContainer } from '@/components/Toast'
 import { DynamicPanels } from '@/components/DynamicPanels'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
@@ -46,7 +45,6 @@ export default function RootLayout({
         {supabaseUrl && <link rel="preconnect" href={supabaseUrl} />}
       </head>
       <body>
-        <InsightsProvider>
           <a
             href="#main-content"
             className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-brand-navy focus:text-white focus:px-4 focus:py-2 focus:font-semibold"
@@ -60,7 +58,6 @@ export default function RootLayout({
           <ToastContainer />
           <main id="main-content" className="pb-16 md:pb-0">{children}</main>
           <ServiceWorkerRegistration />
-        </InsightsProvider>
 </body>
     </html>
   )
