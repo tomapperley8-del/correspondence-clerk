@@ -32,6 +32,8 @@ export interface SearchFilters {
   direction?: 'received' | 'sent' | ''
   type?: 'Email' | 'Call' | 'Meeting' | 'Email Thread' | 'Note' | ''
   sortBy?: 'relevance' | 'date_newest' | 'date_oldest'
+  /** No query and no filters: list the latest correspondence (the Correspondence tab's opening view). */
+  latest?: boolean
 }
 
 // Type for the joined correspondence query result
@@ -103,7 +105,7 @@ export async function searchAll(query: string, filters?: SearchFilters) {
   // Browse mode: no query, but filters present — list recent correspondence
   // matching the filters, ordered by date. Used by "what happened this week?".
   if (!trimmed) {
-    if (!hasActiveFilters(filters)) return { data: [] }
+    if (!hasActiveFilters(filters) && !filters?.latest) return { data: [] }
 
     // Smaller select list than the full-text branch — snippets only, no
     // raw_text blobs. Keeps the payload small for broad browses.

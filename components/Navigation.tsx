@@ -23,6 +23,7 @@ export function Navigation() {
   const [isLoading, setIsLoading] = useState(true)
   const [overdueCount, setOverdueCount] = useState<number | null>(null)
   const [inboundCount, setInboundCount] = useState(0)
+  const [dataHealthCount, setDataHealthCount] = useState(0)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -38,6 +39,7 @@ export function Navigation() {
     setDisplayName(nav.displayName)
     setOverdueCount(nav.overdueCount)
     setInboundCount(nav.inboundCount)
+    setDataHealthCount(nav.dataHealthCount)
     setAiEnabled(nav.aiEnabled)
     if (nav.organizationId) {
       setOrganization({ id: nav.organizationId, name: nav.organizationName ?? '' })
@@ -69,6 +71,7 @@ export function Navigation() {
         setDisplayName(null)
         setOverdueCount(null)
         setInboundCount(0)
+        setDataHealthCount(0)
       }
     })
 
@@ -220,12 +223,32 @@ export function Navigation() {
       badgeTitle: `${inboundCount} email${inboundCount === 1 ? '' : 's'} to file`,
       badgeTone: 'bg-red-500',
     },
+    // Tom, 2 Nov: Correspondence, Resources and Data health as tabs too.
+    {
+      href: '/search',
+      label: 'Correspondence',
+      active: pathname === '/search',
+      badge: null,
+      badgeTone: '',
+    },
+    {
+      href: '/resources',
+      label: 'Resources',
+      active: !!pathname?.startsWith('/resources'),
+      badge: null,
+      badgeTone: '',
+    },
+    {
+      href: '/data-health',
+      label: 'Data health',
+      active: pathname === '/data-health',
+      badge: dataHealthCount > 0 ? dataHealthCount : null,
+      badgeTitle: `${dataHealthCount} thing${dataHealthCount === 1 ? '' : 's'} to fix`,
+      badgeTone: 'bg-amber-500',
+    },
   ]
 
   const menuItems: { href: string; label: string }[] = [
-    { href: '/resources', label: 'Resources' },
-    { href: '/search', label: 'Search page' },
-    { href: '/data-health', label: 'Data health' },
     { href: '/dashboard', label: 'Old business list' },
     { href: '/import/gmail', label: 'Import emails' },
     { href: '/help', label: 'Help' },

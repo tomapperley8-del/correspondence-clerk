@@ -15,6 +15,8 @@ export type NavData = {
   /** How many of Today's items are overdue (Stage 14a v2); null when switched off or unavailable. */
   overdueCount: number | null
   inboundCount: number
+  /** Things to fix on Data health (v_data_health_counts, as its own links count them). */
+  dataHealthCount: number
   /** False when AI_ENABLED=false: the app hides the buttons that would only fail. */
   aiEnabled: boolean
 }
@@ -22,7 +24,7 @@ export type NavData = {
 export async function getNavData(): Promise<NavData> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { displayName: null, organizationId: null, organizationName: null, overdueCount: null, inboundCount: 0, aiEnabled: isAiEnabled() }
+  if (!user) return { displayName: null, organizationId: null, organizationName: null, overdueCount: null, inboundCount: 0, dataHealthCount: 0, aiEnabled: isAiEnabled() }
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -30,16 +32,17 @@ export async function getNavData(): Promise<NavData> {
     .eq('id', user.id)
     .single()
 
-  if (!profile) return { displayName: null, organizationId: null, organizationName: null, overdueCount: null, inboundCount: 0, aiEnabled: isAiEnabled() }
+  if (!profile) return { displayName: null, organizationId: null, organizationName: null, overdueCount: null, inboundCount: 0, dataHealthCount: 0, aiEnabled: isAiEnabled() }
 
   const orgId = profile.organization_id
   const orgs = profile.organizations as { id: string; name: string }[] | { id: string; name: string } | null
   const org = Array.isArray(orgs) ? orgs[0] ?? null : orgs
 
-  const [inbound, overdue] = await Promise.all([
+  const [inbound, overdue, health] = await Promise.all([
     supabase.from('inbound_queue').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('status', 'pending'),
     getOverdueCount(),
+    supabase.from('v_data_health_counts').select('n').eq('organization_id', orgId).eq('fixed_on', '/data-health'),
   ])
 
   return {
@@ -48,6 +51,7 @@ export async function getNavData(): Promise<NavData> {
     organizationName: org?.name ?? null,
     overdueCount: overdue,
     inboundCount: inbound.count ?? 0,
+    dataHealthCount: (health.data ?? []).reduce((t, r) => t + Number(r.n ?? 0), 0),
     aiEnabled: isAiEnabled(),
   }
 }
