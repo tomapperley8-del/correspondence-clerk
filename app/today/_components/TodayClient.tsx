@@ -12,7 +12,7 @@ import {
   clearFollowUpFlag, moveFollowUpFlag, getTodayDetail, deleteTodayTask, undoDeleteTodayTask, linkTaskToBusiness, getBusinessNames,
   type TodayData, type TodayDetail, type QuietReminder,
 } from '@/app/actions/today'
-import { markInvoiceVoid } from '@/app/actions/invoices'
+import { markInvoiceVoid, markInvoiceVoidAndEndContract, undoVoidInvoice } from '@/app/actions/invoices'
 import {
   markNewsletterUsed, deleteNewsletterItem, undoDeleteNewsletterItem, moveNewsletterItem, changeNewsletterKind, changeTaskKind,
   type CalendarItem, type NewsletterItem,
@@ -257,7 +257,7 @@ export function TodayClient({
         toast.error(result.error)
         return
       }
-      toast.success(message)
+      if (message) toast.success(message)
       if (clears) setGone((prev) => new Set(prev).add(key))
       changed()
     })
@@ -828,7 +828,17 @@ function DetailPanel({ row, detail, actions, inline = false }: { row: Row; detai
                     className={`${linkBtn} ml-auto`}
                     onClick={() => {
                       if (!window.confirm(`Mark invoice ${v.doc_number ?? ''} void? It stops counting as owed everywhere in the app. Void it in QuickBooks yourself as well.`)) return
-                      run(key, () => markInvoiceVoid(v.qbo_invoice_id), `Invoice ${v.doc_number ?? ''} marked void`, false)
+                      const endToo = window.confirm('Was this their membership? OK ends the contract and marks them Former. Cancel keeps the contract and only marks the invoice void.')
+                      const invoiceId = v.qbo_invoice_id
+                      run(key, async () => {
+                        const result = endToo ? await markInvoiceVoidAndEndContract(invoiceId) : await markInvoiceVoid(invoiceId)
+                        if (result.error) return result
+                        const backupIds: number[] = 'backupIds' in result && Array.isArray(result.backupIds) ? result.backupIds : []
+                        toast.undo(endToo && backupIds.length ? `Invoice ${v.doc_number ?? ''} marked void and the contract ended` : `Invoice ${v.doc_number ?? ''} marked void`, () => {
+                          run(key, () => undoVoidInvoice(invoiceId, backupIds), 'Undone', false)
+                        })
+                        return result
+                      }, '', false)
                     }}
                   >
                     Mark void<span className="sr-only">: invoice {v.doc_number}</span>
