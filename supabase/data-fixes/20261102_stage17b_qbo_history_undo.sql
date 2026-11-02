@@ -1,7 +1,8 @@
 -- Undo 20261102_stage17b_qbo_history.sql (reason 'stage17b qbo history 2026-11-02').
 -- Removes everything the load added, and what the nightly pipeline and the review list made from it:
 --   * invoice notes in correspondence (ai_metadata->>'qbo_invoice_id' in the created invoices)
---   * one_off_sales and contracts made from those invoices (contracts.qbo_invoice_id)
+--   * one_off_sales and contracts made from those invoices (contracts.qbo_invoice_id; only contracts created
+--     after the load, older contracts name invoices the mirror did not hold)
 --   * contract_invoices rows for them (if the table exists)
 --   * qbo_links for the created customers (the load's exact-name links, and any made in Data health)
 --   * the created invoices and customers
@@ -25,7 +26,11 @@ DO $$ BEGIN
     DELETE FROM contract_invoices WHERE qbo_invoice_id IN (SELECT id FROM u_inv);
   END IF;
 END $$;
-DELETE FROM contracts WHERE qbo_invoice_id IN (SELECT id FROM u_inv);
+-- Only contracts made after the load: older contracts can name an invoice (by QuickBooks id) the mirror
+-- did not hold before, and those stay.
+DELETE FROM contracts WHERE qbo_invoice_id IN (SELECT id FROM u_inv)
+  AND created_at >= (SELECT min(taken_at) FROM cc_phase0_backup
+                     WHERE reason = 'stage17b qbo history 2026-11-02' AND table_name = 'qbo_invoices_created');
 DELETE FROM qbo_links WHERE qbo_customer_id IN (SELECT id FROM u_cust);
 DELETE FROM qbo_invoices WHERE qbo_invoice_id IN (SELECT id FROM u_inv);
 DELETE FROM qbo_customers WHERE qbo_customer_id IN (SELECT id FROM u_cust);
