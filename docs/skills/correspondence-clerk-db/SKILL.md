@@ -36,8 +36,8 @@ Merged records resolve to the surviving business. Returns one JSON document:
 | Key | What it holds |
 |---|---|
 | `business` | name, status, category, type, website, address, phone, notes, last in touch, renewal and outreach stage, `merged_from` |
-| `deal` | `current` contract (type, start, end, amount, terms, paid, `days_to_end`) and `history` (all contracts) |
-| `money` | `owed_total`, `overdue_total`, `open_invoices`, `recent_invoices` (paid/voided flagged), QuickBooks customer, `do_not_chase` (Tom's "let them go" decisions) |
+| `deal` | `current` contract (type, start, end, amount, terms, paid, `days_to_end`) and `history` (up to 60 contracts, past ones too, each with the QuickBooks invoice numbers it was made from in `invoices`) |
+| `money` | `owed_total`, `overdue_total`, `open_invoices`, `invoices` (every invoice since Nov 2019, newest first, up to 100 of `invoices_total`; paid/voided flagged, with the `contract` it belongs to when it is one), `invoices_by_year` (count and total), QuickBooks customer, `do_not_chase` (Tom's "let them go" decisions) |
 | `contacts` | main contact (and whether Tom chose it), every contact with role, emails, phones, active flag |
 | `attention` | why it is on Today: reason (`money_owed`, `renewal`, `waiting_on_you`, `todo`, `club_card`, `club_card_lapsed`), detail, since, snoozed |
 | `correspondence` | totals, first date, `last_received`, `last_sent`, the 20 most recent emails/calls/meetings (date, direction, subject, contact, cleaned text cut to 700 characters) and the 10 latest notes |
@@ -125,7 +125,7 @@ SELECT search_everything('wanted sidebar', '2026-01-01', NULL, 25);
 For "who was it who said they wanted …", "did anyone mention …". Arguments: words (same
 web-search syntax), optional from and to dates, how many (default 25, at most 100). Searches
 emails, calls, meetings and notes, business and contact notes, to-dos, newsletter items and the
-routines' drafts. Returns `total`, `by_kind`, `businesses_matched` (all matches, not just those
+routines' drafts. Searches QuickBooks invoices too (kind `invoice`: number, customer name, what was sold; the business is the linked one, or none for a customer not matched yet). Returns `total`, `by_kind`, `businesses_matched` (all matches, not just those
 shown), then results newest first: kind, date, business and id, contact, title and a snippet
 with the matched words in `**bold**`. Open a promising one with `business_dossier(business_id)`.
 
@@ -142,7 +142,6 @@ labelled as that, not as the answer:
 - **Sent email that wasn't BCC'd or forwarded** in, and email nobody forwarded.
 - **Google Drive documents** (contracts, media packs, proposals).
 - **Ad stats** (Google Analytics figures from Dawn or James) as data: only the emails they sent, if forwarded.
-- **Full QuickBooks history**: the app holds a partial copy (about 180 of some 780 invoices).
 - **Mailchimp opens and clicks**, **Companies House** details for members, and website pages beyond Club Card.
 
 ## Counting across businesses (tested recipes)
@@ -253,7 +252,9 @@ SELECT bucket, count(*) FROM v_outreach_next GROUP BY 1 ORDER BY 2 DESC;
 - Status: Active = a deal in force or ended within 60 days; Former = had a deal; Prospect = never;
   Unreviewed = created automatically from an email and not yet checked by Tom; "Not a business" =
   hidden (kept for its emails).
-- Money: QuickBooks in the app is a partial copy (not every invoice since 2019 yet). Voided
+- Money: QuickBooks in the app holds every invoice since Nov 2019 (the daily desk routine keeps it
+  current on weekdays; `v_system_alarm` has a `routine:quickbooks_copy` line if it is over 2 days old).
+  Old Club Card and advertising invoices are past contracts (`deal.history`, `is_current` false). Voided
   invoices don't count. If `do_not_chase` is set, don't suggest chasing.
 - Email text is the cleaned body (quoted chains removed). Quote Tom's and the business's words
   exactly; don't paraphrase them as if quoting.
@@ -284,7 +285,9 @@ Current objects worth knowing (all in `public`):
 | `v_outreach_next` | Outreach Work on next buckets |
 | `routine_drafts` | drafts written by the Claude routines |
 | `tasks` | to-dos (`source = 'manual'` are Tom's; others feed the desk email) |
-| `v_data_health` | records that need tidying |
+| `v_data_health` | records that need tidying (check `qbo_customer_to_match`: QuickBooks customers with invoices and no business, one row each; the detail is the customer id) |
+| `v_qbo_customers_to_match` | QuickBooks customers with invoices but no business yet: customer, email, invoice count, total, last invoice date, open balance, and a suggested business with why (same name, email, domain or similar name; a guess). Tom matches them on Data health. Their invoices are still found with `search_everything` kind `invoice` |
+| `contract_invoices` | which QuickBooks invoices a contract covers (a past contract can cover several monthly invoices) |
 | `v_system_alarm` | every scheduled job and routine: last good run, when due, `missed`, a plain `line` (weekday routines are never due at weekends) |
 
 Match names with `cc_name_key(name) LIKE '%' || cc_name_key('term') || '%'` (ignores punctuation),
