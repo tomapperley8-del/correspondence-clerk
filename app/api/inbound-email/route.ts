@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import crypto from 'crypto'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { refreshTruth } from '@/lib/refresh-truth'
 import { formatCorrespondence } from '@/lib/ai/formatter'
 import { isThreadSplitResponse } from '@/lib/ai/types'
 import {
@@ -351,6 +352,7 @@ async function insertCorrespondenceServiceRole(
     .from('businesses')
     .update({ last_contacted_at: opts.entryDate, disposition: null, follow_up_after: null })
     .eq('id', opts.businessId)
+  await refreshTruth(supabase, opts.businessId)
 
   return inserted.id
 }

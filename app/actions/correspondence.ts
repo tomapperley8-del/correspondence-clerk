@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { refreshTruth } from '@/lib/refresh-truth'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { z } from 'zod'
 import { checkAndResolveActions } from '@/lib/ai/action-resolution'
@@ -384,6 +385,8 @@ export async function createCorrespondence(formData: {
     promoteOpenThreadsToActions(organizationId, formData.business_id)
       .catch(err => { console.error('promoteOpenThreadsToActions failed:', err); return 0 }),
   ])
+
+  await refreshTruth(supabase, formData.business_id)
 
   return { data, actionsResolved, threadsPromoted }
 }
@@ -1691,6 +1694,7 @@ export async function linkCorrespondenceToBusiness(
 
   if (error) return { error: error.message }
 
+  await refreshTruth(supabase, existing.business_id, targetBusinessId)
   revalidatePath(`/businesses/${existing.business_id}`)
   revalidatePath(`/businesses/${targetBusinessId}`)
 
@@ -1728,6 +1732,7 @@ export async function unlinkCorrespondenceFromBusiness(
 
   if (error) return { error: error.message }
 
+  await refreshTruth(supabase, existing.business_id, businessId)
   revalidatePath(`/businesses/${existing.business_id}`)
   revalidatePath(`/businesses/${businessId}`)
 
@@ -1763,6 +1768,7 @@ export async function refileCorrespondence(
 
   if (error) return { error: error.message }
 
+  await refreshTruth(supabase, existing.business_id, newBusinessId)
   revalidatePath(`/businesses/${existing.business_id}`)
   revalidatePath(`/businesses/${newBusinessId}`)
   revalidatePath('/inbox')

@@ -147,7 +147,7 @@ type Biz = { id: string; name: string; organization_id: string; status: string |
 
 /** Businesses in scope with no record and not searched recently, Active first. */
 export async function businessesToLookUp(supabase: SupabaseClient, orgId?: string): Promise<Biz[]> {
-  let q = supabase.from('businesses').select('id, name, organization_id, status').is('merged_into', null).in('status', SCOPE_STATUSES).limit(5000)
+  let q = supabase.from('v_businesses').select('id, name, organization_id, status').is('merged_into', null).in('status', SCOPE_STATUSES).limit(5000)
   if (orgId) q = q.eq('organization_id', orgId)
   const [{ data: biz }, { data: recs }, { data: looks }] = await Promise.all([
     q,

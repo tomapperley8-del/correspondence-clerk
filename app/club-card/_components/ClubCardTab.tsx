@@ -9,6 +9,7 @@ import { cn, formatDateGB } from '@/lib/utils'
 import type { ClubCardTabRow, ClubCardSummary } from '@/app/actions/club-card-tab'
 import { getClubCardForBusiness, setClubCardOffer, type ClubCardArticle } from '@/app/actions/club-card'
 import { getTodayDetail, type TodayDetail } from '@/app/actions/today'
+import { endMembership, undoEndContract } from '@/app/actions/end-contract'
 import { CARD_STATE_LABEL, ISSUE_LABEL, type ClubCardIssue } from '@/lib/club-card/labels'
 import { ActionMenu, type MenuEntry } from '@/components/ui/action-menu'
 import { FilterChips } from '@/components/ui/filter-chips'
@@ -496,6 +497,8 @@ function MemberPanel({ row, today, due, inline = false }: { row: ClubCardTabRow;
   const [busy, setBusy] = useState(false)
   const [endDate, setEndDate] = useState('')
   const [picking, setPicking] = useState(false)
+  const [confirmEnd, setConfirmEnd] = useState(false)
+  const [endedBackup, setEndedBackup] = useState<number | null>(null)
   const m = row.member
   const biz = `/businesses/${row.business_id}`
 
@@ -531,6 +534,30 @@ function MemberPanel({ row, today, due, inline = false }: { row: ClubCardTabRow;
     router.refresh()
   }
 
+  async function end() {
+    setBusy(true)
+    const r = await endMembership(row.business_id)
+    setBusy(false)
+    setConfirmEnd(false)
+    if (r.error) { toast.error(r.error); return }
+    setEndedBackup(r.backupId ?? null)
+    toast.success('Membership ended')
+    window.dispatchEvent(new Event('cc:nav-refresh'))
+    router.refresh()
+  }
+
+  async function undoEnd() {
+    if (endedBackup == null) return
+    setBusy(true)
+    const r = await undoEndContract(endedBackup)
+    setBusy(false)
+    if (r.error) { toast.error(r.error); return }
+    setEndedBackup(null)
+    toast.success('Membership restored')
+    window.dispatchEvent(new Event('cc:nav-refresh'))
+    router.refresh()
+  }
+
   const email = loaded?.contact?.emails[0]
   const more: MenuEntry[] = [
     { label: 'Log an email or call', href: `/new-entry?businessId=${row.business_id}` },
@@ -555,6 +582,19 @@ function MemberPanel({ row, today, due, inline = false }: { row: ClubCardTabRow;
       <div className="flex flex-wrap gap-2 items-center">
         <Link href={biz} className={mainBtn}>Open business page</Link>
         <ActionMenu label="More" accessibleLabel={`More for ${row.name}`} entries={more} />
+        {endedBackup != null ? (
+          <button type="button" disabled={busy} className={softBtn} onClick={undoEnd}>{busy ? 'Undoing…' : 'Undo end of membership'}</button>
+        ) : (row.card_state === 'member' || row.card_state === 'grace') && c && (
+          confirmEnd ? (
+            <>
+              <span className="text-sm text-gray-700">End {row.name}&apos;s Club Card contract and mark them Former?</span>
+              <button type="button" disabled={busy} className={mainBtn} onClick={end}>{busy ? 'Ending…' : 'Yes, end membership'}</button>
+              <button type="button" disabled={busy} className={softBtn} onClick={() => setConfirmEnd(false)}>Cancel</button>
+            </>
+          ) : (
+            <button type="button" className={softBtn} onClick={() => setConfirmEnd(true)}>End membership</button>
+          )
+        )}
       </div>
 
       {/* The card */}

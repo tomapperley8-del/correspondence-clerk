@@ -5,6 +5,7 @@ import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
 import { formatCorrespondence } from '@/lib/ai/formatter'
 import { isThreadSplitResponse } from '@/lib/ai/types'
 import { revalidatePath } from 'next/cache'
+import { refreshTruth } from '@/lib/refresh-truth'
 import { isPersonalDomain, stripQuotedContent, getOwnDomains, plainEmailBody } from '@/lib/inbound/utils'
 
 export { isPersonalDomain, stripQuotedContent }
@@ -266,6 +267,7 @@ export async function fileInboundEmail(queueItemId: string, businessId: string, 
     .update({ status: 'filed' })
     .eq('id', queueItemId)
 
+  await refreshTruth(supabase, businessId)
   revalidatePath('/inbox')
   revalidatePath(`/businesses/${businessId}`)
   revalidatePath('/dashboard')
