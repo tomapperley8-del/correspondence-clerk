@@ -13,7 +13,6 @@ import { dismissDuplicatePair, dismissMultipleDuplicatePairs } from '@/app/actio
 import { EditBusinessButton } from '@/components/EditBusinessButton'
 import { EditBusinessDetailsButton } from '@/components/EditBusinessDetailsButton'
 import { ExportDropdown } from '@/components/ExportDropdown'
-import { useInsights } from '@/components/InsightsContext'
 import { CorrespondenceSummary } from '@/components/CorrespondenceSummary'
 import { ActionSuggestions } from '@/components/ActionSuggestions'
 import { ContractDetailsCard } from '@/components/ContractDetailsCard'
@@ -103,7 +102,6 @@ export function BusinessDetailClient({
   fromTodos,
 }: Props) {
   const router = useRouter()
-  const { open: openInsights } = useInsights()
 
   // Data seeded from server, refreshed locally after mutations
   const [business, setBusiness] = useState(initialBusiness)
@@ -1034,12 +1032,6 @@ export function BusinessDetailClient({
               {business.relationship_memory_updated_at && (
                 <span>{formatRelativeTime(business.relationship_memory_updated_at)}</span>
               )}
-              <button
-                onClick={() => openInsights(business.id, business.name)}
-                className="text-brand-navy hover:underline"
-              >
-                Refresh via Insights
-              </button>
             </div>
           </div>
           <p className="text-sm text-gray-700 leading-relaxed">{business.relationship_memory}</p>
@@ -1105,16 +1097,6 @@ export function BusinessDetailClient({
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Correspondence</h2>
           <div className="flex gap-3">
-            <button
-              onClick={() => openInsights(business.id, business.name)}
-              className="relative px-3 py-2 text-sm font-semibold border rounded-sm text-brand-navy border-brand-navy hover:bg-brand-navy hover:text-white transition-colors"
-              title={business.relationship_memory ? `Memory: ${formatRelativeTime(business.relationship_memory_updated_at ?? '')}` : undefined}
-            >
-              Insights
-              {business.relationship_memory && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-brand-olive rounded-full border-2 border-white" aria-label="Relationship memory available" />
-              )}
-            </button>
             <ExportDropdown businessId={business.id} />
             <Link href={`/new-entry?businessId=${business.id}`}>
               <Button className="bg-brand-navy text-white hover:bg-brand-navy-hover px-6 py-3 font-semibold">

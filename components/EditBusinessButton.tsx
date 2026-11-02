@@ -121,7 +121,7 @@ export function EditBusinessButton({ business }: { business: Business }) {
       setSaving(false)
     } else {
       appEvents.businessesChanged()
-      router.push('/dashboard')
+      router.push('/businesses')
     }
   }
 
