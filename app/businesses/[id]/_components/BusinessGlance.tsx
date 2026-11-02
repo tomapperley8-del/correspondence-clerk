@@ -1,5 +1,6 @@
 'use client'
 
+import { isOngoingEnd } from '@/lib/ongoing'
 import { useState } from 'react'
 import { KIND, REASON_KIND } from '@/components/ui/kind'
 import Link from 'next/link'
@@ -86,7 +87,8 @@ function DealTerms({ text }: { text: string }) {
 
 function DealLine({ c, membershipTypes, today }: { c: GlanceContract; membershipTypes: MembershipType[]; today: string }) {
   const amount = money(c.contract_amount, c.contract_currency)
-  const ended = c.contract_end && c.contract_end < today
+  const ongoing = isOngoingEnd(c.contract_end)
+  const ended = !ongoing && c.contract_end && c.contract_end < today
   return (
     <div className="space-y-0.5">
       <p className="font-semibold">
@@ -97,8 +99,8 @@ function DealLine({ c, membershipTypes, today }: { c: GlanceContract; membership
         <p className="text-gray-700">
           {c.contract_start && dateOnlyGB(c.contract_start)}
           {c.contract_start && c.contract_end && ' to '}
-          {c.contract_end && dateOnlyGB(c.contract_end)}
-          {c.contract_end && (
+          {c.contract_end && (ongoing ? 'Ongoing' : dateOnlyGB(c.contract_end))}
+          {c.contract_end && !ongoing && (
             <span className={ended ? 'text-red-700' : 'text-gray-500'}>
               {' '}({ended ? 'ended' : 'ends'} {relativeDays(c.contract_end, today)})
             </span>

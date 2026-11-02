@@ -17,6 +17,7 @@ export type Contract = {
   deal_terms: string | null
   invoice_paid: boolean
   is_current: boolean
+  is_ongoing: boolean
   created_at: string
   updated_at: string
 }
@@ -51,6 +52,7 @@ export async function createContract(businessId: string, fields: {
   deal_terms?: string | null
   invoice_paid?: boolean
   is_current?: boolean
+  is_ongoing?: boolean
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -73,6 +75,7 @@ export async function createContract(businessId: string, fields: {
       deal_terms: fields.deal_terms || null,
       invoice_paid: fields.invoice_paid ?? false,
       is_current: fields.is_current ?? true,
+      is_ongoing: fields.is_ongoing ?? false,
     })
     .select()
     .single()
@@ -102,6 +105,7 @@ export async function updateContract(contractId: string, businessId: string, fie
   deal_terms: string | null
   invoice_paid: boolean
   is_current: boolean
+  is_ongoing: boolean
 }>) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

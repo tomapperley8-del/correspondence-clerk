@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { isOngoingEnd, ONGOING_END } from '@/lib/ongoing'
 import { ContractStatusBadge } from '@/components/ContractStatusBadge'
 import { getContractsByBusiness, createContract, updateContract, deleteContract, type Contract } from '@/app/actions/contracts'
 import type { Business } from '@/app/actions/businesses'
@@ -181,6 +183,26 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const [clearingId, setClearingId] = useState<string | null>(null)
+  const [clearDate, setClearDate] = useState('')
+  const [undo, setUndo] = useState<{ id: string; is_ongoing: boolean; contract_end: string | null } | null>(null)
+
+  const setOngoing = async (c: Contract, on: boolean, newEnd?: string) => {
+    const prev = { id: c.id, is_ongoing: c.is_ongoing, contract_end: c.contract_end }
+    const result = await updateContract(c.id, business.id, on
+      ? { is_ongoing: true, contract_end: ONGOING_END }
+      : { is_ongoing: false, contract_end: newEnd || null })
+    if ('error' in result) { toast.error(result.error ?? 'Could not save'); return }
+    setUndo(prev); setClearingId(null); setClearDate('')
+    await loadContracts(); onUpdate()
+  }
+
+  const undoOngoing = async () => {
+    if (!undo) return
+    const result = await updateContract(undo.id, business.id, { is_ongoing: undo.is_ongoing, contract_end: undo.contract_end })
+    if ('error' in result) { toast.error(result.error ?? 'Could not undo'); return }
+    setUndo(null); await loadContracts(); onUpdate()
+  }
 
   const loadContracts = async () => {
     const result = await getContractsByBusiness(business.id)
@@ -221,6 +243,7 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
       deal_terms: data.deal_terms || null,
       invoice_paid: data.invoice_paid,
       is_current: data.is_current,
+      is_ongoing: isOngoingEnd(data.contract_end),
     })
     if ('error' in result) throw new Error(result.error)
     setShowAddForm(false)
@@ -239,6 +262,7 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
       deal_terms: data.deal_terms || null,
       invoice_paid: data.invoice_paid,
       is_current: data.is_current,
+      is_ongoing: isOngoingEnd(data.contract_end),
     })
     if ('error' in result) throw new Error(result.error)
     setEditingId(null)
@@ -306,7 +330,11 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
 
             {(contract.contract_start || contract.contract_end) && (
               <div className="mb-1">
-                {contract.contract_start && contract.contract_end ? (
+                {contract.is_ongoing ? (
+                  <span className="text-sm text-gray-700">
+                    {contract.contract_start ? `From ${formatDate(contract.contract_start)}, ` : ''}<span className="font-semibold">Ongoing</span> (no end date)
+                  </span>
+                ) : contract.contract_start && contract.contract_end ? (
                   <ContractStatusBadge startDate={contract.contract_start} endDate={contract.contract_end} isCurrent={contract.is_current} />
                 ) : (
                   <span className="text-sm text-gray-700">
@@ -327,6 +355,26 @@ export function ContractDetailsCard({ business, onUpdate, membershipTypes = [] }
 
             {contract.deal_terms && (
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{contract.deal_terms}</p>
+            )}
+
+            {contract.is_current && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {!contract.is_ongoing ? (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setOngoing(contract, true)}>Set ongoing (no end date)</Button>
+                ) : clearingId === contract.id ? (
+                  <>
+                    <Label htmlFor={`end-${contract.id}`} className="text-xs">New end date</Label>
+                    <Input id={`end-${contract.id}`} type="date" value={clearDate} onChange={(e) => setClearDate(e.target.value)} className="w-40" />
+                    <Button type="button" size="sm" disabled={!clearDate} onClick={() => setOngoing(contract, false, clearDate)}>Save end date</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setClearingId(null)}>Cancel</Button>
+                  </>
+                ) : (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setClearingId(contract.id)}>Clear ongoing</Button>
+                )}
+                {undo?.id === contract.id && (
+                  <Button type="button" variant="outline" size="sm" onClick={undoOngoing}>Undo</Button>
+                )}
+              </div>
             )}
           </div>
 

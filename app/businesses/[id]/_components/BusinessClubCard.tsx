@@ -1,5 +1,6 @@
 'use client'
 
+import { isOngoingEnd } from '@/lib/ongoing'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getClubCardForBusiness, setClubCardOffer } from '@/app/actions/club-card'
@@ -55,7 +56,7 @@ export function BusinessClubCard({ businessId }: { businessId: string }) {
       {m && (
         <p className={`text-xs mb-2 ${m.card_state === 'member' ? 'text-gray-600' : 'text-red-700'}`}>
           {CARD_STATE_LABEL[m.card_state]}
-          {m.contract_end && `${m.card_state === 'member' ? ', ends' : ''} ${dateOnlyGB(m.contract_end)}`}
+          {m.contract_end && (isOngoingEnd(m.contract_end) ? ', ongoing' : `${m.card_state === 'member' ? ', ends' : ''} ${dateOnlyGB(m.contract_end)}`)}
         </p>
       )}
       {m && m.issues.length > 0 && (

@@ -1,5 +1,6 @@
 'use client'
 
+import { isOngoingEnd } from '@/lib/ongoing'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -86,7 +87,7 @@ function issueText(r: ClubCardTabRow, i: ClubCardIssue) {
 
 function endTone(r: ClubCardTabRow, today: string) {
   const end = r.contract?.contract_end
-  if (!end || r.card_state === 'former') return ''
+  if (!end || r.card_state === 'former' || isOngoingEnd(end)) return ''
   if (end < today) return 'text-ms-red-text font-semibold'
   if (end <= addDaysISO(today, 31)) return 'text-ms-orange-text font-semibold'
   return ''
@@ -102,7 +103,7 @@ function cellText(r: ClubCardTabRow, col: Col): string {
   const m = r.member
   switch (col) {
     case 'card': return CARD_PILL[r.card_state].text
-    case 'ends': return dateGB(r.contract?.contract_end)
+    case 'ends': return isOngoingEnd(r.contract?.contract_end) ? 'Ongoing' : dateGB(r.contract?.contract_end)
     case 'amount': return moneyGB(r.contract?.contract_amount)
     case 'offer': return m?.offer_text?.replace(/\s+/g, ' ').trim() ?? ''
     case 'page': return m?.page_link ?? ''
@@ -348,7 +349,7 @@ export function ClubCardTab({ data, initialShow, initialBusiness, initialQuery }
                               <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span className="font-semibold text-brand-dark">{r.name}</span>
                                 <span className={cn('text-[11px] font-semibold px-1.5 py-0.5 rounded-full', CARD_PILL[r.card_state].cls)}>{CARD_PILL[r.card_state].text}</span>
-                                {r.contract?.contract_end && <span className={cn('text-xs', endTone(r, today) || 'text-gray-600')}>{r.card_state === 'former' ? 'ended' : 'ends'} {dateGB(r.contract.contract_end)}</span>}
+                                {r.contract?.contract_end && <span className={cn('text-xs', endTone(r, today) || 'text-gray-600')}>{isOngoingEnd(r.contract.contract_end) ? 'ongoing' : <>{r.card_state === 'former' ? 'ended' : 'ends'} {dateGB(r.contract.contract_end)}</>}</span>}
                               </span>
                               <span className="text-xs text-gray-600 mt-0.5 line-clamp-1">
                                 {[r.member?.offer_text?.replace(/\s+/g, ' '), contactName(r), r.table?.last_in_touch ? `in touch ${dateGB(r.table.last_in_touch)}` : null].filter(Boolean).join(' · ')}
@@ -441,7 +442,7 @@ function cell(r: ClubCardTabRow, c: Col, today: string): React.ReactNode {
     case 'card':
       return <span className={cn('text-[11px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap', CARD_PILL[r.card_state].cls)}>{CARD_PILL[r.card_state].text}</span>
     case 'ends':
-      return <span className={cn('whitespace-nowrap tabular-nums', endTone(r, today))}>{dateGB(r.contract?.contract_end)}</span>
+      return <span className={cn('whitespace-nowrap tabular-nums', endTone(r, today))}>{isOngoingEnd(r.contract?.contract_end) ? 'Ongoing' : dateGB(r.contract?.contract_end)}</span>
     case 'amount':
       return <span className="whitespace-nowrap tabular-nums">{moneyGB(r.contract?.contract_amount)}</span>
     case 'offer':
@@ -560,7 +561,7 @@ function MemberPanel({ row, today, due, inline = false }: { row: ClubCardTabRow;
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
         {c ? (
           <Fact term={row.card_state === 'former' ? 'Last card' : 'Card'}>
-            {c.contract_start ? `${dateGB(c.contract_start)} to ` : 'Until '}{dateGB(c.contract_end) || 'no end date'}
+            {c.contract_start ? `${dateGB(c.contract_start)} to ` : 'Until '}{isOngoingEnd(c.contract_end) ? 'ongoing' : dateGB(c.contract_end) || 'no end date'}
             {c.contract_amount ? `, ${moneyGB(c.contract_amount)}${c.billing_frequency === 'monthly' ? ' a month' : ''}` : ', no amount recorded'}
           </Fact>
         ) : (

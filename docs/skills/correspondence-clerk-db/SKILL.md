@@ -255,6 +255,9 @@ SELECT bucket, count(*) FROM v_outreach_next GROUP BY 1 ORDER BY 2 DESC;
   `contract_start`, `contract_end`, `contract_amount` and `deal_terms` were emptied on 23 Oct 2026
   and are not kept up to date. If you query by hand, read deals from `contracts`
   (`is_current`, `membership_type` club_card / advertiser / former_*), status from `v_businesses`.
+  `is_ongoing = true` means an indefinite deal with no end date (`contract_end` is the placeholder
+  2030-01-01): say "ongoing", never "ends 2030"; it is never due for renewal. The dossier's `deal` and
+  `history` rows carry `is_ongoing`.
 - A business can hold two deals at once (a Club Card and an advert): look at `deal.history` or
   `deals_in_force`, not only `deal.current`.
 - Status: Active = a deal in force or ended within 60 days; Former = had a deal; Prospect = never;
