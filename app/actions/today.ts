@@ -1,5 +1,6 @@
 'use server'
 
+import { AUTO_DRAFTS_ENABLED } from '@/lib/auto-drafts'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
@@ -78,12 +79,14 @@ export async function getTodayData(): Promise<{ data?: TodayData; error?: string
 
   const [leadsRes, draftsRes, quietRes, toMatchRes] = await Promise.all([
     supabase.from('prospect_leads').select('id', { count: 'exact', head: true }).eq('status', 'new'),
-    supabase
-      .from('routine_drafts')
-      .select('id', { count: 'exact', head: true })
-      .eq('outcome', 'drafted')
-      .is('sent_at', null)
-      .gte('created_at', draftsSince),
+    AUTO_DRAFTS_ENABLED
+      ? supabase
+          .from('routine_drafts')
+          .select('id', { count: 'exact', head: true })
+          .eq('outcome', 'drafted')
+          .is('sent_at', null)
+          .gte('created_at', draftsSince)
+      : Promise.resolve({ count: 0, error: null }),
     supabase
       .from('tasks')
       .select('id, title, due_date, source, signal_key, business_id, business:businesses!tasks_business_id_fkey(name)')

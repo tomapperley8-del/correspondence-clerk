@@ -1,5 +1,6 @@
 'use server'
 
+import { AUTO_DRAFTS_ENABLED } from '@/lib/auto-drafts'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
@@ -280,6 +281,7 @@ export async function getRoutineDrafts(days = 14, limit = 40, businessId?: strin
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
+  if (!AUTO_DRAFTS_ENABLED) return { data: [] }
 
   const since = new Date(Date.now() - days * 86_400_000).toISOString()
   const query = supabase
