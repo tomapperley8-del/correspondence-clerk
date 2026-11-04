@@ -298,7 +298,7 @@ Current objects worth knowing (all in `public`):
 | `v_outreach_next` | Outreach Work on next buckets |
 | `routine_drafts` | drafts written by the Claude routines |
 | `tasks` | to-dos (`source = 'manual'` are Tom's; others feed the desk email) |
-| `v_data_health` | records that need tidying (check `qbo_customer_to_match`: QuickBooks customers with invoices and no business, one row each; the detail is the customer id) |
+| `v_data_health` | records that need tidying (check `void_invoice_contract`: a current, unpaid Club Card or advertising contract whose QuickBooks invoice is void; check `qbo_customer_to_match`: QuickBooks customers with invoices and no business, one row each; the detail is the customer id) |
 | `v_sent_mail_to_review` | sent email held for review: recipient, name, number of emails, last sent, subjects (Data health check `sent_mail_to_review`) |
 | `company_records` / `company_candidates` | Companies House record per business (number, status, officers jsonb, dates) and suggestions awaiting confirmation (Data health checks `company_to_match` and `company_not_trading`) |
 | `ad_placements` / `ad_reports` / `ad_email_links` | Ad placements and stats read from Dawn's and James's emails, each with its source email (`source_entry_id`); `ad_email_links` = which advertiser an ad email is about (pending ones wait on Data health) |
