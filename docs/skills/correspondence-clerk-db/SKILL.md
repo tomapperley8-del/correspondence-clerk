@@ -296,7 +296,7 @@ Current objects worth knowing (all in `public`):
 | `v_listing_requests` | What's On listing requests: asked, sent to Cleo, her reply, live on the website (`status`, `is_open`, `website_url`) |
 | `business_articles` | news articles about a business (`status` confirmed/rejected) |
 | `v_outreach_next` | Outreach Work on next buckets |
-| `routine_drafts` | drafts written by the Claude routines |
+| `routine_drafts` | drafts written by the Claude routines (auto-drafting switched off 4 Nov 2026: no new rows; old ones are history) |
 | `tasks` | to-dos (`source = 'manual'` are Tom's; others feed the desk email) |
 | `v_data_health` | records that need tidying (check `void_invoice_contract`: a current, unpaid Club Card or advertising contract whose QuickBooks invoice is void; check `qbo_customer_to_match`: QuickBooks customers with invoices and no business, one row each; the detail is the customer id) |
 | `v_sent_mail_to_review` | sent email held for review: recipient, name, number of emails, last sent, subjects (Data health check `sent_mail_to_review`) |
