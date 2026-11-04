@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { AUTO_DRAFTS_ENABLED } from '@/lib/auto-drafts'
 import { Resend } from 'resend'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { buildDeskEmail, WORK_ON_NEXT_BUCKETS, type CareGap, type ClosedItem, type DeskLine, type DraftItem, type DeskTabs } from '@/lib/email/desk-email'
@@ -68,11 +69,13 @@ export async function GET(request: NextRequest) {
       .eq('action', 'closed')
       .gte('observed_at', since)
       .order('observed_at', { ascending: true }),
-    supabase
-      .from('routine_drafts')
-      .select('kind, outcome, recipient, reason, sent_at, bump_count, bumped_at, business_id, businesses(name)')
-      .or(`created_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()},bumped_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()}`)
-      .order('created_at', { ascending: true }),
+    AUTO_DRAFTS_ENABLED
+      ? supabase
+          .from('routine_drafts')
+          .select('kind, outcome, recipient, reason, sent_at, bump_count, bumped_at, business_id, businesses(name)')
+          .or(`created_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()},bumped_at.gte.${new Date(now.getTime() - 26 * 3_600_000).toISOString()}`)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
     supabase.from('v_care_gaps').select('severity, gap, detail').order('severity'),
     supabase.from('care_exclusions').select('business_id').eq('kind', 'all'),
     // Stage 18: the system alarm, and the tabs' lists from the tabs' own sources
