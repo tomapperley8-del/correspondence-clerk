@@ -91,10 +91,8 @@ app/
   new-entry/page.tsx           Add correspondence (forced filing + draft autosave)
   search/page.tsx              Full-text search results (Ctrl+K overlay is the usual way in)
   settings/page.tsx            User settings + Tools + membership types
-  dashboard/page.tsx           OLD business list, kept in the user menu as "Old business list"
   briefing, todos, attention   RETIRED (Stage 7): redirect to /today; /todos?view=contracts|outreach redirect
                                to the matching /businesses board
-  daily-briefing/page.tsx      Full-page inline ChatPanel (AI; off while AI_ENABLED=false)
   import/gmail, import/outlook Bulk email import wizards
   onboarding/                  4-step flow
   install-bookmarklet/page.tsx Bookmarklet installer (public)
@@ -122,8 +120,7 @@ lib/
 components/
   CommandSearch.tsx        Cmd+K global overlay (sessionStorage cache 5min TTL, keyboard nav)
   Navigation.tsx           Three places: Today (badge = Do now count), Businesses, Inbox; Search (Ctrl+K), + New entry;
-                           user menu: Old business list, Resources, Import emails, Search page, Settings, Help,
-                           Mastersheet (archived)
+                           user menu: Import emails, Settings, Help
   ChatPanel.tsx            Daily Briefing AI panel (inline=true or slide-out overlay)
   Toast.tsx                Toast container (singleton in layout.tsx)
   BusinessSelector.tsx     Search dropdown + Add New
@@ -281,6 +278,8 @@ All features complete and deployed (unless noted):
 28. ~~Actions Page~~ — replaced by Today (Oct 2026) (unified smart list → top priorities hero + 3 collapsible sections. Needs Reply direction-aware, no 7-day cap. Done permanent via `reply_dismissed_at`. One-click flag sets due_at +7d. Commitment alerts from insight_history. Rationale slide-out panel. AI auto-flags high-confidence inbound emails. Insights "Add to Actions" push. Keyboard nav D/S/L/Enter.)
 
 ## Recent Changes
+
+- **2 Nov 2026: Stage 10 finish.** Every status/last-in-touch reader uses `v_businesses`; `refreshTruth()` (lib/refresh-truth.ts) runs after a business is created, an email is filed or linked, a contract changes or an invoice is voided, and `refresh_business_truth()` clears last-in-touch when no emails remain. End membership (Club Card tab) and Mark void's "Was this their membership?" end a contract with Undo (`app/actions/end-contract.ts`). Data health check `void_invoice_contract`. Task rules reply_needed, renewal_due, renewal_lapsed, invoice_overdue, invoice_due_soon and unrecorded_renewal are off. Old business list, Daily Briefing page, Insights panel and Mastersheet import page are gone (redirects in next.config.ts).
 
 - **Oct 21-22, 2026: UI overhaul (`docs/ui-overhaul-plan.md` is the full record).** Paid Edge Function calls stopped (old Outreach Engine Vercel project paused). Task ticks stick and never reopen. Email from unknown senders creates `Unreviewed` businesses; services, bulk and personal-provider senders never do. 75 junk records marked `Not a business`, 17 duplicates merged (`merge_businesses()`), main contact (`is_primary`) and Internal/Community types added. `v_business_attention` gives one reason per business. New layout: Today (home), Businesses (Mastersheet-style table with saved views and boards), Inbox; Briefing, To-dos and Needs attention retired with redirects. Business page has an at-a-glance header and one merged history. Mastersheet retired: Tom's chosen data brought across, `cc-live-export` switched off, sheet archived (link in the user menu). In progress: Club Card view (6b); next: one source of truth and Insights (11), drafting templates (8), finish (10).
 
