@@ -18,6 +18,28 @@ const PUBLIC_ROUTES = [
   '/bookmarklet',
 ]
 
+// The app's own pages: signed-out visitors are sent to /login (audit 5 Nov 2026)
+const APP_PAGES = [
+  '/today',
+  '/businesses',
+  '/inbox',
+  '/club-card',
+  '/advertising',
+  '/newsletter',
+  '/listings',
+  '/outreach',
+  '/data-health',
+  '/search',
+  '/resources',
+  '/settings',
+  '/new-entry',
+  '/import',
+  '/onboarding',
+  '/admin',
+  '/articles',
+  '/review',
+]
+
 // Routes that specifically need billing access even with expired trial
 const BILLING_ROUTES = ['/settings/billing']
 
@@ -89,8 +111,16 @@ export async function updateSession(request: NextRequest) {
     return response
   }
 
-  // If no user and not a public route, let the app handle auth redirect
+  // Signed out on one of the app's own pages: go to login rather than render an empty page
+  // that says "Unauthorized". Anything else (API routes, webhooks) handles auth itself.
   if (!user) {
+    const isAppPage = APP_PAGES.some((route) => pathname === route || pathname.startsWith(route + '/'))
+    if (isAppPage) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
     return response
   }
 

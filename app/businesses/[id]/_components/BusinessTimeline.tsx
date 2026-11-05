@@ -71,6 +71,10 @@ function noteInvoiceId(entry: Correspondence): string | null {
   return meta?.source === 'qbo_invoice' && meta.qbo_invoice_id ? String(meta.qbo_invoice_id) : null
 }
 
+function isQuickBooksNotice(entry: Correspondence): boolean {
+  return (entry.ai_metadata as { source?: string } | null)?.source === 'quickbooks_notice'
+}
+
 function entryMatches(e: Correspondence, q: string): boolean {
   const text = e.formatted_text_current || e.formatted_text_original || e.raw_text_original || ''
   return !!(e.subject?.toLowerCase().includes(q) || e.contact?.name.toLowerCase().includes(q) || text.toLowerCase().includes(q))
@@ -255,14 +259,17 @@ export function BusinessTimeline(props: Props) {
       case 'correspondence': {
         const e = item.entry
         const call = e.type === 'Call'
-        const kind = e.direction === 'received' ? (call ? 'Call from' : 'From')
+        // QuickBooks emails (invoice sent, reminder, payment) are on record but are not being in touch
+        const kind = isQuickBooksNotice(e) ? 'QuickBooks'
+          : e.direction === 'received' ? (call ? 'Call from' : 'From')
           : e.direction === 'sent' ? (call ? 'Called' : 'To')
           : (e.type ?? 'Entry')
         const who = e.contact?.name ?? (e.type === 'Note' ? 'Note' : 'No contact')
         const text = e.formatted_text_current || e.formatted_text_original || e.raw_text_original
         return {
           date, kind,
-          kindTone: e.direction === 'received' ? 'text-ms-blue-text' : e.direction === 'sent' ? 'text-ms-green-text' : 'text-gray-600',
+          kindTone: isQuickBooksNotice(e) ? 'text-gray-600'
+            : e.direction === 'received' ? 'text-ms-blue-text' : e.direction === 'sent' ? 'text-ms-green-text' : 'text-gray-600',
           title: who,
           detail: e.subject || firstLine(text),
           status: e.action_needed !== 'none' ? e.action_needed.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : e.is_pinned ? 'Pinned' : undefined,

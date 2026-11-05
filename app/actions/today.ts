@@ -141,7 +141,7 @@ export async function getBusinessNames(): Promise<{ id: string; name: string }[]
       .select('id, name')
       .eq('organization_id', orgId)
       .is('merged_into', null)
-      .neq('status', 'Not a business')
+      .or('status.is.null,status.neq.Not a business') // null status = Internal/Community records
       .order('name')
       .range(from, from + 999)
     if (error || !data) break
