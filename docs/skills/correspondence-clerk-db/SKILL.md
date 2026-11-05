@@ -43,7 +43,7 @@ Merged records resolve to the surviving business. Returns one JSON document:
 | `company` | Companies House register facts for Active, Former and Unreviewed businesses: company number, status (and detail: dissolved, liquidation), type, incorporated, SIC codes, registered office (often the accountant, not the premises), accounts type and dates (`accounts_overdue`), confirmation statement due (`confirmation_statement_overdue`), insolvency history, charges, current `officers` (name as the register gives it, role, appointed). Officers are not contacts: say "the register lists X as director" and never put one in an email as if Tom knew them. Absent means no match confirmed yet, not that there is no company. `company_to_confirm` lists suggestions awaiting Tom on Data health. `read_on` says how fresh (refreshed weekly) |
 | `ads` | Ad placements and stats from Dawn Wilson's and James Willcocks's emails: `placements` (placement, `live_from`, `expires`, `note` in their words, `source_entry_id`) and `reports` (period, `figures` as written, e.g. impressions and clicks, `note`). Not complete: only what the emails say in text; stats sent as screenshots are not read. `emails_to_confirm` counts ad emails awaiting Tom on Data health. The emails themselves are in `correspondence` (they stay on Dawn's/James's record and are also linked to the advertiser), so "what did Dawn say about X's ad" = read `correspondence` and `ads` |
 | `attention` | why it is on Today: reason (`money_owed`, `renewal`, `waiting_on_you`, `todo`, `club_card`, `club_card_lapsed`), detail, since, snoozed |
-| `correspondence` | totals, first date, `last_received`, `last_sent`, the 20 most recent emails/calls/meetings (date, direction, subject, contact, cleaned text cut to 700 characters) and the 10 latest notes |
+| `correspondence` | totals, first date, `last_received`, `last_sent`, the 20 most recent emails/calls/meetings (date, direction, subject, contact, cleaned text cut to 700 characters) and the 10 latest notes. QuickBooks emails (invoice sent, reminder, payment) are listed with `quickbooks_notice: true`: they are part of the record, but they are not being in touch, so `last_received`, `last_sent` and `business.last_in_touch` leave them out |
 | `todos` | open to-dos (hand-written ones first) and the last 5 done |
 | `calendar` | to-dos, deal ends and invoice due dates from a week ago to 90 days ahead |
 | `club_card` | card state (member, grace, lapsed, none), the website page, offer and its end date, page checks |
@@ -89,7 +89,7 @@ card state, last featured, main contact and email). Call `business_dossier(id)` 
 | `q` | part of the name |
 | `status` | `"Active"`, `"Former"`, `"Prospect"`, `"Unreviewed"`, or a list |
 | `category` | e.g. `"Food & Drink"`, `"Health & Beauty"`, `"Retail"` |
-| `deal` | `"club_card"` (member or in grace, same as the Club Card tab), `"advertiser"`: a deal of that kind running or ended within 60 days |
+| `deal` | `"club_card"` (member or in grace, same as the Club Card tab), `"advertiser"`: an advertising deal in force or in its 60-day grace (same as the Advertising tab) |
 | `card_state` | `"member"`, `"grace"`, `"lapsed"`, `"none"`, or a list |
 | `ends_from`, `ends_to` | a deal ends in this range and hasn't already been renewed ("who's renewing next month") |
 | `renewal_stage`, `outreach_stage` | stage names as in the app |
@@ -143,8 +143,9 @@ labelled as that, not as the answer:
   `newsletter.freebies`, or the query below. Freebies before the newsletter archive (May 2024),
   or not linked to a business, aren't counted.
 - **Sent email before 4 Jun 2026**, and sent mail to personal-provider addresses (Gmail, Hotmail and so on) that
-  are not a contact on file, and sent mail to the team (Cleo, Bridget). Sent mail since 4 Jun 2026 to a known
-  contact or business is filed (`correspondence.ai_metadata->>'source' = 'sent_mail_sweep'` for the swept ones;
+  are not a contact on file, and sent mail to the team (Cleo, Bridget). Sent mail to a known contact or business is filed
+  from tom@ since 13 Jul 2026 (plus the first few days of June) and from both mailboxes going forward; tom@ mail from
+  4 Jun to 13 Jul and older info@ mail were not backfilled, so a gap there is not proof of no contact. Filed sent mail (`correspondence.ai_metadata->>'source' = 'sent_mail_sweep'` for the swept ones;
   BCC copies are `webhook_bcc`). A swept sent email keeps Outlook's preview of the message (the first part, flagged
   `ai_metadata->>'body_is_preview'`, with `web_link` to the whole message), so a long reply may be cut short.
   Sent mail to a company we have no contact for is held on Data health (`sent_mail_to_review`,
@@ -152,7 +153,7 @@ labelled as that, not as the answer:
 - **Email nobody forwarded or sent from tom@ / info@** is only seen by the daily desk routine's Inbox sweep.
 - **Google Drive documents** (contracts, media packs, proposals).
 - **Ad stats** (Google Analytics figures from Dawn or James) as data: only the emails they sent, if forwarded.
-- **Mailchimp opens and clicks**, **Companies House** details for members, and website pages beyond Club Card.
+- **Mailchimp opens and clicks**, and website pages beyond Club Card. (Companies House details are in: the dossier's `company` key.)
 
 ## Counting across businesses (tested recipes)
 
