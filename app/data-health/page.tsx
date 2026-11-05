@@ -31,6 +31,7 @@ const HINTS: Record<string, string> = {
   company_to_match: 'A Companies House company that looks like this business but was not certain enough to attach on its own (a similar name, a registered office outside W3, W4 and W5, or more than one company with the name). Open the register link, then tick and Confirm, or say it is not this company. Confirming reads its status, officers and filing dates into the business dossier.',
   company_not_trading: 'The register says this company is dissolved, in liquidation or similar, but the business is still Active or has a current deal. Check before chasing money or renewing. Clears when the business or deal is updated.',
   void_invoice_contract: 'A current Club Card or advertising contract, not marked paid, whose invoice is void in QuickBooks. If it was their membership, open the business and end the contract (Club Card tab: End membership); if not, the contract can stay. Clears when the contract ends or is paid.',
+  contract_not_current: 'A Club Card or advertising deal whose dates cover today but which is not marked current, while no current deal does. The pages then disagree (Active, but no current deal; the Club Card tab calls them a member). Open the business and mark that deal current, or end it. Clears once a current deal covers today.',
   stored_out_of_step: 'The status or last-in-touch date stored on the business differs from the one worked out from its deals and emails. Hidden records are left out.',
 }
 
@@ -43,6 +44,8 @@ function what(r: DataHealthRow): string {
       return r.ref_date ? `Card ended ${dateGB(r.ref_date)}; the deal is still marked current` : 'No Club Card deal dates on file'
     case 'deal_no_quickbooks':
       return `${DEAL_WORDS[r.detail ?? ''] ?? r.detail ?? 'Deal'}, ${r.ref_date ? `ends ${dateGB(r.ref_date)}` : 'no end date'}`
+    case 'contract_not_current':
+      return `${DEAL_WORDS[r.detail ?? ''] ?? r.detail ?? 'Deal'} to ${dateGB(r.ref_date)}, not marked current`
     case 'active_no_named_contact':
       return r.detail === 'grace' ? 'In grace, no named contact' : 'No named contact'
     case 'stored_out_of_step':

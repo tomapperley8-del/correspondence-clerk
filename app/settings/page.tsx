@@ -6,8 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import { getUserProfile, updateDisplayName, updateBriefingEmailOptOut, deleteAccount, type UserProfile } from '@/app/actions/user-profile'
+import { getUserProfile, updateDisplayName, deleteAccount, type UserProfile } from '@/app/actions/user-profile'
 import { getInboundEmailToken, getOwnEmailAddresses, updateOwnEmailAddresses, getBlockedSenders, unblockSender } from '@/app/actions/inbound-email'
 import { getUnformattedCount, formatAllUnformatted } from '@/app/actions/ai-formatter'
 import { runRetroScan, applyRetroScanResult, dismissRetroScanResult, type RetroMediumResult } from '@/app/actions/retro-scan'
@@ -44,8 +43,6 @@ function SettingsPageContent() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [ownEmailAddresses, setOwnEmailAddresses] = useState<string[]>([])
   const [newEmailInput, setNewEmailInput] = useState('')
-  const [briefingOptOut, setBriefingOptOut] = useState(false)
-  const [isSavingBriefing, setIsSavingBriefing] = useState(false)
   const [blockedSenders, setBlockedSenders] = useState<{ id: string; email: string; created_at: string | null }[]>([])
   const [unblockingId, setUnblockingId] = useState<string | null>(null)
   const [blockedSendersExpanded, setBlockedSendersExpanded] = useState(false)
@@ -88,7 +85,6 @@ function SettingsPageContent() {
 
     setProfile(result.data)
     setDisplayName(result.data.display_name || '')
-    setBriefingOptOut(result.data.briefing_email_opt_out ?? false)
 
     const tokenResult = await getInboundEmailToken()
     if (tokenResult.data) {
@@ -152,18 +148,6 @@ function SettingsPageContent() {
     }
 
     setIsSaving(false)
-  }
-
-  async function handleBriefingToggle(checked: boolean) {
-    setIsSavingBriefing(true)
-    const newOptOut = !checked
-    setBriefingOptOut(newOptOut)
-    const result = await updateBriefingEmailOptOut(newOptOut)
-    if (result.error) {
-      toast.error('Could not update briefing preference')
-      setBriefingOptOut(!newOptOut)
-    }
-    setIsSavingBriefing(false)
   }
 
   async function handleSendTest() {
@@ -369,26 +353,6 @@ function SettingsPageContent() {
                 {isSaving ? 'Saving...' : 'Save Display Name'}
               </Button>
             </form>
-          </div>
-
-          <div className="bg-white border border-gray-200 p-6 mb-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">Daily Briefing Email</h2>
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="briefingOptIn"
-                checked={!briefingOptOut}
-                onCheckedChange={(c) => handleBriefingToggle(c as boolean)}
-                disabled={isSavingBriefing}
-              />
-              <div>
-                <Label htmlFor="briefingOptIn" className="font-semibold cursor-pointer">
-                  Send me a morning briefing email
-                </Label>
-                <p className="text-sm text-gray-500 mt-1">
-                  Delivered at 8am each day with your priorities from Insights.
-                </p>
-              </div>
-            </div>
           </div>
         </>
       )}

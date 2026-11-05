@@ -17,7 +17,7 @@ const PERSONAL_DOMAINS = new Set([
   'virgin.net', 'virginmedia.com', 'btinternet.com', 'btconnect.com',
   'sky.com', 'talktalk.net', 'tiscali.co.uk', 'blueyonder.co.uk',
   'ntlworld.com', 'gmx.net', 'gmx.com', 'zen.co.uk', 'plus.net',
-  'btopenworld.com', 'ymail.com', 'aol.co.uk', 'gmx.co.uk',
+  'btopenworld.com', 'ymail.com', 'rocketmail.com', 'aol.co.uk', 'gmx.co.uk',
   // Shared mail for members of an institution, not a business identity
   'cantab.net', 'nhs.net',
   // Transactional/notification services — emails from these should never be

@@ -11,8 +11,6 @@ import type { AttentionRow } from '@/app/actions/attention'
 
 /** Deal types that make a business "active" (Decision 21 Oct). */
 const ACTIVE_DEAL_TYPES = ['club_card', 'advertiser']
-/** Ended deals still count as active for this many days, unless not renewing (Decision 21 Oct). */
-const ACTIVE_GRACE_DAYS = 60
 /** The renewal window from the Needs attention definition: ending within 45 days or ended up to 60 days ago. */
 const RENEWAL_AHEAD_DAYS = 45
 const RENEWAL_BACK_DAYS = 60
@@ -319,7 +317,6 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
   }
 
   const today = londonToday()
-  const graceStart = addDays(today, -ACTIVE_GRACE_DAYS)
   const renewalFrom = addDays(today, -RENEWAL_BACK_DAYS)
   const renewalTo = addDays(today, RENEWAL_AHEAD_DAYS)
 
@@ -392,9 +389,6 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
     const inForceDeals = bizContracts.filter(
       (c) => c.is_current && (!c.contract_start || c.contract_start <= today) && (!c.contract_end || c.contract_end >= today)
     )
-    const dealInForce = inForceDeals.some((c) => ACTIVE_DEAL_TYPES.includes(c.membership_type ?? ''))
-    const lastEnd = activeDeals.reduce<string | null>((max, c) => (c.contract_end && (!max || c.contract_end > max) ? c.contract_end : max), null)
-    const recentlyEnded = !dealInForce && !!lastEnd && lastEnd < today && lastEnd >= graceStart && b.renewal_stage !== 'not_renewing'
     const currentEnds = activeDeals.filter((c) => c.is_current && c.contract_end).map((c) => c.contract_end as string)
     const latestCurrentEnd = currentEnds.sort().at(-1) ?? null
 
@@ -439,7 +433,8 @@ export async function getBusinessTable(): Promise<{ data?: BusinessTable; error?
             attention_snoozed_until: att.attention_snoozed_until,
           }
         : null,
-      is_active: dealInForce || recentlyEnded,
+      // Same rule as everywhere else (v_businesses / cc_business_status), not worked out here
+      is_active: b.status === 'Active',
       in_renewal_window: !!latestCurrentEnd && latestCurrentEnd >= renewalFrom && latestCurrentEnd <= renewalTo,
       on_website: onWebsiteBy.get(b.id) ?? null,
     }

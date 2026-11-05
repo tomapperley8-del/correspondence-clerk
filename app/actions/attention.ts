@@ -3,11 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserOrganizationId } from '@/lib/auth-helpers'
-import { isFeatureEnabled } from '@/lib/feature-flags'
 
 // "Needs attention" (UI overhaul Stage 4). Worked out live in the database by
-// v_business_attention; the count comes from get_attention_count(), which uses
-// the same London date as the view, so the nav and the page always agree.
+// v_business_attention; Today and its nav badge read it through lib/today-source.ts.
 
 export type AttentionReason = 'money_owed' | 'renewal' | 'club_card_lapsed' | 'waiting_on_you' | 'todo' | 'club_card'
 
@@ -27,48 +25,6 @@ export type AttentionRow = {
   todos_due: number | null
   attention_snoozed_until: string | null
   is_snoozed: boolean
-}
-
-export type AttentionCount = {
-  today: string
-  total: number
-  businesses: number
-  money_owed: number
-  renewal: number
-  club_card_lapsed: number
-  waiting_on_you: number
-  todo: number
-  club_card: number
-  unlinked_todos: number
-  /** Club Card pages waiting for Tom to match (not in total). */
-  club_card_to_match: number
-  snoozed: number
-}
-
-/** The count for the nav and the page header. Null when switched off or not available. */
-export async function getAttentionCount(): Promise<AttentionCount | null> {
-  if (!isFeatureEnabled('attentionView')) return null
-  const supabase = await createClient()
-  const { data, error } = await supabase.rpc('get_attention_count')
-  if (error || !data) return null
-  return data as AttentionCount
-}
-
-export async function getAttention(): Promise<{ data?: AttentionRow[]; error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
-  const orgId = await getCurrentUserOrganizationId()
-  if (!orgId) return { error: 'No organization found' }
-
-  const { data, error } = await supabase
-    .from('v_business_attention')
-    .select('*')
-    .eq('organization_id', orgId)
-    .order('priority')
-    .order('since', { ascending: true, nullsFirst: false })
-  if (error) return { error: error.message }
-  return { data: (data ?? []) as AttentionRow[] }
 }
 
 /** Snooze a business until a date (YYYY-MM-DD), or clear the snooze with null. */

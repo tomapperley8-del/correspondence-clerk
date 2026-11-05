@@ -1,19 +1,27 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
 
 // GET /api/cleanup-temp-emails
-// Deletes expired temporary email data
-// This can be called manually or via a cron job (e.g., Vercel Cron)
-export async function GET() {
+// Deletes expired temporary email data. Vercel cron, daily 00:00 UTC.
+// Runs on the service role: the cron has no signed-in user, so the user client deleted nothing.
+export async function GET(request: NextRequest) {
+  const secret = process.env.CRON_SECRET
+  if (!secret) {
+    return NextResponse.json({ error: 'CRON_SECRET is not configured' }, { status: 500 })
+  }
+  if (request.headers.get('authorization') !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
-    const supabase = await createClient()
+    const supabase = createServiceRoleClient()
 
     // Delete expired records
     const { data, error } = await supabase
       .from('temporary_email_data')
       .delete()
       .lt('expires_at', new Date().toISOString())
-      .select()
+      .select('id')
 
     if (error) {
       console.error('Cleanup failed:', error)

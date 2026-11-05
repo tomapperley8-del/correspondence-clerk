@@ -153,7 +153,7 @@ export async function getClubCardReview(): Promise<{ pages?: ReviewPage[]; busin
   for (let from = 0; ; from += 1000) {
     const { data, error } = await ctx.supabase
       .from('businesses').select('id, name').eq('organization_id', ctx.orgId).is('merged_into', null)
-      .neq('status', 'Not a business').order('name').range(from, from + 999)
+      .or('status.is.null,status.neq.Not a business').order('name').range(from, from + 999) // null = Internal/Community
     if (error) return { error: error.message }
     businesses.push(...(data ?? []))
     if (!data || data.length < 1000) break

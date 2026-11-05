@@ -6,7 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { getAnthropicClient } from '@/lib/ai/client'
+import { getAnthropicClient, isAiEnabled } from '@/lib/ai/client'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 import { AI_MODELS } from '@/lib/ai/models'
 
 let supabaseClient: SupabaseClient | null = null
@@ -55,6 +56,10 @@ RULES:
 - You can ask clarifying questions if needed`
 
 export async function POST(request: NextRequest) {
+  // Public and unauthenticated: only answers while the marketing site and AI are both on
+  if (!isFeatureEnabled('landingPage') || !isAiEnabled()) {
+    return NextResponse.json({ error: 'Not available' }, { status: 404 })
+  }
   try {
     const { message, history, visitor_id } = await request.json()
 

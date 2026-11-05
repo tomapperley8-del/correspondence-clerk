@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { enrollInSequence } from '@/lib/marketing/sequence-runner'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 let supabaseClient: SupabaseClient | null = null
 
@@ -19,6 +20,10 @@ function getSupabase(): SupabaseClient {
 }
 
 export async function POST(request: NextRequest) {
+  // Public and unauthenticated: only takes leads while the marketing site is on
+  if (!isFeatureEnabled('landingPage')) {
+    return NextResponse.json({ error: 'Not available' }, { status: 404 })
+  }
   try {
     const body = await request.json()
     const {
