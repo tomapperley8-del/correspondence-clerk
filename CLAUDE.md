@@ -78,9 +78,9 @@ app/actions/
   files.ts               File upload/delete/download (Supabase Storage)
 
 app/
-  today/page.tsx               HOME (`/` redirects here). Built on v_business_attention: This week strip,
-                               Do now (max 8, plain rules), everything else folded by reason, quick add.
-                               Nav badge = Do now count.
+  today/page.tsx               HOME (`/` redirects here). Built on v_business_attention (lib/today-source.ts):
+                               Your to-dos box, one Needs attention list folded by kind, week calendar.
+                               Nav badge = the overdue count (getOverdueCount, same items as the page).
   businesses/page.tsx          Businesses table (Mastersheet look) with saved views: All active, Needs attention,
                                Renewals, Outreach, Leads, Unreviewed, Prospects, Former members, Internal and
                                community, Everything; board toggle for Renewals/Outreach; Club Card view (Stage 6b)
@@ -119,8 +119,9 @@ lib/
 
 components/
   CommandSearch.tsx        Cmd+K global overlay (sessionStorage cache 5min TTL, keyboard nav)
-  Navigation.tsx           Three places: Today (badge = Do now count), Businesses, Inbox; Search (Ctrl+K), + New entry;
-                           user menu: Import emails, Settings, Help
+  Navigation.tsx           Two rows: logo, Search (Ctrl+K), + New entry, user menu; then the tabs Today (overdue badge),
+                           Club Card, Advertising, Newsletter, Listings, Outreach, Businesses, Inbox, Correspondence,
+                           Resources, Data health (badge = its checks to fix)
   ChatPanel.tsx            Daily Briefing AI panel (inline=true or slide-out overlay)
   Toast.tsx                Toast container (singleton in layout.tsx)
   BusinessSelector.tsx     Search dropdown + Add New
@@ -149,13 +150,14 @@ lib/marketing/ + app/(public)/ + app/for/[industry]/  Marketing engine (see Feat
 
 The old `/actions` page and the Briefing, To-dos and Needs attention pages are gone. **Read `docs/ui-overhaul-plan.md`** (Definitions, "New layout (Stage 7)", "Who reads what") before changing any of this.
 
-- **`v_business_attention`** (SQL view): one top reason per business, worked out live: 1 Money owed (QuickBooks, past due, no chase in 7 days), 2 Renewal (ending within 45 days or ended up to 60 days ago, not agreed, paid or declined), 3 Waiting on you (email from a reviewed commercial business within 30 days, nothing sent since), 4 Your to-dos (hand-written tasks). Nothing to tick: each clears when the thing is done. Per-business snooze: `businesses.attention_snoozed_until`. `cc_today()` is the one clock (London date). `get_attention_count()` feeds the badge.
-- **Today** (`app/today`, `lib/today.ts`, `app/actions/today.ts`) groups that list; "Do now" picks at most 8 by plain rules.
+- **`v_business_attention`** (SQL view): one top reason per business, worked out live: 1 Money owed (QuickBooks, past due, no chase in 7 days), 2 Renewal (ending within 45 days or ended up to 60 days ago, not agreed, paid or declined), 3 Waiting on you (email from a reviewed commercial business within 30 days, nothing sent since), 4 Your to-dos (hand-written tasks), then `club_card_lapsed` and `club_card` (website page problems). Nothing to tick: each clears when the thing is done. Per-business snooze: `businesses.attention_snoozed_until`. `cc_today()` is the one clock (London date). (`get_attention_count()` still exists but no longer feeds the badge.)
+- **Today** (`app/today`, `lib/today.ts`, `lib/today-source.ts`, `app/actions/today.ts`) groups that list; the badge is the overdue rule over the same items, and the desk email uses the same source.
+- **Last in touch** is `v_businesses.last_contacted_at`: emails, calls, meetings and notes, but not drafts, QuickBooks invoice notes or QuickBooks emails (`ai_metadata.source = 'quickbooks_notice'`, shown on the business page as "QuickBooks").
 - **Task engine** (`refresh_system_tasks()`, pg_cron 02:10; rules in `task_rules`, signals in `v_task_signals`) still runs, because the morning desk email and the Claude routines read `tasks`. Its reply, renewal and invoice tasks are hidden in the app; hand-written to-dos show. Ticks write back to the source (trigger `tasks_write_back_to_source`) and never reopen.
 
 ### Database Tables
 
-- **businesses** - name, category, status (`Active` / `Former` / `Prospect` / `Unreviewed` (auto-created from email) / `Not a business` (hidden, kept for its emails); Stage 11 will derive it from contracts), merged_into (set by `merge_businesses()`), attention_snoozed_until, membership_type, business_type (TEXT, per-org taxonomy), address, email, phone, notes, contract fields, last_contacted_at, relationship_memory (AI-distilled 3-sentence summary), relationship_memory_updated_at
+- **businesses** - name, category, status (`Active` / `Former` / `Prospect` / `Unreviewed` (auto-created from email) / `Not a business` (hidden, kept for its emails) / `Closed` (set by hand) / no status (Internal and Community types); worked out by `cc_business_status()` and read from `v_businesses`, never from this column), merged_into (set by `merge_businesses()`), attention_snoozed_until, membership_type, business_type (TEXT, per-org taxonomy), address, email, phone, notes, contract fields, last_contacted_at, relationship_memory (AI-distilled 3-sentence summary), relationship_memory_updated_at
 - **contacts** - business_id, name, emails (jsonb array), phones[], role, notes, is_active, is_primary (main contact), name_is_placeholder
 - **correspondence** - business_id, contact_id (nullable — Notes have no contact), cc_contact_ids (UUID[]), bcc_contact_ids (UUID[]), linked_business_ids (UUID[] — shared entry visible on multiple businesses), raw_text_original, formatted_text_original, formatted_text_current, entry_date, subject, type, direction, formatting_status, action_needed, due_at, reply_dismissed_at, edited_at, content_hash
 - **contracts** - the deal: business_id, membership_type (club_card / advertiser / ...), contract_start/end, amount, is_current, is_ongoing (no end date: contract_end stays the placeholder 2030-01-01, enforced by a trigger; shown as "Ongoing"), invoice_paid. Source of truth for deals; triggers copy the current one onto businesses (copies being retired in Stage 11)
@@ -278,6 +280,8 @@ All features complete and deployed (unless noted):
 28. ~~Actions Page~~ — replaced by Today (Oct 2026) (unified smart list → top priorities hero + 3 collapsible sections. Needs Reply direction-aware, no 7-day cap. Done permanent via `reply_dismissed_at`. One-click flag sets due_at +7d. Commitment alerts from insight_history. Rationale slide-out panel. AI auto-flags high-confidence inbound emails. Insights "Add to Actions" push. Keyboard nav D/S/L/Enter.)
 
 ## Recent Changes
+
+- **5 Nov 2026: Full audit and fixes** (report: side-session notes `final-audit-findings.md`; plan Log 5 Nov). Sent-mail review functions locked to signed-in members, the service role and direct database sessions (anon could call them); QuickBooks emails no longer count as last in touch; the sent-mail sweep refreshes stored truth; Businesses "All active" reads `v_businesses`; Data health check `contract_not_current`; rate card PDF and app icons restored; signed-out visitors to app pages go to /login (`APP_PAGES` in `lib/supabase/middleware.ts`). Migrations `20261105_001`, `_002`; data script `supabase/data-fixes/20261105_audit_data_fixes.sql` (+ undo).
 
 - **2 Nov 2026: Stage 10 finish.** Every status/last-in-touch reader uses `v_businesses`; `refreshTruth()` (lib/refresh-truth.ts) runs after a business is created, an email is filed or linked, a contract changes or an invoice is voided, and `refresh_business_truth()` clears last-in-touch when no emails remain. End membership (Club Card tab) and Mark void's "Was this their membership?" end a contract with Undo (`app/actions/end-contract.ts`). Data health check `void_invoice_contract`. Task rules reply_needed, renewal_due, renewal_lapsed, invoice_overdue, invoice_due_soon and unrecorded_renewal are off. Old business list, Daily Briefing page, Insights panel and Mastersheet import page are gone (redirects in next.config.ts).
 
