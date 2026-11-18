@@ -219,6 +219,26 @@ export function TodayClient({
   const [opened, setOpened] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [showQuiet, setShowQuiet] = useState(false)
+  /** Your to-dos box shows at its full length, remembered in this browser. */
+  const [showAllTodos, setShowAllTodos] = useState(false)
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of a saved preference on mount
+      if (window.localStorage.getItem('today.todos.all') === '1') setShowAllTodos(true)
+    } catch {
+      // storage blocked: keep the default
+    }
+  }, [])
+  function toggleAllTodos() {
+    setShowAllTodos((v) => {
+      try {
+        window.localStorage.setItem('today.todos.all', v ? '0' : '1')
+      } catch {
+        // storage blocked
+      }
+      return !v
+    })
+  }
   const { today } = data
 
   // Rows cleared here stay hidden until fresh data arrives, which leaves them
@@ -348,11 +368,18 @@ export function TodayClient({
       defaultOpen
       count={todoRows.length}
       badge={todoRows.some((r) => r.overdue) ? <span className="shrink-0 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded-full bg-white text-kind-overdue" style={{ fontFamily: 'var(--font-sans)' }}>{todoRows.filter((r) => r.overdue).length} overdue</span> : undefined}
-      scroll="max-h-[10vh] sm:max-h-[16vh] lg:max-h-[24vh]"
+      scroll={showAllTodos ? '' : 'max-h-[10vh] sm:max-h-[16vh] lg:max-h-[24vh]'}
       controls={
-        <button type="button" className={`${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`} aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
-          + Add to-do
-        </button>
+        <>
+          {todoRows.length > 0 && (
+            <button type="button" className={`${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`} aria-pressed={showAllTodos} onClick={toggleAllTodos}>
+              {showAllTodos ? 'Show fewer' : 'Show all'}
+            </button>
+          )}
+          <button type="button" className={`${btnBase} bg-ms-band text-white hover:bg-ms-band-hover`} aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
+            + Add to-do
+          </button>
+        </>
       }
       className="shadow-[var(--shadow-sm)]"
     >

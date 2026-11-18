@@ -7,8 +7,6 @@ import { QboMatchList } from './_components/QboMatchList'
 import { getSentMailToReview } from '@/app/actions/sent-mail-review'
 import { SentMailList } from './_components/SentMailList'
 import { bandClass } from '@/components/ui/kind'
-import { getCompanyOverview, getCompanyMatches } from '@/app/actions/companies-house'
-import { CompanyLookup, CompanyMatchList } from './_components/CompanyHousePanel'
 import { getAdEmailMatches } from '@/app/actions/ad-emails'
 import { AdEmailList } from './_components/AdEmailList'
 
@@ -28,8 +26,6 @@ const HINTS: Record<string, string> = {
   active_no_named_contact: 'An Active member or advertiser with no named, active contact. Add the person on the business page.',
   qbo_customer_to_match: 'QuickBooks customers (all of them since Nov 2019) that have invoices but no business in the app, so their invoices can’t be seen on a business page. Tick any, then Confirm the suggested business, Choose a business, or Make a new business. The suggestion is a guess from the name, email address or domain: check it. Undo takes back the last change.',
   sent_mail_to_review: 'Sent email from tom@ or info@ to an address that matches no contact or business in the app (personal Gmail-type addresses are skipped). Tick any, then Choose a business to file the emails there (the person is added as a contact if Outlook gave a name, and the company domain is remembered) or Ignore them. Undo takes back the last change.',
-  company_to_match: 'A Companies House company that looks like this business but was not certain enough to attach on its own (a similar name, a registered office outside W3, W4 and W5, or more than one company with the name). Open the register link, then tick and Confirm, or say it is not this company. Confirming reads its status, officers and filing dates into the business dossier.',
-  company_not_trading: 'The register says this company is dissolved, in liquidation or similar, but the business is still Active or has a current deal. Check before chasing money or renewing. Clears when the business or deal is updated.',
   void_invoice_contract: 'A current Club Card or advertising contract, not marked paid, whose invoice is void in QuickBooks. If it was their membership, open the business and end the contract (Club Card tab: End membership); if not, the contract can stay. Clears when the contract ends or is paid.',
   advertising_invoice_no_contract: 'An advertising invoice from the last 90 days (sidebar, leaderboard, banner and so on, not an instalment) that no advertiser contract covers. Ones with a clear term (3 months, 6 weeks, a stated date range) are recorded as a contract by the morning run; these are the ones where the term was not clear or the invoice is older. Open the business and add the advertising deal. Clears once a contract covers the invoice.',
   contract_not_current: 'A Club Card or advertising deal whose dates cover today but which is not marked current, while no current deal does. The pages then disagree (Active, but no current deal; the Club Card tab calls them a member). Open the business and mark that deal current, or end it. Clears once a current deal covers today.',
@@ -93,8 +89,6 @@ export default async function DataHealthPage() {
   const todo = here.filter((c) => c.n > 0)
   const qbo = todo.some((c) => c.check_key === 'qbo_customer_to_match') ? await getQboToMatch() : null
   const sent = todo.some((c) => c.check_key === 'sent_mail_to_review') ? await getSentMailToReview() : null
-  const company = todo.some((c) => c.check_key === 'company_to_match') ? await getCompanyMatches() : null
-  const companyOverview = await getCompanyOverview()
   const adEmails = await getAdEmailMatches()
   const fine = here.filter((c) => c.n === 0)
 
@@ -110,16 +104,6 @@ export default async function DataHealthPage() {
           {fine.length > 0 && <>; {fine.length} clear ({fine.map((c) => c.title).join(', ')})</>}.
         </p>
       )}
-
-      <section aria-labelledby="dh-ch-h" className={card}>
-        <h2 id="dh-ch-h" className="px-3 pt-2 text-base font-semibold">Companies House</h2>
-        <p className="px-3 text-xs text-gray-600">
-          Company number, status, officers, registered office and filing dates for Active, Former and Unreviewed businesses, read from the free register and refreshed weekly. Exact name matches with a W3, W4 or W5 registered office attach themselves; the rest are listed below to confirm.
-        </p>
-        {companyOverview.data
-          ? <CompanyLookup overview={companyOverview.data} />
-          : <p className="px-3 py-2 text-sm text-red-700">Could not load: {companyOverview.error}</p>}
-      </section>
 
       {adEmails.data && adEmails.data.length > 0 && (
         <section className={card}>
@@ -155,22 +139,6 @@ export default async function DataHealthPage() {
               {qbo?.data
                 ? <QboMatchList rows={qbo.data.rows} businesses={qbo.data.businesses} />
                 : <p className="px-3 py-2 text-sm text-red-700">Could not load the list: {qbo?.error ?? 'no data'}</p>}
-            </FoldSection>
-          )
-        }
-        if (c.check_key === 'company_to_match') {
-          return (
-            <FoldSection
-              key={c.check_key}
-              storageKey={`datahealth.${c.check_key}`}
-              title={c.title}
-              badge={<span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-sm tabular-nums bg-ms-orange text-ms-orange-text">{c.n}</span>}
-              hint={HINTS[c.check_key]}
-              heading="h3"
-            >
-              {company?.data
-                ? <CompanyMatchList rows={company.data} />
-                : <p className="px-3 py-2 text-sm text-red-700">Could not load the list: {company?.error ?? 'no data'}</p>}
             </FoldSection>
           )
         }
